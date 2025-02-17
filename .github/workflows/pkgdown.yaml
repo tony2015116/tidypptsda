@@ -3,7 +3,7 @@
 on:
   push:
     branches: [main, master]
-  pull_request:
+  pull_request:  [main, master]
   release:
     types: [published]
   workflow_dispatch:
