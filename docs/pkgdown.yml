@@ -3,4 +3,7 @@ pkgdown: 2.1.1
 pkgdown_sha: ~
 articles:
   get-started: get-started.html
-last_built: 2025-02-17T09:55Z
+last_built: 2025-02-20T09:47Z
+urls:
+  reference: https://tony2015116.github.io/tidypptsda/reference
+  article: https://tony2015116.github.io/tidypptsda/articles

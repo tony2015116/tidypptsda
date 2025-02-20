@@ -1,4 +1,19 @@
 url: https://tony2015116.github.io/tidypptsda/
+
 template:
-  bootstrap: 5
+  bootswatch: cosmo
+  theme: arrow-dark
+
+
+navbar:
+  structure:
+    right: [github, discussions]
+  components:
+    github:
+      icon: fab fa-github fa-lg
+      href: https://github.com/tony2015116/mintyr
+    discussions:
+      icon: fa-users fa-lg
+      href: https://github.com/tony2015116/mintyr/discussions
+
 
