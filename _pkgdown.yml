@@ -1,16 +1,12 @@
 url: https://tony2015116.github.io/tidypptsda/
-# template:
-#   params:
-#     bootswatch: cosmo
-#     dev_stats: true
 template:
   bootswatch: cosmo
   theme: arrow-dark
-
-
 navbar:
   structure:
-    right: [github, discussions]
+    right:
+    - github
+    - discussions
   components:
     github:
       icon: fab fa-github fa-lg
