@@ -1,5 +1,8 @@
 url: https://tony2015116.github.io/tidypptsda/
-
+# template:
+#   params:
+#     bootswatch: cosmo
+#     dev_stats: true
 template:
   bootswatch: cosmo
   theme: arrow-dark
@@ -15,5 +18,4 @@ navbar:
     discussions:
       icon: fa-users fa-lg
       href: https://github.com/tony2015116/tidypptsda/discussions
-
 
