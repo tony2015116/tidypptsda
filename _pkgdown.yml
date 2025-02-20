@@ -11,9 +11,9 @@ navbar:
   components:
     github:
       icon: fab fa-github fa-lg
-      href: https://github.com/tony2015116/mintyr
+      href: https://github.com/tony2015116/tidypptsda
     discussions:
       icon: fa-users fa-lg
-      href: https://github.com/tony2015116/mintyr/discussions
+      href: https://github.com/tony2015116/tidypptsda/discussions
 
 
