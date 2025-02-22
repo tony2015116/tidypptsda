@@ -1,8 +1,8 @@
 flat_teaching.Rmd:
   path: dev/flat_teaching.Rmd
   state: active
-  R: R/add_one.R
-  tests: tests/testthat/test-add_one.R
+  R: R/preproces_data.R
+  tests: []
   vignettes: vignettes/get-started.Rmd
   inflate:
     flat_file: dev/flat_teaching.Rmd

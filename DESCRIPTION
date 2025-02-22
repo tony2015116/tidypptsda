@@ -1,20 +1,25 @@
 Package: tidypptsda
 Title: Learn How to Build a Package from Rmarkdown File
 Version: 0.0.0.9000
-Authors@R: 
-    person("John", "Doe", , "john@email.me", role = c("aut", "cre"),
-           comment = c(ORCID = "0000-0000-0000-0000"))
+Authors@R: c(
+    person("Guo Meng", "Doe", , "tony2015116@163.com", role = c("aut", "cre")),
+    person("Guo Meng", role = "cph")
+  )
 Description: A Set of tools to understand packages structure. Use
     Rmarkdown First method to build a package from a defined template.
     Start your package with documentation. Everything can be set from a
     Rmarkdown file in your project.
 License: MIT + file LICENSE
-URL: https://github.com/tony2015116/tidypptsda, https://tony2015116.github.io/tidypptsda/
+URL: https://tony2015116.github.io/tidypptsda/
 BugReports: https://github.com/tony2015116/tidypptsda/issues
+Imports: 
+    cli,
+    data.table,
+    tidyr
 Suggests: 
     knitr,
-    rmarkdown,
-    testthat
+    mintyr,
+    rmarkdown
 VignetteBuilder: 
     knitr
 Config/fusen/version: 0.6.0
