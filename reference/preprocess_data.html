@@ -195,58 +195,6 @@ data validation, and quality control checks.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 4:               3</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 5:               4</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6:               5</span>
-<span class="r-in"><span><span class="va">result_fire</span> <span class="op">&lt;-</span> <span class="fu">preprocess_data</span><span class="op">(</span>data <span class="op">=</span> <span class="fu">mintyr</span><span class="fu">::</span><span class="va"><a href="https://tony2015116.github.io/mintyr/reference/fire.html" class="external-link">fire</a></span>, station_type <span class="op">=</span> <span class="st">"fire"</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Pre-processing </span><span style="color: #00BB00; font-weight: bold;">FIRE</span><span style="font-weight: bold;"> Data</span> <span style="color: #00BBBB;">────────────────────────────────────────────────────</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Validating input <span style="color: #00BB00;">FIRE</span> data</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Created a copy of the input data.table</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Validating input <span style="color: #00BB00;">FIRE</span> data</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Validating input <span style="color: #00BB00;">FIRE</span> data ... done</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Converting FIRE data to Nedap format</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #BBBB00;">!</span> Removed <span style="color: #BB0000;">51</span> rows where responder was <span style="color: #0000BB;">[0]</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Converting FIRE data to Nedap format</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Converting FIRE data to Nedap format ... done</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Converting data variable types</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Converting data variable types ... done</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Initial valid responders: <span style="color: #00BB00;">26</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Checking for duplicated responders across locations</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> No duplicated responders found</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Checking for duplicated responders across locations</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Checking for duplicated responders across locations ... done</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Creating new dataset with sequence numbers</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Creating new dataset with sequence numbers ... done</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Data pre-processing completed successfully</span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">result_fire</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Key: &lt;responder, date, visit_time&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    location responder          visit_time duration feed_intake entrancetime</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>      &lt;char&gt;    &lt;char&gt;              &lt;POSc&gt;    &lt;num&gt;       &lt;num&gt;       &lt;char&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:      101     25822 2023-12-20 07:57:22       16           0     07:57:22</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:      101     25822 2023-12-20 08:01:24       11           0     08:01:24</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:      101     25822 2023-12-20 08:25:47       43          17     08:25:47</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:      101     25822 2023-12-20 09:03:56      325         311     09:03:56</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:      101     25822 2023-12-20 09:22:42      797         293     09:22:42</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:      101     25822 2023-12-20 09:44:06        6           2     09:44:06</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    exittime entrancefeedweight exitfeedweight weight       date     n seq_days</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>      &lt;char&gt;              &lt;num&gt;          &lt;num&gt;  &lt;num&gt;     &lt;Date&gt; &lt;int&gt;    &lt;int&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1: 07:57:38                341            341      0 2023-12-20   466        2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2: 08:01:35                341            341      0 2023-12-20   466        2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3: 08:26:30                552            535  44200 2023-12-20   466        2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4: 09:09:21                605            294  44600 2023-12-20   466        2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5: 09:35:59                662            369  44400 2023-12-20   466        2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6: 09:44:12                369            367      0 2023-12-20   466        2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    seq_in_day seq_in_location</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>         &lt;int&gt;           &lt;int&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:          1               1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:          2               2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:          3               3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:          4               4</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:          5               5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:          6               6</span>
 </code></pre></div>
     </div>
   </div>
