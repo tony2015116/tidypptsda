@@ -15,6 +15,9 @@ BugReports: https://github.com/tony2015116/tidypptsda/issues
 Imports: 
     cli,
     data.table,
+    MASS,
+    purrr,
+    stats,
     tidyr
 Suggests: 
     knitr,

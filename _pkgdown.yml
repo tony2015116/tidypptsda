@@ -1,10 +1,11 @@
 url: https://tony2015116.github.io/tidypptsda/
 template:
-  light-switch: true
-  bootstrap: 5
-  #bootswatch: cosmo
-  theme: breeze-light
-  theme-dark: arrow-dark
+  #light-switch: true
+  #bootstrap: 5
+  bootswatch: cosmo
+  theme: arrow-dark
+  #theme: breeze-light
+  #theme-dark: arrow-dark
 navbar:
   bg: light
   structure:
