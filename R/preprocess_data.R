@@ -84,8 +84,6 @@
 #' @examples
 #' result_nedap <- preprocess_data(data = mintyr::nedap, station_type = "nedap")
 #' head(result_nedap)
-#' result_fire <- preprocess_data(data = mintyr::fire, station_type = "fire")
-#' head(result_fire)
 preprocess_data <- function(data, station_type = "nedap", print_details = FALSE) {
   . <- Consumed <- Date <- `Ent Wt` <- Entry <- Exit <- `Ext Wt` <- Location <- N <-Tag <- Weight <- location <- location_maxn <- n <- responder <- visit_time <- NULL
 
