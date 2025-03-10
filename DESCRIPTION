@@ -1,6 +1,6 @@
 Package: tidypptsda
 Title: Learn How to Build a Package from Rmarkdown File
-Version: 0.0.0.9000
+Version: 0.1.0
 Authors@R: c(
     person("Guo Meng", "Doe", , "tony2015116@163.com", role = c("aut", "cre")),
     person("Guo Meng", role = "cph")
@@ -13,12 +13,17 @@ License: MIT + file LICENSE
 URL: https://tony2015116.github.io/tidypptsda/
 BugReports: https://github.com/tony2015116/tidypptsda/issues
 Imports: 
+    cAIC4,
     cli,
     data.table,
+    lme4,
+    lubridate,
     MASS,
     purrr,
+    recipes,
     stats,
-    tidyr
+    tidyr,
+    zoo
 Suggests: 
     knitr,
     mintyr,
