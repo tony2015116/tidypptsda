@@ -4,7 +4,12 @@
 \alias{preprocess_data}
 \title{Data Preprocessing Pipeline}
 \usage{
-preprocess_data(data, station_type = "nedap", print_details = FALSE)
+preprocess_data(
+  data,
+  station_type = "nedap",
+  print_details = FALSE,
+  quiet = FALSE
+)
 }
 \arguments{
 \item{data}{\verb{[data.frame/data.table]} Input dataset
@@ -33,6 +38,18 @@ preprocess_data(data, station_type = "nedap", print_details = FALSE)
 \itemize{
 \item \code{TRUE}: Show detailed duplicate responder information
 \item \code{FALSE}: Suppress detailed output (default)
+}}
+
+\item{quiet}{Comprehensive silencing control
+\itemize{
+\item \strong{Purpose}: Suppresses all non-essential output
+\item \strong{Default}: \code{FALSE}
+\item \strong{Effect}:
+\itemize{
+\item Disables progress messages
+\item Suppresses warnings
+\item Overrides print_details
+}
 }}
 }
 \value{
@@ -87,14 +104,14 @@ Key Constraints:
 \itemize{
 \item Critical columns must exist based on \code{station_type}
 \item FIRE data conversion includes:
-- Unit conversions (kg → g)
+- Unit conversions (kg to g)
 - DateTime standardization (UTC timezone)
 - Removal of invalid \code{Tag == "0"} records
 \item Duplicate responder resolution selects location with most records
 }
 }
 \examples{
-result_nedap <- preprocess_data(data = mintyr::nedap, station_type = "nedap")
+result_nedap <- preprocess_data(data = mintyr::nedap, station_type = "nedap", quiet = TRUE)
 head(result_nedap)
 }
 \seealso{

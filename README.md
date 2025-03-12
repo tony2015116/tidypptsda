@@ -13,7 +13,7 @@ The goal of tidypptsda is to …
 ## Installation
 
 You can install the development version of tidypptsda from
-[GitHub](https://github.com/) with:
+[GitHub](https://tony2015116.github.io/tidypptsda/) with:
 
 ``` r
 # install.packages("pak")

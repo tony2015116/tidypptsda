@@ -2,7 +2,13 @@ flat_teaching.Rmd:
   path: dev/flat_teaching.Rmd
   state: active
   R:
+  - R/adfi_get.R
+  - R/adfi_plot.R
+  - R/adg_get.R
+  - R/adg_plot.R
   - R/clean_weight_get.R
+  - R/fcr_get.R
+  - R/import_nedap.R
   - R/preprocess_data.R
   tests: []
   vignettes: vignettes/get-started.Rmd

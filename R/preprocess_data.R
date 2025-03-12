@@ -21,7 +21,17 @@
 #' @param print_details `[logical]` Debugging output control
 #'   - `TRUE`: Show detailed duplicate responder information
 #'   - `FALSE`: Suppress detailed output (default)
-#' 
+#'   
+#' @param quiet Comprehensive silencing control
+#'   - **Purpose**: Suppresses all non-essential output
+#'   - **Default**: `FALSE`
+#'   - **Effect**:
+#'     \itemize{
+#'       \item Disables progress messages
+#'       \item Suppresses warnings
+#'       \item Overrides print_details
+#'     }
+#'   
 #' @details
 #' ## Core Processing Workflow
 #' \enumerate{
@@ -66,7 +76,7 @@
 #' \itemize{
 #'   \item Critical columns must exist based on `station_type`
 #'   \item FIRE data conversion includes:
-#'     - Unit conversions (kg → g)
+#'     - Unit conversions (kg to g)
 #'     - DateTime standardization (UTC timezone)
 #'     - Removal of invalid `Tag == "0"` records
 #'   \item Duplicate responder resolution selects location with most records
@@ -82,184 +92,195 @@
 #' @importFrom cli cli_h1 cli_process_start cli_alert_info cli_abort
 #' @export
 #' @examples
-#' result_nedap <- preprocess_data(data = mintyr::nedap, station_type = "nedap")
+#' result_nedap <- preprocess_data(data = mintyr::nedap, station_type = "nedap", quiet = TRUE)
 #' head(result_nedap)
-preprocess_data <- function(data, station_type = "nedap", print_details = FALSE) {
+preprocess_data <- function(data, station_type = "nedap", print_details = FALSE, quiet = FALSE) {
   . <- Consumed <- Date <- `Ent Wt` <- Entry <- Exit <- `Ext Wt` <- Location <- N <-Tag <- Weight <- location <- location_maxn <- n <- responder <- visit_time <- NULL
-
-  cli::cli_h1("Pre-processing {.field {toupper(station_type)}} Data")
-  # 数据验证开始
-  cli::cli_process_start("Validating input {.field {toupper(station_type)}} data")
-
-  if (missing(data)) {
-    cli::cli_process_failed()
-    cli::cli_abort("Missing data frame or data table!")
-  }
-
-  # 确保输入是data.table并创建深度复制
-  if (!data.table::is.data.table(data)) {
-    data <- data.table::as.data.table(data, keep.rownames = FALSE)
-    cli::cli_alert_info("Converted input data to data.table")
+  
+  # Define process function based on quiet parameter
+  process_fn <- if (quiet) {
+    function(expr) suppressMessages(suppressWarnings(expr))
   } else {
-    data <- data.table::copy(data)
-    cli::cli_alert_info("Created a copy of the input data.table")
+    function(expr) expr
   }
-
-  # 根据station_type定义和检查所需列
-  if (station_type == "nedap") {
-    required_cols <- c("animal_number", "lifenumber", "responder", "location",
-                       "visit_time", "duration", "state", "weight", "feed_intake")
-  } else if (station_type == "fire") {
-    required_cols <- c("Location", "Tag", "Date", "Entry", "Exit",
-                       "Ent Wt", "Ext Wt", "Consumed", "Weight", "Topup Amount")
-  } else {
-    cli::cli_process_failed()
-    cli::cli_abort("Invalid {.field station_type}: {.val {station_type}}. Must be either 'nedap' or 'fire'.")
-  }
-
-  missing_columns <- setdiff(required_cols, names(data))
-  if (length(missing_columns) > 0) {
-    cli::cli_process_failed()
-    cli::cli_abort("Missing columns: {.val {missing_columns}}")
-  } else {
-    cli::cli_process_done()
-  }
-
-  # 如果是FIRE数据，转换为Nedap格式
-  if (station_type == "fire") {
-    cli::cli_process_start("Converting FIRE data to Nedap format")
-    # 删除responder为"0"的数据
-    initial_row_count <- nrow(data)
-    data <- data[Tag != "0"]
-    removed_rows <- initial_row_count - nrow(data)
-    if (removed_rows > 0) {
-      cli::cli_alert_warning("Removed {.field {cli::col_red(removed_rows)}} rows where responder was {.kbd 0}")
-    } #{cli::col_red(0)}
-
-    data <- data[, `:=`(
-      location = Location,
-      responder = Tag,
-      visit_time = as.POSIXct(paste(Date, Entry), format = "%Y-%m-%d %H:%M:%S", tz = "UTC"),
-      duration = as.numeric(difftime(as.POSIXct(paste(Date, Exit), format = "%Y-%m-%d %H:%M:%S"),
-                                     as.POSIXct(paste(Date, Entry), format = "%Y-%m-%d %H:%M:%S"),
-                                     units = "secs")),
-      feed_intake = Consumed * 1000,
-      entrancetime = Entry,
-      exittime = Exit,
-      # 将重量单位从kg转换为g
-      entrancefeedweight = `Ent Wt` * 1000,
-      exitfeedweight = `Ext Wt` * 1000,
-      weight = Weight * 1000
+  
+  # Main processing logic wrapped in process_fn
+  process_fn({
+    cli::cli_h1("Pre-processing {.field {toupper(station_type)}} Data")
+    # 数据验证开始
+    cli::cli_process_start("Validating input {.field {toupper(station_type)}} data")
+    
+    if (missing(data)) {
+      cli::cli_process_failed()
+      cli::cli_abort("Missing data frame or data table!")
+    }
+    
+    # 确保输入是data.table并创建深度复制
+    if (!data.table::is.data.table(data)) {
+      data <- data.table::as.data.table(data, keep.rownames = FALSE)
+      cli::cli_alert_info("Converted input data to data.table")
+    } else {
+      data <- data.table::copy(data)
+      cli::cli_alert_info("Created a copy of the input data.table")
+    }
+    
+    # 根据station_type定义和检查所需列
+    if (station_type == "nedap") {
+      required_cols <- c("animal_number", "lifenumber", "responder", "location",
+                         "visit_time", "duration", "state", "weight", "feed_intake")
+    } else if (station_type == "fire") {
+      required_cols <- c("Location", "Tag", "Date", "Entry", "Exit",
+                         "Ent Wt", "Ext Wt", "Consumed", "Weight", "Topup Amount")
+    } else {
+      cli::cli_process_failed()
+      cli::cli_abort("Invalid {.field station_type}: {.val {station_type}}. Must be either 'nedap' or 'fire'.")
+    }
+    
+    missing_columns <- setdiff(required_cols, names(data))
+    if (length(missing_columns) > 0) {
+      cli::cli_process_failed()
+      cli::cli_abort("Missing columns: {.val {missing_columns}}")
+    } else {
+      cli::cli_process_done()
+    }
+    
+    # 如果是FIRE数据，转换为Nedap格式
+    if (station_type == "fire") {
+      cli::cli_process_start("Converting FIRE data to Nedap format")
+      # 删除responder为"0"的数据
+      initial_row_count <- nrow(data)
+      data <- data[Tag != "0"]
+      removed_rows <- initial_row_count - nrow(data)
+      if (removed_rows > 0) {
+        cli::cli_alert_warning("Removed {.field {cli::col_red(removed_rows)}} rows where responder was {.kbd 0}")
+      }
+      
+      data <- data[, `:=`(
+        location = Location,
+        responder = Tag,
+        visit_time = as.POSIXct(paste(Date, Entry), format = "%Y-%m-%d %H:%M:%S", tz = "UTC"),
+        duration = as.numeric(difftime(as.POSIXct(paste(Date, Exit), format = "%Y-%m-%d %H:%M:%S"),
+                                       as.POSIXct(paste(Date, Entry), format = "%Y-%m-%d %H:%M:%S"),
+                                       units = "secs")),
+        feed_intake = Consumed * 1000,
+        entrancetime = Entry,
+        exittime = Exit,
+        # 将重量单位从kg转换为g
+        entrancefeedweight = `Ent Wt` * 1000,
+        exitfeedweight = `Ext Wt` * 1000,
+        weight = Weight * 1000
+      )]
+      
+      # 删除原始列
+      data[, c("Location", "Tag", "Date", "Entry", "Exit", "Ent Wt", "Ext Wt",
+               "Consumed", "Weight", "Topup Amount") := NULL]
+      cli::cli_process_done()
+    }
+    
+    # 开始数据转换
+    cli::cli_process_start("Converting data variable types")
+    if (!inherits(data$visit_time, c("POSIXct", "POSIXlt"))) {
+      data[, visit_time := as.POSIXct(visit_time, format = "%Y-%m-%d %H:%M:%S", tz = "UTC")]
+      cli::cli_alert_warning("{.field visit_time} converted to POSIXct. Please check if the data source is consistent.")
+    }
+    
+    data[, `:=`(
+      location = as.character(location),
+      responder = as.character(responder),
+      date = as.Date(visit_time)
     )]
-
-    # 删除原始列
-    data[, c("Location", "Tag", "Date", "Entry", "Exit", "Ent Wt", "Ext Wt",
-             "Consumed", "Weight", "Topup Amount") := NULL]
+    
+    # 设置键值以优化性能
+    data.table::setkey(data, responder, date, visit_time)
     cli::cli_process_done()
-  }
-
-  # 开始数据转换
-  cli::cli_process_start("Converting data variable types")
-  if (!inherits(data$visit_time, c("POSIXct", "POSIXlt"))) {
-    data[, visit_time := as.POSIXct(visit_time, format = "%Y-%m-%d %H:%M:%S", tz = "UTC")]
-    cli::cli_alert_warning("{.field visit_time} converted to POSIXct. Please check if the data source is consistent.")
-  }
-
-  data[, `:=`(
-    location = as.character(location),
-    responder = as.character(responder),
-    date = as.Date(visit_time)
-  )]
-
-  # 设置键值以优化性能
-  data.table::setkey(data, responder, date, visit_time)
-  cli::cli_process_done()
-
-  # 移除重复项并过滤掉NA responders
-  original_row_count <- nrow(data)
-  data <- unique(data[!is.na(responder)])
-  removed_duplicates <- original_row_count - nrow(data)
-  if (removed_duplicates > 0) {
-    cli::cli_alert_info("Removed {.field {cli::col_red(removed_duplicates)}} duplicate records or NA responders")
-  }
-
-  # 计算有效responders数量
-  initial_responders <- data.table::uniqueN(data$responder)
-  cli::cli_alert_info("Initial valid responders: {.field {initial_responders}}")
-
-  # 识别跨位置的重复responders
-  cli::cli_process_start("Checking for duplicated responders across locations")
-
-  data.table::setkey(data, responder, location)
-  unique_dt <- unique(data[, .(responder, location)])
-  dup_responders <- unique_dt[, .N, by = .(responder)][N > 1]
-
-  # 计算每个responder-location组合的记录数
-  num_records <- unique(data[, `:=`(n = .N), by = .(responder, location)][, .(responder, location, n)])
-
-  # 设置连接操作的键值
-  data.table::setkey(dup_responders, responder)
-  data.table::setkey(num_records, responder)
-
-  # 执行左连接
-  dup_records <- num_records[dup_responders]
-
-  # 打印重复信息
-  if(nrow(dup_responders) > 0) {
-    cli::cli_process_done("danger")
-    if(print_details) {
-      cli::cli_alert_danger("Found {nrow(dup_responders)} duplicated responders:")
-      cli::cli_rule("Duplicate Records")
-
-      # 按responder排序
-      dup_records <- dup_records[order(responder)]
-
-      for(resp in unique(dup_records$responder)) {
-        subset_records <- dup_records[responder == resp]
-        locations_str <- paste(subset_records$location, collapse = "/")
-        records_str <- paste(subset_records$n, collapse = "/")
-        cli::cli_alert_danger("Responder {.val {resp}}: {locations_str} ({records_str} records)")
+    
+    # 移除重复项并过滤掉NA responders
+    original_row_count <- nrow(data)
+    data <- unique(data[!is.na(responder)])
+    removed_duplicates <- original_row_count - nrow(data)
+    if (removed_duplicates > 0) {
+      cli::cli_alert_info("Removed {.field {cli::col_red(removed_duplicates)}} duplicate records or NA responders")
+    }
+    
+    # 计算有效responders数量
+    initial_responders <- data.table::uniqueN(data$responder)
+    cli::cli_alert_info("Initial valid responders: {.field {initial_responders}}")
+    
+    # 识别跨位置的重复responders
+    cli::cli_process_start("Checking for duplicated responders across locations")
+    
+    data.table::setkey(data, responder, location)
+    unique_dt <- unique(data[, .(responder, location)])
+    dup_responders <- unique_dt[, .N, by = .(responder)][N > 1]
+    
+    # 计算每个responder-location组合的记录数
+    num_records <- unique(data[, `:=`(n = .N), by = .(responder, location)][, .(responder, location, n)])
+    
+    # 设置连接操作的键值
+    data.table::setkey(dup_responders, responder)
+    data.table::setkey(num_records, responder)
+    
+    # 执行左连接
+    dup_records <- num_records[dup_responders]
+    
+    # 打印重复信息
+    if(nrow(dup_responders) > 0) {
+      cli::cli_process_done("danger")
+      if(print_details && !quiet) {
+        cli::cli_alert_danger("Found {nrow(dup_responders)} duplicated responders:")
+        cli::cli_rule("Duplicate Records")
+        
+        # 按responder排序
+        dup_records <- dup_records[order(responder)]
+        
+        for(resp in unique(dup_records$responder)) {
+          subset_records <- dup_records[responder == resp]
+          locations_str <- paste(subset_records$location, collapse = "/")
+          records_str <- paste(subset_records$n, collapse = "/")
+          cli::cli_alert_danger("Responder {.val {resp}}: {locations_str} ({records_str} records)")
+        }
+      } else {
+        cli::cli_alert_danger("Found {nrow(dup_responders)} duplicated responders")
       }
     } else {
-      cli::cli_alert_danger("Found {nrow(dup_responders)} duplicated responders")
+      cli::cli_process_done("success")
+      cli::cli_alert_info("No duplicated responders found")
     }
-  } else {
-    cli::cli_process_done("success")
-    cli::cli_alert_info("No duplicated responders found")
-  }
-  cli::cli_process_done()
-  # 处理重复的responders
-  if (nrow(dup_responders) > 0) {
-    cli::cli_process_start("Resolving duplicate responders by selecting location with maximum records")
-    data.table::setkey(num_records, responder)
-    max_n_location <- num_records[, .(max_n = max(n),
-                                      location_maxn = location[which.max(n)]),
-                                  by = responder]
-    max_n_location <- unique(max_n_location)
-
-    data.table::setkey(data, responder)
-    data.table::setkey(max_n_location, responder)
-
-    data <- merge(data, max_n_location, by = "responder", all.x = TRUE)[
-      , `:=`(location = location_maxn)][
-        , `:=`(c("max_n", "location_maxn"), NULL)]
     cli::cli_process_done()
-  }
-
-  # 创建最终数据集
-  cli::cli_process_start("Creating new dataset with sequence numbers")
-  data.table::setkey(data, date, responder, visit_time)
-
-  data_pre <- data[data.table::CJ(date = tidyr::full_seq(date, 1)), on = .(date)
-  ][, `:=`(seq_days = .GRP), by = .(date)
-  ][, `:=`(seq_in_day = 1:.N), by = .(responder, date)
-  ][, `:=`(seq_in_location = 1:.N), by = .(date, location)
-  ][order(responder, visit_time)][!is.na(responder)
-  ]
-
-  data.table::setkey(data_pre, responder, date, visit_time)
-  cli::cli_process_done()
-
-  cli::cli_alert_success("Data pre-processing completed successfully")
-  return(data_pre)
+    
+    # 处理重复的responders
+    if (nrow(dup_responders) > 0) {
+      cli::cli_process_start("Resolving duplicate responders by selecting location with maximum records")
+      data.table::setkey(num_records, responder)
+      max_n_location <- num_records[, .(max_n = max(n),
+                                        location_maxn = location[which.max(n)]),
+                                    by = responder]
+      max_n_location <- unique(max_n_location)
+      
+      data.table::setkey(data, responder)
+      data.table::setkey(max_n_location, responder)
+      
+      data <- merge(data, max_n_location, by = "responder", all.x = TRUE)[
+        , `:=`(location = location_maxn)][
+          , `:=`(c("max_n", "location_maxn"), NULL)]
+      cli::cli_process_done()
+    }
+    
+    # 创建最终数据集
+    cli::cli_process_start("Creating new dataset with sequence numbers")
+    data.table::setkey(data, date, responder, visit_time)
+    
+    data_pre <- data[data.table::CJ(date = tidyr::full_seq(date, 1)), on = .(date)
+    ][, `:=`(seq_days = .GRP), by = .(date)
+    ][, `:=`(seq_in_day = 1:.N), by = .(responder, date)
+    ][, `:=`(seq_in_location = 1:.N), by = .(date, location)
+    ][order(responder, visit_time)][!is.na(responder)
+    ]
+    
+    data.table::setkey(data_pre, responder, date, visit_time)
+    cli::cli_process_done()
+    
+    cli::cli_alert_success("Data pre-processing completed successfully")
+    return(data_pre)
+  })
 }

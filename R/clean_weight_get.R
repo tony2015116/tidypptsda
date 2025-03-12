@@ -78,7 +78,7 @@
 #'   - **Purpose**: Forecast period for growth modeling
 #'   - **Units**: Days
 #'   - **Default**: `30`
-#'   - **Constraint**: Must be ≥ 0
+#'   - **Constraint**: Must be >= 0
 #'
 #' @param step Prediction interval granularity
 #'   - **Purpose**: Controls forecast resolution
@@ -88,22 +88,14 @@
 #' @param degree Polynomial regression complexity
 #'   - **Purpose**: Determines growth curve flexibility
 #'   - **Default**: `2` (quadratic)
-#'   - **Constraint**: 1 ≤ degree ≤ 3
+#'   - **Constraint**: 1 <= degree <= 3
 #'
 #' @param print_details Diagnostic output control
 #'   - **Purpose**: Enables detailed process reporting
 #'   - **Default**: `FALSE`
 #'   - **Note**: Overridden by `quiet = TRUE`
 #'
-#' @param quiet Comprehensive silencing control
-#'   - **Purpose**: Suppresses all non-essential output
-#'   - **Default**: `FALSE`
-#'   - **Effect**:
-#'     \itemize{
-#'       \item Disables progress messages
-#'       \item Suppresses warnings
-#'       \item Overrides print_details
-#'     }
+#' @param quiet Logical. If TRUE, suppresses messages and warnings. Default: FALSE.
 #'
 #' @details
 #' **Multi-Stage Processing Pipeline**:
@@ -117,7 +109,7 @@
 #'     
 #'   \item **Data Cleansing**
 #'     \itemize{
-#'       \item Unit conversion (kg ↔ g)
+#'       \item Unit conversion (kg to g)
 #'       \item Invalid responder filtering
 #'       \item Temporal consistency checks
 #'       \item Missing data thresholding
@@ -182,8 +174,8 @@
 #' @importFrom stats predict
 #' @export
 #' @examples
-#' result_nedap <- preprocess_data(data = mintyr::nedap, station_type = "nedap")
-#' clean_weight <- clean_weight_get(result_nedap, my_break = c(30,120), range_offset = 0.5)
+#' result_nedap <- preprocess_data(data = mintyr::nedap, station_type = "nedap", quiet = TRUE)
+#' clean_weight <- clean_weight_get(result_nedap, my_break = c(30,120), quiet = TRUE)
 #' head(clean_weight)
 
 clean_weight_get <- function(data,

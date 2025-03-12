@@ -41,18 +41,7 @@ fusen::fill_description(
 usethis::use_mit_license("Guo Meng")
 ```
 
-# Add one to any value
 
-This is the first tool of our wonderful package. 
-You can add `1` to any `value` using function `add_one()`.
-
-<!-- 
-This first section shows:
-
-- the three parts necessary for a package: 'function', 'examples' and 'tests'.  
-  + Note that the three following chunks have names accordingly.
-
--->
 # preprocess_data
     
 ```{r function-preprocess_data}
@@ -77,7 +66,17 @@ This first section shows:
 #' @param print_details `[logical]` Debugging output control
 #'   - `TRUE`: Show detailed duplicate responder information
 #'   - `FALSE`: Suppress detailed output (default)
-#' 
+#'   
+#' @param quiet Comprehensive silencing control
+#'   - **Purpose**: Suppresses all non-essential output
+#'   - **Default**: `FALSE`
+#'   - **Effect**:
+#'     \itemize{
+#'       \item Disables progress messages
+#'       \item Suppresses warnings
+#'       \item Overrides print_details
+#'     }
+#'   
 #' @details
 #' ## Core Processing Workflow
 #' \enumerate{
@@ -122,7 +121,7 @@ This first section shows:
 #' \itemize{
 #'   \item Critical columns must exist based on `station_type`
 #'   \item FIRE data conversion includes:
-#'     - Unit conversions (kg → g)
+#'     - Unit conversions (kg to g)
 #'     - DateTime standardization (UTC timezone)
 #'     - Removal of invalid `Tag == "0"` records
 #'   \item Duplicate responder resolution selects location with most records
@@ -137,189 +136,200 @@ This first section shows:
 #' @import data.table
 #' @importFrom cli cli_h1 cli_process_start cli_alert_info cli_abort
 #' @export
-preprocess_data <- function(data, station_type = "nedap", print_details = FALSE) {
+preprocess_data <- function(data, station_type = "nedap", print_details = FALSE, quiet = FALSE) {
   . <- Consumed <- Date <- `Ent Wt` <- Entry <- Exit <- `Ext Wt` <- Location <- N <-Tag <- Weight <- location <- location_maxn <- n <- responder <- visit_time <- NULL
-
-  cli::cli_h1("Pre-processing {.field {toupper(station_type)}} Data")
-  # 数据验证开始
-  cli::cli_process_start("Validating input {.field {toupper(station_type)}} data")
-
-  if (missing(data)) {
-    cli::cli_process_failed()
-    cli::cli_abort("Missing data frame or data table!")
-  }
-
-  # 确保输入是data.table并创建深度复制
-  if (!data.table::is.data.table(data)) {
-    data <- data.table::as.data.table(data, keep.rownames = FALSE)
-    cli::cli_alert_info("Converted input data to data.table")
+  
+  # Define process function based on quiet parameter
+  process_fn <- if (quiet) {
+    function(expr) suppressMessages(suppressWarnings(expr))
   } else {
-    data <- data.table::copy(data)
-    cli::cli_alert_info("Created a copy of the input data.table")
+    function(expr) expr
   }
-
-  # 根据station_type定义和检查所需列
-  if (station_type == "nedap") {
-    required_cols <- c("animal_number", "lifenumber", "responder", "location",
-                       "visit_time", "duration", "state", "weight", "feed_intake")
-  } else if (station_type == "fire") {
-    required_cols <- c("Location", "Tag", "Date", "Entry", "Exit",
-                       "Ent Wt", "Ext Wt", "Consumed", "Weight", "Topup Amount")
-  } else {
-    cli::cli_process_failed()
-    cli::cli_abort("Invalid {.field station_type}: {.val {station_type}}. Must be either 'nedap' or 'fire'.")
-  }
-
-  missing_columns <- setdiff(required_cols, names(data))
-  if (length(missing_columns) > 0) {
-    cli::cli_process_failed()
-    cli::cli_abort("Missing columns: {.val {missing_columns}}")
-  } else {
-    cli::cli_process_done()
-  }
-
-  # 如果是FIRE数据，转换为Nedap格式
-  if (station_type == "fire") {
-    cli::cli_process_start("Converting FIRE data to Nedap format")
-    # 删除responder为"0"的数据
-    initial_row_count <- nrow(data)
-    data <- data[Tag != "0"]
-    removed_rows <- initial_row_count - nrow(data)
-    if (removed_rows > 0) {
-      cli::cli_alert_warning("Removed {.field {cli::col_red(removed_rows)}} rows where responder was {.kbd 0}")
-    } #{cli::col_red(0)}
-
-    data <- data[, `:=`(
-      location = Location,
-      responder = Tag,
-      visit_time = as.POSIXct(paste(Date, Entry), format = "%Y-%m-%d %H:%M:%S", tz = "UTC"),
-      duration = as.numeric(difftime(as.POSIXct(paste(Date, Exit), format = "%Y-%m-%d %H:%M:%S"),
-                                     as.POSIXct(paste(Date, Entry), format = "%Y-%m-%d %H:%M:%S"),
-                                     units = "secs")),
-      feed_intake = Consumed * 1000,
-      entrancetime = Entry,
-      exittime = Exit,
-      # 将重量单位从kg转换为g
-      entrancefeedweight = `Ent Wt` * 1000,
-      exitfeedweight = `Ext Wt` * 1000,
-      weight = Weight * 1000
+  
+  # Main processing logic wrapped in process_fn
+  process_fn({
+    cli::cli_h1("Pre-processing {.field {toupper(station_type)}} Data")
+    # 数据验证开始
+    cli::cli_process_start("Validating input {.field {toupper(station_type)}} data")
+    
+    if (missing(data)) {
+      cli::cli_process_failed()
+      cli::cli_abort("Missing data frame or data table!")
+    }
+    
+    # 确保输入是data.table并创建深度复制
+    if (!data.table::is.data.table(data)) {
+      data <- data.table::as.data.table(data, keep.rownames = FALSE)
+      cli::cli_alert_info("Converted input data to data.table")
+    } else {
+      data <- data.table::copy(data)
+      cli::cli_alert_info("Created a copy of the input data.table")
+    }
+    
+    # 根据station_type定义和检查所需列
+    if (station_type == "nedap") {
+      required_cols <- c("animal_number", "lifenumber", "responder", "location",
+                         "visit_time", "duration", "state", "weight", "feed_intake")
+    } else if (station_type == "fire") {
+      required_cols <- c("Location", "Tag", "Date", "Entry", "Exit",
+                         "Ent Wt", "Ext Wt", "Consumed", "Weight", "Topup Amount")
+    } else {
+      cli::cli_process_failed()
+      cli::cli_abort("Invalid {.field station_type}: {.val {station_type}}. Must be either 'nedap' or 'fire'.")
+    }
+    
+    missing_columns <- setdiff(required_cols, names(data))
+    if (length(missing_columns) > 0) {
+      cli::cli_process_failed()
+      cli::cli_abort("Missing columns: {.val {missing_columns}}")
+    } else {
+      cli::cli_process_done()
+    }
+    
+    # 如果是FIRE数据，转换为Nedap格式
+    if (station_type == "fire") {
+      cli::cli_process_start("Converting FIRE data to Nedap format")
+      # 删除responder为"0"的数据
+      initial_row_count <- nrow(data)
+      data <- data[Tag != "0"]
+      removed_rows <- initial_row_count - nrow(data)
+      if (removed_rows > 0) {
+        cli::cli_alert_warning("Removed {.field {cli::col_red(removed_rows)}} rows where responder was {.kbd 0}")
+      }
+      
+      data <- data[, `:=`(
+        location = Location,
+        responder = Tag,
+        visit_time = as.POSIXct(paste(Date, Entry), format = "%Y-%m-%d %H:%M:%S", tz = "UTC"),
+        duration = as.numeric(difftime(as.POSIXct(paste(Date, Exit), format = "%Y-%m-%d %H:%M:%S"),
+                                       as.POSIXct(paste(Date, Entry), format = "%Y-%m-%d %H:%M:%S"),
+                                       units = "secs")),
+        feed_intake = Consumed * 1000,
+        entrancetime = Entry,
+        exittime = Exit,
+        # 将重量单位从kg转换为g
+        entrancefeedweight = `Ent Wt` * 1000,
+        exitfeedweight = `Ext Wt` * 1000,
+        weight = Weight * 1000
+      )]
+      
+      # 删除原始列
+      data[, c("Location", "Tag", "Date", "Entry", "Exit", "Ent Wt", "Ext Wt",
+               "Consumed", "Weight", "Topup Amount") := NULL]
+      cli::cli_process_done()
+    }
+    
+    # 开始数据转换
+    cli::cli_process_start("Converting data variable types")
+    if (!inherits(data$visit_time, c("POSIXct", "POSIXlt"))) {
+      data[, visit_time := as.POSIXct(visit_time, format = "%Y-%m-%d %H:%M:%S", tz = "UTC")]
+      cli::cli_alert_warning("{.field visit_time} converted to POSIXct. Please check if the data source is consistent.")
+    }
+    
+    data[, `:=`(
+      location = as.character(location),
+      responder = as.character(responder),
+      date = as.Date(visit_time)
     )]
-
-    # 删除原始列
-    data[, c("Location", "Tag", "Date", "Entry", "Exit", "Ent Wt", "Ext Wt",
-             "Consumed", "Weight", "Topup Amount") := NULL]
+    
+    # 设置键值以优化性能
+    data.table::setkey(data, responder, date, visit_time)
     cli::cli_process_done()
-  }
-
-  # 开始数据转换
-  cli::cli_process_start("Converting data variable types")
-  if (!inherits(data$visit_time, c("POSIXct", "POSIXlt"))) {
-    data[, visit_time := as.POSIXct(visit_time, format = "%Y-%m-%d %H:%M:%S", tz = "UTC")]
-    cli::cli_alert_warning("{.field visit_time} converted to POSIXct. Please check if the data source is consistent.")
-  }
-
-  data[, `:=`(
-    location = as.character(location),
-    responder = as.character(responder),
-    date = as.Date(visit_time)
-  )]
-
-  # 设置键值以优化性能
-  data.table::setkey(data, responder, date, visit_time)
-  cli::cli_process_done()
-
-  # 移除重复项并过滤掉NA responders
-  original_row_count <- nrow(data)
-  data <- unique(data[!is.na(responder)])
-  removed_duplicates <- original_row_count - nrow(data)
-  if (removed_duplicates > 0) {
-    cli::cli_alert_info("Removed {.field {cli::col_red(removed_duplicates)}} duplicate records or NA responders")
-  }
-
-  # 计算有效responders数量
-  initial_responders <- data.table::uniqueN(data$responder)
-  cli::cli_alert_info("Initial valid responders: {.field {initial_responders}}")
-
-  # 识别跨位置的重复responders
-  cli::cli_process_start("Checking for duplicated responders across locations")
-
-  data.table::setkey(data, responder, location)
-  unique_dt <- unique(data[, .(responder, location)])
-  dup_responders <- unique_dt[, .N, by = .(responder)][N > 1]
-
-  # 计算每个responder-location组合的记录数
-  num_records <- unique(data[, `:=`(n = .N), by = .(responder, location)][, .(responder, location, n)])
-
-  # 设置连接操作的键值
-  data.table::setkey(dup_responders, responder)
-  data.table::setkey(num_records, responder)
-
-  # 执行左连接
-  dup_records <- num_records[dup_responders]
-
-  # 打印重复信息
-  if(nrow(dup_responders) > 0) {
-    cli::cli_process_done("danger")
-    if(print_details) {
-      cli::cli_alert_danger("Found {nrow(dup_responders)} duplicated responders:")
-      cli::cli_rule("Duplicate Records")
-
-      # 按responder排序
-      dup_records <- dup_records[order(responder)]
-
-      for(resp in unique(dup_records$responder)) {
-        subset_records <- dup_records[responder == resp]
-        locations_str <- paste(subset_records$location, collapse = "/")
-        records_str <- paste(subset_records$n, collapse = "/")
-        cli::cli_alert_danger("Responder {.val {resp}}: {locations_str} ({records_str} records)")
+    
+    # 移除重复项并过滤掉NA responders
+    original_row_count <- nrow(data)
+    data <- unique(data[!is.na(responder)])
+    removed_duplicates <- original_row_count - nrow(data)
+    if (removed_duplicates > 0) {
+      cli::cli_alert_info("Removed {.field {cli::col_red(removed_duplicates)}} duplicate records or NA responders")
+    }
+    
+    # 计算有效responders数量
+    initial_responders <- data.table::uniqueN(data$responder)
+    cli::cli_alert_info("Initial valid responders: {.field {initial_responders}}")
+    
+    # 识别跨位置的重复responders
+    cli::cli_process_start("Checking for duplicated responders across locations")
+    
+    data.table::setkey(data, responder, location)
+    unique_dt <- unique(data[, .(responder, location)])
+    dup_responders <- unique_dt[, .N, by = .(responder)][N > 1]
+    
+    # 计算每个responder-location组合的记录数
+    num_records <- unique(data[, `:=`(n = .N), by = .(responder, location)][, .(responder, location, n)])
+    
+    # 设置连接操作的键值
+    data.table::setkey(dup_responders, responder)
+    data.table::setkey(num_records, responder)
+    
+    # 执行左连接
+    dup_records <- num_records[dup_responders]
+    
+    # 打印重复信息
+    if(nrow(dup_responders) > 0) {
+      cli::cli_process_done("danger")
+      if(print_details && !quiet) {
+        cli::cli_alert_danger("Found {nrow(dup_responders)} duplicated responders:")
+        cli::cli_rule("Duplicate Records")
+        
+        # 按responder排序
+        dup_records <- dup_records[order(responder)]
+        
+        for(resp in unique(dup_records$responder)) {
+          subset_records <- dup_records[responder == resp]
+          locations_str <- paste(subset_records$location, collapse = "/")
+          records_str <- paste(subset_records$n, collapse = "/")
+          cli::cli_alert_danger("Responder {.val {resp}}: {locations_str} ({records_str} records)")
+        }
+      } else {
+        cli::cli_alert_danger("Found {nrow(dup_responders)} duplicated responders")
       }
     } else {
-      cli::cli_alert_danger("Found {nrow(dup_responders)} duplicated responders")
+      cli::cli_process_done("success")
+      cli::cli_alert_info("No duplicated responders found")
     }
-  } else {
-    cli::cli_process_done("success")
-    cli::cli_alert_info("No duplicated responders found")
-  }
-  cli::cli_process_done()
-  # 处理重复的responders
-  if (nrow(dup_responders) > 0) {
-    cli::cli_process_start("Resolving duplicate responders by selecting location with maximum records")
-    data.table::setkey(num_records, responder)
-    max_n_location <- num_records[, .(max_n = max(n),
-                                      location_maxn = location[which.max(n)]),
-                                  by = responder]
-    max_n_location <- unique(max_n_location)
-
-    data.table::setkey(data, responder)
-    data.table::setkey(max_n_location, responder)
-
-    data <- merge(data, max_n_location, by = "responder", all.x = TRUE)[
-      , `:=`(location = location_maxn)][
-        , `:=`(c("max_n", "location_maxn"), NULL)]
     cli::cli_process_done()
-  }
-
-  # 创建最终数据集
-  cli::cli_process_start("Creating new dataset with sequence numbers")
-  data.table::setkey(data, date, responder, visit_time)
-
-  data_pre <- data[data.table::CJ(date = tidyr::full_seq(date, 1)), on = .(date)
-  ][, `:=`(seq_days = .GRP), by = .(date)
-  ][, `:=`(seq_in_day = 1:.N), by = .(responder, date)
-  ][, `:=`(seq_in_location = 1:.N), by = .(date, location)
-  ][order(responder, visit_time)][!is.na(responder)
-  ]
-
-  data.table::setkey(data_pre, responder, date, visit_time)
-  cli::cli_process_done()
-
-  cli::cli_alert_success("Data pre-processing completed successfully")
-  return(data_pre)
+    
+    # 处理重复的responders
+    if (nrow(dup_responders) > 0) {
+      cli::cli_process_start("Resolving duplicate responders by selecting location with maximum records")
+      data.table::setkey(num_records, responder)
+      max_n_location <- num_records[, .(max_n = max(n),
+                                        location_maxn = location[which.max(n)]),
+                                    by = responder]
+      max_n_location <- unique(max_n_location)
+      
+      data.table::setkey(data, responder)
+      data.table::setkey(max_n_location, responder)
+      
+      data <- merge(data, max_n_location, by = "responder", all.x = TRUE)[
+        , `:=`(location = location_maxn)][
+          , `:=`(c("max_n", "location_maxn"), NULL)]
+      cli::cli_process_done()
+    }
+    
+    # 创建最终数据集
+    cli::cli_process_start("Creating new dataset with sequence numbers")
+    data.table::setkey(data, date, responder, visit_time)
+    
+    data_pre <- data[data.table::CJ(date = tidyr::full_seq(date, 1)), on = .(date)
+    ][, `:=`(seq_days = .GRP), by = .(date)
+    ][, `:=`(seq_in_day = 1:.N), by = .(responder, date)
+    ][, `:=`(seq_in_location = 1:.N), by = .(date, location)
+    ][order(responder, visit_time)][!is.na(responder)
+    ]
+    
+    data.table::setkey(data_pre, responder, date, visit_time)
+    cli::cli_process_done()
+    
+    cli::cli_alert_success("Data pre-processing completed successfully")
+    return(data_pre)
+  })
 }
 ```
   
 ```{r example-preprocess_data}
-result_nedap <- preprocess_data(data = mintyr::nedap, station_type = "nedap")
+result_nedap <- preprocess_data(data = mintyr::nedap, station_type = "nedap", quiet = TRUE)
 head(result_nedap)
 ```
   
@@ -405,7 +415,7 @@ head(result_nedap)
 #'   - **Purpose**: Forecast period for growth modeling
 #'   - **Units**: Days
 #'   - **Default**: `30`
-#'   - **Constraint**: Must be ≥ 0
+#'   - **Constraint**: Must be >= 0
 #'
 #' @param step Prediction interval granularity
 #'   - **Purpose**: Controls forecast resolution
@@ -415,22 +425,14 @@ head(result_nedap)
 #' @param degree Polynomial regression complexity
 #'   - **Purpose**: Determines growth curve flexibility
 #'   - **Default**: `2` (quadratic)
-#'   - **Constraint**: 1 ≤ degree ≤ 3
+#'   - **Constraint**: 1 <= degree <= 3
 #'
 #' @param print_details Diagnostic output control
 #'   - **Purpose**: Enables detailed process reporting
 #'   - **Default**: `FALSE`
 #'   - **Note**: Overridden by `quiet = TRUE`
 #'
-#' @param quiet Comprehensive silencing control
-#'   - **Purpose**: Suppresses all non-essential output
-#'   - **Default**: `FALSE`
-#'   - **Effect**:
-#'     \itemize{
-#'       \item Disables progress messages
-#'       \item Suppresses warnings
-#'       \item Overrides print_details
-#'     }
+#' @param quiet Logical. If TRUE, suppresses messages and warnings. Default: FALSE.
 #'
 #' @details
 #' **Multi-Stage Processing Pipeline**:
@@ -444,7 +446,7 @@ head(result_nedap)
 #'     
 #'   \item **Data Cleansing**
 #'     \itemize{
-#'       \item Unit conversion (kg ↔ g)
+#'       \item Unit conversion (kg to g)
 #'       \item Invalid responder filtering
 #'       \item Temporal consistency checks
 #'       \item Missing data thresholding
@@ -957,28 +959,2262 @@ validate_responder_weights <- function(data, entry_weight_limit, exit_weight_lim
 ```
   
 ```{r example-clean_weight_get}
-result_nedap <- preprocess_data(data = mintyr::nedap, station_type = "nedap")
-clean_weight <- clean_weight_get(result_nedap, my_break = c(30,120), range_offset = 0.5)
+result_nedap <- preprocess_data(data = mintyr::nedap, station_type = "nedap", quiet = TRUE)
+clean_weight <- clean_weight_get(result_nedap, my_break = c(30,120), quiet = TRUE)
 head(clean_weight)
 ```
   
+# adg_get
+    
+```{r function-adg_get}
+#' Comprehensive Average Daily Gain (ADG) Calculation Pipeline
+#'
+#' @description
+#' Integrated system for calculating porcine average daily gain (ADG) through 
+#' cleaned weight data, incorporating growth curve modeling and prediction 
+#' capabilities. Inherits and extends the functionality of [clean_weight_get()].
+#'
+#' @inheritParams clean_weight_get
+#' 
+#' @details
+#' **Extended Processing Workflow**:
+#' \enumerate{
+#'   \item **Data Preparation**:
+#'     \itemize{
+#'       \item Inherits all cleaning steps from [clean_weight_get()]
+#'       \item Additional outlier handling specific to growth modeling
+#'     }
+#'     
+#'   \item **Growth Modeling**:
+#'     \itemize{
+#'       \item Polynomial regression fitting (degree configurable)
+#'       \item Weight trajectory prediction with confidence intervals
+#'       \item Dynamic range extension for forward/backward prediction
+#'     }
+#'     
+#'   \item **ADG Calculation**:
+#'     \itemize{
+#'       \item Stage-specific growth rate computation
+#'       \item Weight-to-time conversion modeling
+#'       \item Prediction range optimization
+#'     }
+#' }
+#'
+#' **Modeling Features**:
+#' \itemize{
+#'   \item Dual prediction modes (linear/polynomial)
+#'   \item Automatic outlier boundary detection
+#'   \item Confidence interval calculation for predictions
+#'   \item Multi-stage growth curve analysis
+#' }
+#'
+#' @return Enhanced `list` containing:
+#' \itemize{
+#'   \item `adg_info`: 
+#'     \itemize{
+#'       \item Aggregated growth metrics data.table
+#'       \item Contains columns:
+#'         \itemize{
+#'           \item `responder`, `location`, `stage`
+#'           \item `start_date_cut`, `end_date_cut`
+#'           \item `min_weight_cut`, `max_weight_cut`
+#'           \item `lm_slope`, `r_squared`
+#'           \item `stage_days`, `adg`
+#'         }
+#'     }
+#'   \item `adg_data`:
+#'     \itemize{
+#'       \item Detailed prediction results data.table
+#'       \item Contains columns:
+#'         \itemize{
+#'           \item All columns from `cleaned_data`
+#'           \item `predicted_weight_lm`, `lower_lm`, `upper_lm`
+#'           \item `outlier` (prediction status flag)
+#'         }
+#'     }
+#' }
+#'
+#' @seealso
+#' \itemize{
+#'   \item [clean_weight_get()] For core data cleaning functionality
+#'   \item [preprocess_data()] For input data preparation
+#' }
+#'
+#' @importFrom data.table := .N .SD
+#' @importFrom MASS rlm
+#' @importFrom purrr map map2
+#' @importFrom stats predict
+#' @export
+adg_get <- function(data,
+                    my_break,
+                    range_offset = 0.5,
+                    min_days = 35,
+                    min_records = 20,
+                    min_na_perc = 0.3,
+                    w_threshold = 0.5,
+                    maxit = 1000,
+                    entry_weight_limit = 65,
+                    exit_weight_limit = 85,
+                    max_weight_limit = 15,
+                    days_extend = 30,
+                    step = 1,
+                    degree = 2,
+                    print_details = FALSE,
+                    quiet = FALSE) {
+
+  # Build configuration list
+  config <- list(
+    min_days = min_days,
+    min_records = min_records,
+    min_na_perc = min_na_perc,
+    w_threshold = w_threshold,
+    maxit = maxit,
+    entry_weight_limit = entry_weight_limit,
+    exit_weight_limit = exit_weight_limit,
+    max_weight_limit = max_weight_limit,
+    days_extend = days_extend,
+    step = step,
+    degree = degree
+  )
+
+  # Define process function based on quiet parameter
+  process_fn <- if (quiet) {
+    function(expr) suppressMessages(suppressWarnings(expr))
+  } else {
+    function(expr) expr
+  }
+
+  # Main processing logic wrapped in process_fn
+  process_fn({
+    tryCatch({
+      validate_params(data, my_break, range_offset, config)
+
+      # Clean weight data using clean_weight_get
+      cleaned_data <- clean_weight_get(
+        data = data,
+        my_break = my_break,
+        range_offset = range_offset,
+        min_days = config$min_days,
+        min_records = config$min_records,
+        min_na_perc = config$min_na_perc,
+        w_threshold = config$w_threshold,
+        maxit = config$maxit,
+        entry_weight_limit = config$entry_weight_limit,
+        exit_weight_limit = config$exit_weight_limit,
+        max_weight_limit = config$max_weight_limit,
+        days_extend = config$days_extend,
+        step = config$step,
+        degree = config$degree,
+        print_details = print_details,
+        quiet = quiet
+      )
+
+      # Calculate ADG
+      if (!is.null(cleaned_data)) {
+        adg_results <- cleaned_data |>
+          calculate_adg_and_clean_data(
+            my_break = my_break,
+            range_offset = range_offset,
+            days_extend = config$days_extend,
+            step = config$step,
+            degree = config$degree
+          )
+
+        return(adg_results)
+      } else {
+        return(NULL)
+      }
+
+    }, error = function(e) {
+      if (!quiet) {
+        cli::cli_alert_danger("Error in adg_get: {e$message}")
+      }
+      return(NULL)
+    }, warning = function(w) {
+      if (!quiet) {
+        cli::cli_alert_warning("Warning in adg_get: {w$message}")
+      }
+    })
+  })
+}
+cut_weight <- function(data, my_break, range_offset) {
+  rlm_predict <- NULL
+  # Convert my_break to grams to match weight representation in data
+  my_break <- my_break * 1000
+  # Generate actual break points using the given range and offset
+  actual_breaks <- c(my_break[1] - range_offset * 1000, my_break[2] + range_offset * 1000)
+  # Select weights within the specified range
+  data <- data[rlm_predict >= actual_breaks[1] & rlm_predict <= actual_breaks[2], ]
+  # Add a 'stage' column to represent the selected weight range
+  #data[, `:=`(stage, paste0(my_break[1] / 1000, "-", my_break[2] / 1000))]
+  return(data)
+}
+process_lm_results <- function(data, my_break, range_offset, ...) {
+  rlm_outliers <- . <- responder <- quiet_lm_result <- lm_slope <- NULL
+  quiet_lm <- purrr::quietly(stats::lm)
+
+  cut_data <- cut_weight(data = data, my_break = my_break, range_offset = range_offset)
+  temp1 <- cut_data[!is.na(rlm_outliers) & rlm_outliers == FALSE]
+
+  # 对每个 responder 的数据进行线性回归
+  temp2 <- temp1[, .(data = list(.SD)), by = responder
+  ][, `:=`(quiet_lm = purrr::map(data, \(df, ...) quiet_lm(..., data = df), ...))]
+
+  # 修改这部分代码，使用 map 而不是 map_chr，并提供默认值
+  temp2[, `:=`(
+    quiet_lm_result = purrr::map(quiet_lm, "result"),
+    messages = purrr::map(quiet_lm, \(x) if(is.null(x$messages)) "" else x$messages),
+    warnings = purrr::map(quiet_lm, \(x) if(is.null(x$warnings)) "" else x$warnings)
+  )]
+
+  # 处理预测值、斜率和 R 平方
+  temp2[, `:=`(
+    lm_predict = purrr::map2(quiet_lm_result, warnings, \(x, w) {
+      if (length(w) == 0 || w == "") try(stats::predict(x), silent = TRUE) else NA
+    }),
+    lm_slope = purrr::map(quiet_lm_result, \(x) {
+      if (!is.null(x)) try(stats::coef(x)["seq_days"], silent = TRUE) else NA
+    }),
+    r_squared = purrr::map_dbl(quiet_lm_result, \(x) {
+      if (!is.null(x)) try(summary(x)$r.squared, silent = TRUE) else NA
+    })
+  )]
+
+  # 清理并扩展数据
+  final <- temp2[, c("responder", "lm_slope", "r_squared")]
+  final[, lm_slope := unlist(lm_slope)]
+
+  return(final)
+}
+get_my_break_per_pig_lm <- function(data, my_break, range_offset, days_extend, step, degree) {
+  seq_days <- predicted_weight_lm <- NULL
+  # Convert to data.table if not already
+  dt <- data.table::copy(data)
+  cut_data <- cut_weight(data = dt, my_break = my_break, range_offset = range_offset)
+
+  # Create safe lm function and fit model
+  safelm <- purrr::safely(.f = stats::lm)
+
+  # Fit polynomial regression using poly() with raw polynomials
+  safe_model <- safelm(weight ~ poly(seq_days, degree = degree, raw = TRUE), data = cut_data)
+
+  if (!is.null(safe_model$error)) {
+    cli::cli_alert_danger("Model fitting failed: {safe_model$error$message}")
+    stop(paste("Model fitting error:", safe_model$error$message))
+  }
+
+  model <- safe_model$result
+
+  if (is.null(my_break)) {
+    cli::cli_alert_danger("Missing required my_break parameter")
+    stop("my_break parameter is required for dynamic prediction range")
+  }
+
+  # Set prediction range
+  my_break_g <- my_break * 1000
+  actual_breaks <- c(
+    my_break_g[1] - range_offset * 1000,
+    my_break_g[2] + range_offset * 1000
+  )
+
+  # Create prediction sequence
+  date_range <- dt[, range(date)]
+  days_range <- dt[, range(seq_days)]
+
+  # Forward prediction
+  forward_days <- seq(from = days_range[1], to = days_range[1] - days_extend, by = -step)
+  forward_dt <- data.table::data.table(seq_days = forward_days)
+  forward_pred <- predict(model, newdata = forward_dt)
+  forward_cutoff <- which(forward_pred < actual_breaks[1])[1]
+  if (!is.na(forward_cutoff)) {
+    forward_days <- forward_days[1:forward_cutoff]
+  }
+
+  # Backward prediction
+  backward_days <- seq(from = days_range[2], to = days_range[2] + days_extend, by = step)
+  backward_dt <- data.table::data.table(seq_days = backward_days)
+  backward_pred <- predict(model, newdata = backward_dt)
+  backward_cutoff <- which(backward_pred > actual_breaks[2])[1]
+  if (!is.na(backward_cutoff)) {
+    backward_days <- backward_days[1:backward_cutoff]
+  }
+
+  # Merge prediction sequences
+  pred_days <- sort(unique(c(forward_days, days_range[1]:days_range[2], backward_days)))
+  new_dt <- data.table::data.table(seq_days = pred_days)
+
+  # Safe prediction with confidence intervals
+  safe_predict <- purrr::safely(.f = predict)
+  pred_result <- safe_predict(
+    model,
+    newdata = new_dt,
+    interval = "prediction"
+  )
+
+  if (!is.null(pred_result$error)) {
+    cli::cli_alert_danger("Prediction calculation failed: {pred_result$error$message}")
+    stop(paste("Prediction error:", pred_result$error$message))
+  }
+
+  # Create results data.table
+  results <- data.table::data.table(
+    seq_days = pred_days,
+    predicted_weight_lm = pred_result$result[, "fit"],
+    lower_lm = pred_result$result[, "lwr"],
+    upper_lm = pred_result$result[, "upr"]
+  )
+
+  # Add date and R-squared columns
+  results[, `:=`(
+    date = date_range[1] + as.difftime(pred_days - days_range[1], units = "days"),
+    r_squared_lm = summary(model)$r.squared
+  )]
+
+  # Filter results within prediction range
+  results <- results[predicted_weight_lm >= actual_breaks[1] &
+                       predicted_weight_lm <= actual_breaks[2]]
+
+  return(results)
+}
+get_my_break_all_pigs <- function(data, my_break, range_offset, step, days_extend, degree) {
+  . <- responder <- location <- rlm_outliers <- seq_days <- seq_in_day <- weight <- rlm_predict <- predicted_weight_lm <- NULL
+  cli::cli_process_start("Processing all pig predictions")
+  # Extract base information
+  base_info <- unique(data[, .(responder, location)])
+
+  # Handle outliers
+  clean_data <- data[rlm_outliers == FALSE]
+
+  # Extract basic information
+  selected_data <- data[, .(
+    responder,
+    seq_days,
+    location,
+    date,
+    seq_in_day,
+    weight,
+    rlm_predict,
+    rlm_outliers
+  )]
+
+  # Initialize safe prediction function
+  safe_predict <- function(data) {
+    tryCatch({
+      get_my_break_per_pig_lm(
+        data = data,
+        my_break = my_break,
+        range_offset = range_offset,
+        step = step,
+        days_extend = days_extend,
+        degree = degree
+      )
+    }, error = function(e) {
+      cli::cli_alert_warning("Error processing data: {e$message}")
+      return(NULL)
+    })
+  }
+
+  # Linear model predictions
+  cli::cli_progress_step("Predictions for each pig", spinner = TRUE)
+  lm_results <- clean_data[, {
+    model_result <- safe_predict(.SD)
+  }, by = responder]
+  cli::cli_process_done()
+
+  lm_results <- merge(lm_results, base_info, by = "responder", all = TRUE)
+
+  # Merge operations
+  final_results <- merge(
+    selected_data,
+    lm_results,
+    by = c("responder", "date", "seq_days", "location"),
+    all = TRUE
+  )
+
+  final_results[, `:=`(
+    weight = as.numeric(weight),
+    predicted_weight_lm = as.numeric(predicted_weight_lm)
+  )][, `:=`(
+    weight = data.table::fcase(
+      is.na(weight), predicted_weight_lm,
+      default = weight
+    ),
+    outlier = data.table::fcase(
+      rlm_outliers == FALSE & is.na(predicted_weight_lm), "bound",
+      rlm_outliers == FALSE & !is.na(predicted_weight_lm), "normal",
+      rlm_outliers == TRUE, "outliers",
+      default = "predict"
+    )
+  )]
+
+  # Sort by date
+  data.table::setorder(final_results, date)
+
+  cli::cli_alert_info("Processed {.field {length(unique(final_results$responder))}} pigs with {.field {nrow(final_results)}} total records")
+  cli::cli_process_done()
+  return(final_results)
+  cli::cli_process_done()
+}
+extract_growth_metrics <- function(data, my_break) {
+  predicted_weight_lm <- rlm_outliers <- seq_days <- NULL
+  # Input validation
+  data <- data.table::copy(data)
+
+  # Filter data more efficiently
+  data_predict_date <- data[!is.na(predicted_weight_lm)]
+  data_true_cut <- data[
+    !is.na(predicted_weight_lm) &
+      !is.na(rlm_outliers) &
+      rlm_outliers == FALSE
+  ]
+
+  # Extract min/max records more efficiently
+  get_boundary_records <- function(dt) {
+    min_seq <- dt[, min(seq_days)]
+    max_seq <- dt[, max(seq_days)]
+    list(
+      min = dt[seq_days == min_seq],
+      max = dt[seq_days == max_seq]
+    )
+  }
+
+  predict_records <- get_boundary_records(data_predict_date)
+  true_records <- get_boundary_records(data_true_cut)
+
+  # Calculate stage days
+  stage_days <- as.numeric(difftime(
+    unique(predict_records$max$date),
+    unique(predict_records$min$date),
+    units = "days"
+  ))
+
+  # Validate stage days
+  if (stage_days <= 0) {
+    cli::cli_alert_warning("Invalid time period detected: {.field {cli::col_red(stage_days)}} days")
+  }
+
+  # Calculate ADG (weight difference in grams / days)
+  weight_diff <- (my_break[2] - my_break[1]) * 1000
+  adg <- weight_diff / stage_days
+
+  # Create results directly as data.table
+  results <- data.table::data.table(
+    location = unique(data$location),
+    min_weight_cut = mean(true_records$min$weight),
+    max_weight_cut = mean(true_records$max$weight),
+    start_date_cut = unique(true_records$min$date),
+    end_date_cut = unique(true_records$max$date),
+    stage_days = stage_days,
+    adg = adg
+  )
+
+  # Validate results
+  na_cols <- names(results)[results[, sapply(.SD, anyNA)]]
+  if (length(na_cols) > 0) {
+    cli::cli_alert_warning("Missing values detected in columns: {paste(na_cols, collapse = ', ')}")
+  }
+
+  return(results)
+}
+extract_growth_metrics_all <- function(data, my_break) {
+  responder <- NULL
+  # 对每个responder进行处理
+  cli::cli_progress_step("Extraction ADG information for each pig", spinner = TRUE)
+  results <- data[, {
+    extract_growth_metrics(.SD, my_break)
+  }, by = responder, showProgress=FALSE]  # 添加 .progress = FALSE
+  cli::cli_process_done()
+
+  return(results)
+}
+calculate_adg_and_clean_data <- function(data, my_break, range_offset, days_extend, step, degree) {
+  location <- responder <- seq_days <- seq_in_day <- stage <- NULL
+  # Create a deep copy of the input data
+  data <- data.table::copy(data)
+
+  # Calculate actual breaks once
+  actual_breaks <- c(
+    my_break[1] - range_offset,
+    my_break[2] + range_offset
+  )
+
+  # Function to process data and handle errors
+  process_data <- function() {
+    cli::cli_h1("ADG Calculation")
+    cli::cli_alert_info("Truncated weight from {.field {actual_breaks[1]}kg} to {.field {actual_breaks[2]}kg}")
+
+    # Get all pigs data
+    all_info <- get_my_break_all_pigs(
+      data = data,
+      my_break = my_break,
+      range_offset = range_offset,
+      days_extend = days_extend,
+      step = step,
+      degree = degree
+    )
+    data.table::setorder(all_info, location, responder, date, seq_days, seq_in_day)
+    # Process linear model results
+    adg_info2 <- process_lm_results(
+      data = all_info,
+      my_break = my_break,
+      range_offset = range_offset,
+      formula = weight ~ seq_days
+    )
+
+    # Extract growth metrics
+    adg_info1 <- extract_growth_metrics_all(
+      data = all_info,
+      my_break = my_break
+    )
+
+    # Merge results and add stage column
+    adg_info <- merge(adg_info1, adg_info2)
+    adg_info[, stage := paste0(my_break[1], "-", my_break[2])]
+
+    # Set column order
+    col_order <- c(
+      "responder", "location", "stage",
+      "start_date_cut", "min_weight_cut",
+      "end_date_cut", "max_weight_cut",
+      "lm_slope", "r_squared",
+      "stage_days", "adg"
+    )
+    data.table::setorder(adg_info, location, responder)
+    data.table::setcolorder(adg_info, col_order)
+
+    list(
+      adg_info = adg_info,
+      adg_data = all_info
+    )
+  }
+
+  # Main execution with error handling
+  tryCatch({
+    result <- process_data()
+    cli::cli_alert_success("ADG calculation completed successfully")
+    return(result)
+  },
+  error = function(e) {
+    cli::cli_alert_danger("Error occurred during ADG calculation")
+    cli::cli_alert_info("Error details: {conditionMessage(e)}")
+    stop("Execution stopped due to error: ", conditionMessage(e))
+  },
+  warning = function(w) {
+    cli::cli_alert_warning("Warning during calculation: {conditionMessage(w)}")
+    invokeRestart("muffleWarning")
+  })
+}
+```
+  
+```{r example-adg_get}
+result_nedap <- preprocess_data(data = mintyr::nedap, station_type = "nedap", quiet = TRUE)
+adg_result <- adg_get(result_nedap, my_break = c(30,120), quiet = TRUE)
+head(adg_result$adg_info)
+head(adg_result$adg_data)
+```
+  
+
+# adfi_get
+    
+```{r function-adfi_get}
+#' Comprehensive Average Daily Feed Intake (ADFI) Calculation Pipeline
+#'
+#' @description
+#' Integrated system for calculating porcine average daily feed intake (ADFI) 
+#' through error detection, correction, and imputation. Processes and calibrates
+#' feed intake data from feeding stations.
+#'
+#' @param data A data.table or data.frame containing feed intake records
+#' @param adg_res Result list from adg_get() function containing ADG information
+#' @param station_type Character. Type of feeding station: "nedap" or "fire". 
+#'        If NULL, will auto-detect from data structure.
+#' @param quiet Logical. If TRUE, suppresses messages and warnings. Default: FALSE.
+#' 
+#' @details
+#' **Processing Workflow**:
+#' \enumerate{
+#'   \item **Error Detection**:
+#'     \itemize{
+#'       \item Generates error variables based on station type
+#'       \item Identifies feed intake anomalies through predefined thresholds
+#'       \item Flags problematic records for correction
+#'     }
+#'     
+#'   \item **Error Correction**:
+#'     \itemize{
+#'       \item Calculates error proportions by animal and day
+#'       \item Separates valid vs. error-containing intake records
+#'       \item Applies LMM modeling for calibration of error feeds
+#'     }
+#'     
+#'   \item **ADFI Calculation**:
+#'     \itemize{
+#'       \item Combines corrected and valid intake records
+#'       \item Performs temporal imputation for missing data points
+#'       \item Calculates average daily feed intake metrics
+#'     }
+#' }
+#'
+#' **Supported Station Types**:
+#' \itemize{
+#'   \item **NEDAP**: Processes responder, location, date, and state-based data
+#'   \item **FIRE**: Processes entrancetime/exittime and weight-based feeding data
+#' }
+#'
+#' @return A `list` containing:
+#' \itemize{
+#'   \item `adfi_info`: 
+#'     \itemize{
+#'       \item Aggregated feed intake metrics data.table
+#'       \item Contains columns: `responder`, `location`, `origin_dfi`, `corrected_dfi`
+#'     }
+#'   \item `adfi_data`:
+#'     \itemize{
+#'       \item Detailed daily feed intake data.table
+#'       \item Contains columns: `responder`, `location`, `date`, `seq_days`, 
+#'             `origin_dfi`, `corrected_dfi`, `state`
+#'       \item State indicators: "org" (original), "corr" (corrected), 
+#'             "iii" (interpolated), "elrp" (extrapolated)
+#'     }
+#' }
+#'
+#' @seealso
+#' \itemize{
+#'   \item [adg_get()] For average daily gain calculation
+#' }
+#'
+#' @importFrom data.table := .N .SD setnames
+#' @importFrom purrr map map2
+#' @importFrom recipes recipe update_role step_zv step_corr step_scale prep juice
+#' @importFrom zoo na.approx
+#' @importFrom stats reformulate formula
+#' @importFrom cAIC4 stepcAIC
+#' @export
+adfi_get <- function(data,
+                     adg_res,
+                     station_type = NULL,
+                     quiet = FALSE) {
 
 
+  # Define process function based on quiet parameter
+  process_fn <- if (quiet) {
+    function(expr) suppressMessages(suppressWarnings(expr))
+  } else {
+    function(expr) expr
+  }
 
 
+  # Main processing logic wrapped in process_fn
+  process_fn({
+    tryCatch({
+      # prepare dfi data
+      prepare_dfi_data <- data |>
+        create_error_types(station_type = station_type) |>
+        create_error_prop()
+
+      # prepare scaled data
+      scale_data <- prepare_scale_data(right_dfi = prepare_dfi_data$right_dfi,
+                                       error_prop = prepare_dfi_data$error_prop_result,
+                                       adg_info = adg_res$adg_info,
+                                       adg_data = adg_res$adg_data)
 
 
+      # correct adfi
+      dfi_correct <- train_lmm_model(data = scale_data$processed_data) |>
+        merge_lmm_predictions(error_dfi = prepare_dfi_data$error_dfi,
+                              right_dfi_each_day = scale_data$right_dfi_each_day)
+
+      # impute adfi and get adfi
+      adfi_results <- calculate_adfi(dfi_correct = dfi_correct, adg_data = adg_res$adg_data, origin_dfi = prepare_dfi_data$origin_dfi)
+
+      return(adfi_results)
+
+    }, error = function(e) {
+      if (!quiet) {
+        cli::cli_alert_danger("Error in adfi_get: {e$message}")
+      }
+      return(NULL)
+    }, warning = function(w) {
+      if (!quiet) {
+        cli::cli_alert_warning("Warning in adfi_get: {w$message}")
+      }
+    })
+  })
+}
+
+create_error_types <- function(data, station_type = NULL) {
+  responder <- location <- visit_time <- . <- feed_intake <- duration <- weight <- seq_in_day <- seq_days <- 
+    frv <- fiv <- otv <- entrancetime <- exittime <- ltd_entrance_step1 <- ftd_exit_step1 <- entrancefeedweight <-
+    exitfeedweight <- lwd_exit_step1 <- lwd <- fwd <- ltd <- ftd <- fwd_exit_step1 <- lwd_entrance_step1 <- NULL
+  # # Auto-detect station_type
+  if (is.null(station_type)) {
+    # Check the data structure to determine station_type
+    if ("animal_number" %in% names(data) && "state" %in% names(data)) {
+      station_type <- "nedap"
+      #cli::cli_alert_info("Auto-detected station type: {.field NEDAP}")
+    } else if ("entrancetime" %in% names(data) && "exittime" %in% names(data)) {
+      station_type <- "fire"
+      #cli::cli_alert_info("Auto-detected station type: {.field FIRE}")
+    } else {
+      cli::cli_abort(c(
+        "Cannot auto-detect station type from data",
+        "i" = "Please provide 'station_type' parameter or ensure data has the correct columns",
+        "i" = "NEDAP data should have `animal_number` and 'state' columns",
+        "i" = "FIRE data should have 'entrancetime' and 'exittime' columns"
+      ))
+    }
+  }
+  cli::cli_h1("Generating Variables for {.field {toupper(station_type)}} Data")
+  cli::cli_process_start("Processing {.field {toupper(station_type)}} station feed intake data")
+
+  # Validate station_type parameter
+  valid_types <- c("nedap", "fire")
+  if (!station_type %in% valid_types) {
+    cli::cli_abort(c(
+      "Invalid station_type: {station_type}",
+      "i" = "Valid types are: {paste(valid_types, collapse = ', ')}"
+    ))
+  }
+
+  # Input validation
+  if (!inherits(data, "data.table")) {
+    data <- data.table::as.data.table(data)
+  }
+
+  # Define required columns based on station type
+  required_cols <- if (station_type == "nedap") {
+    c("responder", "location", "date", "seq_in_location",
+      "seq_days", "seq_in_day", "duration", "visit_time",
+      "feed_intake", "weight")
+  } else {
+    c("location", "responder", "date", "seq_in_location",
+      "seq_days", "seq_in_day", "entrancetime", "exittime",
+      "entrancefeedweight", "exitfeedweight", "feed_intake",
+      "weight")
+  }
+
+  # Helper function for safe column selection
+  select_columns <- function(dt, cols) {
+    missing_cols <- setdiff(cols, names(dt))
+    if (length(missing_cols) > 0) {
+      cli::cli_abort(c(
+        "Missing required columns in data",
+        "x" = "Missing columns: {.val {missing_cols}}",
+        "i" = "Please ensure all required columns are present"
+      ))
+    }
+    dt[, cols, with = FALSE]
+  }
+
+  if (station_type == "nedap") {
+    # Process Nedap data
+    processed_data <- select_columns(data, required_cols)[
+      responder != 0 & !is.na(location)
+    ][
+      order(visit_time), .(
+        fiv = feed_intake,
+        otv = duration,
+        entrancetime = visit_time,
+        entrancefeedweight = NA,
+        exitfeedweight = NA,
+        exittime = visit_time + as.integer(duration),
+        weight = weight,
+        responder = responder,
+        date = date,
+        seq_in_day = seq_in_day,
+        seq_days = seq_days
+      ),
+      by = location
+    ][, frv := fiv/(otv/60)
+    ][, `:=`(
+      lwd = NA,
+      fwd = NA,
+      ltd = NA,
+      ftd = NA
+    )]
+  } else if (station_type == "fire") {
+    # Process FIRE data
+    processed_data <- select_columns(data, required_cols)
+    data.table::setnames(processed_data,
+                         "feed_intake", "fiv",
+                         skip_absent = TRUE)
+
+    processed_data <- processed_data[
+      responder != 0 & !is.na(location)
+    ][, entrancetime := do.call(paste, c(.SD, sep = " ")), .SDcol = c("date", "entrancetime")
+    ][, exittime := do.call(paste, c(.SD, sep = " ")), .SDcol = c("date", "exittime")
+    ][, c("entrancetime", "exittime") := lapply(.SD, lubridate::ymd_hms),
+      .SDcols = c("entrancetime", "exittime")
+    ][order(entrancetime)
+    ][, otv := data.table::fifelse(
+      exittime - entrancetime < 0 & lubridate::hour(exittime) == 0,
+      exittime - entrancetime + lubridate::ddays(1),
+      exittime - entrancetime
+    )
+    ][, otv := as.numeric(otv)
+    ][, frv := fiv / (otv / 60)
+    ][, `:=`(
+      ltd_entrance_step1 = data.table::shift(entrancetime, type = "lead"),
+      ftd_exit_step1 = data.table::shift(exittime, type = "lag")
+    )
+    ][, `:=`(
+      ltd = ltd_entrance_step1 - exittime,
+      ftd = entrancetime - ftd_exit_step1
+    )
+    ][, `:=`(
+      lwd_entrance_step1 = data.table::shift(entrancefeedweight, type = "lead"),
+      fwd_exit_step1 = data.table::shift(exitfeedweight, type = "lag")
+    )
+    ][, `:=`(
+      lwd = lwd_entrance_step1 - exitfeedweight,
+      fwd = entrancefeedweight - fwd_exit_step1
+    )
+    ][, c("ltd", "ftd") := lapply(.SD, as.numeric),
+      .SDcols = c("ltd", "ftd")]
+  }
+
+  # Report success
+  cli::cli_alert_success("Generated variables for feed intake:")
+
+  if (station_type == "nedap") {
+    cli::cli_bullets(c(
+      "*" = paste0("{.kbd FIV}", cli::col_blue(" {.emph Feed intake per visit}")),
+      "*" = paste0("{.kbd OTV}", cli::col_blue(" {.emph Occupation time per visit}")),
+      "*" = paste0("{.kbd FRV}", cli::col_blue(" {.emph Feeding rate per visit}"))
+    ))
+  } else {
+    cli::cli_bullets(c(
+      "*" = paste0("{.kbd FIV}", cli::col_blue(" {.emph Feed intake per visit}")),
+      "*" = paste0("{.kbd OTV}", cli::col_blue(" {.emph Occupation time per visit}")),
+      "*" = paste0("{.kbd FRV}", cli::col_blue(" {.emph Feeding rate per visit}")),
+      "*" = paste0("{.kbd LWD}", cli::col_blue(" {.emph Leading weight difference}")),
+      "*" = paste0("{.kbd FWD}", cli::col_blue(" {.emph Following weight difference}")),
+      "*" = paste0("{.kbd LTD}", cli::col_blue(" {.emph Leading time difference}")),
+      "*" = paste0("{.kbd FTD}", cli::col_blue(" {.emph Following time difference}"))
+    ))
+  }
+
+  # Common processing for both types
+  cli::cli_alert_info("Criteria used for identifying errors in feed intake")
+
+  processed_data[, `:=`(
+    fiv_lo = data.table::fifelse(fiv < -20, 1, 0),
+    fiv_hi = data.table::fifelse(fiv > 2000, 1, 0),
+    fiv_0 = data.table::fifelse(otv == 0 & abs(fiv) > 20, 1, 0),
+    otv_lo = data.table::fifelse(otv < 0, 1, 0),
+    otv_hi = data.table::fifelse(otv > 3600, 1, 0),
+    frv_hi_fiv_lo = data.table::fifelse(fiv > 0 & fiv < 50 & frv > 500, 1, 0),
+    frv_hi_strict = data.table::fifelse(fiv >= 50 &
+                                          any(data.table::shift(fiv, type = "lag") < -20,
+                                              data.table::shift(fiv, type = "lead") < -20) &
+                                          frv > 110, 1, 0),
+    frv_hi = data.table::fifelse(fiv >= 50 &
+                                   any(data.table::shift(fiv, type = "lag", n = 2) < -20,
+                                       data.table::shift(fiv, type = "lead", n = 2) < -20) &
+                                   frv > 170, 1, 0),
+    frv_0 = data.table::fifelse(frv == 0 & otv > 500, 1, 0),
+    frv_lo = data.table::fifelse(frv != 0 & abs(frv) <= 2, 1, 0),
+    lwd_lo = data.table::fifelse((!is.na(lwd)) & lwd < -20, 1, 0),
+    lwd_hi = data.table::fifelse((!is.na(lwd)) & lwd > 1800, 1, 0),
+    fwd_lo = data.table::fifelse((!is.na(fwd)) & fwd < -20, 1, 0),
+    fwd_hi = data.table::fifelse((!is.na(fwd)) & fwd > 1800, 1, 0),
+    ltd_lo = data.table::fifelse((!is.na(ltd)) & ltd < 0, 1, 0),
+    ftd_lo = data.table::fifelse((!is.na(ftd)) & ftd < 0, 1, 0)
+  )]
+
+  # Report error types
+  cli::cli_alert_success("Generated error types:")
+
+  if (station_type == "nedap") {
+    cli::cli_bullets(c(
+      "*" = paste0("{.kbd FIV}", cli::col_blue(" {.emph fiv-lo|fiv-hi|fiv-0}")),
+      "*" = paste0("{.kbd OTV}", cli::col_blue(" {.emph otv-lo|otv-hi}")),
+      "*" = paste0("{.kbd FRV}", cli::col_blue(" {.emph frv-hi-fiv-lo|frv-hi-strict|frv-hi|frv-0|frv-lo}"))
+    ))
+  } else {
+    cli::cli_bullets(c(
+      "*" = paste0("{.kbd FIV}", cli::col_blue(" {.emph fiv-lo|fiv-hi|fiv-0}")),
+      "*" = paste0("{.kbd OTV}", cli::col_blue(" {.emph otv-lo|otv-hi}")),
+      "*" = paste0("{.kbd FRV}", cli::col_blue(" {.emph frv-hi-fiv-lo|frv-hi-strict|frv-hi|frv-0|frv-lo}")),
+      "*" = paste0("{.kbd LWD}", cli::col_blue(" {.emph lwd-lo|lwd-hi}")),
+      "*" = paste0("{.kbd FWD}", cli::col_blue(" {.emph fwd-lo|fwd-hi}")),
+      "*" = paste0("{.kbd LTD/FTD}", cli::col_blue(" {.emph ltd-lo|ftd-lo}"))
+    ))
+  }
+
+  cli::cli_process_done()
+  return(processed_data)
+}
+create_error_prop <- function(data) {
+  OE <- . <- fiv <- responder <- seq_days <- N <- NULL
+  # Define error types with descriptive names
+  error_codes <- c(
+    fiv_lo = "Feed Intake Volume Low",
+    fiv_hi = "Feed Intake Volume High",
+    fiv_0 = "Feed Intake Volume Zero",
+    otv_lo = "Occupancy Time Low",
+    otv_hi = "Occupancy Time High",
+    frv_hi_fiv_lo = "Feed Rate High & Intake Low",
+    frv_hi_strict = "Feed Rate Critically High",
+    frv_hi = "Feed Rate High",
+    frv_0 = "Feed Rate Zero",
+    frv_lo = "Feed Rate Low",
+    lwd_lo = "Last Weight Low",
+    lwd_hi = "Last Weight High",
+    fwd_lo = "First Weight Low",
+    fwd_hi = "First Weight High",
+    ltd_lo = "Last Time Low",
+    ftd_lo = "First Time Low"
+  )
+
+  # Check required columns
+  required_cols <- c("date", "seq_in_day", "seq_days", "location",
+                     "responder", "weight", "otv", "fiv", "frv",
+                     "ltd", "ftd", "lwd", "fwd")
+  missing_cols <- setdiff(required_cols, names(data))
+  if (length(missing_cols) > 0) {
+    cli::cli_abort(c(
+      "Missing required columns in input data",
+      "x" = "The following columns are missing: {.val {missing_cols}}",
+      "i" = "Please ensure all required columns are present in the dataset"
+    ))
+  }
+
+  cli::cli_h1("Error Properties Data Processing")
+  cli::cli_process_start("Processing error properties data")
+  #cli::cli_alert_info("Analyzing {.val {length(error_codes)}} error types")
+
+  # Select required columns and calculate total errors
+  #cli::cli_process_start("Transforming input data")
+  processed_data <- data[, c(required_cols, names(error_codes)), with = FALSE]
+  processed_data[, OE := rowSums(.SD, na.rm = TRUE), .SDcols = names(error_codes)]
+  #cli::cli_process_done()
+
+  # Calculate original Daily Feed Intake (DFI)
+  cli::cli_process_start("Computing original daily feed intake")
+  origin_dfi <- processed_data[, .(origin_dfi = sum(fiv)), by = .(responder, seq_days)]
+  cli::cli_process_done()
+
+  # Calculate correct DFI part
+  cli::cli_process_start("Computing right daily feed intake portion")
+  right_dfi <- processed_data[OE == 0, .(dfi_right_part = sum(fiv)), by = .(responder, seq_days)]
+  cli::cli_process_done()
+
+  # Extract error DFI data
+  cli::cli_process_start("Computing error daily feed intake portion")
+  error_dfi_data <- processed_data[OE != 0]
+  error_dfi <- error_dfi_data[, .(dfi_error_part = sum(fiv)), by = .(responder, seq_days)]
+  cli::cli_process_done()
+
+  # OTD and FID transformation function
+  otd_fid_trans <- function(data, target_col, error_cols, new_names) {
+    #cli::cli_alert_info("Transforming {.field {toupper(target_col)}} data")
+
+    if (length(error_cols) != length(new_names)) {
+      cli::cli_abort(c(
+        "Invalid transformation parameters",
+        "x" = "Length mismatch: error_cols ({length(error_cols)}) != new_names ({length(new_names)})",
+        "i" = "Both vectors must have equal length"
+      ))
+    }
+
+    temp1 <- function(col_names) {
+      tryCatch({
+        eval(as.name(data))[eval(as.name(col_names)) > 0,
+                            by = .(responder, seq_days),
+                            purrr::map(.SD, sum),
+                            .SDcols = target_col]
+      }, error = function(e) {
+        cli::cli_abort(c(
+          "Transformation error",
+          "x" = "{e$message}",
+          "i" = "Verify input data structure and column names"
+        ))
+      })
+    }
+
+    temp2 <- purrr::map(error_cols, temp1)
+    temp3 <- purrr::map2(temp2, new_names, function(x, y) data.table::setnames(x, target_col, y))
+    temp4 <- Reduce(function(x, y) merge(x, y, by = c("responder", "seq_days"), all = TRUE), temp3)
+
+    return(temp4)
+  }
+
+  # Create transformation parameters table
+  useful_list <- data.table::data.table(
+    data = c("error_dfi_data", "error_dfi_data"),
+    target_col = c("otv", "fiv"),
+    error_cols = list(
+      I(names(error_dfi_data)[c(14:15, 19:27)]),
+      I(names(error_dfi_data)[c(17:18, 28:29)])
+    ),
+    new_names = list(
+      I(paste0("otd_", c(1:2, 6:14))),
+      I(paste0("fid_", c(4:5, 15:16)))
+    )
+  )
+
+  # Apply transformations
+  cli::cli_process_start("Executing {.field FID} and {.field OTD} transformations")
+  tryCatch({
+    otd_fid_result <- purrr::pmap(useful_list, otd_fid_trans)
+    cli::cli_alert_success("Transforming {.field FIV} and {.field OTV} to:")
+    cli::cli_bullets(c(
+      "*" = paste0("{.kbd FID}", cli::col_blue(" {.emph Sum of daily feed intake for error type p}")),
+      "*" = paste0("{.kbd OTD}", cli::col_blue(" {.emph Sum of daily occupation time for error type p}"))
+    ))
+
+    merged_result <- Reduce(function(x, y) merge(x, y, by = c("responder", "seq_days"), all = TRUE), otd_fid_result)
+  }, error = function(e) {
+    cli::cli_abort(c(
+      "OTD/FID transformation failed",
+      "x" = "{e$message}",
+      "i" = "Check transformation parameters and data structure"
+    ))
+  })
+  cli::cli_process_done()
+
+  # Calculate error type proportions
+  cli::cli_process_start("Computing error type proportions")
+  error_cols <- names(error_codes)
+  error_proportions <- processed_data[, c(.N, lapply(.SD, sum)), .SDcols = error_cols, by = .(responder, seq_days)]
+  error_proportions[, (paste0(error_cols, "_p")) := lapply(.SD, function(x) x / N), .SDcols = error_cols, by = .(responder, seq_days)]
+  error_proportions[, c(error_cols, "N") := NULL]
+  cli::cli_process_done()
+
+  # Merge results
+  #cli::cli_progress_step("Merging final results")
+  final_result <- merge(merged_result, error_proportions, by = c("responder", "seq_days"), all.x = TRUE)
+  final_result <- merge(final_result, error_dfi, by = c("responder", "seq_days"), all.x = TRUE)
+  #cli::cli_progress_done()
+
+  # Fill NA values
+  # cli::cli_progress_step("Handling missing values")
+  # numeric_cols <- names(final_result)[sapply(final_result, is.numeric)]
+  # data.table::setnafill(final_result, fill = 0, cols = numeric_cols)
+  # cli::cli_progress_done()
+
+  # cli::cli_alert_success(c(
+  #   "Data processing completed successfully!",
+  #   "v" = "Processed {.val {nrow(final_result)}} rows",
+  #   "v" = "Generated {.val {ncol(final_result)}} columns",
+  #   "i" = "All error properties have been calculated"
+  # ))
+
+  final <- list(
+    error_prop_result = final_result,
+    origin_dfi = origin_dfi,
+    right_dfi = right_dfi,
+    error_dfi = error_dfi
+  )
+  cli::cli_process_done()
+
+  return(final)
+}
+prepare_scale_data <- function(right_dfi, error_prop, adg_info, adg_data) {
+  . <- responder <- seq_days <- dfi_error_part <- dfi_right_part <- location <- lm_slope <- 
+    rlm_outliers <- weight <- NULL
+  if (any(missing(right_dfi), missing(error_prop), missing(adg_info), missing(adg_data))) {
+    cli::cli_alert_warning("Missing required input parameters")
+    return(NULL)
+  }
+  # Check input parameters
+  cli::cli_h1("Preparing Data for Feed Intake Calibration")
+
+  cli::cli_process_start("Preparing Data")
+
+  # Extract DFI data for days with errors
+  cli::cli_process_start("Processing feed intake with errors")
+  right_dfi_in_one_day <- tryCatch({
+    error_prop[right_dfi, on = .(responder, seq_days)
+    ][!is.na(dfi_error_part)
+    ][, dfi_error_part := NULL]
+  }, error = function(e) {
+    cli::cli_alert_danger("Error while processing data for days with errors: {e$message}")
+    return(NULL)
+  })
+  cli::cli_process_done()
+
+  # Extract DFI data for days without errors
+  cli::cli_process_start("Processing feed intake without errors")
+  right_dfi_each_day <- tryCatch({
+    error_prop[right_dfi, on = .(responder, seq_days)
+    ][is.na(dfi_error_part)
+    ][, .(responder, seq_days, dfi_right_part)]
+  }, error = function(e) {
+    cli::cli_alert_danger("Error while processing data for days without errors: {e$message}")
+    return(NULL)
+  })
+  cli::cli_process_done()
+
+  # Extract ADG base information
+  cli::cli_process_start("Extracting ADG base information")
+  base_info_adg <- tryCatch({
+    adg_info[, .(responder, location, lm_slope)]
+  }, error = function(e) {
+    cli::cli_alert_danger("Error while processing ADG information: {e$message}")
+    return(NULL)
+  })
+  cli::cli_process_done()
+
+  # Extract and calculate average weight for each responder and day
+  cli::cli_process_start("Extracting weight information")
+  base_info_weight <- tryCatch({
+    unique(adg_data[rlm_outliers == FALSE
+    ][, weight := as.double(weight)
+    ][, .(responder, seq_days, weight)
+    ][, weight := mean(weight, na.rm = TRUE),
+      by = .(responder, seq_days)][])
+  }, error = function(e) {
+    cli::cli_alert_danger("Error while processing weight data: {e$message}")
+    return(NULL)
+  })
+  cli::cli_process_done()
+
+  # Merge datasets
+  cli::cli_process_start("Merging all informations")
+  merged_data <- tryCatch({
+    temp <- merge(right_dfi_in_one_day, base_info_adg,
+                  by = "responder", all.x = TRUE)
+    temp <- merge(temp, base_info_weight,
+                  by = c("responder", "seq_days"), all.x = TRUE)
+    temp[!is.na(weight)]
+  }, error = function(e) {
+    cli::cli_alert_danger("Error while merging datasets: {e$message}")
+    return(NULL)
+  })
+  cli::cli_process_done()
+
+  # Process data using recipes package
+  cli::cli_process_start("Processing data with recipes")
+  processed_data <- tryCatch({
+    suppressWarnings({  # 使用suppressWarnings包装主要代码
+      temp <- data.table::setDF(merged_data) |>
+        recipes::recipe(dfi_right_part ~ .) |>
+        recipes::update_role(responder, seq_days, location, new_role = "id") |>
+        recipes::step_zv(recipes::all_numeric()) |>
+        recipes::step_corr(recipes::all_predictors(), threshold = 0.9) |>
+        recipes::step_scale(recipes::all_predictors()) |>
+        recipes::prep() |>
+        recipes::juice()
+
+      temp$responder <- as.factor(temp$responder)
+
+      numeric_cols <- names(temp)[sapply(temp, is.numeric)]
+      data.table::setnafill(temp, fill = 0, cols = numeric_cols)
+      temp
+
+    })
+  }, error = function(e) {
+    cli::cli_alert_danger("Error during recipes processing: {e$message}")
+    return(NULL)
+  })
+  cli::cli_process_done()
+
+  #Check processing results
+  if (is.null(processed_data) || is.null(right_dfi_each_day)) {
+    cli::cli_alert_danger("Data processing failed")
+    return(NULL)
+  }
+
+  cli::cli_alert_info("Processed data dimensions: {nrow(processed_data)}*{ncol(processed_data)}")
+
+  final <- list(processed_data = processed_data,
+                right_dfi_each_day = right_dfi_each_day)
+
+  cli::cli_process_done()
+
+  return(final)
+}
+train_lmm_model <- function(data, trace = FALSE) {
+  fitted <- NULL
+  cli::cli_h1("LMM Stepwise Model Selection and Fitting")
+  
+  predictor_name <- setdiff(names(data), c("responder", "dfi_right_part", "seq_days"))
+  if (length(predictor_name) == 0) {
+    cli::cli_abort("No predictor variables found in the dataset")
+  }
+  
+  cli::cli_bullets(c("*" = paste0("Selected predictors:\n",
+                                  cli::col_blue("{paste(predictor_name, collapse=', ')}"))))
+  
+  # Create formula
+  eq <- reformulate(c(predictor_name, "(1|responder)"), response = "dfi_right_part")
+  
+  # Try to fit the full model and attempt stepwise selection
+  full_model <- NULL
+  final_model <- tryCatch({
+    # Fit the full model
+    full_model <- lme4::lmer(eq, data = data)
+    
+    # Attempt stepwise selection
+    step_res2 <- cAIC4::stepcAIC(
+      full_model,
+      direction = "backward",
+      returnResult = TRUE,
+      trace = trace
+    )
+    
+    # Correctly handle the string representation of the formula
+    formula_str <- paste(deparse(formula(step_res2$finalModel)), collapse = " ")
+    
+    cli::cli_bullets(c("*" = paste0("Final model equation:\n",
+                                    cli::col_green("{formula_str}"))))
+    
+    step_res2$finalModel
+  }, error = function(e) {
+    if (is.null(full_model)) {
+      # Full model fitting failed
+      cli::cli_alert_danger("Error in initial model fitting: {e$message}")
+      return(NULL)
+    } else {
+      # Full model fitting succeeded, but stepwise failed
+      cli::cli_alert_warning("Stepwise selection failed: {e$message}")
+      cli::cli_alert_info("Falling back to full model")
+      
+      # Correctly handle the string representation of the formula
+      formula_str <- paste(deparse(formula(full_model)), collapse = " ")
+      
+      cli::cli_bullets(c("*" = paste0("Using full model equation:\n",
+                                      cli::col_yellow("{formula_str}"))))
+      return(full_model)
+    }
+  })
+  
+  # If model fitting completely failed, return the original data
+  if (is.null(final_model)) {
+    cli::cli_alert_warning("Model fitting failed, returning original data without predictions")
+    return(data)
+  }
+  
+  # Add predicted values
+  data_result <- tryCatch({
+    data.table::setDT(data)[, fitted := stats::predict(final_model)]
+    cli::cli_alert_success("Predictions added to data")
+    data
+  }, error = function(e) {
+    cli::cli_alert_danger("Error in prediction: {e$message}")
+    return(data)
+  })
+  
+  return(data_result)
+}
+merge_lmm_predictions <- function(fit_result, error_dfi, right_dfi_each_day) {
+  responder <- seq_days <- NULL
+  tryCatch({
+    # Stage 4: Data Merging ---------------------------------------------------
+    cli::cli_process_start("Merging predictions with error feed intake")
+    error_dfi <- merge(fit_result, error_dfi, all.x = TRUE, by = c("responder", "seq_days"))
+
+    temp1 <- error_dfi[, c("responder", "seq_days", "fitted")]
+    data.table::setnames(temp1, "fitted", "dfi_right_part")
+    cli::cli_process_done()
+
+    # Stage 6: Final Merge ----------------------------------------------------
+    cli::cli_process_start("Combining error-free feed intake with corrected portion")
+    temp2 <- data.table::rbindlist(list(temp1, right_dfi_each_day))[
+      order(responder, seq_days)
+    ]
+
+    cli::cli_bullets(c(
+      "*" = paste0("Input records: ", cli::col_green("corrected = {nrow(temp1)}, error-free = {nrow(right_dfi_each_day)}")),
+      "*" = paste0("Output records: ", cli::col_green("{nrow(temp2)}")) # (+{round(nrow(temp2)/(nrow(temp1)+nrow(right_dfi_each_day))*100,1)}%)
+    ))
+
+    cli::cli_process_done()
+    # Final Output ------------------------------------------------------------
+    return(temp2)
+
+  }, error = function(e) {
+    cli::cli_alert_danger("Merging process aborted: {e$message}")
+    return(NULL)
+  })
+}
+calculate_adfi <- function(dfi_correct, adg_data, origin_dfi) {
+. <- responder <- location <- seq_days <- corrected_dfi_filled <- corrected_dfi <- value_lm <- state <- NULL
+  cli::cli_h1("Starting ADFI Calculation Process")
+  cli::cli_alert_info("Processing base data...")
+
+  # Base information extraction
+  base_info <- tryCatch(
+    {
+      unique(adg_data[, .(responder, location, date, seq_days)])
+    },
+    error = function(e) {
+      cli::cli_alert_danger("Failed to extract base information: {e$message}")
+      stop("Data processing terminated")
+    }
+  )
+
+  # Data merging
+  cli::cli_process_start("Performing data imputation and status labeling")
+  correct_dfi <- merge(dfi_correct, base_info, all = TRUE)
+
+  # Column rename validation
+  if (!"dfi_right_part" %in% names(correct_dfi)) {
+    cli::cli_abort("Cannot find target column 'dfi_right_part' for renaming")
+  }
+  data.table::setnames(correct_dfi, "dfi_right_part", "corrected_dfi")
+
+  # Main data processing
+  all_dfi <- tryCatch(
+    {
+      all_dfi <- merge(correct_dfi, origin_dfi, all = TRUE)
+      all_dfi <- all_dfi[!is.na(location)]
+      all_dfi[, corrected_dfi_filled := zoo::na.approx(corrected_dfi, na.rm = FALSE), by = responder]
+      all_dfi[, corrected_dfi := data.table::fifelse(is.na(corrected_dfi), corrected_dfi_filled, corrected_dfi)]
+      all_dfi[, value_lm := {
+        current_responder <- .BY$responder  # # Get the current responder value
+        if (all(is.na(corrected_dfi))) {
+          cli::cli_alert_warning("Insufficient data for responder {current_responder}, unable to build prediction model")
+          corrected_dfi
+        } else {
+          tryCatch(
+            {
+              mod <- stats::lm(corrected_dfi ~ seq_days, data = .SD[!is.na(corrected_dfi)])
+              data.table::fifelse(is.na(corrected_dfi), stats::predict(mod, newdata = .SD), corrected_dfi)
+            },
+            error = function(e) {
+              cli::cli_alert_danger("Modeling failed for responder {current_responder}: {e$message}")
+              rep(NA_real_, .N)
+            }
+          )
+        }
+      }, by = responder]
+      all_dfi[, corrected_dfi := data.table::fifelse(is.na(corrected_dfi), value_lm, corrected_dfi)]
+      all_dfi[, state := data.table::fcase(
+        is.na(corrected_dfi_filled) & !is.na(value_lm), "elrp",
+        !is.na(origin_dfi) & !is.na(corrected_dfi) & (as.numeric(origin_dfi) == corrected_dfi), "org",
+        !is.na(origin_dfi) & !is.na(corrected_dfi) & (as.numeric(origin_dfi) != corrected_dfi), "corr",
+        is.na(corrected_dfi) & !is.na(corrected_dfi_filled), "iii",
+        default = NA_character_
+      )]
+      all_dfi <- all_dfi[, .(responder, location, date, seq_days, origin_dfi, corrected_dfi, state)]
+      all_dfi
+    },
+    error = function(e) {
+      cli::cli_abort("Data processing pipeline error: {e$message}")
+    }
+  )
+
+  # Status validation
+  if (anyNA(all_dfi$state)) {
+    na_count <- sum(is.na(all_dfi$state))
+    cli::cli_alert_warning("Found {.val {na_count}} undefined state records")
+  }
+
+  # Result aggregation
+  cli::cli_alert_info("Generating final results...")
+  adfi_info <- all_dfi[, lapply(.SD, mean, na.rm = TRUE),
+                       .SDcols = c("origin_dfi", "corrected_dfi"),
+                       by = .(responder, location)]
+
+  # Result validation
+  if (nrow(adfi_info) == 0) {
+    cli::cli_abort("Result aggregation failed, no valid data generated")
+  }
+
+  fin <- list(adfi_info = adfi_info, adfi_data = all_dfi)
+
+  cli::cli_alert_info("Final results contain: {.val {nrow(adfi_info)}} responders and {.val {nrow(all_dfi)}} records")
+  cli::cli_process_done()
+  return(fin)
+}
+```
+  
+```{r example-adfi_get}
+result_nedap <- preprocess_data(data = mintyr::nedap, station_type = "nedap", quiet = TRUE)
+adg_result <- adg_get(result_nedap, my_break = c(30,120), quiet = TRUE)
+adfi_result <- adfi_get(result_nedap, adg_result, quiet = TRUE)
+head(adfi_result$adfi_info)
+head(adfi_result$adfi_data)
+```
+  
+  
+# adg_plot
+    
+```{r function-adg_plot}
+#' Plot Average Daily Gain (ADG) Growth Curves
+#'
+#' @description
+#' Creates and optionally saves visualization plots for pig growth data based on ADG (Average Daily Gain) 
+#' calculations. The function generates detailed growth curve plots with prediction intervals, outlier 
+#' marking, and linear regression fits.
+#'
+#' @param data A list object returned by the `adg_get()` function, containing ADG data and related information.
+#' @param responders Character vector specifying which pig IDs to include. Default is `NULL` (all responders).
+#' @param locations Character vector specifying which locations to include. Default is `NULL` (all locations).
+#' @param color_theme Character string specifying the color theme to use from the `ggsci` package. 
+#'   Default is "d3". Available themes include: "npg", "aaas", "nejm", "lancet", "jama", "bjm", "jco", 
+#'   "d3", "observable", "locuszoom", "igv", "cosmic", "uchicago", "startrek", "tron", "futurama", 
+#'   "rickandmorty", "simpsons", "flatui", "frontiers", "ucscgb".
+#' @param save_path Character string specifying the path to save plots. Default is `NULL` (plots not saved).
+#' @param file_prefix Character string for the prefix of saved filenames. Default is "loc".
+#' @param file_suffix Character string for the suffix of saved filenames. Default is `NULL` (automatically set to "grow").
+#' @param dpi Numeric value for the resolution of saved plots. Default is 300.
+#' @param device Character string specifying the file format for saved plots. Default is "png".
+#'   Supported formats: "png", "pdf", "jpeg", "tiff".
+#' @param quiet Logical. If TRUE, suppresses messages and warnings. Default: FALSE.
+#'
+#' @return A `data.table` containing:
+#' \itemize{
+#'   \item `location`: Location identifier
+#'   \item `data`: List of data for each location
+#'   \item `plot`: List of ggplot2 objects for each location
+#' }
+#'
+#' @details
+#' The plots created by `adg_plot` include:
+#' \itemize{
+#'   \item Weight over time scatter plots
+#'   \item Linear regression prediction lines
+#'   \item Prediction confidence interval bands
+#'   \item Horizontal reference lines at key weight stages (30kg, 60kg, 120kg)
+#'   \item Growth parameter annotations (slope, R² value, stage days, ADG value) for each pig
+#'   \item Color differentiation between outliers and normal values
+#' }
+#'
+#' @seealso
+#' \code{\link{adg_get}} for calculating ADG data
+#' \code{\link{clean_weight_get}} for cleaning and preparing weight data
+#' \code{\link{preprocess_data}} for data preprocessing
+#'
+#' @importFrom ggplot2 ggplot aes geom_hline geom_ribbon geom_point geom_line facet_wrap scale_x_date 
+#'   scale_y_continuous geom_text labs theme_bw theme element_blank element_text guides guide_legend ggsave
+#' @importFrom data.table copy tstrsplit :=
+#' @importFrom ggsci scale_color_npg scale_color_aaas scale_color_nejm scale_color_lancet scale_color_jama 
+#'   scale_color_bmj scale_color_jco scale_color_d3 scale_color_observable scale_color_locuszoom 
+#'   scale_color_igv scale_color_cosmic scale_color_uchicago scale_color_startrek scale_color_tron 
+#'   scale_color_futurama scale_color_rickandmorty scale_color_simpsons scale_color_flatui 
+#'   scale_color_frontiers scale_color_ucscgb
+#' @importFrom cli cli_abort cli_alert_warning cli_alert_success cli_alert_info cli_process_start 
+#'   cli_progress_bar cli_progress_update cli_progress_done cli_process_done cli_alert_danger
+#' @importFrom purrr map map2
+#'
+#' @export
+adg_plot <- function(data,
+                     responders = NULL,
+                     locations = NULL,
+                     color_theme = "d3",
+                     save_path = NULL,
+                     file_prefix = "loc",
+                     file_suffix = NULL,
+                     dpi = 300,
+                     device = "png",
+                     quiet = FALSE) {
+
+  # 定义处理函数，根据quiet参数决定是否抑制消息和警告
+  process_fn <- if (quiet) {
+    function(expr) suppressMessages(suppressWarnings(expr))
+  } else {
+    function(expr) expr
+  }
+
+  # 使用process_fn包装主要处理逻辑
+  result <- process_fn({
+    # 创建ADG图表
+    adg_results <- create_adg_plots(
+      data = data,
+      responders = responders,
+      locations = locations,
+      color_theme = color_theme
+    )
+
+    # 如果提供了保存路径，则保存图表
+    if (!is.null(save_path)) {
+      save_plots(
+        data = adg_results,
+        save_path = save_path,
+        plot_type = "adg",
+        file_prefix = file_prefix,
+        file_suffix = file_suffix,
+        dpi = dpi,
+        device = device
+      )
+    }
+
+    # 返回结果
+    adg_results
+  })
+  
+  return(result)
+}
+
+validate_color_theme <- function(color_theme) {
+  color_themes <- list(
+    "npg" = ggsci::scale_color_npg,
+    "aaas" = ggsci::scale_color_aaas,
+    "nejm" = ggsci::scale_color_nejm,
+    "lancet" = ggsci::scale_color_lancet,
+    "jama" = ggsci::scale_color_jama,
+    "bjm" = ggsci::scale_color_bmj,
+    "jco" = ggsci::scale_color_jco,
+    "d3" = ggsci::scale_color_d3,
+    "observable" = ggsci::scale_color_observable,
+    "locuszoom" = ggsci::scale_color_locuszoom,
+    "igv" = ggsci::scale_color_igv,
+    "cosmic" = ggsci::scale_color_cosmic,
+    "uchicago" = ggsci::scale_color_uchicago,
+    "startrek" = ggsci::scale_color_startrek,
+    "tron" = ggsci::scale_color_tron,
+    "futurama" = ggsci::scale_color_futurama,
+    "rickandmorty" = ggsci::scale_color_rickandmorty,
+    "simpsons" = ggsci::scale_color_simpsons,
+    "flatui" = ggsci::scale_color_flatui,
+    "frontiers" = ggsci::scale_color_frontiers,
+    "ucscgb" = ggsci::scale_color_ucscgb
+  )
+
+  if (!color_theme %in% names(color_themes)) {
+    cli::cli_abort(c(
+      "x" = "Invalid color theme: {color_theme}",
+      "i" = "Available themes: {paste(names(color_themes), collapse = ', ')}"
+    ))
+  }
+
+  color_themes[[color_theme]]
+}
+validate_inputs <- function(data, data_type, responders, locations) {
+  responder <- location <- NULL
+  data <- data.table::copy(data)
+  dataset_name <- paste0(data_type, "_data")
+  main_data <- data[[dataset_name]]
+
+  # 验证responders
+  if (!is.null(responders)) {
+    valid_responders <- responders %in% unique(main_data$responder)
+    if (!all(valid_responders)) {
+      invalid_resp <- responders[!valid_responders]
+      cli::cli_alert_warning("Some responders not found: {.field {cli::col_red(invalid_resp)}}")
+    }
+  }
+
+  # 验证locations
+  if (!is.null(locations)) {
+    valid_locations <- locations %in% unique(main_data$location)
+    if (!all(valid_locations)) {
+      invalid_loc <- locations[!valid_locations]
+      cli::cli_alert_warning("Some locations not found: {.field {cli::col_red(invalid_loc)}}")
+    }
+  }
+
+  # 过滤数据
+  filtered_data <- main_data
+  if (!is.null(responders)) filtered_data <- filtered_data[responder %in% responders]
+  if (!is.null(locations)) filtered_data <- filtered_data[location %in% locations]
+
+  if (nrow(filtered_data) == 0) {
+    cli::cli_abort("No available data after filtering. Please check the parameter settings.")
+  }
+
+  list(data = data, filtered_data = filtered_data)
+}
+set_common_theme <- function(plot, title, y_lab, color_scale, legend_breaks, legend_labels) {
+  plot +
+    ggplot2::labs(title = title, y = y_lab) +
+    color_scale(
+      name = "Data Source:",
+      breaks = legend_breaks,
+      labels = legend_labels
+    ) +
+    ggplot2::theme_bw() +
+    ggplot2::theme(
+      legend.position = "bottom",
+      legend.box = "vertical",
+      axis.title = ggplot2::element_blank(),
+      legend.title = ggplot2::element_text(size = 20),
+      legend.text = ggplot2::element_text(size = 20),
+      axis.text.x = ggplot2::element_text(angle = -90, hjust = 0.5, vjust = 0.5, size = 8),
+      plot.title = ggplot2::element_text(size = 25, face = "bold"),
+      strip.text = ggplot2::element_text(size = 15)
+    ) +
+    ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(size = 5, fill = NA, linewidth = 1.5)))
+}
+create_adg_plots <- function(data, responders = NULL, locations = NULL, color_theme = "d3") {
+  weight <- lower_lm <- upper_lm <- predicted_weight_lm <- stage <- lm_slope <- r_squared <- stage_days <- 
+    adg <- responder <- day_text <- stage_start <- stage_end <- . <- location <- outlier <- NULL
+  # 验证颜色主题
+  color_scale <- validate_color_theme(color_theme)
+
+  # 验证输入并过滤数据
+  validated <- validate_inputs(data, "adg", responders, locations)
+  data <- validated$data
+  adg_data <- validated$filtered_data
+
+  # 单位转换
+  adg_data <- adg_data[, `:=`(
+    weight = weight/1000,
+    lower_lm = lower_lm/1000,
+    upper_lm = upper_lm/1000,
+    predicted_weight_lm = predicted_weight_lm/1000
+  )]
+
+  # 处理斜率数据
+  slopes_data <- data$adg_info[, list(stage, lm_slope, r_squared, stage_days, adg, responder)]
+  slopes_data <- slopes_data[, c("stage_start", "stage_end") := {
+    split_result <- data.table::tstrsplit(stage, "-", type.convert = TRUE)
+    list(as.numeric(split_result[[1]]), as.numeric(split_result[[2]]))
+  }]
+
+  if (!is.null(responders)) {
+    slopes_data <- slopes_data[responder %in% responders]
+  }
+
+  # 创建标注文本
+  slopes_data[, day_text := sprintf(
+    "Slope: %.2f, R^2: %.2f\n%d~%d kg: %.1f days\nADG: %.2f",
+    lm_slope, r_squared, stage_start, stage_end, stage_days, adg
+  )]
 
 
+  # 分组处理
+  adg_data <- adg_data[, .(data = list(.SD)), by = location]
+
+  # 生成图形
+  adg_data[, plot := purrr::map2(data, location, function(.x, .y) {
+    current_slopes <- slopes_data[responder %in% unique(.x$responder)]
+    n_responders <- length(unique(.x$responder))
+
+    base_plot <- ggplot2::ggplot(.x, ggplot2::aes(x = date, y = weight)) +
+      ggplot2::geom_hline(yintercept = c(30, 60, 120), linetype = "dashed", color = "#666666", alpha = 0.3) +
+      ggplot2::geom_ribbon(ggplot2::aes(ymin = lower_lm, ymax = upper_lm), alpha = 0.2) +
+      ggplot2::geom_point(ggplot2::aes(color = outlier), size = 1, alpha = 0.8) +
+      ggplot2::geom_line(ggplot2::aes(y = predicted_weight_lm, color = "lm prediction"), linewidth = 0.7, alpha = 0.6) +
+      ggplot2::facet_wrap(~ as.numeric(responder), ncol = min(2, n_responders)) +
+      ggplot2::scale_x_date(date_breaks = "2 day", date_labels = "%m-%d") +
+      ggplot2::scale_y_continuous(breaks = seq(15, 135, 15), limits = c(15, 135))
+
+    annotated_plot <- set_common_theme(
+      base_plot,
+      title = paste("Location:", .y),
+      y_lab = "Weight (kg)",
+      color_scale = color_scale,
+      legend_breaks = c("bound", "outliers", "normal", "predict", "lm prediction"),
+      legend_labels = c("outside prediction", "outliers", "normal", "predict", "lm prediction")
+    )
 
 
+    annotated_plot +
+      ggplot2::geom_text(
+        data = current_slopes,
+        ggplot2::aes(x = min(.x$date), y = 135, label = day_text),
+        hjust = 0, vjust = 1, size = 3.3
+      )
+  })]
+  cli::cli_alert_success("Successfully created {.field {nrow(adg_data)}} plot{?s}")
+  return(adg_data)
+}
+save_plots <- function(data,
+                       save_path,
+                       plot_type = c("adg", "adfi"),
+                       file_prefix = "loc",
+                       file_suffix = NULL,
+                       dpi = 300,
+                       device = "png") {
+  . <- location <- filename <- width <- height <- location <- filename <- NULL
+
+  # 验证并设置 plot_type
+  plot_type <- match.arg(plot_type)
+
+  # 根据 plot_type 设置默认的 file_suffix
+  if (is.null(file_suffix)) {
+    file_suffix <- switch(plot_type,
+                          adg = "grow",
+                          adfi = "adfi")
+  }
+
+  # 参数验证
+  if (!inherits(data, "data.table")) {
+    cli::cli_abort("Input 'data' must be a data.table")
+  }
+
+  if (!all(c("location", "plot", "data") %in% names(data))) {
+    cli::cli_abort("Input data must contain 'location', 'plot', and 'data' columns")
+  }
+
+  # 验证并创建保存路径
+  if (!dir.exists(save_path)) {
+    cli::cli_alert_info("Creating directory: {.file {save_path}}")
+    dir.create(save_path, recursive = TRUE)
+  }
+
+  # 验证其他参数
+  supported_devices <- c("png", "pdf", "jpeg", "tiff")
+  if (!device %in% supported_devices) {
+    cli::cli_abort(c(
+      "x" = "Unsupported output device: {device}",
+      "i" = "Supported devices: {paste(supported_devices, collapse = ', ')}"
+    ))
+  }
+
+  cli::cli_process_start("Saving {toupper(plot_type)} plots")
+
+  # 计算图表尺寸和文件名
+  save_info <- data[, {
+    n_responders <- data.table::uniqueN(data[[1]]$responder)
+    n_days <- data.table::uniqueN(data[[1]]$date)
+    .(
+      width = pmax(0.5 * n_days, 20),
+      height = pmax(5 * n_responders, 15),
+      filename = file.path(
+        save_path,
+        paste0(file_prefix, "_", location, "_", file_suffix, ".", device)
+      )
+    )
+  }, by = location]
+
+  # 创建进度条
+  pb <- cli::cli_progress_bar(
+    format = paste0(
+      "{cli::pb_spin} Saving ",
+      cli::col_blue("{.emph {file_prefix}_{location}_{file_suffix}.{device}}"),
+      " [{cli::pb_current}/{cli::pb_total}] | ETA:{cli::pb_eta}"
+    ),
+    total = nrow(data)
+  )
+
+  # 合并信息并保存图表
+  results <- save_info[data, on = "location"][, {
+    # 使用 data.table 逐行处理
+    result <- .SD[, {
+      tryCatch({
+        ggplot2::ggsave(
+          filename = filename,
+          plot = plot[[1]],
+          width = width,
+          height = height,
+          units = "cm",
+          dpi = dpi,
+          device = device
+        )
+        cli::cli_progress_update(id = pb)
+        list(
+          location = location,
+          filename = filename,
+          success = TRUE
+        )
+      }, error = function(e) {
+        cli::cli_alert_danger("Error saving plot for location {.field {cli::col_red(location)}}: {e$message}")
+        list(
+          location = location,
+          filename = filename,
+          success = FALSE
+        )
+      })
+    }, by = location, showProgress = FALSE]
+    result
+  }]
+
+  # 完成进度条
+  cli::cli_progress_done(id = pb)
+
+  # 统计和显示最终结果
+  success_count <- sum(results$success)
+  total_count <- nrow(results)
+
+  if (success_count == total_count) {
+    cli::cli_alert_success("Successfully saved all plots to {.file {save_path}}")
+  } else {
+    cli::cli_alert_warning(
+      "Saved {.field {cli::col_red(success_count)}} out of {.field {cli::col_red(total_count)}} plots to {.file {save_path}}"
+    )
+  }
+
+  cli::cli_process_done()
+  #cli::cli_alert_success("Successfully created {toupper(plot_type)} plots")
+
+  # 返回结果
+  invisible(results)
+}
+```
+  
+```{r example-adg_plot}
+result_nedap <- preprocess_data(data = mintyr::nedap, station_type = "nedap", quiet = TRUE)
+adg_result <- adg_get(result_nedap, my_break = c(30,120), quiet = TRUE)
+res <- adg_plot(data = adg_result, save_path = tempdir(), location = "101", quiet = TRUE)
+# Check exported files
+list.files(path = tempdir(), pattern = "png", recursive = TRUE)
+# Clean up exported files
+files <- list.files(
+  path = tempdir(),         # Default export directory
+  pattern = "png",          # File type pattern to search
+  recursive = TRUE,         # Search in subdirectories
+  full.names = TRUE         # Return full file paths
+)
+file.remove(files)          # Remove all exported files
+```
+  
+  
+# adfi_plot
+    
+```{r function-adfi_plot}
+#' Plot Average Daily Feed Intake (ADFI) Curves
+#'
+#' @description
+#' Creates and optionally saves visualization plots for pig feed intake data based on ADFI (Average Daily Feed Intake) 
+#' calculations. The function generates detailed feed intake curve plots with original and corrected values, 
+#' smoothing lines, and state indicators.
+#'
+#' @inheritParams adg_plot
+#' @param data A list object returned by the `adfi_get()` function, containing ADFI data and related information.
+#'
+#' @return A `data.table` containing:
+#' \itemize{
+#'   \item `location`: Location identifier
+#'   \item `data`: List of data for each location
+#'   \item `plot`: List of ggplot2 objects for each location
+#' }
+#'
+#' @details
+#' The plots created by `adfi_plot` include:
+#' \itemize{
+#'   \item Original daily feed intake values (gray points)
+#'   \item Corrected daily feed intake values (colored by state)
+#'   \item LOESS smoothing line for corrected values
+#'   \item Horizontal reference lines showing average corrected ADFI
+#'   \item Text annotations showing original and corrected ADFI values
+#' }
+#'
+#' @seealso
+#' \code{\link{adfi_get}} for calculating ADFI data
+#' \code{\link{adg_plot}} for plotting Average Daily Gain data
+#'
+#' @importFrom ggplot2 ggplot aes geom_point geom_line geom_smooth scale_y_continuous geom_hline 
+#'   facet_wrap scale_x_date geom_text
+#' @importFrom data.table copy :=
+#' @importFrom purrr map map2
+#'
+#' @export
+adfi_plot <- function(data,
+                      responders = NULL,
+                      locations = NULL,
+                      color_theme = "d3",
+                      save_path = NULL,
+                      file_prefix = "loc",
+                      file_suffix = NULL,
+                      dpi = 300,
+                      device = "png",
+                      quiet = FALSE) {
+
+  # 定义处理函数，根据quiet参数决定是否抑制消息和警告
+  process_fn <- if (quiet) {
+    function(expr) suppressMessages(suppressWarnings(expr))
+  } else {
+    function(expr) expr
+  }
+
+  # 使用process_fn包装主要处理逻辑
+  result <- process_fn({
+    # 创建ADFI图表
+    adfi_results <- create_adfi_plots(
+      data = data,
+      responders = responders,
+      locations = locations,
+      color_theme = color_theme
+    )
+
+    # 如果提供了保存路径，则保存图表
+    if (!is.null(save_path)) {
+      save_plots(
+        data = adfi_results,
+        save_path = save_path,
+        plot_type = "adfi",
+        file_prefix = file_prefix,
+        file_suffix = file_suffix,
+        dpi = dpi,
+        device = device
+      )
+    }
+
+    # 返回结果
+    adfi_results
+  })
+  
+  return(result)
+}
+
+create_adfi_plots <- function(data, responders = NULL, locations = NULL, color_theme = "d3") {
+  responder <- location <- . <- origin_dfi <- corrected_dfi <- mean_text <- state <- y_pos <- NULL
+  # 验证颜色主题
+  color_scale <- validate_color_theme(color_theme)
+
+  # 验证输入并过滤数据
+  validated <- validate_inputs(data, "adfi", responders, locations)
+  data <- validated$data
+  adfi_data <- validated$filtered_data
+
+  # 处理信息数据
+  current_info <- data$adfi_info
+  if (!is.null(responders)) current_info <- current_info[responder %in% responders]
+
+  # 准备标注数据
+  text_data <- current_info[
+    ,
+    {
+      target_data <- adfi_data[location == .BY$location, ]
+      x_pos <- if (nrow(target_data) > 0) min(target_data$date) else as.Date(NA)
+      .(
+        mean_text = sprintf("Original ADFI: %.2f\nCorrected ADFI: %.2f", origin_dfi, corrected_dfi),
+        x_pos = x_pos,
+        y_pos = 6000
+      )
+    },
+    by = .(responder, location)
+  ]
+
+  # 分组处理
+  adfi_data <- adfi_data[, .(data = list(.SD)), by = location]
+
+  # 生成图形
+  adfi_data[, plot := purrr::map2(data, location, function(.x, .y) {
+    current_text <- text_data[location == .y & responder %in% unique(.x$responder)]
+    n_responders <- length(unique(.x$responder))
+
+    base_plot <- ggplot2::ggplot(.x, ggplot2::aes(x = date)) +
+      ggplot2::geom_point(ggplot2::aes(y = origin_dfi), size = 1, color = "#666666") +
+      ggplot2::geom_line(ggplot2::aes(y = corrected_dfi), linewidth = 0.3, alpha = 0.3) +
+      ggplot2::geom_point(ggplot2::aes(y = corrected_dfi, color = state), size = 1) +
+      ggplot2::geom_smooth(
+        ggplot2::aes(y = corrected_dfi, color = "smooth line"),
+        method = "loess", formula = y ~ x,
+        linewidth = 0.2, alpha = 0.2
+      ) +
+      ggplot2::scale_y_continuous(breaks = seq(0, 6000, 1000), limits = c(0, 6000)) +
+      ggplot2::geom_hline(
+        data = current_info[responder %in% unique(.x$responder)],
+        ggplot2::aes(yintercept = corrected_dfi),
+        color = "gray", linewidth = 0.3, alpha = 0.3
+      ) +
+      ggplot2::facet_wrap(~ responder, ncol = min(2, n_responders)) +
+      ggplot2::scale_x_date(date_breaks = "2 day", date_labels = "%m-%d")
+
+    annotated_plot <- set_common_theme(
+      base_plot,
+      title = paste("Location:", .y),
+      y_lab = "Average Daily Feed Intake (g)",
+      color_scale = color_scale,
+      legend_breaks = c("org", "corr", "elrp", "lll", "smooth line"),
+      legend_labels = c("original adfi", "corrected adfi", "linear prediction", "linear interpolation", "smooth line")
+    )
+
+    annotated_plot +
+      ggplot2::geom_text(
+        data = current_text,
+        ggplot2::aes(x = x_pos, y = y_pos, label = mean_text),
+        hjust = 0, vjust = 1, size = 3.3, inherit.aes = FALSE
+      )
+  })]
+
+  cli::cli_alert_success("Successfully created {.field {nrow(adfi_data)}} plot{?s}")
+  return(adfi_data)
+}
+```
+  
+```{r example-adfi_plot}
+result_nedap <- preprocess_data(data = mintyr::nedap, station_type = "nedap", quiet = TRUE)
+adg_result <- adg_get(result_nedap, my_break = c(30,120), quiet = TRUE)
+adfi_result <- adfi_get(result_nedap, adg_result, quiet = TRUE)
+res <- adfi_plot(data = adfi_result, save_path = tempdir(), location = "101", quiet = TRUE)
+# Check exported files
+list.files(path = tempdir(), pattern = "png", recursive = TRUE)
+# Clean up exported files
+files <- list.files(
+  path = tempdir(),         # Default export directory
+  pattern = "png",          # File type pattern to search
+  recursive = TRUE,         # Search in subdirectories
+  full.names = TRUE         # Return full file paths
+)
+file.remove(files)          # Remove all exported files
+```
+  
+# fcr_get
+    
+```{r function-fcr_get}
+#' Calculate Feed Conversion Ratio (FCR)
+#'
+#' @description
+#' Calculates Feed Conversion Ratio (FCR) based on Average Daily Gain (ADG) and Average Daily Feed Intake (ADFI) data.
+#' This function merges ADG and ADFI data, calculates corrected FCR values, and generates statistical summaries.
+#'
+#' @param adg_res A list object returned by the `adg_get()` function, containing ADG data and related information.
+#' @param adfi_res A list object returned by the `adfi_get()` function, containing ADFI data and related information.
+#' @param quiet Logical; if TRUE, suppresses all messages and warnings, default is FALSE.
+#'
+#' @return A list containing:
+#' \itemize{
+#'   \item `fcr_res`: A data.table with FCR calculation results
+#'   \item `adg_info`: The input ADG information table
+#'   \item `adg_data`: The original ADG data
+#'   \item `adfi_info`: The input ADFI information table
+#'   \item `adfi_data`: The original ADFI data
+#'   \item `fcr_summary`: Statistical summary of FCR calculation results
+#' }
+#'
+#' @details
+#' The `fcr_get` function performs the following steps:
+#' \itemize{
+#'   \item Validates the format of input ADG and ADFI data
+#'   \item Merges ADG and ADFI data, matching by animal ID and location
+#'   \item Calculates corrected daily gain and feed conversion ratio
+#'   \item Generates statistical summaries of FCR, including sample size, minimum, maximum, median, mean, standard deviation, and coefficient of variation
+#' }
+#'
+#' @seealso
+#' \code{\link{adg_get}} for calculating Average Daily Gain data
+#' \code{\link{adfi_get}} for calculating Average Daily Feed Intake data
+#'
+#' @importFrom cli cli_h1 cli_process_start cli_process_done cli_process_failed cli_abort cli_alert_info cli_alert_success
+#' @importFrom data.table setkeyv :=
+#'
+#' @export
+fcr_get <- function(adg_res, adfi_res, quiet = FALSE) {
+  corrected_adg <- lm_slope <- adg <- cor_fcr <- corrected_dfi <- NULL
+  # 定义处理函数，根据quiet参数决定是否抑制消息和警告
+  process_fn <- if (quiet) {
+    function(expr) suppressMessages(suppressWarnings(expr))
+  } else {
+    function(expr) expr
+  }
+
+  # 使用process_fn包装主要处理逻辑
+  result <- process_fn({
+    cli::cli_h1("Calculating FCR")
+
+    # 验证输入参数
+    cli::cli_process_start("Validating input ADG data")
+    if (!is.list(adg_res) || !all(c("adg_info", "adg_data") %in% names(adg_res))) {
+      cli::cli_process_failed()
+      cli::cli_abort("adg_res must be the output from adg_get() function")
+    }
+    cli::cli_process_done()
+    cli::cli_process_start("Validating input ADFI data")
+    if (!is.list(adfi_res) || !all(c("adfi_info", "adfi_data") %in% names(adfi_res))) {
+      cli::cli_process_failed()
+      cli::cli_abort("adfi_res must be the output from adfi_get() function")
+    }
+
+    if (!data.table::is.data.table(adg_res$adg_info) || !data.table::is.data.table(adfi_res$adfi_info)) {
+      cli::cli_process_failed()
+      cli::cli_abort("adg_info and adfi_info must be data.tables")
+    }
+    cli::cli_process_done()
+
+    # 准备数据
+    cli::cli_process_start("Preparing data for FCR calculation")
+    dt1 <- adg_res$adg_info
+    dt2 <- adfi_res$adfi_info
+
+    data.table::setkeyv(dt1, c("responder", "location"))
+    data.table::setkeyv(dt2, c("responder", "location"))
+
+    # 合并数据
+    cli::cli_alert_info("Merging ADG and ADFI data")
+    joined_dt <- dt1[dt2, nomatch = 0]
+
+    # 计算动物数量
+    animal_count <- nrow(joined_dt)
+    location_count <- length(unique(joined_dt$location))
+    cli::cli_alert_info("Found {.val {animal_count}} animals across {.val {location_count}} locations")
+    cli::cli_process_done()
+
+    # 计算FCR
+    cli::cli_process_start("Calculating FCR values")
+    joined_dt[, `:=`(corrected_adg, (lm_slope + adg) / 2)
+    ][, `:=`(cor_fcr, corrected_dfi/corrected_adg)]
+
+    # 如果存在stage列，计算校正FCR(因预测了体重范围内所有体重与采食量，所以不需要再次校正)
+    # if ("stage" %in% colnames(joined_dt)) {
+    #   cli::cli_alert_info("Calculating corrected FCR based on stage information")
+    #   stage_values <- as.numeric(unlist(strsplit(unique(joined_dt$stage), "-")))
+    #   joined_dt[, `:=`(cor_fcr, fcr +
+    #                      (stage_values[1] - min_weight_cut/1000) * 0.005 +
+    #                      (stage_values[2] - max_weight_cut/1000) * 0.005)]
+    # }
+    cli::cli_process_done()
+
+    # 计算FCR统计摘要
+    cli::cli_process_start("Generating FCR summary statistics")
+    fcr_results_stats <- fcr_summary(joined_dt)
+    cli::cli_process_done()
+
+    # 创建结果列表
+    result_list <- list(
+      fcr_res = joined_dt,
+      adg_info = dt1,
+      adg_data = adg_res$adg_data,
+      adfi_info = dt2,
+      adfi_data = adfi_res$adfi_data,
+      fcr_summary = fcr_results_stats
+    )
+
+    cli::cli_alert_success("FCR calculation completed successfully")
+
+    return(result_list)
+  })
+
+  return(result)
+}
+# Helper function to process data
+process_fcr_data <- function(data) {
+  ..common_cols <- NULL
+  # Determine column names
+  common_cols <- c("min_weight_cut", "max_weight_cut", "lm_slope", "stage_days", "adg", "corrected_dfi", "cor_fcr")  # Define common columns
+
+  # Perform operations on these columns in data
+  data <- data[, ..common_cols]  # Select only the chosen columns from the data
+
+  # Find all columns that contain "weight"
+  weight_cols <- grep("weight", names(data), value = TRUE)
+
+  # Divide all values in these columns by 1000
+  data[, (weight_cols) := lapply(.SD, function(x) x / 1000), .SDcols = weight_cols][]
+
+  return(data)  # Return the processed data
+}
+# Helper function to calculate statistics
+fcr_data_stats <- function(data) {
+  # Calculate statistics for each column in the data
+  stats <- data[, lapply(.SD, function(x) {
+    list(
+      N = sum(!is.na(x)),  # Number of non-NA values
+      min = min(x, na.rm = TRUE),  # Minimum value, ignoring NA
+      max = max(x, na.rm = TRUE),  # Maximum value, ignoring NA
+      median = stats::median(x, na.rm = TRUE),  # Median value, ignoring NA
+      mean = mean(x, na.rm = TRUE),  # Mean value, ignoring NA
+      sd = stats::sd(x, na.rm = TRUE),  # Standard deviation, ignoring NA
+      cv = stats::sd(x, na.rm = TRUE) / mean(x, na.rm = TRUE)  # Coefficient of variation (CV)
+    )
+  })]
+
+  return(stats)  # Return the calculated statistics
+}
+# FCR results summary
+fcr_summary <- function(data) {
+  cv <- N <- NULL
+
+  # Process data and calculate statistics
+  fcr_stats <- process_fcr_data(data) |>
+    fcr_data_stats()
+
+  fcr_summary_data <- data.table::data.table(t(fcr_stats))
+
+  data.table::setnames(fcr_summary_data, c("N", "min", "max", "median", "mean", "sd", "cv"))
+
+  fcr_summary_data$traits <- colnames(fcr_stats)
+
+  data.table::setcolorder(fcr_summary_data, c("traits", setdiff(names(fcr_summary_data), "traits")))
+
+  num_cols <- c("N", "min", "max", "median", "mean", "sd", "cv")
+  fcr_summary_data[, (num_cols) := lapply(.SD, function(x) as.numeric(unlist(x))), .SDcols = num_cols]
 
 
+  fcr_summary_data[, cv := sprintf("%.2f%%", round(cv * 100, 2))][, N := as.character(N)]
 
+  numeric_cols <- names(fcr_summary_data)[sapply(fcr_summary_data, is.numeric)]
+  fcr_summary_data[, (numeric_cols) := lapply(.SD, function(x) sprintf("%0.2f", as.numeric(x))), .SDcols = numeric_cols][]
 
+  return(fcr_summary_data)
+}
+```
+  
+```{r example-fcr_get}
+result_nedap <- preprocess_data(data = mintyr::nedap, station_type = "nedap", quiet = TRUE)
+adg_result <- adg_get(result_nedap, my_break = c(30,120), quiet = TRUE)
+adfi_result <- adfi_get(result_nedap, adg_result, quiet = TRUE)
+fcr_result <- fcr_get(adg_res = adg_result, adfi_res = adfi_result, quiet = TRUE)
+head(fcr_result$fcr_res)
+head(fcr_result$fcr_summary)
+```
+  
+# import_nedap
+    
+```{r function-import_nedap}
+#' Import Nedap Data CSV Files
+#'
+#' @description
+#' Imports and combines data from multiple Nedap data csv files using either the data.table or vroom package.
+#' This function provides a flexible way to read and merge multiple data files with consistent formatting.
+#'
+#' @param filepaths A character vector of file paths to the Nedap data files to be imported.
+#' @param package Character string specifying which package to use for importing; either "data.table" or "vroom". Default is "data.table".
+#' @param ... Additional arguments passed to the underlying import function (data.table::fread or vroom::vroom).
+#'
+#' @return A data.table or tibble (depending on the package used) containing the combined data from all imported files.
+#'
+#' @details
+#' The `import_nedap` function performs the following steps:
+#' \itemize{
+#'   \item Validates that all specified file paths exist
+#'   \item Checks that the requested package is installed and supported
+#'   \item Imports all files using the specified method
+#'   \item Combines all imported data into a single data structure
+#' }
+#'
+#' When using "data.table" as the package, files are read individually with fread() and combined with rbindlist().
+#' When using "vroom", all files are read at once using vroom's multi-file capability.
+#'
+#' @seealso
+#' \code{\link[data.table]{fread}} for data.table's file reading function
+#' \code{\link[vroom]{vroom}} for vroom's file reading function
+#'
+#' @importFrom cli cli_abort cli_alert_info cli_alert_success
+#' @importFrom data.table rbindlist
+#' @importFrom purrr map
+#'
+#' @export
+import_nedap <- function (filepaths, package = "data.table", ...) {
+  # Check if filepaths is provided and is a valid vector of file paths
+  if (missing(filepaths) || is.null(filepaths) || !is.character(filepaths) || !all(file.exists(filepaths))) {
+    cli::cli_abort("filepaths must be a vector of existing file paths.")
+  }
+  
+  # Check if package is valid
+  if (!is.character(package) || !package %in% c("data.table", "vroom")) {
+    cli::cli_abort("package must be one of 'data.table', 'vroom'.")
+  }
+  
+  # Check if package is installed and can be loaded
+  if (!requireNamespace(package, quietly = TRUE)) {
+    cli::cli_abort("Package '{package}' could not be loaded. Please install it.")
+  }
+  
+  # Import data based on the selected package
+  result <- switch(
+    package,
+    data.table = {
+      cli::cli_alert_info("Using package {.pkg data.table} to import {length(filepaths)} files.")
+      data.table::rbindlist(purrr::map(filepaths, function(x, ...) {
+        data.table::fread(x, ...)
+      }, ...))
+    },
+    vroom = {
+      cli::cli_alert_info("Using package {.pkg vroom} to import {length(filepaths)} files.")
+      vroom::vroom(filepaths, ...)
+    },
+    {
+      # This should not be reached due to package validation, but as a fallback
+      cli::cli_abort("Invalid package specified.")
+      invisible(NULL)
+    }
+  )
+  cli::cli_alert_success("Successfully imported data from {length(filepaths)} files")
+  return(result)
+}
+```
+  
+```{r example-import_nedap}
+# Example: CSV file import demonstrations
 
+# Setup test files
+csv_files <- mintyr::mintyr_example(
+  mintyr::mintyr_examples("csv_test")     # Get example CSV files
+)
 
-
+import_nedap(filepaths = csv_files)
+```
+  
+  
+  
 That's it ! This the end of the documented story of our package. All components are there.
 
 <!-- 
