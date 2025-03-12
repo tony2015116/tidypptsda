@@ -18,7 +18,7 @@ data validation, and quality control checks."><meta property="og:image" content=
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.0.0.9000</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0</span>
       </span>
     </div>
 
@@ -62,7 +62,12 @@ data validation, and quality control checks.</p>
     </div>
 
     <div id="ref-usage">
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">preprocess_data</span><span class="op">(</span><span class="va">data</span>, station_type <span class="op">=</span> <span class="st">"nedap"</span>, print_details <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">preprocess_data</span><span class="op">(</span></span>
+<span>  <span class="va">data</span>,</span>
+<span>  station_type <span class="op">=</span> <span class="st">"nedap"</span>,</span>
+<span>  print_details <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  quiet <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div id="arguments">
@@ -90,6 +95,16 @@ data validation, and quality control checks.</p>
 <dt id="arg-print-details">print_details<a class="anchor" aria-label="anchor" href="#arg-print-details"></a></dt>
 <dd><p><code>[logical]</code> Debugging output control</p><ul><li><p><code>TRUE</code>: Show detailed duplicate responder information</p></li>
 <li><p><code>FALSE</code>: Suppress detailed output (default)</p></li>
+</ul></dd>
+
+
+<dt id="arg-quiet">quiet<a class="anchor" aria-label="anchor" href="#arg-quiet"></a></dt>
+<dd><p>Comprehensive silencing control</p><ul><li><p><strong>Purpose</strong>: Suppresses all non-essential output</p></li>
+<li><p><strong>Default</strong>: <code>FALSE</code></p></li>
+<li><p><strong>Effect</strong>:</p><ul><li><p>Disables progress messages</p></li>
+<li><p>Suppresses warnings</p></li>
+<li><p>Overrides print_details</p></li>
+</ul></li>
 </ul></dd>
 
 </dl></div>
@@ -133,7 +148,7 @@ data validation, and quality control checks.</p>
     <h2>Note</h2>
     <p>Key Constraints:</p><ul><li><p>Critical columns must exist based on <code>station_type</code></p></li>
 <li><p>FIRE data conversion includes:
-- Unit conversions (kg → g)
+- Unit conversions (kg to g)
 - DateTime standardization (UTC timezone)
 - Removal of invalid <code>Tag == "0"</code> records</p></li>
 <li><p>Duplicate responder resolution selects location with most records</p></li>
@@ -141,34 +156,13 @@ data validation, and quality control checks.</p>
     <div id="see-also">
     <h2>See also</h2>
     <div class="dont-index">
-<ul><li><p><a href="https://rdrr.io/pkg/data.table/man/data.table.html" class="external-link">data.table::data.table</a> For underlying data manipulation</p></li>
+<ul><li><p><a href="https://rdatatable.gitlab.io/data.table/reference/data.table.html" class="external-link">data.table::data.table</a> For underlying data manipulation</p></li>
 </ul></div>
     </div>
 
     <div id="ref-examples">
     <h2>Examples</h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">result_nedap</span> <span class="op">&lt;-</span> <span class="fu">preprocess_data</span><span class="op">(</span>data <span class="op">=</span> <span class="fu">mintyr</span><span class="fu">::</span><span class="va"><a href="https://tony2015116.github.io/mintyr/reference/nedap.html" class="external-link">nedap</a></span>, station_type <span class="op">=</span> <span class="st">"nedap"</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Pre-processing </span><span style="color: #00BB00; font-weight: bold;">NEDAP</span><span style="font-weight: bold;"> Data</span> <span style="color: #00BBBB;">───────────────────────────────────────────────────</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Validating input <span style="color: #00BB00;">NEDAP</span> data</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Created a copy of the input data.table</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Validating input <span style="color: #00BB00;">NEDAP</span> data</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Validating input <span style="color: #00BB00;">NEDAP</span> data ... done</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Converting data variable types</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Converting data variable types ... done</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Removed <span style="color: #BB0000;">211</span> duplicate records or NA responders</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Initial valid responders: <span style="color: #00BB00;">30</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Checking for duplicated responders across locations</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> No duplicated responders found</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Checking for duplicated responders across locations</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Checking for duplicated responders across locations ... done</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Creating new dataset with sequence numbers</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Creating new dataset with sequence numbers ... done</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Data pre-processing completed successfully</span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">result_nedap</span> <span class="op">&lt;-</span> <span class="fu">preprocess_data</span><span class="op">(</span>data <span class="op">=</span> <span class="fu">mintyr</span><span class="fu">::</span><span class="va"><a href="https://tony2015116.github.io/mintyr/reference/nedap.html" class="external-link">nedap</a></span>, station_type <span class="op">=</span> <span class="st">"nedap"</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">result_nedap</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Key: &lt;responder, date, visit_time&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    animal_number lifenumber responder location          visit_time duration</span>

@@ -38,7 +38,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.0.0.9000</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0</span>
       </span>
     </div>
 
@@ -107,43 +107,10 @@ Fill and run the content of this chunk, before anything else.
 Note: when you will use other flat templates, this part will be in a separate file. Do not be surprised!
 -->
 <div class="section level2">
-<h2 id="add-one-to-any-value">Add one to any value<a class="anchor" aria-label="anchor" href="#add-one-to-any-value"></a>
-</h2>
-<p>This is the first tool of our wonderful package. You can add
-<code>1</code> to any <code>value</code> using function
-<code>add_one()</code>.</p>
-<!-- 
-This first section shows:
-
-- the three parts necessary for a package: 'function', 'examples' and 'tests'.  
-  + Note that the three following chunks have names accordingly.
-
--->
-</div>
-<div class="section level2">
 <h2 id="preprocess_data">preprocess_data<a class="anchor" aria-label="anchor" href="#preprocess_data"></a>
 </h2>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">result_nedap</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/preprocess_data.html">preprocess_data</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu">mintyr</span><span class="fu">::</span><span class="va"><a href="https://tony2015116.github.io/mintyr/reference/nedap.html" class="external-link">nedap</a></span>, station_type <span class="op">=</span> <span class="st">"nedap"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Pre-processing </span><span style="color: #00BB00; font-weight: bold;">NEDAP</span><span style="font-weight: bold;"> Data</span> <span style="color: #00BBBB;">───────────────────────────────────────────────────</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Validating input <span style="color: #00BB00;">NEDAP</span> data</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Created a copy of the input data.table</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Validating input <span style="color: #00BB00;">NEDAP</span> data<span style="color: #00BB00;">✔</span> Validating input <span style="color: #00BB00;">NEDAP</span> data ... done</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Converting data variable types</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Converting data variable types ... done</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Removed <span style="color: #BB0000;">211</span> duplicate records or NA responders</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Initial valid responders: <span style="color: #00BB00;">30</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Checking for duplicated responders across locations</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> No duplicated responders found</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Checking for duplicated responders across locations<span style="color: #00BB00;">✔</span> Checking for duplicated responders across locations ... done</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Creating new dataset with sequence numbers</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Creating new dataset with sequence numbers ... done</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Data pre-processing completed successfully</span></span>
+<code class="sourceCode R"><span><span class="va">result_nedap</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/preprocess_data.html">preprocess_data</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu">mintyr</span><span class="fu">::</span><span class="va"><a href="https://tony2015116.github.io/mintyr/reference/nedap.html" class="external-link">nedap</a></span>, station_type <span class="op">=</span> <span class="st">"nedap"</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">result_nedap</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Key: &lt;responder, date, visit_time&gt;</span></span>
 <span><span class="co">#&gt;    animal_number lifenumber responder location          visit_time duration</span></span>
@@ -175,66 +142,8 @@ This first section shows:
 <h2 id="clean_weight_get">clean_weight_get<a class="anchor" aria-label="anchor" href="#clean_weight_get"></a>
 </h2>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">result_nedap</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/preprocess_data.html">preprocess_data</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu">mintyr</span><span class="fu">::</span><span class="va"><a href="https://tony2015116.github.io/mintyr/reference/nedap.html" class="external-link">nedap</a></span>, station_type <span class="op">=</span> <span class="st">"nedap"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Pre-processing </span><span style="color: #00BB00; font-weight: bold;">NEDAP</span><span style="font-weight: bold;"> Data</span> <span style="color: #00BBBB;">───────────────────────────────────────────────────</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Validating input <span style="color: #00BB00;">NEDAP</span> data</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Created a copy of the input data.table</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Validating input <span style="color: #00BB00;">NEDAP</span> data<span style="color: #00BB00;">✔</span> Validating input <span style="color: #00BB00;">NEDAP</span> data ... done</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Converting data variable types</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Converting data variable types ... done</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Removed <span style="color: #BB0000;">211</span> duplicate records or NA responders</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Initial valid responders: <span style="color: #00BB00;">30</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Checking for duplicated responders across locations</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> No duplicated responders found</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Checking for duplicated responders across locations<span style="color: #00BB00;">✔</span> Checking for duplicated responders across locations ... done</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Creating new dataset with sequence numbers</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Creating new dataset with sequence numbers ... done</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Data pre-processing completed successfully</span></span>
-<span><span class="va">clean_weight</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/clean_weight_get.html">clean_weight_get</a></span><span class="op">(</span><span class="va">result_nedap</span>, my_break <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>,<span class="fl">120</span><span class="op">)</span>, range_offset <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Pre-cleaning Low Quality Records</span> <span style="color: #00BBBB;">────────────────────────────────────────────</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Calculating maximum weight boundary</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Calculating maximum weight boundary ... done</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Removing records with max weight less than <span style="color: #00BB00;">15kg</span> will not delete responder</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Processing data quality checks</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Processing data quality checks ... done</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; <span style="color: #BB0000;">✖</span> Removing low quality records will delete <span style="color: #00BB00;">1</span> responders</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Pre-cleaning low quality records completed!</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Test period less than <span style="color: #00BB00;">35</span> days: <span style="color: #BB0000;">1</span> responders</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Less than <span style="color: #00BB00;">20</span> records: <span style="color: #BB0000;">0</span> responders</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> More than <span style="color: #00BB00;">30%</span> of data is missing: <span style="color: #BB0000;">0</span> responders</span></span>
-<span><span class="co">#&gt; ── Deleted Responders ──────────────────────────────────────────────────────────</span></span>
-<span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> Total deleted responder: <span style="color: #BB0000;">1</span></span></span>
-<span><span class="co">#&gt; <span style="font-weight: bold;">c</span><span style="color: #D7AF00;">(</span><span style="color: #00AFAF;">"15964"</span><span style="color: #D7AF00;">)</span></span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Abnormal Weight Detection</span> <span style="color: #00BBBB;">───────────────────────────────────────────────────</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Total responders processed: <span style="color: #00BB00;">29</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Detecting weight outliers</span></span>
-<span><span class="co">#&gt; ⠙ Fitting robust regression models</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Fitting robust regression models <span style="color: #B2B2B2;">[2ms]</span></span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Detecting weight outliers<span style="color: #00BBBB;">•</span> Outliers detected: <span style="color: #BB0000;">2281</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Detecting weight outliers<span style="color: #00BBBB;">•</span> Outlier percentage: <span style="color: #BB0000;">7.26%</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Detecting weight outliers<span style="color: #00BB00;">✔</span> Detecting weight outliers ... done</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> No responders will be deleted based on outlier detection</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Validating Responder Weights</span> <span style="color: #00BBBB;">────────────────────────────────────────────────</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> All responders' entry weights are within limit <span style="color: #00BB00;">65kg</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BB0000;">✖</span> Found <span style="color: #BB0000;">1</span> responder below exit weight limit of <span style="color: #00BB00;">85kg</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Initial responders: <span style="color: #00BB00;">29</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Removed responders: <span style="color: #BB0000;">1</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Remaining responders: <span style="color: #00BB00;">28</span></span></span>
-<span><span class="co">#&gt; ── Deleted Responders ──────────────────────────────────────────────────────────</span></span>
-<span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> Total deleted responder: <span style="color: #BB0000;">1</span></span></span>
-<span><span class="co">#&gt; <span style="font-weight: bold;">c</span><span style="color: #D7AF00;">(</span><span style="color: #00AFAF;">"15967"</span><span style="color: #D7AF00;">)</span></span></span>
+<code class="sourceCode R"><span><span class="va">result_nedap</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/preprocess_data.html">preprocess_data</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu">mintyr</span><span class="fu">::</span><span class="va"><a href="https://tony2015116.github.io/mintyr/reference/nedap.html" class="external-link">nedap</a></span>, station_type <span class="op">=</span> <span class="st">"nedap"</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="va">clean_weight</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/clean_weight_get.html">clean_weight_get</a></span><span class="op">(</span><span class="va">result_nedap</span>, my_break <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>,<span class="fl">120</span><span class="op">)</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">clean_weight</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Key: &lt;responder&gt;</span></span>
 <span><span class="co">#&gt;    responder location       date seq_in_location seq_days seq_in_day weight</span></span>
@@ -253,6 +162,182 @@ This first section shows:
 <span><span class="co">#&gt; 4:    23212.70        FALSE</span></span>
 <span><span class="co">#&gt; 5:    23212.70        FALSE</span></span>
 <span><span class="co">#&gt; 6:    23212.70        FALSE</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="adg_get">adg_get<a class="anchor" aria-label="anchor" href="#adg_get"></a>
+</h2>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">result_nedap</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/preprocess_data.html">preprocess_data</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu">mintyr</span><span class="fu">::</span><span class="va"><a href="https://tony2015116.github.io/mintyr/reference/nedap.html" class="external-link">nedap</a></span>, station_type <span class="op">=</span> <span class="st">"nedap"</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="va">adg_result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/adg_get.html">adg_get</a></span><span class="op">(</span><span class="va">result_nedap</span>, my_break <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>,<span class="fl">120</span><span class="op">)</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">adg_result</span><span class="op">$</span><span class="va">adg_info</span><span class="op">)</span></span>
+<span><span class="co">#&gt;    responder location  stage start_date_cut min_weight_cut end_date_cut</span></span>
+<span><span class="co">#&gt;       &lt;char&gt;   &lt;char&gt; &lt;char&gt;         &lt;Date&gt;          &lt;num&gt;       &lt;Date&gt;</span></span>
+<span><span class="co">#&gt; 1:     13913      101 30-120     2024-03-02       30500.00   2024-05-16</span></span>
+<span><span class="co">#&gt; 2:     13918      101 30-120     2024-03-07       29846.15   2024-05-24</span></span>
+<span><span class="co">#&gt; 3:     13954      101 30-120     2024-02-25       35250.00   2024-05-23</span></span>
+<span><span class="co">#&gt; 4:     13996      101 30-120     2024-02-27       32136.36   2024-05-06</span></span>
+<span><span class="co">#&gt; 5:     14962      101 30-120     2024-02-26       33400.00   2024-05-07</span></span>
+<span><span class="co">#&gt; 6:     15006      101 30-120     2024-02-27       32500.00   2024-05-06</span></span>
+<span><span class="co">#&gt;    max_weight_cut  lm_slope r_squared stage_days      adg</span></span>
+<span><span class="co">#&gt;             &lt;num&gt;     &lt;num&gt;     &lt;num&gt;      &lt;num&gt;    &lt;num&gt;</span></span>
+<span><span class="co">#&gt; 1:       121171.9 1193.6622 0.9938655         75 1200.000</span></span>
+<span><span class="co">#&gt; 2:       119208.3 1147.9651 0.9968953         78 1153.846</span></span>
+<span><span class="co">#&gt; 3:       112295.5  998.5019 0.9375183         88 1022.727</span></span>
+<span><span class="co">#&gt; 4:       119850.0 1308.1903 0.9950834         69 1304.348</span></span>
+<span><span class="co">#&gt; 5:       121375.0 1261.8753 0.9957298         71 1267.606</span></span>
+<span><span class="co">#&gt; 6:       119517.9 1300.1419 0.9958055         69 1304.348</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">adg_result</span><span class="op">$</span><span class="va">adg_data</span><span class="op">)</span></span>
+<span><span class="co">#&gt;    responder       date seq_days location seq_in_day weight rlm_predict</span></span>
+<span><span class="co">#&gt;       &lt;char&gt;     &lt;Date&gt;    &lt;num&gt;   &lt;char&gt;      &lt;int&gt;  &lt;num&gt;       &lt;num&gt;</span></span>
+<span><span class="co">#&gt; 1:     13913 2024-02-19        1      101          1  23500    22407.54</span></span>
+<span><span class="co">#&gt; 2:     13913 2024-02-20        2      101          1  23500    23212.70</span></span>
+<span><span class="co">#&gt; 3:     13913 2024-02-20        2      101          2  31000    23212.70</span></span>
+<span><span class="co">#&gt; 4:     13913 2024-02-20        2      101          3  23500    23212.70</span></span>
+<span><span class="co">#&gt; 5:     13913 2024-02-20        2      101          4  24000    23212.70</span></span>
+<span><span class="co">#&gt; 6:     13913 2024-02-20        2      101          6  28500    23212.70</span></span>
+<span><span class="co">#&gt;    rlm_outliers predicted_weight_lm lower_lm upper_lm r_squared_lm  outlier</span></span>
+<span><span class="co">#&gt;          &lt;lgcl&gt;               &lt;num&gt;    &lt;num&gt;    &lt;num&gt;        &lt;num&gt;   &lt;char&gt;</span></span>
+<span><span class="co">#&gt; 1:        FALSE                  NA       NA       NA           NA    bound</span></span>
+<span><span class="co">#&gt; 2:        FALSE                  NA       NA       NA           NA    bound</span></span>
+<span><span class="co">#&gt; 3:         TRUE                  NA       NA       NA           NA outliers</span></span>
+<span><span class="co">#&gt; 4:        FALSE                  NA       NA       NA           NA    bound</span></span>
+<span><span class="co">#&gt; 5:        FALSE                  NA       NA       NA           NA    bound</span></span>
+<span><span class="co">#&gt; 6:        FALSE                  NA       NA       NA           NA    bound</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="adfi_get">adfi_get<a class="anchor" aria-label="anchor" href="#adfi_get"></a>
+</h2>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">result_nedap</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/preprocess_data.html">preprocess_data</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu">mintyr</span><span class="fu">::</span><span class="va"><a href="https://tony2015116.github.io/mintyr/reference/nedap.html" class="external-link">nedap</a></span>, station_type <span class="op">=</span> <span class="st">"nedap"</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="va">adg_result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/adg_get.html">adg_get</a></span><span class="op">(</span><span class="va">result_nedap</span>, my_break <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>,<span class="fl">120</span><span class="op">)</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="va">adfi_result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/adfi_get.html">adfi_get</a></span><span class="op">(</span><span class="va">result_nedap</span>, <span class="va">adg_result</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">adfi_result</span><span class="op">$</span><span class="va">adfi_info</span><span class="op">)</span></span>
+<span><span class="co">#&gt;    responder location origin_dfi corrected_dfi</span></span>
+<span><span class="co">#&gt;       &lt;char&gt;   &lt;char&gt;      &lt;num&gt;         &lt;num&gt;</span></span>
+<span><span class="co">#&gt; 1:     13913      101   2535.959      2560.189</span></span>
+<span><span class="co">#&gt; 2:     13918      101   2319.814      2307.572</span></span>
+<span><span class="co">#&gt; 3:     13935      102   2703.371      2704.603</span></span>
+<span><span class="co">#&gt; 4:     13954      101   2317.260      2307.228</span></span>
+<span><span class="co">#&gt; 5:     13996      101   2909.309      2921.705</span></span>
+<span><span class="co">#&gt; 6:     14260      102   2846.546      2822.715</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">adfi_result</span><span class="op">$</span><span class="va">adfi_data</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Key: &lt;responder, seq_days&gt;</span></span>
+<span><span class="co">#&gt;    responder location       date seq_days origin_dfi corrected_dfi  state</span></span>
+<span><span class="co">#&gt;       &lt;char&gt;   &lt;char&gt;     &lt;Date&gt;    &lt;int&gt;      &lt;int&gt;         &lt;num&gt; &lt;char&gt;</span></span>
+<span><span class="co">#&gt; 1:     13913      101 2024-02-19        1          1      896.8517   elrp</span></span>
+<span><span class="co">#&gt; 2:     13913      101 2024-02-20        2        677      677.0000    org</span></span>
+<span><span class="co">#&gt; 3:     13913      101 2024-02-21        3        661      661.0000    org</span></span>
+<span><span class="co">#&gt; 4:     13913      101 2024-02-22        4        869      869.0000    org</span></span>
+<span><span class="co">#&gt; 5:     13913      101 2024-02-23        5       1046     1046.0000    org</span></span>
+<span><span class="co">#&gt; 6:     13913      101 2024-02-24        6        998      998.0000    org</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="adg_plot">adg_plot<a class="anchor" aria-label="anchor" href="#adg_plot"></a>
+</h2>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">result_nedap</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/preprocess_data.html">preprocess_data</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu">mintyr</span><span class="fu">::</span><span class="va"><a href="https://tony2015116.github.io/mintyr/reference/nedap.html" class="external-link">nedap</a></span>, station_type <span class="op">=</span> <span class="st">"nedap"</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="va">adg_result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/adg_get.html">adg_get</a></span><span class="op">(</span><span class="va">result_nedap</span>, my_break <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>,<span class="fl">120</span><span class="op">)</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/adg_plot.html">adg_plot</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">adg_result</span>, save_path <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, location <span class="op">=</span> <span class="st">"101"</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="co"># Check exported files</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/list.files.html" class="external-link">list.files</a></span><span class="op">(</span>path <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, pattern <span class="op">=</span> <span class="st">"png"</span>, recursive <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "loc_101_grow.png"</span></span>
+<span><span class="co"># Clean up exported files</span></span>
+<span><span class="va">files</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.files.html" class="external-link">list.files</a></span><span class="op">(</span></span>
+<span>  path <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>,         <span class="co"># Default export directory</span></span>
+<span>  pattern <span class="op">=</span> <span class="st">"png"</span>,          <span class="co"># File type pattern to search</span></span>
+<span>  recursive <span class="op">=</span> <span class="cn">TRUE</span>,         <span class="co"># Search in subdirectories</span></span>
+<span>  full.names <span class="op">=</span> <span class="cn">TRUE</span>         <span class="co"># Return full file paths</span></span>
+<span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.remove</a></span><span class="op">(</span><span class="va">files</span><span class="op">)</span>          <span class="co"># Remove all exported files</span></span>
+<span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="adfi_plot">adfi_plot<a class="anchor" aria-label="anchor" href="#adfi_plot"></a>
+</h2>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">result_nedap</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/preprocess_data.html">preprocess_data</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu">mintyr</span><span class="fu">::</span><span class="va"><a href="https://tony2015116.github.io/mintyr/reference/nedap.html" class="external-link">nedap</a></span>, station_type <span class="op">=</span> <span class="st">"nedap"</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="va">adg_result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/adg_get.html">adg_get</a></span><span class="op">(</span><span class="va">result_nedap</span>, my_break <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>,<span class="fl">120</span><span class="op">)</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="va">adfi_result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/adfi_get.html">adfi_get</a></span><span class="op">(</span><span class="va">result_nedap</span>, <span class="va">adg_result</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/adfi_plot.html">adfi_plot</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">adfi_result</span>, save_path <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, location <span class="op">=</span> <span class="st">"101"</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="co"># Check exported files</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/list.files.html" class="external-link">list.files</a></span><span class="op">(</span>path <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, pattern <span class="op">=</span> <span class="st">"png"</span>, recursive <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "loc_101_adfi.png"</span></span>
+<span><span class="co"># Clean up exported files</span></span>
+<span><span class="va">files</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.files.html" class="external-link">list.files</a></span><span class="op">(</span></span>
+<span>  path <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>,         <span class="co"># Default export directory</span></span>
+<span>  pattern <span class="op">=</span> <span class="st">"png"</span>,          <span class="co"># File type pattern to search</span></span>
+<span>  recursive <span class="op">=</span> <span class="cn">TRUE</span>,         <span class="co"># Search in subdirectories</span></span>
+<span>  full.names <span class="op">=</span> <span class="cn">TRUE</span>         <span class="co"># Return full file paths</span></span>
+<span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.remove</a></span><span class="op">(</span><span class="va">files</span><span class="op">)</span>          <span class="co"># Remove all exported files</span></span>
+<span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="fcr_get">fcr_get<a class="anchor" aria-label="anchor" href="#fcr_get"></a>
+</h2>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">result_nedap</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/preprocess_data.html">preprocess_data</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu">mintyr</span><span class="fu">::</span><span class="va"><a href="https://tony2015116.github.io/mintyr/reference/nedap.html" class="external-link">nedap</a></span>, station_type <span class="op">=</span> <span class="st">"nedap"</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="va">adg_result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/adg_get.html">adg_get</a></span><span class="op">(</span><span class="va">result_nedap</span>, my_break <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>,<span class="fl">120</span><span class="op">)</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="va">adfi_result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/adfi_get.html">adfi_get</a></span><span class="op">(</span><span class="va">result_nedap</span>, <span class="va">adg_result</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="va">fcr_result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fcr_get.html">fcr_get</a></span><span class="op">(</span>adg_res <span class="op">=</span> <span class="va">adg_result</span>, adfi_res <span class="op">=</span> <span class="va">adfi_result</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">fcr_result</span><span class="op">$</span><span class="va">fcr_res</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Key: &lt;responder, location&gt;</span></span>
+<span><span class="co">#&gt;    responder location  stage start_date_cut min_weight_cut end_date_cut</span></span>
+<span><span class="co">#&gt;       &lt;char&gt;   &lt;char&gt; &lt;char&gt;         &lt;Date&gt;          &lt;num&gt;       &lt;Date&gt;</span></span>
+<span><span class="co">#&gt; 1:     13913      101 30-120     2024-03-02       30500.00   2024-05-16</span></span>
+<span><span class="co">#&gt; 2:     13918      101 30-120     2024-03-07       29846.15   2024-05-24</span></span>
+<span><span class="co">#&gt; 3:     13935      102 30-120     2024-02-28       31388.89   2024-05-09</span></span>
+<span><span class="co">#&gt; 4:     13954      101 30-120     2024-02-25       35250.00   2024-05-23</span></span>
+<span><span class="co">#&gt; 5:     13996      101 30-120     2024-02-27       32136.36   2024-05-06</span></span>
+<span><span class="co">#&gt; 6:     14260      102 30-120     2024-02-23       31437.50   2024-05-07</span></span>
+<span><span class="co">#&gt;    max_weight_cut  lm_slope r_squared stage_days      adg origin_dfi</span></span>
+<span><span class="co">#&gt;             &lt;num&gt;     &lt;num&gt;     &lt;num&gt;      &lt;num&gt;    &lt;num&gt;      &lt;num&gt;</span></span>
+<span><span class="co">#&gt; 1:       121171.9 1193.6622 0.9938655         75 1200.000   2535.959</span></span>
+<span><span class="co">#&gt; 2:       119208.3 1147.9651 0.9968953         78 1153.846   2319.814</span></span>
+<span><span class="co">#&gt; 3:       119937.5 1261.9862 0.9973985         71 1267.606   2703.371</span></span>
+<span><span class="co">#&gt; 4:       112295.5  998.5019 0.9375183         88 1022.727   2317.260</span></span>
+<span><span class="co">#&gt; 5:       119850.0 1308.1903 0.9950834         69 1304.348   2909.309</span></span>
+<span><span class="co">#&gt; 6:       121000.0 1224.6884 0.9954987         74 1216.216   2846.546</span></span>
+<span><span class="co">#&gt;    corrected_dfi corrected_adg  cor_fcr</span></span>
+<span><span class="co">#&gt;            &lt;num&gt;         &lt;num&gt;    &lt;num&gt;</span></span>
+<span><span class="co">#&gt; 1:      2560.189      1196.831 2.139140</span></span>
+<span><span class="co">#&gt; 2:      2307.572      1150.906 2.005005</span></span>
+<span><span class="co">#&gt; 3:      2704.603      1264.796 2.138371</span></span>
+<span><span class="co">#&gt; 4:      2307.228      1010.615 2.282995</span></span>
+<span><span class="co">#&gt; 5:      2921.705      1306.269 2.236679</span></span>
+<span><span class="co">#&gt; 6:      2822.715      1220.452 2.312844</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">fcr_result</span><span class="op">$</span><span class="va">fcr_summary</span><span class="op">)</span></span>
+<span><span class="co">#&gt;            traits      N     min     max  median    mean     sd     cv</span></span>
+<span><span class="co">#&gt;            &lt;char&gt; &lt;char&gt;  &lt;char&gt;  &lt;char&gt;  &lt;char&gt;  &lt;char&gt; &lt;char&gt; &lt;char&gt;</span></span>
+<span><span class="co">#&gt; 1: min_weight_cut     28   27.80   35.25   31.13   31.35   1.40  4.46%</span></span>
+<span><span class="co">#&gt; 2: max_weight_cut     28  104.16  121.38  119.49  118.48   3.48  2.94%</span></span>
+<span><span class="co">#&gt; 3:       lm_slope     28  934.27 1358.17 1219.19 1199.13 107.21  8.94%</span></span>
+<span><span class="co">#&gt; 4:     stage_days     28   66.00   96.00   74.00   75.36   7.53 10.00%</span></span>
+<span><span class="co">#&gt; 5:            adg     28  937.50 1363.64 1216.22 1204.68 108.19  8.98%</span></span>
+<span><span class="co">#&gt; 6:  corrected_dfi     28 2039.54 3333.84 2817.13 2745.49 333.44 12.14%</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="import_nedap">import_nedap<a class="anchor" aria-label="anchor" href="#import_nedap"></a>
+</h2>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Example: CSV file import demonstrations</span></span>
+<span></span>
+<span><span class="co"># Setup test files</span></span>
+<span><span class="va">csv_files</span> <span class="op">&lt;-</span> <span class="fu">mintyr</span><span class="fu">::</span><span class="fu"><a href="https://tony2015116.github.io/mintyr/reference/mintyr_example.html" class="external-link">mintyr_example</a></span><span class="op">(</span></span>
+<span>  <span class="fu">mintyr</span><span class="fu">::</span><span class="fu"><a href="https://tony2015116.github.io/mintyr/reference/mintyr_examples.html" class="external-link">mintyr_examples</a></span><span class="op">(</span><span class="st">"csv_test"</span><span class="op">)</span>     <span class="co"># Get example CSV files</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="../reference/import_nedap.html">import_nedap</a></span><span class="op">(</span>filepaths <span class="op">=</span> <span class="va">csv_files</span><span class="op">)</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Using package <span style="color: #0000BB;">data.table</span> to import 2 files.</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Successfully imported data from 2 files</span></span>
+<span><span class="co">#&gt;     col1   col2   col3</span></span>
+<span><span class="co">#&gt;    &lt;int&gt; &lt;char&gt; &lt;lgcl&gt;</span></span>
+<span><span class="co">#&gt; 1:     4      d  FALSE</span></span>
+<span><span class="co">#&gt; 2:     5      f   TRUE</span></span>
+<span><span class="co">#&gt; 3:     6      e   TRUE</span></span>
+<span><span class="co">#&gt; 4:    15      o  FALSE</span></span>
+<span><span class="co">#&gt; 5:    16      p   TRUE</span></span>
+<span><span class="co">#&gt; 6:    17      q  FALSE</span></span></code></pre></div>
 <p>That’s it ! This the end of the documented story of our package. All
 components are there.</p>
 <!-- 

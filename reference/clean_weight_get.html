@@ -18,7 +18,7 @@ integrating multiple quality control checks and statistical validation steps."><
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.0.0.9000</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0</span>
       </span>
     </div>
 
@@ -178,7 +178,7 @@ integrating multiple quality control checks and statistical validation steps.</p
 <dd><p>Prediction window extension</p><ul><li><p><strong>Purpose</strong>: Forecast period for growth modeling</p></li>
 <li><p><strong>Units</strong>: Days</p></li>
 <li><p><strong>Default</strong>: <code>30</code></p></li>
-<li><p><strong>Constraint</strong>: Must be ≥ 0</p></li>
+<li><p><strong>Constraint</strong>: Must be &gt;= 0</p></li>
 </ul></dd>
 
 
@@ -192,7 +192,7 @@ integrating multiple quality control checks and statistical validation steps.</p
 <dt id="arg-degree">degree<a class="anchor" aria-label="anchor" href="#arg-degree"></a></dt>
 <dd><p>Polynomial regression complexity</p><ul><li><p><strong>Purpose</strong>: Determines growth curve flexibility</p></li>
 <li><p><strong>Default</strong>: <code>2</code> (quadratic)</p></li>
-<li><p><strong>Constraint</strong>: 1 ≤ degree ≤ 3</p></li>
+<li><p><strong>Constraint</strong>: 1 &lt;= degree &lt;= 3</p></li>
 </ul></dd>
 
 
@@ -204,13 +204,7 @@ integrating multiple quality control checks and statistical validation steps.</p
 
 
 <dt id="arg-quiet">quiet<a class="anchor" aria-label="anchor" href="#arg-quiet"></a></dt>
-<dd><p>Comprehensive silencing control</p><ul><li><p><strong>Purpose</strong>: Suppresses all non-essential output</p></li>
-<li><p><strong>Default</strong>: <code>FALSE</code></p></li>
-<li><p><strong>Effect</strong>:</p><ul><li><p>Disables progress messages</p></li>
-<li><p>Suppresses warnings</p></li>
-<li><p>Overrides print_details</p></li>
-</ul></li>
-</ul></dd>
+<dd><p>Logical. If TRUE, suppresses messages and warnings. Default: FALSE.</p></dd>
 
 </dl></div>
     <div id="value">
@@ -235,7 +229,7 @@ integrating multiple quality control checks and statistical validation steps.</p
 <li><p>Parameter sanity checks</p></li>
 <li><p>Column existence validation</p></li>
 </ul></li>
-<li><p><strong>Data Cleansing</strong></p><ul><li><p>Unit conversion (kg ↔ g)</p></li>
+<li><p><strong>Data Cleansing</strong></p><ul><li><p>Unit conversion (kg to g)</p></li>
 <li><p>Invalid responder filtering</p></li>
 <li><p>Temporal consistency checks</p></li>
 <li><p>Missing data thresholding</p></li>
@@ -262,71 +256,8 @@ integrating multiple quality control checks and statistical validation steps.</p
 
     <div id="ref-examples">
     <h2>Examples</h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">result_nedap</span> <span class="op">&lt;-</span> <span class="fu"><a href="preprocess_data.html">preprocess_data</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu">mintyr</span><span class="fu">::</span><span class="va"><a href="https://tony2015116.github.io/mintyr/reference/nedap.html" class="external-link">nedap</a></span>, station_type <span class="op">=</span> <span class="st">"nedap"</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Pre-processing </span><span style="color: #00BB00; font-weight: bold;">NEDAP</span><span style="font-weight: bold;"> Data</span> <span style="color: #00BBBB;">───────────────────────────────────────────────────</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Validating input <span style="color: #00BB00;">NEDAP</span> data</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Created a copy of the input data.table</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Validating input <span style="color: #00BB00;">NEDAP</span> data</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Validating input <span style="color: #00BB00;">NEDAP</span> data ... done</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Converting data variable types</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Converting data variable types ... done</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Removed <span style="color: #BB0000;">211</span> duplicate records or NA responders</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Initial valid responders: <span style="color: #00BB00;">30</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Checking for duplicated responders across locations</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> No duplicated responders found</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Checking for duplicated responders across locations</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Checking for duplicated responders across locations ... done</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Creating new dataset with sequence numbers</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Creating new dataset with sequence numbers ... done</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Data pre-processing completed successfully</span>
-<span class="r-in"><span><span class="va">clean_weight</span> <span class="op">&lt;-</span> <span class="fu">clean_weight_get</span><span class="op">(</span><span class="va">result_nedap</span>, my_break <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>,<span class="fl">120</span><span class="op">)</span>, range_offset <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Pre-cleaning Low Quality Records</span> <span style="color: #00BBBB;">────────────────────────────────────────────</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Calculating maximum weight boundary</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Calculating maximum weight boundary ... done</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Removing records with max weight less than <span style="color: #00BB00;">15kg</span> will not delete responder</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Processing data quality checks</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Processing data quality checks ... done</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #BB0000;">✖</span> Removing low quality records will delete <span style="color: #00BB00;">1</span> responders</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Pre-cleaning low quality records completed!</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Test period less than <span style="color: #00BB00;">35</span> days: <span style="color: #BB0000;">1</span> responders</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Less than <span style="color: #00BB00;">20</span> records: <span style="color: #BB0000;">0</span> responders</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> More than <span style="color: #00BB00;">30%</span> of data is missing: <span style="color: #BB0000;">0</span> responders</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> ── Deleted Responders ──────────────────────────────────────────────────────────</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #BBBB00;">!</span> Total deleted responder: <span style="color: #BB0000;">1</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">c</span><span style="color: #D7AF00;">(</span><span style="color: #00AFAF;">"15964"</span><span style="color: #D7AF00;">)</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Abnormal Weight Detection</span> <span style="color: #00BBBB;">───────────────────────────────────────────────────</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Total responders processed: <span style="color: #00BB00;">29</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Detecting weight outliers</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> ⠙ Fitting robust regression models</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Fitting robust regression models <span style="color: #B2B2B2;">[3ms]</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Detecting weight outliers</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Outliers detected: <span style="color: #BB0000;">2281</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Detecting weight outliers</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Outlier percentage: <span style="color: #BB0000;">7.26%</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Detecting weight outliers</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Detecting weight outliers ... done</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> No responders will be deleted based on outlier detection</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Validating Responder Weights</span> <span style="color: #00BBBB;">────────────────────────────────────────────────</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> All responders' entry weights are within limit <span style="color: #00BB00;">65kg</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #BB0000;">✖</span> Found <span style="color: #BB0000;">1</span> responder below exit weight limit of <span style="color: #00BB00;">85kg</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Initial responders: <span style="color: #00BB00;">29</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Removed responders: <span style="color: #BB0000;">1</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Remaining responders: <span style="color: #00BB00;">28</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> ── Deleted Responders ──────────────────────────────────────────────────────────</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #BBBB00;">!</span> Total deleted responder: <span style="color: #BB0000;">1</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">c</span><span style="color: #D7AF00;">(</span><span style="color: #00AFAF;">"15967"</span><span style="color: #D7AF00;">)</span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">result_nedap</span> <span class="op">&lt;-</span> <span class="fu"><a href="preprocess_data.html">preprocess_data</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu">mintyr</span><span class="fu">::</span><span class="va"><a href="https://tony2015116.github.io/mintyr/reference/nedap.html" class="external-link">nedap</a></span>, station_type <span class="op">=</span> <span class="st">"nedap"</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">clean_weight</span> <span class="op">&lt;-</span> <span class="fu">clean_weight_get</span><span class="op">(</span><span class="va">result_nedap</span>, my_break <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>,<span class="fl">120</span><span class="op">)</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">clean_weight</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Key: &lt;responder&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    responder location       date seq_in_location seq_days seq_in_day weight</span>
