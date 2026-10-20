@@ -1,0 +1,4033 @@
+---
+title: "flat_tidypptsda.Rmd for working package"
+output: html_document
+editor_options:
+  chunk_output_type: console
+---
+
+<!--
+Run this 'development' chunk
+
+Store every call to library() that you need to run chunks line by line, as in a classical Rmd for analysis
+-->
+
+```{r development, include=FALSE}
+library(testthat)
+library(data.table)
+```
+
+<!--
+# Description of your package
+
+Fill and run the content of this chunk, before anything else.
+-->
+
+```{r description, eval=FALSE}
+fusen::fill_description(
+  pkg = here::here(),
+  fields = list(
+    Title = "Process and Analyse Pig Performance Testing Station Data",
+    Description = paste(
+      "Tools to clean and analyse visit records from automatic pig feeding",
+      "stations (NEDAP and FIRE). Covers data import, preprocessing, the",
+      "16 feeder error criteria of Casey et al. (2005)",
+      "<doi:10.2527/2005.835969x>, body weight cleaning with robust",
+      "regression, average daily gain, feed intake correction with a linear",
+      "mixed model as in Jiao et al. (2014) <doi:10.2527/jas.2013-7338>,",
+      "feed conversion ratio and plotting."
+    ),
+    `Authors@R` = c(
+      person("Meng", "Guo", email = "tony2015116@163.com",
+             role = c("aut", "cre", "cph"))
+    ),
+    Depends = "R (>= 4.1.0)",
+    Language = "en-US",
+    URL = "https://tony2015116.github.io/tidypptsda/, https://github.com/tony2015116/tidypptsda",
+    BugReports = "https://github.com/tony2015116/tidypptsda/issues"
+  ),
+  overwrite = TRUE
+)
+desc::desc_set_version("0.2.0")
+usethis::use_mit_license("Meng Guo")
+# Use markdown in roxygen comments
+desc::desc_set("Roxygen", "list(markdown = TRUE)")
+```
+
+```{r development-data, eval=FALSE}
+# Example datasets: run once to (re)create data/nedap.rda and data/fire.rda
+e <- new.env()
+load(here::here("data-raw", "nedap.rda"), envir = e)
+load(here::here("data-raw", "fire.rda"), envir = e)
+nedap <- as.data.frame(e$nedap)
+fire <- as.data.frame(e$fire)
+usethis::use_data(nedap, fire, overwrite = TRUE, compress = "xz")
+```
+
+# Example datasets
+
+Two example datasets ship with the package, one per station type. They
+are raw station exports, before any processing.
+
+```{r function-datasets}
+#' NEDAP feeding station visits
+#'
+#' Raw visit records exported from two NEDAP feeding stations.
+#'
+#' @filename datasets
+#'
+#' @format A data frame with 31,863 rows and 9 columns:
+#' \describe{
+#'   \item{animal_number}{Full animal number.}
+#'   \item{lifenumber}{Life number (empty in this export).}
+#'   \item{responder}{Transponder number. `NA` for visits where no
+#'     transponder was read (unidentified visits, 211 rows).}
+#'   \item{location}{Station (feeder) number, 101 or 102.}
+#'   \item{visit_time}{Entrance time, POSIXct in UTC.}
+#'   \item{duration}{Occupation time of the visit in seconds.}
+#'   \item{state}{Station state code.}
+#'   \item{weight}{Body weight in grams. `0` means no valid weight.}
+#'   \item{feed_intake}{Feed intake of the visit in grams.}
+#' }
+#' @source Pig performance testing station, 2024-02-19 to 2024-05-25,
+#'   30 pigs.
+"nedap"
+
+#' FIRE feeding station visits
+#'
+#' Raw visit records exported from two FIRE (Osborne) feeding stations.
+#'
+#' @format A data frame with 9,794 rows and 10 columns:
+#' \describe{
+#'   \item{Location}{Station (feeder) number, 101 or 102.}
+#'   \item{Tag}{Transponder number. `0` for unidentified visits (51 rows).}
+#'   \item{Date}{Visit date, `"YYYY-MM-DD"`.}
+#'   \item{Entry, Exit}{Entrance and exit clock time, `"HH:MM:SS"`. A visit
+#'     that crosses midnight has `Exit < Entry` (68 rows).}
+#'   \item{Ent Wt, Ext Wt}{Feed trough weight at entrance and exit, kg.}
+#'   \item{Consumed}{Feed intake of the visit, kg.}
+#'   \item{Weight}{Body weight, kg. `0` means no valid weight.}
+#'   \item{Topup Amount}{Feed dispensed into the trough during the visit, kg.}
+#' }
+#' @source Pig performance testing station, 2023-12-19 to 2024-02-22,
+#'   26 pigs.
+"fire"
+```
+
+```{r tests-datasets}
+test_that("example datasets have the documented structure", {
+  expect_equal(dim(nedap), c(31863L, 9L))
+  expect_equal(dim(fire), c(9794L, 10L))
+  expect_equal(sum(is.na(nedap$responder)), 211L)
+  expect_equal(sum(fire$Tag == 0), 51L)
+  expect_s3_class(nedap$visit_time, "POSIXct")
+})
+```
+
+# Internal helpers
+
+Small internal tools shared by every function of the package:
+
+- **verbosity**: every exported function has `verbose = 0/1/2`
+  (silent / summary / details). Messages go through `ppt_msg()`.
+- **input checks**: `as_dt()` always returns a copy, so user objects are
+  never modified; `check_cols()` reports missing columns.
+- **per-pig fitting**: `fit_by_pig()` runs a function on each pig. A pig
+  that fails is recorded and skipped instead of stopping everything.
+- **removal log**: `new_removed()` builds the `removed` table returned by
+  every analysis step.
+- **result object**: `new_ppt_result()` gives every `calc_*()` function the
+  same return structure.
+
+```{r function-utils}
+#' @filename utils
+#' @import data.table
+#' @importFrom cli cli_abort cli_warn
+#' @importFrom utils globalVariables
+#' @keywords internal
+"_PACKAGE"
+
+# ---- verbosity --------------------------------------------------------------
+
+ppt_verbose <- function() {
+  getOption("tidypptsda.verbose", 1L)
+}
+
+check_verbose <- function(verbose) {
+  if (!is.numeric(verbose) || length(verbose) != 1L || is.na(verbose) ||
+      !verbose %in% 0:2) {
+    cli::cli_abort("{.arg verbose} must be 0 (silent), 1 (summary) or 2 (details).")
+  }
+  as.integer(verbose)
+}
+
+# Set the verbosity level until the calling function exits.
+local_verbose <- function(verbose, envir = parent.frame()) {
+  verbose <- check_verbose(verbose)
+  old <- options(tidypptsda.verbose = verbose)
+  do.call(on.exit, list(bquote(options(.(old))), add = TRUE), envir = envir)
+  invisible(verbose)
+}
+
+# Print a message if the current verbosity is at least `level`.
+ppt_msg <- function(msg,
+                    type = c("info", "success", "warning", "danger",
+                             "bullets", "h1", "h2"),
+                    level = 1L,
+                    .envir = parent.frame()) {
+  if (ppt_verbose() < level) {
+    return(invisible(NULL))
+  }
+  type <- match.arg(type)
+  switch(type,
+    info    = cli::cli_alert_info(msg, .envir = .envir),
+    success = cli::cli_alert_success(msg, .envir = .envir),
+    warning = cli::cli_alert_warning(msg, .envir = .envir),
+    danger  = cli::cli_alert_danger(msg, .envir = .envir),
+    bullets = cli::cli_bullets(msg, .envir = .envir),
+    h1      = cli::cli_h1(msg, .envir = .envir),
+    h2      = cli::cli_h2(msg, .envir = .envir)
+  )
+  invisible(NULL)
+}
+
+# Raise a real warning unless verbose = 0. Whatever triggers it is also
+# recorded in the result (removed / flags), so nothing is lost when silent.
+ppt_warn <- function(msg, .envir = parent.frame()) {
+  if (ppt_verbose() >= 1L) {
+    cli::cli_warn(msg, .envir = .envir)
+  }
+  invisible(NULL)
+}
+
+# ---- input checks -----------------------------------------------------------
+
+# Always return a data.table that is a copy of the input.
+as_dt <- function(data, arg = "data") {
+  if (!is.data.frame(data)) {
+    cli::cli_abort("{.arg {arg}} must be a data.frame or data.table, not {.cls {class(data)[1]}}.")
+  }
+  if (data.table::is.data.table(data)) data.table::copy(data) else data.table::as.data.table(data)
+}
+
+check_cols <- function(data, cols, arg = "data", hint = NULL) {
+  missing_cols <- setdiff(cols, names(data))
+  if (length(missing_cols) > 0L) {
+    cli::cli_abort(c(
+      "{.arg {arg}} is missing required column{?s}: {.val {missing_cols}}.",
+      "i" = hint
+    ))
+  }
+  invisible(TRUE)
+}
+
+# ---- per-pig fitting --------------------------------------------------------
+
+# Apply `fun` to each pig. Errors are recorded in `failed` and the pig is
+# skipped; warnings are recorded in `warnings` and muffled.
+# `fun` must return a data.frame (or NULL to drop the pig silently).
+fit_by_pig <- function(data, fun, step, by = "responder", ...) {
+  groups <- split(data, by = by, keep.by = TRUE, sorted = TRUE)
+  n <- length(groups)
+  out <- vector("list", n)
+  failed <- vector("list", n)
+  warns <- vector("list", n)
+
+  for (i in seq_len(n)) {
+    id <- as.character(groups[[i]][[by]][1L])
+    w <- character()
+    res <- withCallingHandlers(
+      tryCatch(fun(groups[[i]], ...), error = function(e) e),
+      warning = function(cnd) {
+        w <<- c(w, conditionMessage(cnd))
+        invokeRestart("muffleWarning")
+      }
+    )
+    if (length(w) > 0L) {
+      warns[[i]] <- data.table::data.table(responder = id, step = step,
+                                           message = unique(w))
+    }
+    if (inherits(res, "error")) {
+      failed[[i]] <- data.table::data.table(responder = id, step = step,
+                                            reason = conditionMessage(res))
+      next
+    }
+    if (is.null(res)) next
+    res <- data.table::as.data.table(res)
+    if (!by %in% names(res)) {
+      res[, (by) := id]
+      data.table::setcolorder(res, by)
+    }
+    out[[i]] <- res
+  }
+
+  failed <- data.table::rbindlist(failed)
+  if (nrow(failed) == 0L) {
+    failed <- data.table::data.table(responder = character(), step = character(),
+                                     reason = character())
+  }
+  warns <- data.table::rbindlist(warns)
+  if (nrow(warns) == 0L) {
+    warns <- data.table::data.table(responder = character(), step = character(),
+                                    message = character())
+  }
+  list(
+    result = data.table::rbindlist(out, use.names = TRUE, fill = TRUE),
+    failed = failed,
+    warnings = warns
+  )
+}
+
+# ---- removal log ------------------------------------------------------------
+
+# Each analysis step appends rows to this table: which pig was removed, at
+# which step and why.
+new_removed <- function(responder = character(), location = NA_character_,
+                        step = character(), reason = character()) {
+  if (length(responder) == 0L) {
+    return(data.table::data.table(responder = character(), location = character(),
+                                  step = character(), reason = character()))
+  }
+  data.table::data.table(
+    responder = as.character(responder),
+    location = as.character(location),
+    step = as.character(step),
+    reason = as.character(reason)
+  )
+}
+
+# ---- result object ----------------------------------------------------------
+
+new_ppt_result <- function(per_pig, daily, removed = new_removed(),
+                           settings = list(), class) {
+  structure(
+    list(per_pig = per_pig, daily = daily, removed = removed,
+         settings = settings),
+    class = c(class, "ppt_result")
+  )
+}
+
+# ---- data.table column names ------------------------------------------------
+
+# Column names used in data.table expressions, declared once so that
+# R CMD check does not report them as undefined globals.
+utils::globalVariables(c(
+  ".", "i.responder",
+  # visit table
+  "responder", "responder_raw", "identified", "location", "date", "seq_days",
+  "seq_in_day", "seq_in_location", "entry_time", "exit_time", "duration",
+  "feed_intake", "weight", "trough_in", "trough_out", "topup", "source_file",
+  "visit_time",
+  # station history
+  "main_location", "transfer", "n", "n_loc", "row_id", "start", "N",
+  # weight cleaning
+  "qc_flag", "fitted", "outlier", "i.fitted", "i.outlier", "i.outlier_by",
+  "r2", "entry_weight", "exit_weight", "first_date", "last_date",
+  "test_days", "valid_days", "missing_rate", "reason", "status", "kept_pig",
+  # ADG
+  "adg", "adg_type", "stage", "curve_used", "predicted", "in_stage",
+  "Asym", "b2", "b3",
+  # feeder errors
+  "fiv", "otv", "frv", "lwd", "fwd", "ltd", "ftd", "prev_fiv", "next_fiv",
+  "n_errors", "unidentified_feed_kg", "error_free", "..cols",
+  "fiv_lo", "fiv_hi", "fiv_0", "otv_lo", "otv_hi", "frv_hi_fiv_lo",
+  "frv_hi_strict", "frv_hi", "frv_0", "frv_lo", "lwd_lo", "lwd_hi",
+  "fwd_lo", "fwd_hi", "ltd_lo", "ftd_lo",
+  # ADFI
+  "all_error", "bw", "y", "dfi", "dfi_raw", "dfi_check", "dfi_corrected",
+  "dfi_error_free", "check_flag", "pig_location", "adfi", "coverage",
+  "state", "n_visits", "n_error_visits", "n_observed", "n_stage_days",
+  # FCR
+  "fcr", "gf", "fcr_flag", "fcr_note", "weight_status", "stage_days",
+  "start_weight", "end_weight", "group", "trait", "cv", "sd",
+  "extrap_days_start", "extrap_days_end", "n_extrap_start", "n_extrap_end",
+  # plots
+  "label", "lower", "upper", "kind"
+))
+
+#' @export
+print.ppt_result <- function(x, ...) {
+  cli::cli_h2("{.cls {class(x)[1]}}")
+  pp <- x$per_pig
+  if (!is.null(pp) && "status" %in% names(pp)) {
+    st <- table(factor(pp$status, levels = c("keep", "low_confidence", "removed")))
+    cli::cli_text("Pigs: {nrow(pp)} (keep {st[['keep']]}, low confidence {st[['low_confidence']]}, removed {st[['removed']]})")
+  } else if (!is.null(pp)) {
+    cli::cli_text("Pigs: {nrow(pp)}")
+  }
+  for (nm in setdiff(names(x), "settings")) {
+    el <- x[[nm]]
+    if (is.data.frame(el)) cli::cli_text("{.field ${nm}}: {nrow(el)} row{?s} x {ncol(el)} column{?s}")
+  }
+  cli::cli_text("QC profile: {.val {attr(x$settings, 'profile') %||% 'none'}}")
+  invisible(x)
+}
+
+# ---- colours ----------------------------------------------------------------
+
+# Okabe-Ito palette: colour-blind safe, no extra dependency.
+ppt_palette <- function(n) {
+  pal <- c("#0072B2", "#D55E00", "#009E73", "#CC79A7", "#E69F00",
+           "#56B4E9", "#F0E442", "#000000", "#999999")
+  if (n > length(pal)) {
+    pal <- grDevices::colorRampPalette(pal)(n)
+  }
+  pal[seq_len(n)]
+}
+```
+
+```{r tests-utils}
+test_that("as_dt returns a copy and never modifies the input", {
+  dt <- data.table::data.table(a = 1:3)
+  out <- as_dt(dt)
+  out[, b := 1]
+  expect_false("b" %in% names(dt))
+  expect_s3_class(as_dt(data.frame(a = 1)), "data.table")
+  expect_error(as_dt(1:3), "data.frame")
+})
+
+test_that("check_cols names the missing columns", {
+  expect_true(check_cols(data.frame(a = 1, b = 2), c("a", "b")))
+  expect_error(check_cols(data.frame(a = 1), c("a", "b", "c")), "b")
+})
+
+test_that("verbosity is validated and restored on exit", {
+  expect_error(check_verbose(3), "verbose")
+  expect_error(check_verbose(TRUE), "verbose")
+  f <- function() {
+    local_verbose(0)
+    ppt_verbose()
+  }
+  old <- getOption("tidypptsda.verbose")
+  expect_equal(f(), 0L)
+  expect_identical(getOption("tidypptsda.verbose"), old)
+})
+
+test_that("ppt_msg and ppt_warn respect verbose", {
+  silent <- function() {
+    local_verbose(0)
+    ppt_msg("hidden")
+    ppt_warn("hidden")
+    "done"
+  }
+  expect_silent(silent())
+  loud <- function() {
+    local_verbose(1)
+    ppt_msg("shown")
+  }
+  expect_message(loud(), "shown")
+  detail <- function(v) {
+    local_verbose(v)
+    ppt_msg("detail only", level = 2)
+  }
+  expect_silent(detail(1))
+  expect_message(detail(2), "detail only")
+})
+
+test_that("fit_by_pig isolates failures and records warnings", {
+  dt <- data.table::data.table(responder = rep(c("a", "b", "c"), each = 3),
+                               x = 1:9)
+  f <- function(d) {
+    if (d$responder[1] == "b") stop("too few points")
+    if (d$responder[1] == "c") warning("did not converge")
+    data.frame(mean_x = mean(d$x))
+  }
+  res <- fit_by_pig(dt, f, step = "test")
+  expect_equal(res$result$responder, c("a", "c"))
+  expect_equal(res$result$mean_x, c(2, 8))
+  expect_equal(res$failed$responder, "b")
+  expect_match(res$failed$reason, "too few points")
+  expect_equal(res$warnings$responder, "c")
+  expect_match(res$warnings$message, "converge")
+  # no failures: empty tables keep their columns
+  ok <- fit_by_pig(dt[responder == "a"], f, step = "test")
+  expect_named(ok$failed, c("responder", "step", "reason"))
+  expect_named(ok$warnings, c("responder", "step", "message"))
+})
+
+test_that("new_removed builds a consistent log", {
+  empty <- new_removed()
+  expect_equal(nrow(empty), 0L)
+  expect_named(empty, c("responder", "location", "step", "reason"))
+  log <- new_removed(c(1, 2), "101", "weight_range", "too light")
+  expect_type(log$responder, "character")
+  expect_equal(nrow(log), 2L)
+})
+
+test_that("ppt_palette returns n colours", {
+  expect_length(ppt_palette(3), 3L)
+  expect_length(ppt_palette(15), 15L)
+})
+```
+
+# qc_config
+
+All quality-control thresholds live in one object created by `qc_config()`.
+Three presets are available, and any single parameter can be overridden.
+
+```{r function-qc_config}
+#' Quality-control settings
+#'
+#' @description
+#' Build the set of quality-control (QC) thresholds used by the whole
+#' pipeline. Start from a preset with `profile` and override any parameter
+#' through `...`.
+#'
+#' @param profile Preset to start from:
+#'   - `"casey"` (default): feeder error criteria of Casey et al. (2005),
+#'     robust regression (`MASS::rlm`) for body weight outliers and a
+#'     quadratic growth curve.
+#'   - `"national"`: LOESS-based weight cleaning and growth curve, a
+#'     minimum curve R², longer test period and lower missing rate.
+#'   - `"legacy"`: STL + robust regression + robust SD outlier detection
+#'     and a Gompertz growth curve.
+#' @param ... Parameters to override, as `name = value`. See **Parameters**.
+#'
+#' @section Parameters:
+#' **Station transfer** (pigs seen at several stations)
+#' - `max_gap_days`: maximum gap between two stations to treat the pig as
+#'   transferred. A larger gap splits it into two animals. Default 3.
+#' - `max_overlap_days`: maximum time overlap between two stations. A larger
+#'   overlap is treated as transponder misreads. Default 1.
+#' - `max_jump_kg`: body weight jump at the transfer that triggers a
+#'   warning. Default 10.
+#'
+#' **Body weight records**
+#' - `weight_range`: valid body weight of a single record, kg.
+#' - `weight_outlier`: one or more of `"rlm"`, `"loess"`, `"stl"`, `"sd"`.
+#' - `outlier_combine`: `"any"` (outlier for any method) or `"majority"`.
+#' - `rlm_cutoff`: records with a robust regression weight below this are
+#'   outliers. Default 0.5.
+#' - `sd_max`: residuals beyond this many robust SDs (MAD) are outliers.
+#' - `loess_span`: smoothing span for LOESS. Default 0.75.
+#' - `rel_dev_max`: optional, relative deviation from the curve above which
+#'   a record is an outlier (e.g. 0.25). `NULL` = off.
+#' - `daily_drop_min`: optional, a day whose weight is below this ratio of
+#'   the previous day is an outlier (e.g. 0.90). `NULL` = off.
+#'
+#' **Pig-level checks**
+#' - `min_test_days`, `min_records`: minimum test length (days) and number
+#'   of valid weight records.
+#' - `max_missing_rate`: maximum share of days without a valid weight.
+#' - `entry_weight_max`, `exit_weight_min`: maximum entry and minimum exit
+#'   body weight, kg.
+#' - `curve_r2_min`: optional, pigs whose growth curve R² is below this are
+#'   flagged as low confidence (not removed). `NULL` = off.
+#'
+#' **Growth and ADG**
+#' - `stage_range`: body weight interval for ADG and FCR, kg.
+#' - `curve_model`: `"poly1"`, `"poly2"`, `"poly3"`, `"loess"` or
+#'   `"gompertz"` (falls back to `"poly2"` when it does not converge).
+#' - `max_extrap_days`: maximum extrapolation of the curve, days.
+#'
+#' **Feeder errors** (Casey et al. 2005, Table 3)
+#' - `fiv_range`: FIV-lo / FIV-hi, feed intake per visit, g.
+#' - `fiv0_abs_max`: FIV-0, maximum |FIV| for a 0 s visit, g.
+#' - `duration_max`: OTV-hi, maximum occupation time per visit, s.
+#' - `speed_fiv_lo_max`: FRV-hi-FIV-lo, maximum feeding rate for visits with
+#'   0 < FIV < 50 g, g/min.
+#' - `speed_strict_max`: FRV-hi-strict, maximum feeding rate when the
+#'   preceding or following visit has FIV < -20 g, g/min.
+#' - `speed_range`: FRV-lo and FRV-hi, g/min.
+#' - `idle_duration_max`: FRV-0, maximum occupation time with no intake, s.
+#' - `trough_diff_range`: LWD / FWD, trough weight difference between
+#'   subsequent visits, g.
+#' - `max_unidentified_feed_kg`: feed disappearance in unidentified visits
+#'   per feeder above which a warning is given.
+#'
+#' **Daily feed intake**
+#' - `dfi_range`: valid daily feed intake, kg.
+#' - `dfi_quantile`: optional, lower and upper quantile cut-offs (e.g.
+#'   `c(0.025, 0.99)`). `NULL` = off.
+#' - `dfi_correct`: `"lmm"` (Jiao et al. 2014) or `"none"`.
+#' - `impute_method`: `"linear"` (linear interpolation, LOESS for long
+#'   gaps, intake ~ body weight regression at the stage ends) or `"loess"`
+#'   (robust LOESS over days everywhere).
+#' - `long_gap_days`: inside gaps longer than this many days are imputed
+#'   with LOESS instead of a straight line (`impute_method = "linear"`).
+#'   Default 7.
+#'
+#' **Confidence flags** (used by [calc_fcr()])
+#' - `max_edge_extrap_days`: a pig is `"low_confidence"` when the growth
+#'   curve or the feed intake is extrapolated over more than this many days
+#'   at the start or the end of the stage. Default 15.
+#' - `min_coverage`: minimum share of stage days with recorded feed intake.
+#'   Default 0.7.
+#'
+#' @return An object of class `ppt_qc`: a named list of parameters with the
+#'   preset name in attribute `"profile"`.
+#'
+#' @references
+#' Casey, D. S., Stern, H. S., & Dekkers, J. C. M. (2005). Identification of
+#' errors and factors associated with errors in data from electronic swine
+#' feeders. *Journal of Animal Science*, 83, 969-982.
+#'
+#' Jiao, S., Maltecca, C., Gray, K. A., & Cassady, J. P. (2014). Feed intake,
+#' average daily gain, feed efficiency, and real-time ultrasound traits in
+#' Duroc pigs: I. *Journal of Animal Science*, 92, 2377-2386.
+#'
+#' @export
+qc_config <- function(profile = c("casey", "national", "legacy"), ...) {
+  if (!is.character(profile)) {
+    cli::cli_abort(c(
+      "{.arg profile} must be one of {.val {c('casey', 'national', 'legacy')}}.",
+      "i" = "Parameters to override must be named, e.g. {.code qc_config(\"casey\", duration_max = 1800)}."
+    ))
+  }
+  profile <- match.arg(profile)
+  cfg <- qc_defaults()
+  cfg <- qc_set(cfg, qc_presets()[[profile]])
+
+  overrides <- list(...)
+  if (length(overrides) > 0L) {
+    nms <- names(overrides)
+    if (is.null(nms) || any(!nzchar(nms))) {
+      cli::cli_abort("All parameters in {.arg ...} must be named.")
+    }
+    unknown <- setdiff(nms, names(cfg))
+    if (length(unknown) > 0L) {
+      hints <- vapply(unknown, function(u) {
+        m <- agrep(u, names(cfg), max.distance = 0.3, value = TRUE)
+        if (length(m) > 0L) paste0("did you mean {.val ", m[1L], "}?") else ""
+      }, character(1))
+      cli::cli_abort(c(
+        "Unknown QC parameter{?s}: {.val {unknown}}.",
+        stats::setNames(hints[nzchar(hints)], rep("i", sum(nzchar(hints))))
+      ))
+    }
+    cfg <- qc_set(cfg, overrides)
+  }
+
+  qc_validate(cfg)
+  structure(cfg, profile = profile, class = "ppt_qc")
+}
+
+#' @export
+print.ppt_qc <- function(x, ...) {
+  cli::cli_h2("QC settings: profile {.val {attr(x, 'profile')}}")
+  groups <- qc_groups()
+  fmt <- function(v) {
+    if (is.null(v)) return("NULL (off)")
+    paste(format(v), collapse = ", ")
+  }
+  for (g in unique(groups)) {
+    cli::cli_text("{.strong {g}}")
+    nms <- names(groups)[groups == g]
+    lines <- vapply(nms, function(nm) paste0("{.field ", nm, "}: ", fmt(x[[nm]])), character(1))
+    cli::cli_bullets(stats::setNames(lines, rep(" ", length(lines))))
+  }
+  invisible(x)
+}
+
+# Assign values one by one so that NULL values are kept, not dropped.
+qc_set <- function(cfg, values) {
+  for (nm in names(values)) {
+    cfg[nm] <- list(values[[nm]])
+  }
+  cfg
+}
+
+qc_defaults <- function() {
+  list(
+    # station transfer
+    max_gap_days = 3,
+    max_overlap_days = 1,
+    max_jump_kg = 10,
+    # body weight records
+    weight_range = c(15, 150),
+    weight_outlier = "rlm",
+    outlier_combine = "any",
+    rlm_cutoff = 0.5,
+    sd_max = 3,
+    loess_span = 0.75,
+    rel_dev_max = NULL,
+    daily_drop_min = NULL,
+    # pig-level checks
+    min_test_days = 35,
+    min_records = 20,
+    max_missing_rate = 0.30,
+    entry_weight_max = 65,
+    exit_weight_min = 85,
+    curve_r2_min = NULL,
+    # growth and ADG
+    stage_range = c(30, 120),
+    curve_model = "poly2",
+    max_extrap_days = 30,
+    # feeder errors, Casey et al. (2005) Table 3
+    fiv_range = c(-20, 2000),
+    fiv0_abs_max = 20,
+    duration_max = 3600,
+    speed_fiv_lo_max = 500,
+    speed_strict_max = 110,
+    speed_range = c(2, 170),
+    idle_duration_max = 500,
+    trough_diff_range = c(-20, 1800),
+    max_unidentified_feed_kg = 90,
+    # daily feed intake
+    dfi_range = c(0, 6),
+    dfi_quantile = NULL,
+    dfi_correct = "lmm",
+    impute_method = "linear",
+    long_gap_days = 7,
+    # confidence flags
+    max_edge_extrap_days = 15,
+    min_coverage = 0.7
+  )
+}
+
+qc_presets <- function() {
+  list(
+    casey = list(),
+    national = list(
+      weight_range = c(25, 140),
+      weight_outlier = "loess",
+      curve_model = "loess",
+      curve_r2_min = 0.99,
+      min_test_days = 60,
+      max_missing_rate = 0.15,
+      impute_method = "loess"
+    ),
+    legacy = list(
+      weight_range = c(25, 140),
+      stage_range = c(45, 110),
+      weight_outlier = c("stl", "rlm", "sd"),
+      curve_model = "gompertz"
+    )
+  )
+}
+
+qc_groups <- function() {
+  g <- c(
+    max_gap_days = "Station transfer", max_overlap_days = "Station transfer",
+    max_jump_kg = "Station transfer",
+    weight_range = "Body weight records", weight_outlier = "Body weight records",
+    outlier_combine = "Body weight records", rlm_cutoff = "Body weight records",
+    sd_max = "Body weight records", loess_span = "Body weight records",
+    rel_dev_max = "Body weight records", daily_drop_min = "Body weight records",
+    min_test_days = "Pig-level checks", min_records = "Pig-level checks",
+    max_missing_rate = "Pig-level checks", entry_weight_max = "Pig-level checks",
+    exit_weight_min = "Pig-level checks", curve_r2_min = "Pig-level checks",
+    stage_range = "Growth and ADG", curve_model = "Growth and ADG",
+    max_extrap_days = "Growth and ADG",
+    fiv_range = "Feeder errors", fiv0_abs_max = "Feeder errors",
+    duration_max = "Feeder errors", speed_fiv_lo_max = "Feeder errors",
+    speed_strict_max = "Feeder errors", speed_range = "Feeder errors",
+    idle_duration_max = "Feeder errors", trough_diff_range = "Feeder errors",
+    max_unidentified_feed_kg = "Feeder errors",
+    dfi_range = "Daily feed intake", dfi_quantile = "Daily feed intake",
+    dfi_correct = "Daily feed intake", impute_method = "Daily feed intake",
+    long_gap_days = "Daily feed intake",
+    max_edge_extrap_days = "Confidence flags", min_coverage = "Confidence flags"
+  )
+  g[names(qc_defaults())]
+}
+
+# Validation rules for each parameter.
+qc_spec <- function() {
+  num <- function(min = -Inf, max = Inf, null = FALSE) list(type = "num", min = min, max = max, null = null)
+  rng <- function(min = -Inf, max = Inf, null = FALSE) list(type = "range", min = min, max = max, null = null)
+  chc <- function(choices, multiple = FALSE) list(type = "choice", choices = choices, multiple = multiple, null = FALSE)
+  list(
+    max_gap_days = num(0), max_overlap_days = num(0), max_jump_kg = num(0),
+    weight_range = rng(0), weight_outlier = chc(c("rlm", "loess", "stl", "sd"), multiple = TRUE),
+    outlier_combine = chc(c("any", "majority")),
+    rlm_cutoff = num(0, 1), sd_max = num(0), loess_span = num(0.1, 1),
+    rel_dev_max = num(0, 1, null = TRUE), daily_drop_min = num(0, 1, null = TRUE),
+    min_test_days = num(1), min_records = num(3), max_missing_rate = num(0, 1),
+    entry_weight_max = num(0), exit_weight_min = num(0),
+    curve_r2_min = num(0, 1, null = TRUE),
+    stage_range = rng(0), curve_model = chc(c("poly1", "poly2", "poly3", "loess", "gompertz")),
+    max_extrap_days = num(0),
+    fiv_range = rng(), fiv0_abs_max = num(0), duration_max = num(0),
+    speed_fiv_lo_max = num(0), speed_strict_max = num(0), speed_range = rng(0),
+    idle_duration_max = num(0), trough_diff_range = rng(),
+    max_unidentified_feed_kg = num(0),
+    dfi_range = rng(0), dfi_quantile = rng(0, 1, null = TRUE),
+    dfi_correct = chc(c("lmm", "none")),
+    impute_method = chc(c("linear", "loess")),
+    long_gap_days = num(1),
+    max_edge_extrap_days = num(0), min_coverage = num(0, 1)
+  )
+}
+
+qc_validate <- function(cfg) {
+  spec <- qc_spec()
+  for (nm in names(spec)) {
+    s <- spec[[nm]]
+    v <- cfg[[nm]]
+    if (is.null(v)) {
+      if (!s$null) cli::cli_abort("QC parameter {.field {nm}} cannot be NULL.")
+      next
+    }
+    if (s$type == "num") {
+      if (!is.numeric(v) || length(v) != 1L || is.na(v) || v < s$min || v > s$max) {
+        cli::cli_abort("QC parameter {.field {nm}} must be a single number between {s$min} and {s$max}, not {.val {v}}.")
+      }
+    } else if (s$type == "range") {
+      if (!is.numeric(v) || length(v) != 2L || anyNA(v) || v[1L] >= v[2L] ||
+          any(v < s$min) || any(v > s$max)) {
+        cli::cli_abort("QC parameter {.field {nm}} must be two increasing numbers between {s$min} and {s$max}, not {.val {v}}.")
+      }
+    } else if (s$type == "choice") {
+      ok <- is.character(v) && length(v) >= 1L && all(v %in% s$choices) &&
+        (s$multiple || length(v) == 1L) && !anyDuplicated(v)
+      if (!ok) {
+        cli::cli_abort("QC parameter {.field {nm}} must be {if (s$multiple) 'one or more of' else 'one of'} {.val {s$choices}}, not {.val {v}}.")
+      }
+    }
+  }
+
+  # Cross-parameter consistency
+  if (cfg$stage_range[1L] < cfg$weight_range[1L] || cfg$stage_range[2L] > cfg$weight_range[2L]) {
+    cli::cli_abort("{.field stage_range} ({cfg$stage_range[1]}-{cfg$stage_range[2]} kg) must lie inside {.field weight_range} ({cfg$weight_range[1]}-{cfg$weight_range[2]} kg).")
+  }
+  if (cfg$entry_weight_max >= cfg$exit_weight_min) {
+    cli::cli_abort("{.field entry_weight_max} must be smaller than {.field exit_weight_min}.")
+  }
+  if (cfg$outlier_combine == "majority" && length(cfg$weight_outlier) < 2L) {
+    cli::cli_abort("{.field outlier_combine = \"majority\"} needs at least two methods in {.field weight_outlier}.")
+  }
+  invisible(TRUE)
+}
+```
+
+```{r example-qc_config}
+# Default preset
+qc <- qc_config()
+qc$duration_max
+
+# Another preset with one parameter overridden
+qc_national <- qc_config("national", min_test_days = 50)
+qc_national
+
+# Optional rules are off (NULL) unless switched on
+qc_config("casey", daily_drop_min = 0.90)$daily_drop_min
+```
+
+```{r tests-qc_config}
+test_that("all presets are valid and differ where documented", {
+  casey <- qc_config()
+  national <- qc_config("national")
+  legacy <- qc_config("legacy")
+  for (q in list(casey, national, legacy)) {
+    expect_s3_class(q, "ppt_qc")
+    expect_setequal(names(q), names(qc_defaults()))
+  }
+  expect_equal(attr(casey, "profile"), "casey")
+  expect_equal(casey$duration_max, 3600)
+  expect_equal(casey$speed_range, c(2, 170))
+  expect_null(casey$rel_dev_max)
+  expect_equal(national$weight_range, c(25, 140))
+  expect_equal(national$impute_method, "loess")
+  expect_equal(casey$max_edge_extrap_days, 15)
+  expect_error(qc_config(impute_method = "cumulative_loess"), "impute_method")
+  expect_equal(legacy$stage_range, c(45, 110))
+  expect_equal(legacy$weight_outlier, c("stl", "rlm", "sd"))
+})
+
+test_that("overrides apply on top of the preset", {
+  q <- qc_config("national", min_test_days = 50, daily_drop_min = 0.9)
+  expect_equal(q$min_test_days, 50)
+  expect_equal(q$daily_drop_min, 0.9)
+  expect_equal(q$max_missing_rate, 0.15)
+  # NULL switches an optional rule off
+  expect_null(qc_config("national", curve_r2_min = NULL)$curve_r2_min)
+  expect_true("curve_r2_min" %in% names(qc_config("national", curve_r2_min = NULL)))
+})
+
+test_that("unknown or unnamed parameters are rejected", {
+  expect_error(qc_config(duration = 1800), "duration_max")
+  expect_error(qc_config("casey", 1800), "named")
+  expect_error(qc_config(1800), "profile")
+  expect_error(qc_config("other"))
+})
+
+test_that("invalid values are rejected", {
+  expect_error(qc_config(duration_max = -1), "duration_max")
+  expect_error(qc_config(duration_max = "1800"), "duration_max")
+  expect_error(qc_config(weight_range = c(140, 25)), "weight_range")
+  expect_error(qc_config(curve_model = "spline"), "curve_model")
+  expect_error(qc_config(weight_outlier = c("rlm", "rlm")), "weight_outlier")
+  expect_error(qc_config(rlm_cutoff = NULL), "NULL")
+})
+
+test_that("cross-parameter checks work", {
+  expect_error(qc_config(stage_range = c(10, 120)), "stage_range")
+  expect_error(qc_config(entry_weight_max = 90), "entry_weight_max")
+  expect_error(qc_config(outlier_combine = "majority"), "majority")
+  expect_silent(qc_config("legacy", outlier_combine = "majority"))
+})
+
+test_that("print method runs", {
+  expect_message(print(qc_config("legacy")), "legacy")
+})
+```
+
+# read_station
+
+`read_station()` reads one or many station export files (or a whole
+folder) and stacks them into one table. Columns are checked against the
+station type, transponder IDs are always read as text so leading zeros are
+kept, and a `source_file` column records where each row came from.
+
+```{r function-read_station}
+#' Read feeding station export files
+#'
+#' @description
+#' Read one or more CSV exports from NEDAP or FIRE feeding stations and
+#' combine them into one table.
+#'
+#' @param files Character vector of file paths, or a single folder. For a
+#'   folder, all files matching `pattern` are read.
+#' @param station `"nedap"`, `"fire"` or `NULL` (default) to detect the
+#'   station type from the column names.
+#' @param pattern Regular expression for file names when `files` is a
+#'   folder. Default `"\\.csv$"` (case-insensitive).
+#' @param fill If `FALSE` (default), all files must have the same columns.
+#'   If `TRUE`, missing columns are filled with `NA`.
+#' @param verbose 0 (silent), 1 (summary, default) or 2 (details per file).
+#' @param ... Further arguments passed to [data.table::fread()].
+#'
+#' @return A `data.table` with the original columns plus `source_file`
+#'   (file name without folder). Its attribute `"station"` holds the station
+#'   type.
+#'
+#' @details
+#' Required columns:
+#' - NEDAP: `responder`, `location`, `visit_time`, `duration`, `weight`,
+#'   `feed_intake`.
+#' - FIRE: `Location`, `Tag`, `Date`, `Entry`, `Exit`, `Ent Wt`, `Ext Wt`,
+#'   `Consumed`, `Weight`.
+#'
+#' Transponder and animal ID columns (`responder`, `animal_number`,
+#' `lifenumber`, `Tag`) are read as character.
+#'
+#' @export
+read_station <- function(files,
+                         station = NULL,
+                         pattern = "\\.csv$",
+                         fill = FALSE,
+                         verbose = 1,
+                         ...) {
+  local_verbose(verbose)
+  files <- resolve_files(files, pattern)
+  if (!is.null(station)) station <- check_station(station)
+
+  ppt_msg("Reading {length(files)} file{?s}", "h1")
+
+  tables <- lapply(files, function(f) {
+    header <- names(data.table::fread(f, nrows = 0L, showProgress = FALSE, ...))
+    ids <- intersect(id_cols(), header)
+    cc <- if (length(ids) > 0L) list(character = ids) else NULL
+    dt <- data.table::fread(f, colClasses = cc, showProgress = FALSE, ...)
+    ppt_msg("{.file {basename(f)}}: {nrow(dt)} rows, {ncol(dt)} columns",
+            "info", level = 2)
+    dt
+  })
+  names(tables) <- basename(files)
+
+  # Station type: detect from the first file, then require it everywhere.
+  if (is.null(station)) {
+    station <- detect_station(tables[[1L]])
+    ppt_msg("Detected station type {.val {station}}", "info")
+  }
+  required <- station_cols(station)
+  for (nm in names(tables)) {
+    check_cols(tables[[nm]], required, arg = nm,
+               hint = paste0("Is station = \"", station, "\" correct?"))
+  }
+
+  # Same columns in every file, unless fill = TRUE.
+  col_sets <- lapply(tables, names)
+  all_cols <- unique(unlist(col_sets))
+  differ <- vapply(col_sets, function(x) !setequal(x, all_cols), logical(1))
+  if (any(differ) && !fill) {
+    details <- vapply(names(tables)[differ], function(nm) {
+      paste0(nm, " lacks: ", paste(setdiff(all_cols, col_sets[[nm]]), collapse = ", "))
+    }, character(1))
+    cli::cli_abort(c(
+      "Files do not have the same columns.",
+      stats::setNames(details, rep("x", length(details))),
+      "i" = "Use {.code fill = TRUE} to fill missing columns with {.val NA}."
+    ))
+  }
+
+  out <- data.table::rbindlist(tables, use.names = TRUE, fill = fill,
+                               idcol = "source_file")
+  data.table::setcolorder(out, setdiff(names(out), "source_file"))
+  data.table::setattr(out, "station", station)
+
+  ppt_msg("Read {nrow(out)} rows from {length(files)} file{?s} ({toupper(station)})",
+          "success")
+  out
+}
+
+# Columns read as character so that leading zeros in IDs are kept.
+id_cols <- function() {
+  c("responder", "animal_number", "lifenumber", "Tag")
+}
+
+station_cols <- function(station) {
+  switch(station,
+    nedap = c("responder", "location", "visit_time", "duration",
+              "weight", "feed_intake"),
+    fire = c("Location", "Tag", "Date", "Entry", "Exit",
+             "Ent Wt", "Ext Wt", "Consumed", "Weight")
+  )
+}
+
+check_station <- function(station) {
+  if (!is.character(station) || length(station) != 1L ||
+      !tolower(station) %in% c("nedap", "fire")) {
+    cli::cli_abort("{.arg station} must be {.val nedap} or {.val fire}, not {.val {station}}.")
+  }
+  tolower(station)
+}
+
+detect_station <- function(data) {
+  is_nedap <- all(station_cols("nedap") %in% names(data))
+  is_fire <- all(station_cols("fire") %in% names(data))
+  if (is_nedap && !is_fire) return("nedap")
+  if (is_fire && !is_nedap) return("fire")
+  cli::cli_abort(c(
+    "Cannot detect the station type from the column names.",
+    "i" = "NEDAP needs: {.val {station_cols('nedap')}}.",
+    "i" = "FIRE needs: {.val {station_cols('fire')}}.",
+    "i" = "Set {.arg station} explicitly."
+  ))
+}
+
+resolve_files <- function(files, pattern) {
+  if (!is.character(files) || length(files) == 0L) {
+    cli::cli_abort("{.arg files} must be file paths or a folder.")
+  }
+  if (length(files) == 1L && dir.exists(files)) {
+    folder <- files
+    files <- list.files(folder, pattern = pattern, full.names = TRUE,
+                        ignore.case = TRUE)
+    if (length(files) == 0L) {
+      cli::cli_abort("No files matching {.val {pattern}} in {.path {folder}}.")
+    }
+    return(sort(files))
+  }
+  missing_files <- files[!file.exists(files)]
+  if (length(missing_files) > 0L) {
+    cli::cli_abort("File{?s} not found: {.path {missing_files}}.")
+  }
+  if (anyDuplicated(basename(files))) {
+    cli::cli_abort("File names must be unique: {.val {basename(files)[duplicated(basename(files))]}}.")
+  }
+  files
+}
+```
+
+```{r example-read_station}
+# Write the example data to two CSV files, then read them back
+folder <- file.path(tempdir(), "fire_export")
+dir.create(folder, showWarnings = FALSE)
+data.table::fwrite(fire[fire$Location == 101, ], file.path(folder, "fire_101.csv"))
+data.table::fwrite(fire[fire$Location == 102, ], file.path(folder, "fire_102.csv"))
+
+raw <- read_station(folder)
+table(raw$source_file)
+attr(raw, "station")
+
+unlink(folder, recursive = TRUE)
+```
+
+```{r tests-read_station}
+write_split <- function(data, by, folder) {
+  dir.create(folder, showWarnings = FALSE)
+  for (v in unique(data[[by]])) {
+    data.table::fwrite(data[data[[by]] == v, ], file.path(folder, paste0("part_", v, ".csv")))
+  }
+  sort(list.files(folder, full.names = TRUE))
+}
+
+test_that("multiple FIRE files are combined and the station is detected", {
+  folder <- withr::local_tempdir()
+  files <- write_split(fire, "Location", folder)
+  out <- read_station(files, verbose = 0)
+  expect_equal(nrow(out), nrow(fire))
+  expect_equal(attr(out, "station"), "fire")
+  expect_equal(sort(unique(out$source_file)), c("part_101.csv", "part_102.csv"))
+  expect_type(out$Tag, "character")
+  # a folder gives the same result
+  expect_equal(nrow(read_station(folder, verbose = 0)), nrow(fire))
+})
+
+test_that("NEDAP files keep IDs as text, including leading zeros", {
+  folder <- withr::local_tempdir()
+  nd <- nedap[!is.na(nedap$responder), ]
+  nd$responder <- formatC(nd$responder, width = 6, flag = "0")
+  files <- write_split(nd, "location", folder)
+  out <- read_station(files, station = "nedap", verbose = 0)
+  expect_equal(nrow(out), nrow(nd))
+  expect_type(out$responder, "character")
+  expect_true(all(nchar(out$responder) == 6L))
+  expect_true(all(startsWith(out$responder, "0")))
+})
+
+test_that("column mismatches are reported, or filled when asked", {
+  folder <- withr::local_tempdir()
+  data.table::fwrite(fire[1:5, ], file.path(folder, "a.csv"))
+  data.table::fwrite(fire[6:10, setdiff(names(fire), "Topup Amount")], file.path(folder, "b.csv"))
+  expect_error(read_station(folder, verbose = 0), "Topup Amount")
+  out <- read_station(folder, fill = TRUE, verbose = 0)
+  expect_equal(nrow(out), 10L)
+  expect_true(all(is.na(out[source_file == "b.csv"]$`Topup Amount`)))
+})
+
+test_that("wrong inputs give clear errors", {
+  folder <- withr::local_tempdir()
+  expect_error(read_station(file.path(folder, "nope.csv")), "not found")
+  expect_error(read_station(folder), "No files")
+  data.table::fwrite(fire[1:5, ], file.path(folder, "a.csv"))
+  expect_error(read_station(folder, station = "nedap", verbose = 0), "visit_time")
+  expect_error(read_station(folder, station = "other"), "nedap")
+  bad <- file.path(withr::local_tempdir(), "b.csv")
+  data.table::fwrite(data.frame(x = 1), bad)
+  expect_error(read_station(bad, verbose = 0), "detect")
+})
+```
+
+# prep_visits
+
+`prep_visits()` turns a raw NEDAP or FIRE export into one standard visit
+table that every later step uses:
+
+- one row per visit, **including unidentified visits** (no transponder
+  read), marked with `identified = FALSE`. They are needed to compute the
+  differences between subsequent visits on a feeder (Casey et al. 2005);
+- the same column names and units for both stations: body weight in kg,
+  feed intake and trough weights in g, times as POSIXct (UTC);
+- FIRE visits that cross midnight get the right exit time;
+- a body weight of 0 becomes `NA`;
+- pigs seen at more than one station are kept (see **Station transfer**).
+
+```{r function-prep_visits}
+#' Prepare a standard visit table
+#'
+#' @description
+#' Convert raw NEDAP or FIRE station data into a standard visit table with
+#' the same columns and units for both station types.
+#'
+#' @param data Raw station data, e.g. from [read_station()] or the example
+#'   datasets [nedap] and [fire].
+#' @param station `"nedap"`, `"fire"` or `NULL` (default): taken from the
+#'   `"station"` attribute set by [read_station()], or detected from the
+#'   column names.
+#' @param qc QC settings from [qc_config()]. Used here: `duration_max` (to
+#'   tell a FIRE midnight crossing from a recording error) and the station
+#'   transfer parameters `max_gap_days`, `max_overlap_days`, `max_jump_kg`.
+#' @param verbose 0 (silent), 1 (summary, default) or 2 (details).
+#'
+#' @return A `data.table`, one row per visit, ordered by `location` and
+#'   `entry_time`:
+#'   - `responder`: pig ID (character, `NA` for unidentified visits);
+#'     `responder_raw`: transponder number as recorded;
+#'   - `identified`: `FALSE` for visits without a transponder read;
+#'   - `location`: station (feeder) ID, character;
+#'   - `date`, `seq_days` (day number from the first day in the data, 1 =
+#'     first day), `seq_in_day` (visit number of the pig that day),
+#'     `seq_in_location` (visit number on the feeder that day);
+#'   - `entry_time`, `exit_time`: POSIXct, UTC; `duration`: seconds;
+#'   - `feed_intake`: g; `weight`: body weight, kg (`NA` if not recorded);
+#'   - `trough_in`, `trough_out`: trough weight at entrance and exit, g
+#'     (FIRE only, `NA` for NEDAP); `topup`: feed dispensed, g (FIRE only);
+#'   - `source_file`, if present in the input.
+#'
+#'   Attributes:
+#'   - `"station"`: station type;
+#'   - `"stations"`: one row per pig with its station history (see below);
+#'   - `"removed"`: log of visits removed as transponder misreads;
+#'   - `"prep_summary"`: number of rows dropped at each step.
+#'
+#' @section Station transfer:
+#' For each pig seen at several stations, the time span at each station is
+#' compared:
+#' - **misread**: the span at a minor station overlaps the span at the main
+#'   station (most visits) by more than `max_overlap_days`. Visits at the
+#'   minor station inside the main span are removed as transponder misreads.
+#' - **transfer**: consecutive spans are separated by at most
+#'   `max_gap_days`. All visits are kept, each with its real `location`. A
+#'   body weight jump above `max_jump_kg` at the transfer gives a warning.
+#' - **split**: a gap longer than `max_gap_days`. The spans are treated as
+#'   different animals and `responder` becomes `"<id>_<location>"`.
+#'
+#' A pig that returns to a station it already used is not supported: the
+#' return looks like an overlap and is treated as misreads.
+#'
+#' @seealso [read_station()] for the previous step.
+#' @export
+prep_visits <- function(data, station = NULL, qc = qc_config(), verbose = 1) {
+  local_verbose(verbose)
+  if (!inherits(qc, "ppt_qc")) {
+    cli::cli_abort("{.arg qc} must be created with {.fn qc_config}.")
+  }
+  if (is.null(station)) station <- attr(data, "station", exact = TRUE)
+  dt <- as_dt(data)
+  station <- if (is.null(station)) detect_station(dt) else check_station(station)
+  check_cols(dt, station_cols(station))
+
+  ppt_msg("Preparing {toupper(station)} visits", "h1")
+  n_raw <- nrow(dt)
+
+  dt <- switch(station,
+    nedap = standardise_nedap(dt),
+    fire = standardise_fire(dt, qc$duration_max)
+  )
+  n_cross <- attr(dt, "n_midnight")
+
+  # Body weight of 0 (or below) means no weight was recorded.
+  n_zero_weight <- dt[!is.na(weight) & weight <= 0, .N]
+  dt[weight <= 0, weight := NA_real_]
+
+  # Rows without an entry time cannot be placed in the feeder sequence.
+  n_no_time <- dt[is.na(entry_time), .N]
+  dt <- dt[!is.na(entry_time)]
+
+  # Exact duplicate visits.
+  n_before <- nrow(dt)
+  dt <- unique(dt)
+  n_dup <- n_before - nrow(dt)
+
+  ppt_bullets_counts(c(
+    "Visits read" = n_raw,
+    "Unidentified visits (kept, identified = FALSE)" = dt[identified == FALSE, .N],
+    "FIRE visits crossing midnight (exit time corrected)" = if (station == "fire") n_cross else NA,
+    "Body weights of 0 set to NA" = n_zero_weight,
+    "Rows without entry time (dropped)" = n_no_time,
+    "Duplicated rows (dropped)" = n_dup
+  ))
+
+  # Pigs seen at more than one station.
+  tr <- resolve_transfers(dt, qc)
+  dt <- tr$visits
+
+  # Sequence numbers.
+  data.table::setorder(dt, location, entry_time)
+  dt[, date := as.Date(entry_time, tz = "UTC")]
+  dt[, seq_days := as.integer(date - min(date)) + 1L]
+  dt[, seq_in_location := seq_len(.N), by = .(location, date)]
+  dt[identified == TRUE, seq_in_day := seq_len(.N), by = .(responder, date)]
+
+  cols <- c("responder", "responder_raw", "identified", "location", "date",
+            "seq_days", "seq_in_day", "seq_in_location", "entry_time",
+            "exit_time", "duration", "feed_intake", "weight", "trough_in",
+            "trough_out", "topup", "source_file")
+  cols <- intersect(cols, names(dt))
+  dt <- dt[, cols, with = FALSE]
+
+  data.table::setattr(dt, "station", station)
+  data.table::setattr(dt, "stations", tr$stations)
+  data.table::setattr(dt, "removed", tr$removed)
+  data.table::setattr(dt, "prep_summary", list(
+    rows_read = n_raw, midnight_crossings = n_cross,
+    zero_weights = n_zero_weight, no_entry_time = n_no_time,
+    duplicates = n_dup, misreads = nrow(tr$misread_visits)
+  ))
+
+  ppt_msg("{data.table::uniqueN(dt$responder, na.rm = TRUE)} pigs at {data.table::uniqueN(dt$location)} station{?s}, {nrow(dt)} visits over {max(dt$seq_days)} days", "success")
+  dt
+}
+
+standardise_nedap <- function(dt) {
+  if (!inherits(dt$visit_time, "POSIXct")) {
+    dt[, visit_time := as.POSIXct(as.character(visit_time), tz = "UTC")]
+  }
+  # NEDAP exports body weight in g; accept kg if the values are clearly kg.
+  w <- dt$weight[!is.na(dt$weight) & dt$weight > 0]
+  weight_div <- if (length(w) > 0L && stats::median(w) < 1000) 1 else 1000
+  out <- dt[, .(
+    responder_raw = as.character(responder),
+    location = as.character(location),
+    entry_time = visit_time,
+    duration = as.numeric(duration),
+    feed_intake = as.numeric(feed_intake),
+    weight = as.numeric(weight) / weight_div,
+    trough_in = NA_real_,
+    trough_out = NA_real_,
+    topup = NA_real_
+  )]
+  if ("source_file" %in% names(dt)) out[, source_file := dt$source_file]
+  out[, exit_time := entry_time + duration]
+  finish_ids(out)
+  data.table::setattr(out, "n_midnight", 0L)
+  out
+}
+
+standardise_fire <- function(dt, duration_max) {
+  day <- as.character(dt$Date)
+  entry <- as.POSIXct(paste(day, dt$Entry), tz = "UTC")
+  exit <- as.POSIXct(paste(day, dt$Exit), tz = "UTC")
+  # FIRE stores clock times only. An exit before the entry is a midnight
+  # crossing when the corrected duration is plausible; otherwise it stays
+  # negative and is caught later as error OTV-lo.
+  crossing <- !is.na(exit) & !is.na(entry) & exit < entry &
+    as.numeric(difftime(exit + 86400, entry, units = "secs")) <= duration_max
+  exit[crossing] <- exit[crossing] + 86400
+
+  out <- data.table::data.table(
+    responder_raw = as.character(dt$Tag),
+    location = as.character(dt$Location),
+    entry_time = entry,
+    exit_time = exit,
+    duration = as.numeric(difftime(exit, entry, units = "secs")),
+    feed_intake = as.numeric(dt$Consumed) * 1000,
+    weight = as.numeric(dt$Weight),
+    trough_in = as.numeric(dt$`Ent Wt`) * 1000,
+    trough_out = as.numeric(dt$`Ext Wt`) * 1000,
+    topup = if ("Topup Amount" %in% names(dt)) as.numeric(dt$`Topup Amount`) * 1000 else NA_real_
+  )
+  if ("source_file" %in% names(dt)) out[, source_file := dt$source_file]
+  finish_ids(out)
+  data.table::setattr(out, "n_midnight", sum(crossing))
+  out
+}
+
+# Transponder 0, empty or NA means the visit was not identified.
+finish_ids <- function(out) {
+  raw <- trimws(out$responder_raw)
+  unidentified <- is.na(raw) | raw == "" | suppressWarnings(as.numeric(raw)) %in% 0
+  out[, identified := !unidentified]
+  out[, responder := data.table::fifelse(identified, raw, NA_character_)]
+  invisible(out)
+}
+
+ppt_bullets_counts <- function(counts, level = 1L) {
+  counts <- counts[!is.na(counts)]
+  lines <- paste0(names(counts), ": {.strong ", format(counts, big.mark = ","), "}")
+  ppt_msg(stats::setNames(lines, rep("*", length(lines))), "bullets", level = level)
+}
+
+# Classify pigs seen at several stations (misread / transfer / split).
+resolve_transfers <- function(dt, qc) {
+  day <- 86400
+  seg_of <- function(v) {
+    v[, .(start = min(entry_time), end = max(exit_time, na.rm = TRUE), n = .N),
+      by = location][order(start)]
+  }
+  ids <- dt[identified == TRUE, .(n_loc = data.table::uniqueN(location)), by = responder]
+  multi <- ids[n_loc > 1L, responder]
+
+  stations <- dt[identified == TRUE, .(
+    responder_raw = responder[1L],
+    location_path = location[1L],
+    main_location = location[1L],
+    n_locations = 1L,
+    transfer = FALSE,
+    split = FALSE,
+    misreads_removed = 0L,
+    weight_jump_kg = NA_real_
+  ), by = responder]
+
+  misread_rows <- integer()
+  new_id <- data.table::data.table(row = integer(), responder = character())
+  multi_rows <- list()
+  removed <- new_removed()
+  dt[, row_id := .I]
+
+  for (r in multi) {
+    v <- dt[identified == TRUE & responder == r]
+    seg <- seg_of(v)
+    main <- seg[which.max(n), location]
+    main_span <- seg[location == main]
+
+    # 1. misreads: minor stations overlapping the main span
+    n_mis <- 0L
+    for (loc in setdiff(seg$location, main)) {
+      s <- seg[location == loc]
+      overlap <- as.numeric(difftime(min(s$end, main_span$end),
+                                     max(s$start, main_span$start), units = "days"))
+      if (overlap > qc$max_overlap_days) {
+        rows <- v[location == loc & entry_time >= main_span$start &
+                    entry_time <= main_span$end, row_id]
+        misread_rows <- c(misread_rows, rows)
+        n_mis <- n_mis + length(rows)
+        removed <- rbind(removed, new_removed(r, loc, "prep_visits",
+          sprintf("%d visits at station %s during the main station span: transponder misreads",
+                  length(rows), loc)))
+      }
+    }
+    v <- v[!row_id %in% misread_rows]
+    seg <- seg_of(v)
+
+    # 2. transfer or split, by the gap between consecutive spans
+    gaps <- if (nrow(seg) > 1L) {
+      as.numeric(difftime(seg$start[-1L], seg$end[-nrow(seg)], units = "days"))
+    } else numeric()
+    group <- cumsum(c(TRUE, gaps > qc$max_gap_days))
+    seg[, group := group]
+    split <- max(group) > 1L
+
+    for (g in unique(group)) {
+      sg <- seg[group == g]
+      animal <- if (split) paste0(r, "_", sg$location[1L]) else r
+      rows <- v[location %in% sg$location, row_id]
+      new_id <- rbind(new_id, data.table::data.table(row = rows, responder = animal))
+
+      jump <- NA_real_
+      if (nrow(sg) > 1L) {
+        jumps <- vapply(seq_len(nrow(sg) - 1L), function(k) {
+          before <- v[location == sg$location[k] & !is.na(weight)][order(-entry_time)][seq_len(min(.N, 20L)), stats::median(weight)]
+          after <- v[location == sg$location[k + 1L] & !is.na(weight)][order(entry_time)][seq_len(min(.N, 20L)), stats::median(weight)]
+          after - before
+        }, numeric(1))
+        jump <- jumps[which.max(abs(jumps))]
+        if (!is.na(jump) && abs(jump) > qc$max_jump_kg) {
+          ppt_warn("Pig {.val {animal}}: body weight changes by {round(jump, 1)} kg at the station transfer {paste(sg$location, collapse = '>')}.")
+        }
+      }
+      multi_rows[[length(multi_rows) + 1L]] <- data.table::data.table(
+        responder = animal, responder_raw = r,
+        location_path = paste(sg$location, collapse = ">"),
+        main_location = sg[which.max(n), location],
+        n_locations = nrow(sg), transfer = nrow(sg) > 1L, split = split,
+        misreads_removed = n_mis, weight_jump_kg = jump
+      )
+    }
+  }
+
+  misread_visits <- dt[row_id %in% misread_rows]
+  dt <- dt[!row_id %in% misread_rows]
+  if (nrow(new_id) > 0L) {
+    dt[new_id, on = c(row_id = "row"), responder := i.responder]
+  }
+  dt[, row_id := NULL]
+
+  stations <- data.table::rbindlist(c(list(stations[!responder %in% multi]), multi_rows))
+  data.table::setorder(stations, main_location, responder)
+
+  n_tr <- stations[transfer == TRUE, .N]
+  n_sp <- data.table::uniqueN(stations[split == TRUE, responder_raw])
+  n_mr <- data.table::uniqueN(removed$responder)
+  if (length(multi) == 0L) {
+    ppt_msg("No pig was seen at more than one station", "info")
+  } else {
+    ppt_msg("{length(multi)} pig{?s} seen at several stations: {n_tr} transfer{?s}, {n_sp} split into separate animals, {n_mr} with misreads removed ({length(misread_rows)} visits)", "warning")
+    if (ppt_verbose() >= 2L) {
+      show <- stations[responder_raw %in% multi]
+      for (i in seq_len(nrow(show))) {
+        ppt_msg("{show$responder[i]}: {show$location_path[i]}{if (show$split[i]) ' (split)' else ''}{if (show$misreads_removed[i] > 0) paste0(', ', show$misreads_removed[i], ' misreads removed') else ''}", "info", level = 2L)
+      }
+    }
+  }
+
+  list(visits = dt, stations = stations, removed = removed,
+       misread_visits = misread_visits)
+}
+```
+
+```{r example-prep_visits}
+visits <- prep_visits(fire)
+head(visits)
+
+# Unidentified visits are kept for the feeder error checks
+table(visits$identified)
+
+# Station history of each pig
+head(attr(visits, "stations"))
+
+# NEDAP data gets the same columns and units
+nedap_visits <- prep_visits(nedap, verbose = 0)
+summary(nedap_visits$weight)
+```
+
+```{r tests-prep_visits}
+test_that("NEDAP data are standardised", {
+  input <- data.table::as.data.table(nedap)
+  before <- data.table::copy(input)
+  v <- prep_visits(input, verbose = 0)
+  expect_identical(input, before)                 # input not modified
+  expect_equal(nrow(v), nrow(nedap))
+  expect_equal(sum(!v$identified), 211L)
+  expect_true(all(is.na(v[identified == FALSE]$responder)))
+  expect_equal(sum(is.na(v$weight)), sum(nedap$weight == 0))
+  expect_equal(range(v$weight, na.rm = TRUE), range(nedap$weight[nedap$weight > 0]) / 1000)
+  expect_equal(v$exit_time - v$entry_time, as.difftime(v$duration, units = "secs"))
+  expect_equal(attr(v, "station"), "nedap")
+  expect_equal(nrow(attr(v, "stations")), 30L)
+  expect_equal(min(v$seq_days), 1L)
+  expect_true(all(is.na(v$trough_in)))
+})
+
+test_that("FIRE data are standardised and midnight crossings fixed", {
+  v <- prep_visits(fire, verbose = 0)
+  expect_equal(nrow(v), nrow(fire))
+  expect_equal(sum(!v$identified), 51L)
+  expect_equal(attr(v, "prep_summary")$midnight_crossings, 68L)
+  expect_true(all(v$duration >= 0))
+  expect_lte(max(v$duration), 3600)
+  expect_equal(sum(v$feed_intake), sum(fire$Consumed) * 1000)
+  expect_equal(sum(is.na(v$weight)), sum(fire$Weight == 0))
+  expect_equal(nrow(attr(v, "stations")), 26L)
+  expect_equal(nrow(attr(v, "removed")), 0L)
+})
+
+test_that("FIRE exit before entry beyond duration_max stays negative (OTV-lo)", {
+  f <- fire[1:3, ]
+  f$Entry[2] <- "14:20:00"
+  f$Exit[2] <- "12:00:00"
+  v <- prep_visits(f, verbose = 0)
+  expect_equal(attr(v, "prep_summary")$midnight_crossings, 0L)
+  expect_equal(sum(v$duration < 0), 1L)
+})
+
+test_that("sequence numbers are consistent", {
+  v <- prep_visits(nedap, verbose = 0)
+  expect_true(all(v[identified == TRUE, all(seq_in_day == seq_len(.N)), by = .(responder, date)]$V1))
+  expect_true(all(is.na(v[identified == FALSE]$seq_in_day)))
+  expect_equal(v$seq_days, as.integer(v$date - min(v$date)) + 1L)
+})
+
+test_that("read_station output passes the station type on", {
+  folder <- withr::local_tempdir()
+  data.table::fwrite(fire, file.path(folder, "fire.csv"))
+  raw <- read_station(folder, verbose = 0)
+  v <- prep_visits(raw, verbose = 0)
+  expect_equal(attr(v, "station"), "fire")
+  expect_true("source_file" %in% names(v))
+  expect_equal(sum(!v$identified), 51L)
+})
+
+# Station transfer scenarios built from one NEDAP pig
+one_pig <- function() {
+  d <- data.table::as.data.table(nedap)[responder == 15497]
+  d[, location := 101L]
+  d
+}
+mid_time <- function(d) d$visit_time[floor(nrow(d) / 2)]
+
+test_that("a transfer keeps all visits with their real station", {
+  d <- one_pig()
+  d[visit_time > mid_time(d), location := 102L]
+  v <- prep_visits(d, verbose = 0)
+  st <- attr(v, "stations")
+  expect_equal(nrow(st), 1L)
+  expect_true(st$transfer)
+  expect_false(st$split)
+  expect_equal(st$location_path, "101>102")
+  expect_equal(nrow(v), nrow(d))
+  expect_setequal(unique(v$location), c("101", "102"))
+  expect_equal(unique(v$responder), "15497")
+})
+
+test_that("a long gap splits the pig into two animals", {
+  d <- one_pig()
+  m <- mid_time(d)
+  d <- d[visit_time < m | visit_time > m + 10 * 86400]
+  d[visit_time > m, location := 102L]
+  v <- prep_visits(d, verbose = 0)
+  st <- attr(v, "stations")
+  expect_equal(sort(st$responder), c("15497_101", "15497_102"))
+  expect_true(all(st$split))
+  expect_equal(v[location == "102", unique(responder)], "15497_102")
+  expect_equal(unique(st$responder_raw), "15497")
+})
+
+test_that("overlapping visits at a minor station are removed as misreads", {
+  d <- one_pig()
+  # 30 visits spread over the whole test also recorded at station 102
+  misread <- d[seq(1, .N, length.out = 30)]
+  misread[, `:=`(location = 102L, visit_time = visit_time + 1)]
+  v <- prep_visits(rbind(d, misread), verbose = 0)
+  st <- attr(v, "stations")
+  expect_equal(st$misreads_removed, 30L)
+  expect_equal(unique(v$location), "101")
+  expect_equal(nrow(v), nrow(d))
+  expect_equal(nrow(attr(v, "removed")), 1L)
+})
+
+test_that("a weight jump at a transfer gives a warning", {
+  d <- one_pig()
+  m <- mid_time(d)
+  d[visit_time > m, `:=`(location = 102L, weight = weight + 25000L)]
+  d[visit_time > m & weight == 25000L, weight := 0L]
+  expect_warning(v <- prep_visits(d, verbose = 1), "transfer")
+  expect_gt(attr(v, "stations")$weight_jump_kg, 10)
+  expect_silent(prep_visits(d, verbose = 0))
+})
+
+test_that("bad inputs give clear errors", {
+  expect_error(prep_visits(nedap, qc = list()), "qc_config")
+  expect_error(prep_visits(fire, station = "nedap", verbose = 0), "visit_time")
+  expect_error(prep_visits(1:3), "data.frame")
+})
+```
+
+# clean_weight
+
+`clean_weight()` cleans the body weight records of identified visits in
+three layers:
+
+1. **record rules**: weights outside `weight_range` are flagged;
+2. **outlier detection per pig**: one or more methods fit a curve to each
+   pig and flag records far from it:
+   - `"rlm"`: quadratic robust regression with bisquare weights
+     (`MASS::rlm`), records with weight below `rlm_cutoff` are outliers;
+   - `"loess"`: robust LOESS (`family = "symmetric"`), residuals beyond
+     `sd_max` robust SDs;
+   - `"stl"`: STL decomposition of the daily median weight (weekly
+     period, robust), residuals beyond `sd_max` robust SDs. Falls back to
+     LOESS for pigs with fewer than 14 days;
+   - `"sd"`: quadratic least squares, residuals beyond `sd_max` SDs;
+   - optional `rel_dev_max` and `daily_drop_min` rules;
+3. **pig checks**: number of valid records, test length, missing rate,
+   entry and exit weight, and optionally the curve R².
+
+Nothing is deleted silently: every record keeps a `qc_flag`, and every
+removed pig is listed in `removed` with the reason.
+
+```{r function-clean_weight}
+#' Clean body weight records
+#'
+#' @description
+#' Flag implausible and outlying body weight records, then decide for each
+#' pig whether its weight data are good enough for growth analysis.
+#'
+#' @param visits Visit table from [prep_visits()].
+#' @param qc QC settings from [qc_config()]. Used here: `weight_range`,
+#'   `weight_outlier`, `outlier_combine`, `rlm_cutoff`, `sd_max`,
+#'   `loess_span`, `rel_dev_max`, `daily_drop_min`, `min_records`,
+#'   `min_test_days`, `max_missing_rate`, `entry_weight_max`,
+#'   `exit_weight_min`, `curve_r2_min`.
+#' @param verbose 0 (silent), 1 (summary, default) or 2 (details).
+#'
+#' @return An object of class `ppt_weight` (a list):
+#'   - `per_pig`: one row per pig with `n_records`, `n_valid`,
+#'     `n_outliers`, `first_date`, `last_date`, `test_days`,
+#'     `missing_rate`, `entry_weight`, `exit_weight` (kg, from the fitted
+#'     curve), `r2`, `status` (`"keep"`, `"low_confidence"` or
+#'     `"removed"`) and `reason`;
+#'   - `daily`: one row per pig and day for pigs not removed: median of the
+#'     valid weights (`weight`, kg), `n_records`, `n_outliers`;
+#'   - `records`: every weight record with `fitted`, `outlier` and
+#'     `qc_flag` (why it was flagged);
+#'   - `removed`: pigs removed here, plus misreads logged by
+#'     [prep_visits()];
+#'   - `settings`: the QC settings used.
+#'
+#' @details
+#' Pig checks use the valid (non-outlier) records only:
+#' - `n_valid < min_records`, `test_days < min_test_days` or
+#'   `missing_rate > max_missing_rate` (share of test days without a valid
+#'   weight) remove the pig;
+#' - `entry_weight > entry_weight_max`, `exit_weight < exit_weight_min` or
+#'   `r2 < curve_r2_min` mark the pig `"low_confidence"` but keep it: its
+#'   growth can still be estimated by extrapolation in [calc_adg()], with a
+#'   flag.
+#'
+#' @seealso [prep_visits()] for the previous step, [qc_config()] for the
+#'   settings.
+#' @export
+clean_weight <- function(visits, qc = qc_config(), verbose = 1) {
+  local_verbose(verbose)
+  check_qc(qc)
+  dt <- as_dt(visits, "visits")
+  check_cols(dt, c("responder", "identified", "location", "date", "seq_days",
+                   "entry_time", "weight"),
+             arg = "visits", hint = "Use {.fn prep_visits} first.")
+
+  ppt_msg("Cleaning body weight ({.field {paste(qc$weight_outlier, collapse = ' + ')}})", "h1")
+
+  main_loc <- main_location(dt, attr(visits, "stations", exact = TRUE))
+  rec <- dt[identified == TRUE & !is.na(weight),
+            .(responder, location, date, seq_days, entry_time, weight)]
+  data.table::setorder(rec, responder, entry_time)
+  rec[, row_id := .I]
+  rec[, qc_flag := ""]
+
+  # 1. record rules
+  rec[weight < qc$weight_range[1L] | weight > qc$weight_range[2L],
+      qc_flag := "weight_range"]
+  n_range <- rec[qc_flag == "weight_range", .N]
+
+  # 2. outlier detection per pig
+  fits <- fit_by_pig(rec[qc_flag == ""], detect_weight_outliers,
+                     step = "clean_weight", qc = qc)
+  rec[fits$result, on = "row_id", `:=`(
+    fitted = i.fitted, outlier = i.outlier,
+    qc_flag = data.table::fifelse(i.outlier, i.outlier_by, qc_flag)
+  )]
+  rec[qc_flag == "weight_range", outlier := TRUE]
+  rec[is.na(outlier), outlier := FALSE]
+
+  # 3. pig checks
+  pig_fit <- unique(fits$result[, .(responder, r2, entry_weight, exit_weight)])
+  per_pig <- rec[, .(
+    n_records = .N,
+    n_valid = sum(!outlier),
+    n_outliers = sum(outlier),
+    first_date = if (any(!outlier)) min(date[!outlier]) else as.Date(NA),
+    last_date = if (any(!outlier)) max(date[!outlier]) else as.Date(NA),
+    valid_days = data.table::uniqueN(date[!outlier])
+  ), by = responder]
+  # pigs whose records are all outside weight_range or that have no weight
+  no_weight <- setdiff(unique(dt[identified == TRUE, responder]), per_pig$responder)
+  if (length(no_weight) > 0L) {
+    per_pig <- rbind(per_pig, data.table::data.table(
+      responder = no_weight, n_records = 0L, n_valid = 0L, n_outliers = 0L,
+      first_date = as.Date(NA), last_date = as.Date(NA), valid_days = 0L))
+  }
+  per_pig[, test_days := as.integer(last_date - first_date) + 1L]
+  per_pig[, missing_rate := 1 - valid_days / test_days]
+  per_pig <- merge(per_pig, pig_fit, by = "responder", all.x = TRUE)
+  per_pig <- merge(main_loc, per_pig, by = "responder", all.y = TRUE)
+
+  remove_why <- pig_reasons(per_pig, qc, fits$failed, type = "remove")
+  flag_why <- pig_reasons(per_pig, qc, fits$failed, type = "flag")
+  per_pig[, status := data.table::fifelse(nzchar(remove_why), "removed",
+                       data.table::fifelse(nzchar(flag_why), "low_confidence", "keep"))]
+  per_pig[, reason := data.table::fifelse(status == "removed", remove_why, flag_why)]
+  per_pig[, valid_days := NULL]
+  data.table::setcolorder(per_pig, c("responder", "location"))
+  data.table::setorder(per_pig, location, responder)
+
+  kept <- per_pig[status != "removed", responder]
+  rec[, kept_pig := responder %in% kept]
+  daily <- rec[kept_pig == TRUE, .(
+    location = location[1L],
+    seq_days = seq_days[1L],
+    weight = if (any(!outlier)) stats::median(weight[!outlier]) else NA_real_,
+    n_records = .N,
+    n_outliers = sum(outlier)
+  ), by = .(responder, date)]
+  data.table::setcolorder(daily, c("responder", "location", "date", "seq_days"))
+
+  removed <- rbind(
+    attr(visits, "removed", exact = TRUE) %||% new_removed(),
+    per_pig[status == "removed",
+            new_removed(responder, location, "clean_weight", reason)]
+  )
+  records <- rec[, .(responder, location, date, seq_days, entry_time, weight,
+                     fitted, outlier, qc_flag)]
+
+  report_clean_weight(rec, per_pig, n_range, fits, qc)
+
+  new_ppt_result(per_pig = per_pig, daily = daily, removed = removed,
+                 settings = qc, class = "ppt_weight") |>
+    add_element(records = records)
+}
+
+# ---- helpers ----------------------------------------------------------------
+
+`%||%` <- function(x, y) if (is.null(x)) y else x
+
+check_qc <- function(qc) {
+  if (!inherits(qc, "ppt_qc")) {
+    cli::cli_abort("{.arg qc} must be created with {.fn qc_config}.")
+  }
+  invisible(qc)
+}
+
+add_element <- function(x, ...) {
+  extra <- list(...)
+  for (nm in names(extra)) x[[nm]] <- extra[[nm]]
+  x
+}
+
+# Main station of each pig: from the station history if available.
+main_location <- function(dt, stations = NULL) {
+  if (!is.null(stations) && all(c("responder", "main_location") %in% names(stations))) {
+    out <- stations[, .(responder, location = main_location)]
+  } else {
+    out <- dt[identified == TRUE, .N, by = .(responder, location)][
+      order(-N), .(location = location[1L]), by = responder]
+  }
+  unique(out, by = "responder")
+}
+
+# Robust scale: MAD, falling back to SD; NA if no spread at all.
+robust_scale <- function(r) {
+  s <- stats::mad(r, na.rm = TRUE)
+  if (!is.finite(s) || s == 0) s <- stats::sd(r, na.rm = TRUE)
+  if (!is.finite(s) || s == 0) NA_real_ else s
+}
+
+beyond <- function(r, k, scale) {
+  if (is.na(scale)) rep(FALSE, length(r)) else abs(r) > k * scale
+}
+
+# Outlier detection for one pig. Returns one row per record.
+detect_weight_outliers <- function(d, qc) {
+  if (nrow(d) < 5L) {
+    stop(sprintf("only %d weight records in range", nrow(d)), call. = FALSE)
+  }
+  t <- as.numeric(difftime(d$entry_time, min(d$entry_time), units = "days"))
+  y <- d$weight
+  flags <- list()
+  fits <- list()
+
+  for (m in qc$weight_outlier) {
+    if (m == "rlm") {
+      fit <- MASS::rlm(y ~ t + I(t^2), psi = MASS::psi.bisquare, maxit = 100)
+      fits$rlm <- stats::fitted(fit)
+      flags$rlm <- fit$w < qc$rlm_cutoff
+    } else if (m == "loess") {
+      fits$loess <- loess_fit(t, y, qc$loess_span)
+      r <- y - fits$loess
+      flags$loess <- beyond(r, qc$sd_max, robust_scale(r))
+    } else if (m == "sd") {
+      fit <- stats::lm(y ~ t + I(t^2))
+      r <- stats::residuals(fit)
+      fits$sd <- stats::fitted(fit)
+      flags$sd <- beyond(r, qc$sd_max, stats::sd(r))
+    } else if (m == "stl") {
+      fits$stl <- stl_fit(t, y, qc$loess_span)
+      r <- y - fits$stl
+      flags$stl <- beyond(r, qc$sd_max, robust_scale(r))
+    }
+  }
+
+  mat <- do.call(cbind, flags)
+  outlier <- if (qc$outlier_combine == "any") rowSums(mat) > 0 else rowSums(mat) > ncol(mat) / 2
+  by <- apply(mat, 1L, function(z) paste(colnames(mat)[z], collapse = ";"))
+  ref <- fits[[1L]]
+
+  if (!is.null(qc$rel_dev_max)) {
+    rel <- abs(y - ref) / ref > qc$rel_dev_max
+    by <- add_reason(by, rel, "rel_dev")
+    outlier <- outlier | rel
+  }
+  if (!is.null(qc$daily_drop_min)) {
+    drop <- daily_drop(d$date, y, outlier, qc$daily_drop_min)
+    by <- add_reason(by, drop, "daily_drop")
+    outlier <- outlier | drop
+  }
+  by[!outlier] <- ""
+
+  # Curve on the valid records: R2 and entry/exit weight.
+  ok <- !outlier
+  if (sum(ok) >= 5L) {
+    tt <- t[ok]
+    yy <- y[ok]
+    use_loess <- "loess" %in% qc$weight_outlier
+    clean_fit <- if (use_loess) loess_fit(tt, yy, qc$loess_span) else stats::fitted(stats::lm(yy ~ tt + I(tt^2)))
+    r2 <- 1 - sum((yy - clean_fit)^2) / sum((yy - mean(yy))^2)
+    entry_weight <- clean_fit[which.min(tt)]
+    exit_weight <- clean_fit[which.max(tt)]
+  } else {
+    r2 <- entry_weight <- exit_weight <- NA_real_
+  }
+
+  data.table::data.table(row_id = d$row_id, fitted = ref, outlier = outlier,
+                         outlier_by = by, r2 = r2,
+                         entry_weight = entry_weight, exit_weight = exit_weight)
+}
+
+loess_fit <- function(t, y, span) {
+  fit <- stats::loess(y ~ t, span = span, degree = 2, family = "symmetric")
+  stats::fitted(fit)
+}
+
+# Trend + weekly component of the daily median weight; LOESS if < 14 days.
+stl_fit <- function(t, y, span) {
+  day <- floor(t)
+  med <- tapply(y, day, stats::median)
+  days <- as.numeric(names(med))
+  grid <- seq(0, max(days))
+  if (length(grid) < 14L || length(days) < 7L) {
+    return(loess_fit(t, y, span))
+  }
+  x <- stats::approx(days, med, xout = grid, rule = 2)$y
+  s <- stats::stl(stats::ts(x, frequency = 7), s.window = "periodic", robust = TRUE)
+  comp <- s$time.series[, "trend"] + s$time.series[, "seasonal"]
+  as.numeric(comp)[day + 1L]
+}
+
+# Days whose median weight drops below `ratio` x the previous valid day.
+daily_drop <- function(date, y, outlier, ratio) {
+  med <- tapply(y[!outlier], date[!outlier], stats::median)
+  if (length(med) < 2L) return(rep(FALSE, length(y)))
+  bad_days <- names(med)[-1L][med[-1L] / med[-length(med)] < ratio]
+  as.character(date) %in% bad_days
+}
+
+add_reason <- function(by, flag, label) {
+  by[flag] <- ifelse(nzchar(by[flag]), paste(by[flag], label, sep = ";"), label)
+  by
+}
+
+# Reasons to remove (type = "remove") or flag (type = "flag") a pig.
+# Empty string = no reason.
+pig_reasons <- function(p, qc, failed, type = c("remove", "flag")) {
+  type <- match.arg(type)
+  reasons <- vector("list", nrow(p))
+  add <- function(cond, text) {
+    for (i in which(cond %in% TRUE)) reasons[[i]] <<- c(reasons[[i]], text[i])
+  }
+  if (type == "flag") {
+    add(p$entry_weight > qc$entry_weight_max,
+        sprintf("entry weight %.1f kg > %s kg", p$entry_weight, qc$entry_weight_max))
+    add(p$exit_weight < qc$exit_weight_min,
+        sprintf("exit weight %.1f kg < %s kg", p$exit_weight, qc$exit_weight_min))
+    if (!is.null(qc$curve_r2_min)) {
+      add(p$r2 < qc$curve_r2_min, sprintf("curve R2 %.3f < %s", p$r2, qc$curve_r2_min))
+    }
+    return(vapply(reasons, function(x) paste(unique(x), collapse = "; "), character(1)))
+  }
+  add(p$responder %in% failed$responder,
+      paste("curve fit failed:", failed$reason[match(p$responder, failed$responder)]))
+  add(p$n_valid < qc$min_records,
+      sprintf("%d valid weights < %d", p$n_valid, as.integer(qc$min_records)))
+  add(p$n_valid > 0 & p$test_days < qc$min_test_days,
+      sprintf("test period %d d < %d d", p$test_days, as.integer(qc$min_test_days)))
+  add(p$n_valid > 0 & p$missing_rate > qc$max_missing_rate,
+      sprintf("missing rate %.0f%% > %.0f%%", 100 * p$missing_rate, 100 * qc$max_missing_rate))
+  vapply(reasons, function(x) paste(unique(x), collapse = "; "), character(1))
+}
+
+report_clean_weight <- function(rec, per_pig, n_range, fits, qc) {
+  n_rec <- nrow(rec)
+  n_out <- rec[outlier == TRUE & qc_flag != "weight_range", .N]
+  method_counts <- vapply(qc$weight_outlier, function(m) {
+    rec[grepl(paste0("(^|;)", m, "(;|$)"), qc_flag), .N]
+  }, numeric(1))
+  ppt_bullets_counts(c(
+    "Weight records" = n_rec,
+    "Outside weight range" = n_range,
+    "Outliers" = n_out
+  ))
+  if (length(qc$weight_outlier) > 1L) {
+    ppt_bullets_counts(stats::setNames(method_counts, paste0("  flagged by ", names(method_counts))), level = 2L)
+  }
+  if (nrow(fits$warnings) > 0L) {
+    ppt_msg("{nrow(fits$warnings)} curve fit warning{?s} (pigs: {.val {unique(fits$warnings$responder)}})", "warning", level = 2L)
+  }
+  status <- per_pig[, .N, by = status]
+  n_keep <- status[status == "keep", sum(N)]
+  n_low <- status[status == "low_confidence", sum(N)]
+  n_rm <- status[status == "removed", sum(N)]
+  ppt_msg("Pigs kept: {n_keep}, low confidence: {n_low}, removed: {n_rm}",
+          if (n_rm > 0L) "warning" else "success")
+  if (n_rm > 0L) {
+    rm <- per_pig[status == "removed"]
+    for (i in seq_len(nrow(rm))) {
+      ppt_msg("{.val {rm$responder[i]}} ({rm$location[i]}): {rm$reason[i]}", "danger", level = 2L)
+    }
+  }
+  invisible(NULL)
+}
+```
+
+```{r example-clean_weight}
+visits <- prep_visits(nedap, verbose = 0)
+w <- clean_weight(visits)
+w
+
+# Why pigs were removed
+w$removed
+
+# Records flagged as outliers
+head(w$records[outlier == TRUE])
+
+# Another QC preset
+w_national <- clean_weight(visits, qc = qc_config("national"), verbose = 0)
+table(w_national$per_pig$status)
+```
+
+```{r tests-clean_weight}
+# A synthetic pig: linear growth plus noise, with optional spikes
+make_pig <- function(id = "p1", days = 70, start = 30, adg = 0.9,
+                     per_day = 8, spikes = 0, location = "101", seed = 1) {
+  set.seed(seed)
+  t <- sort(runif(days * per_day, 0, days))
+  w <- start + adg * t + rnorm(length(t), 0, 0.5)
+  if (spikes > 0) {
+    idx <- round(seq(10, length(t) - 10, length.out = spikes))
+    w[idx] <- w[idx] + 25
+  }
+  et <- as.POSIXct("2024-01-01", tz = "UTC") + t * 86400
+  is_spike <- seq_along(t) %in% if (spikes > 0) idx else integer()
+  data.table::data.table(
+    responder = id, responder_raw = id, identified = TRUE, location = location,
+    date = as.Date(et), seq_days = as.integer(as.Date(et) - as.Date("2024-01-01")) + 1L,
+    entry_time = et, weight = w, is_spike = is_spike
+  )
+}
+
+test_that("clean_weight runs on NEDAP and FIRE with every preset", {
+  for (data in list(nedap, fire)) {
+    v <- prep_visits(data, verbose = 0)
+    before <- data.table::copy(v)
+    for (p in c("casey", "national", "legacy")) {
+      w <- clean_weight(v, qc = qc_config(p), verbose = 0)
+      expect_s3_class(w, c("ppt_weight", "ppt_result"))
+      expect_named(w, c("per_pig", "daily", "removed", "settings", "records"))
+      expect_equal(nrow(w$per_pig), length(unique(v$responder[v$identified])))
+      expect_true(all(w$per_pig$status %in% c("keep", "low_confidence", "removed")))
+      expect_true(all(w$daily$responder %in% w$per_pig[status != "removed", responder]))
+      expect_equal(attr(w$settings, "profile"), p)
+    }
+    expect_identical(v, before)
+  }
+})
+
+test_that("kept pigs meet every pig-level rule", {
+  qc <- qc_config()
+  w <- clean_weight(prep_visits(nedap, verbose = 0), verbose = 0)
+  k <- w$per_pig[status != "removed"]
+  expect_true(all(k$n_valid >= qc$min_records))
+  expect_true(all(k$test_days >= qc$min_test_days))
+  expect_true(all(k$missing_rate <= qc$max_missing_rate))
+  ok_weights <- k$entry_weight <= qc$entry_weight_max & k$exit_weight >= qc$exit_weight_min
+  expect_true(all(k[!ok_weights, status] == "low_confidence"))
+  # the NEDAP pig with only 2 days of data is removed
+  short <- w$per_pig[test_days < qc$min_test_days | n_valid < qc$min_records]
+  expect_gte(nrow(short), 1L)
+  expect_true(all(short$status == "removed"))
+  expect_true(all(short$responder %in% w$removed$responder))
+})
+
+test_that("every outlier method finds the spikes", {
+  pig <- make_pig(spikes = 6)
+  spike_w <- pig$weight[pig$is_spike]
+  for (m in c("rlm", "loess", "sd", "stl")) {
+    w <- clean_weight(pig, qc = qc_config(weight_outlier = m), verbose = 0)
+    flagged <- w$records[outlier == TRUE, weight]
+    expect_true(all(spike_w %in% flagged), info = m)
+    expect_lt(length(flagged), 30, label = m)
+    expect_true(all(grepl(m, w$records[outlier == TRUE, qc_flag])), info = m)
+  }
+})
+
+test_that("majority combination is stricter than any", {
+  pig <- make_pig(spikes = 6)
+  any_q <- qc_config(weight_outlier = c("rlm", "loess", "sd"), outlier_combine = "any")
+  maj_q <- qc_config(weight_outlier = c("rlm", "loess", "sd"), outlier_combine = "majority")
+  n_any <- sum(clean_weight(pig, any_q, verbose = 0)$records$outlier)
+  n_maj <- sum(clean_weight(pig, maj_q, verbose = 0)$records$outlier)
+  expect_gte(n_any, n_maj)
+  expect_gte(n_maj, 6)
+})
+
+test_that("weight range and optional rules flag records", {
+  pig <- make_pig()
+  pig$weight[c(5, 50)] <- c(5, 200)
+  w <- clean_weight(pig, verbose = 0)
+  expect_equal(w$records[qc_flag == "weight_range", .N], 2L)
+  # daily drop: one day 20% lighter
+  pig2 <- make_pig()
+  d <- pig2$date[pig2$date == pig2$date[300]]
+  pig2[date == d[1], weight := weight * 0.8]
+  w2 <- clean_weight(pig2, qc = qc_config(daily_drop_min = 0.9, weight_outlier = "rlm", rlm_cutoff = 0), verbose = 0)
+  expect_true(all(w2$records[date == d[1], outlier]))
+  expect_true(all(grepl("daily_drop", w2$records[date == d[1], qc_flag])))
+  # relative deviation
+  w3 <- clean_weight(pig, qc = qc_config(rel_dev_max = 0.25), verbose = 0)
+  expect_false(any(grepl("rel_dev", w3$records$qc_flag)))
+})
+
+test_that("length rules remove pigs, entry/exit rules only flag them", {
+  heavy <- make_pig("heavy", start = 80)          # entry weight too high
+  light <- make_pig("light", start = 20, adg = 0.5, seed = 2)  # exit too low
+  short <- make_pig("short", days = 20, seed = 3)  # test too short
+  few <- make_pig("few", per_day = 0.2, seed = 4)  # too few records
+  ok <- make_pig("ok", seed = 5)
+  w <- clean_weight(rbind(heavy, light, short, few, ok), verbose = 0)
+  st <- w$per_pig[, stats::setNames(status, responder)]
+  expect_equal(unname(st[c("heavy", "light", "short", "few", "ok")]),
+               c("low_confidence", "low_confidence", "removed", "removed", "keep"))
+  r <- w$per_pig[, stats::setNames(reason, responder)]
+  expect_match(r[["heavy"]], "entry weight")
+  expect_match(r[["light"]], "exit weight")
+  expect_match(r[["short"]], "test period")
+  expect_match(r[["few"]], "valid weights")
+  expect_setequal(w$removed$responder, c("short", "few"))
+  expect_true(all(c("heavy", "light") %in% w$daily$responder))
+})
+
+test_that("curve R2 only lowers confidence", {
+  pig <- make_pig()
+  pig[, weight := weight + rnorm(.N, 0, 6)]
+  w <- clean_weight(pig, qc = qc_config(curve_r2_min = 0.99), verbose = 0)
+  expect_equal(w$per_pig$status, "low_confidence")
+  expect_match(w$per_pig$reason, "R2")
+  expect_equal(nrow(w$removed), 0L)
+  expect_gt(nrow(w$daily), 0L)
+})
+
+test_that("a pig whose fit fails is removed, others continue", {
+  pig <- make_pig()
+  tiny <- make_pig("tiny")[1:3]
+  w <- clean_weight(rbind(pig, tiny), qc = qc_config(min_records = 3), verbose = 0)
+  expect_equal(w$per_pig[responder == "tiny", status], "removed")
+  expect_match(w$per_pig[responder == "tiny", reason], "fit failed")
+  expect_equal(w$per_pig[responder == "p1", status], "keep")
+})
+
+test_that("verbose = 0 is silent and bad inputs are rejected", {
+  v <- prep_visits(fire, verbose = 0)
+  expect_silent(clean_weight(v, verbose = 0))
+  expect_error(clean_weight(v, qc = list()), "qc_config")
+  expect_error(clean_weight(fire, verbose = 0), "prep_visits")
+})
+```
+
+# calc_adg
+
+`calc_adg()` estimates average daily gain (ADG) over the body weight stage
+`stage_range` (default 30-120 kg):
+
+1. a growth curve is fitted to the valid weight records of each pig
+   (`curve_model`: polynomial, robust LOESS or Gompertz; Gompertz falls back
+   to a quadratic curve when it does not converge);
+2. the times at which the curve reaches the lower and upper stage weight
+   are found, searching up to `max_extrap_days` before the first and after
+   the last record;
+3. ADG = weight difference / days between these two times.
+
+Every pig gets an `adg_type`:
+
+- `"observed"`: both stage limits are reached inside the recorded period;
+- `"extrapolated"`: at least one limit needs extrapolation, but no more
+  than `max_extrap_days`;
+- `"partial"`: a limit is not reached even after extrapolation. ADG is then
+  the mean slope of the curve over the part of the stage that is covered;
+- `"none"`: less than 7 days of the stage are covered; ADG is `NA`.
+
+```{r function-calc_adg}
+#' Average daily gain
+#'
+#' @description
+#' Fit a growth curve to the cleaned body weights of each pig and compute
+#' average daily gain (ADG) over a body weight stage.
+#'
+#' @param weight Result of [clean_weight()].
+#' @param qc QC settings; by default the ones used by [clean_weight()].
+#'   Used here: `stage_range`, `curve_model`, `loess_span`,
+#'   `max_extrap_days`.
+#' @param verbose 0 (silent), 1 (summary, default) or 2 (details).
+#'
+#' @return An object of class `ppt_adg` (a list):
+#'   - `per_pig`: one row per pig (pigs removed by [clean_weight()] are not
+#'     included) with `stage`, `curve_used`, `curve_r2`, `adg_type`,
+#'     `start_date` / `end_date` and `start_weight` / `end_weight` (when the
+#'     curve reaches the stage limits, kg), `stage_days`,
+#'     `extrap_days_start` / `extrap_days_end` (days the curve is
+#'     extrapolated before the first / after the last weight), `adg` (g/d),
+#'     `lm_slope` (g/d, linear regression on the records inside the stage,
+#'     for comparison), `r_squared` (of that regression), `weight_status`
+#'     and `weight_reason` (from [clean_weight()]);
+#'   - `daily`: one row per pig and day from `start_date` to `end_date` and
+#'     over the recorded days: observed `weight` (daily median, kg, `NA` on
+#'     predicted days), `predicted` weight with `lower` / `upper` limits
+#'     (± 1.96 residual SD), `in_stage` and `source` (`"observed"` or
+#'     `"predicted"`);
+#'   - `removed`: pigs removed so far, plus pigs without ADG;
+#'   - `settings`: QC settings.
+#'
+#' @seealso [clean_weight()] for the previous step.
+#' @export
+calc_adg <- function(weight, qc = weight$settings, verbose = 1) {
+  local_verbose(verbose)
+  if (!inherits(weight, "ppt_weight")) {
+    cli::cli_abort("{.arg weight} must be the result of {.fn clean_weight}.")
+  }
+  check_qc(qc)
+  stage <- qc$stage_range
+  ppt_msg("ADG over {stage[1]}-{stage[2]} kg ({.field {qc$curve_model}} curve)", "h1")
+
+  kept <- weight$per_pig[status != "removed", .(responder, location,
+                                                 weight_status = status,
+                                                 weight_reason = reason)]
+  rec <- weight$records[outlier == FALSE & responder %in% kept$responder]
+  day0 <- weight$daily[, min(date - seq_days + 1L)]   # date with seq_days = 1
+
+  fits <- fit_by_pig(rec, adg_one_pig, step = "calc_adg", qc = qc, day0 = day0)
+  res <- fits$result
+
+  daily <- if (nrow(res) > 0L) {
+    data.table::rbindlist(Map(function(id, d) data.table::data.table(responder = id, d),
+                              res$responder, res$daily))
+  } else {
+    data.table::data.table()
+  }
+  per_pig <- if (nrow(res) > 0L) res[, !"daily"] else data.table::data.table(responder = character())
+  per_pig <- merge(kept, per_pig, by = "responder", all.x = TRUE)
+  per_pig[is.na(adg_type), adg_type := "none"]
+  per_pig[, stage := paste0(stage[1L], "-", stage[2L])]
+  if (nrow(daily) > 0L) {
+    daily <- merge(kept[, .(responder, location)], daily, by = "responder")
+    data.table::setcolorder(daily, c("responder", "location", "date", "seq_days"))
+    data.table::setorder(daily, location, responder, date)
+  }
+
+  cols <- c("responder", "location", "stage", "curve_used", "curve_r2",
+            "adg_type", "start_date", "end_date", "start_weight", "end_weight",
+            "stage_days", "extrap_days_start", "extrap_days_end", "adg", "lm_slope",
+            "r_squared", "weight_status",
+            "weight_reason")
+  per_pig <- per_pig[, intersect(cols, names(per_pig)), with = FALSE]
+  data.table::setorder(per_pig, location, responder)
+
+  no_adg <- per_pig[is.na(adg)]
+  why <- fits$failed$reason[match(no_adg$responder, fits$failed$responder)]
+  why[is.na(why)] <- "less than 7 days of the stage covered by the curve"
+  removed <- rbind(weight$removed,
+                   new_removed(no_adg$responder, no_adg$location, "calc_adg", why))
+
+  report_adg(per_pig, fits)
+  new_ppt_result(per_pig = per_pig, daily = daily, removed = removed,
+                 settings = qc, class = "ppt_adg")
+}
+
+# ADG for one pig. `d` holds its valid weight records.
+adg_one_pig <- function(d, qc, day0) {
+  first_day <- min(d$date)
+  t <- as.numeric(difftime(d$entry_time, as.POSIXct(first_day, tz = "UTC"),
+                           units = "days"))
+  y <- d$weight
+  curve <- fit_growth_curve(t, y, qc$curve_model, qc$loess_span)
+
+  lo <- qc$stage_range[1L]
+  hi <- qc$stage_range[2L]
+  tmin <- min(t)
+  tmax <- max(t)
+  from <- tmin - qc$max_extrap_days
+  to <- tmax + qc$max_extrap_days
+
+  t_lo <- first_cross(curve$pred, lo, from, to)
+  t_hi <- first_cross(curve$pred, hi, if (is.na(t_lo)) from else t_lo, to)
+  a <- if (is.na(t_lo)) tmin else t_lo
+  b <- if (is.na(t_hi)) tmax else t_hi
+  tol <- 0.5
+
+  if (b - a < 7) {
+    adg_type <- "none"
+    adg <- NA_real_
+  } else {
+    adg <- (curve$pred(b) - curve$pred(a)) * 1000 / (b - a)
+    adg_type <- if (is.na(t_lo) || is.na(t_hi)) {
+      "partial"
+    } else if (t_lo >= tmin - tol && t_hi <= tmax + tol) {
+      "observed"
+    } else {
+      "extrapolated"
+    }
+  }
+
+  # Linear regression on the records inside the stage, for comparison.
+  inside <- y >= lo & y <= hi
+  lm_slope <- r_squared <- NA_real_
+  if (sum(inside) >= 5L && diff(range(t[inside])) >= 7) {
+    lfit <- stats::lm(y[inside] ~ t[inside])
+    lm_slope <- unname(stats::coef(lfit)[2L]) * 1000
+    r_squared <- summary(lfit)$r.squared
+  }
+
+  # Daily table: the stage period plus the recorded days.
+  obs <- d[, .(weight = stats::median(weight)), by = date]
+  stage_days_idx <- if (adg_type == "none") integer() else seq(floor(a), ceiling(b) - 1)
+  idx <- sort(unique(c(stage_days_idx, as.integer(obs$date - first_day))))
+  dates <- first_day + idx
+  pred <- curve$pred(idx + 0.5)
+  daily <- data.table::data.table(
+    date = dates,
+    seq_days = as.integer(dates - day0) + 1L,
+    weight = obs$weight[match(dates, obs$date)],
+    predicted = pred,
+    lower = pred - 1.96 * curve$sigma,
+    upper = pred + 1.96 * curve$sigma
+  )
+  daily[, `:=`(
+    source = data.table::fifelse(is.na(weight), "predicted", "observed"),
+    in_stage = adg_type != "none" & (idx + 1) > a & idx < b
+  )]
+
+  data.table::data.table(
+    curve_used = curve$name,
+    curve_r2 = curve$r2,
+    adg_type = adg_type,
+    start_date = if (is.na(t_lo)) as.Date(NA) else first_day + floor(t_lo),
+    end_date = if (is.na(t_hi)) as.Date(NA) else first_day + floor(t_hi),
+    start_weight = if (adg_type == "none") NA_real_ else curve$pred(a),
+    end_weight = if (adg_type == "none") NA_real_ else curve$pred(b),
+    stage_days = if (adg_type == "none") NA_real_ else b - a,
+    extrap_days_start = if (adg_type == "none") NA_real_ else max(0, tmin - a),
+    extrap_days_end = if (adg_type == "none") NA_real_ else max(0, b - tmax),
+    adg = adg,
+    lm_slope = lm_slope,
+    r_squared = r_squared,
+    daily = list(daily)
+  )
+}
+
+# Fit a growth curve. Returns a prediction function, the fitted values,
+# the residual SD, R2 and the name of the model actually used.
+fit_growth_curve <- function(t, y, model, span = 0.75) {
+  fit_poly <- function(k, name = paste0("poly", k)) {
+    f <- stats::lm(y ~ poly(t, k, raw = TRUE))
+    list(pred = function(x) unname(stats::predict(f, newdata = data.frame(t = x))),
+         fitted = stats::fitted(f), name = name)
+  }
+  curve <- switch(model,
+    poly1 = fit_poly(1),
+    poly2 = fit_poly(2),
+    poly3 = fit_poly(3),
+    loess = {
+      f <- stats::loess(y ~ t, span = span, degree = 2, family = "symmetric")
+      core <- function(x) unname(stats::predict(f, newdata = data.frame(t = x)))
+      rng <- range(t)
+      h <- min(7, diff(rng) / 2)
+      s_lo <- (core(rng[1] + h) - core(rng[1])) / h
+      s_hi <- (core(rng[2]) - core(rng[2] - h)) / h
+      # linear continuation of the end slopes outside the recorded range
+      pred <- function(x) {
+        p <- core(pmin(pmax(x, rng[1]), rng[2]))
+        p + pmin(x - rng[1], 0) * s_lo + pmax(x - rng[2], 0) * s_hi
+      }
+      list(pred = pred, fitted = stats::fitted(f), name = "loess")
+    },
+    gompertz = {
+      f <- tryCatch(stats::nls(y ~ stats::SSgompertz(t, Asym, b2, b3)),
+                    error = function(e) NULL)
+      if (is.null(f)) {
+        fit_poly(2, "poly2 (gompertz failed)")
+      } else {
+        list(pred = function(x) as.numeric(stats::predict(f, newdata = data.frame(t = x))),
+             fitted = as.numeric(stats::fitted(f)), name = "gompertz")
+      }
+    }
+  )
+  res <- y - curve$fitted
+  curve$sigma <- stats::sd(res)
+  curve$r2 <- 1 - sum(res^2) / sum((y - mean(y))^2)
+  curve
+}
+
+# First time in [from, to] at which `pred` rises to `target`. NA if the
+# curve is already above the target at `from` or never reaches it.
+first_cross <- function(pred, target, from, to, step = 0.1) {
+  if (to <= from) return(NA_real_)
+  g <- seq(from, to, by = step)
+  p <- pred(g)
+  i <- which(p >= target)[1L]
+  if (is.na(i) || i == 1L) return(NA_real_)
+  g[i - 1L] + (target - p[i - 1L]) / (p[i] - p[i - 1L]) * step
+}
+
+report_adg <- function(per_pig, fits) {
+  types <- table(factor(per_pig$adg_type,
+                        levels = c("observed", "extrapolated", "partial", "none")))
+  ppt_bullets_counts(c(
+    "Observed (stage inside the records)" = types[["observed"]],
+    "Extrapolated" = types[["extrapolated"]],
+    "Partial (stage not fully reached)" = types[["partial"]],
+    "No ADG" = types[["none"]]
+  ))
+  fallback <- per_pig[grepl("failed", curve_used), .N]
+  if (fallback > 0L) {
+    ppt_msg("Gompertz did not converge for {fallback} pig{?s}: quadratic curve used", "warning")
+  }
+  if (types[["partial"]] > 0L) {
+    ppt_warn("{types[['partial']]} pig{?s} do not reach the whole stage: ADG is based on part of it (adg_type = \"partial\").")
+  }
+  if (any(!is.na(per_pig$adg))) {
+    ppt_msg("Mean ADG: {round(mean(per_pig$adg, na.rm = TRUE))} g/d (SD {round(stats::sd(per_pig$adg, na.rm = TRUE))})", "success")
+  }
+  for (i in which(per_pig$adg_type != "observed")) {
+    ppt_msg("{.val {per_pig$responder[i]}}: {per_pig$adg_type[i]}, ADG {round(per_pig$adg[i])} g/d", "info", level = 2L)
+  }
+  invisible(NULL)
+}
+```
+
+```{r example-calc_adg}
+visits <- prep_visits(nedap, verbose = 0)
+w <- clean_weight(visits, verbose = 0)
+adg <- calc_adg(w)
+head(adg$per_pig[, .(responder, adg_type, start_date, end_date, stage_days, adg)])
+
+# Gompertz curve, with quadratic fallback
+adg_g <- calc_adg(w, qc = qc_config("casey", curve_model = "gompertz"), verbose = 0)
+table(adg_g$per_pig$curve_used)
+```
+
+```{r tests-calc_adg}
+# Linear pig: y = start + rate * t (kg), weights recorded from day 0 to `days`
+line_pig <- function(id = "p1", start = 30, rate = 1, days = 95, noise = 0.3,
+                     seed = 1) {
+  set.seed(seed)
+  t <- seq(0.3, days, by = 0.25)
+  w <- start + rate * t + rnorm(length(t), 0, noise)
+  et <- as.POSIXct("2024-01-01", tz = "UTC") + t * 86400
+  data.table::data.table(
+    responder = id, responder_raw = id, identified = TRUE, location = "101",
+    date = as.Date(et), seq_days = as.integer(as.Date(et) - as.Date("2024-01-01")) + 1L,
+    entry_time = et, weight = w
+  )
+}
+no_checks <- function(...) {
+  qc_config(min_test_days = 7, min_records = 5, max_missing_rate = 1, ...)
+}
+
+test_that("a perfectly linear pig gives the exact ADG", {
+  for (m in c("poly1", "poly2", "poly3", "loess")) {
+    w <- clean_weight(line_pig(), qc = no_checks(curve_model = m), verbose = 0)
+    a <- calc_adg(w, verbose = 0)$per_pig
+    expect_equal(a$adg, 1000, tolerance = 0.01, info = m)
+    expect_equal(a$adg_type, "observed", info = m)
+    expect_equal(a$stage_days, 90, tolerance = 0.02, info = m)
+    expect_equal(a$lm_slope, 1000, tolerance = 0.01, info = m)
+  }
+})
+
+test_that("extrapolation and partial stages are flagged", {
+  q <- no_checks()
+  # records from 40 to 110 kg: both limits reached within 10 days
+  ext <- calc_adg(clean_weight(line_pig(start = 40, days = 70), q, verbose = 0), verbose = 0)$per_pig
+  expect_equal(ext$adg_type, "extrapolated")
+  expect_equal(ext$adg, 1000, tolerance = 0.01)
+  # records from 30 to 70 kg: 120 kg is 50 days away (> max_extrap_days)
+  part <- suppressWarnings(calc_adg(clean_weight(line_pig(days = 40), q, verbose = 0), verbose = 0))$per_pig
+  expect_equal(part$adg_type, "partial")
+  expect_equal(part$adg, 1000, tolerance = 0.01)
+  expect_true(is.na(part$end_date))
+  expect_warning(calc_adg(clean_weight(line_pig(days = 40), q, verbose = 0), verbose = 1), "partial")
+  # a larger extrapolation window turns it into "extrapolated"
+  q60 <- no_checks(max_extrap_days = 60)
+  ext60 <- calc_adg(clean_weight(line_pig(days = 40), q60, verbose = 0), verbose = 0)$per_pig
+  expect_equal(ext60$adg_type, "extrapolated")
+})
+
+test_that("daily table covers the stage and the records", {
+  w <- clean_weight(line_pig(start = 40, days = 70), no_checks(), verbose = 0)
+  a <- calc_adg(w, verbose = 0)
+  d <- a$daily
+  expect_setequal(names(d), c("responder", "location", "date", "seq_days", "weight",
+                              "predicted", "lower", "upper", "source", "in_stage"))
+  expect_true(all(d[in_stage == TRUE, predicted] >= 29 & d[in_stage == TRUE, predicted] <= 121))
+  expect_equal(sum(d$in_stage), 90, tolerance = 1)
+  expect_true(all(d[source == "predicted", is.na(weight)]))
+  expect_lt(min(d$date), min(w$records$date))     # extrapolated backwards
+})
+
+test_that("calc_adg works on both datasets and every curve", {
+  for (data in list(nedap, fire)) {
+    w <- clean_weight(prep_visits(data, verbose = 0), verbose = 0)
+    for (m in c("poly2", "loess", "gompertz")) {
+      a <- suppressWarnings(calc_adg(w, qc = qc_config(curve_model = m), verbose = 0))
+      expect_s3_class(a, c("ppt_adg", "ppt_result"))
+      expect_equal(nrow(a$per_pig), w$per_pig[status != "removed", .N])
+      ok <- a$per_pig[!is.na(adg)]
+      expect_true(all(ok$adg > 300 & ok$adg < 2000), info = m)
+      expect_true(all(a$per_pig$adg_type %in% c("observed", "extrapolated", "partial", "none")))
+    }
+  }
+})
+
+test_that("Gompertz falls back to a quadratic curve when nls fails", {
+  # a straight line has no Gompertz shape
+  w <- clean_weight(line_pig(), no_checks(curve_model = "gompertz"), verbose = 0)
+  a <- calc_adg(w, verbose = 0)$per_pig
+  expect_match(a$curve_used, "gompertz")
+  expect_equal(a$adg, 1000, tolerance = 0.05)
+  # force a failure: a flat series has no Gompertz shape
+  curve <- fit_growth_curve(0:9, rep(50, 10), "gompertz")
+  expect_equal(curve$name, "poly2 (gompertz failed)")
+})
+
+test_that("pigs with too little of the stage get no ADG and are logged", {
+  late <- line_pig("late", start = 115, days = 20)    # only 115-135 kg
+  ok <- line_pig("ok", seed = 2)
+  w <- clean_weight(rbind(late, ok), no_checks(weight_range = c(15, 150)), verbose = 0)
+  a <- calc_adg(w, verbose = 0)
+  expect_equal(a$per_pig[responder == "late", adg_type], "none")
+  expect_true(is.na(a$per_pig[responder == "late", adg]))
+  expect_true("late" %in% a$removed[step == "calc_adg", responder])
+  expect_equal(a$per_pig[responder == "ok", adg_type], "observed")
+})
+
+test_that("bad inputs are rejected", {
+  expect_error(calc_adg(list()), "clean_weight")
+})
+```
+
+# flag_feed_errors
+
+`flag_feed_errors()` applies the 16 error criteria of Casey et al. (2005,
+Table 3) to every visit.
+
+The seven variables are computed on the **complete visit sequence of each
+feeder**, including unidentified visits, sorted by entrance time:
+
+- FIV = feed intake per visit (g), OTV = occupation time (s),
+  FRV = FIV / (OTV / 60) (g/min, not computed when OTV <= 0);
+- LWD = trough weight at entrance of the following visit - at exit of
+  this visit; FWD = trough weight at entrance of this visit - at exit of the
+  preceding visit (FIRE only, NEDAP has no trough weights);
+- LTD = entrance time of the following visit - exit time of this visit;
+  FTD = entrance time of this visit - exit time of the preceding visit.
+
+| # | Error | Visits considered | Threshold (default) |
+|---|---|---|---|
+| 1 | FIV-lo | all | FIV < -20 g |
+| 2 | FIV-hi | all | FIV > 2000 g |
+| 3 | FIV-0 | OTV = 0 | \|FIV\| > 20 g |
+| 4 | OTV-lo | all | OTV < 0 s |
+| 5 | OTV-hi | all | OTV > 3600 s |
+| 6 | FRV-hi-FIV-lo | 0 < FIV < 50 g | FRV > 500 g/min |
+| 7 | FRV-hi-strict | FIV >= 50 g, preceding or following visit FIV < -20 g | FRV > 110 g/min |
+| 8 | FRV-hi | FIV >= 50 g, neither neighbour FIV < -20 g | FRV > 170 g/min |
+| 9 | FRV-0 | FRV = 0 | OTV > 500 s |
+| 10 | FRV-lo | FRV != 0 | \|FRV\| <= 2 g/min |
+| 11-12 | LWD-lo / LWD-hi | all but the last visit on the feeder | LWD < -20 g / > 1800 g |
+| 13-14 | FWD-lo / FWD-hi | all but the first visit on the feeder | FWD < -20 g / > 1800 g |
+| 15 | LTD-lo | all but the last visit | LTD < 0 s |
+| 16 | FTD-lo | all but the first visit | FTD < 0 s |
+
+The thresholds come from [qc_config()]. Feed disappearance in unidentified
+visits (-20 g <= FIV <= 2000 g) is summed per feeder; Casey et al. discarded
+pens above 90 kg, here a warning is given above `max_unidentified_feed_kg`.
+
+```{r function-flag_feed_errors}
+#' Flag feeder errors
+#'
+#' @description
+#' Flag each visit with the 16 error types of Casey et al. (2005).
+#'
+#' @param visits Visit table from [prep_visits()]. Keep the unidentified
+#'   visits: they are part of the feeder sequence.
+#' @param qc QC settings from [qc_config()]. Used here: `fiv_range`,
+#'   `fiv0_abs_max`, `duration_max`, `speed_fiv_lo_max`,
+#'   `speed_strict_max`, `speed_range`, `idle_duration_max`,
+#'   `trough_diff_range`, `max_unidentified_feed_kg`.
+#' @param verbose 0 (silent), 1 (summary, default) or 2 (rate of each
+#'   error type).
+#'
+#' @return The visit table (all visits) with added columns:
+#'   - `fiv`, `otv`, `frv`, `lwd`, `fwd`, `ltd`, `ftd`: the seven
+#'     variables;
+#'   - one logical column per error type (`fiv_lo`, `fiv_hi`, `fiv_0`,
+#'     `otv_lo`, `otv_hi`, `frv_hi_fiv_lo`, `frv_hi_strict`, `frv_hi`,
+#'     `frv_0`, `frv_lo`, `lwd_lo`, `lwd_hi`, `fwd_lo`, `fwd_hi`, `ltd_lo`,
+#'     `ftd_lo`);
+#'   - `n_errors`: number of error types of the visit (0 = error-free).
+#'
+#'   Attributes `"feeders"` (per feeder: visits, unidentified visits, feed
+#'   disappearance in unidentified visits, error rate) and `"error_rates"`
+#'   (share of identified visits with each error type) summarise the
+#'   result. The attributes of `visits` are kept.
+#'
+#' @references
+#' Casey, D. S., Stern, H. S., & Dekkers, J. C. M. (2005). Identification of
+#' errors and factors associated with errors in data from electronic swine
+#' feeders. *Journal of Animal Science*, 83, 969-982.
+#'
+#' @seealso [prep_visits()] for the previous step, [calc_adfi()] which uses
+#'   the flags.
+#' @export
+flag_feed_errors <- function(visits, qc = qc_config(), verbose = 1) {
+  local_verbose(verbose)
+  check_qc(qc)
+  dt <- as_dt(visits, "visits")
+  check_cols(dt, c("responder", "identified", "location", "entry_time",
+                   "exit_time", "duration", "feed_intake", "trough_in",
+                   "trough_out"),
+             arg = "visits", hint = "Use {.fn prep_visits} first.")
+  ppt_msg("Flagging feeder errors (Casey et al. 2005)", "h1")
+  if (dt[identified == FALSE, .N] == 0L) {
+    ppt_msg("No unidentified visits in the data: if they were removed before, differences between subsequent visits may be wrong", "warning", level = 2L)
+  }
+
+  data.table::setorder(dt, location, entry_time)
+
+  # The seven variables, on the complete sequence of each feeder.
+  dt[, `:=`(fiv = feed_intake, otv = duration)]
+  dt[, frv := data.table::fifelse(otv > 0, fiv / (otv / 60), NA_real_)]
+  dt[, `:=`(
+    prev_fiv = data.table::shift(fiv),
+    next_fiv = data.table::shift(fiv, type = "lead"),
+    lwd = data.table::shift(trough_in, type = "lead") - trough_out,
+    fwd = trough_in - data.table::shift(trough_out),
+    ltd = as.numeric(data.table::shift(entry_time, type = "lead") - exit_time, units = "secs"),
+    ftd = as.numeric(entry_time - data.table::shift(exit_time), units = "secs")
+  ), by = location]
+
+  fiv_lo <- qc$fiv_range[1L]
+  is_true <- function(x) x %in% TRUE
+  neighbour_neg <- dt[, is_true(prev_fiv < fiv_lo) | is_true(next_fiv < fiv_lo)]
+  dt[, `:=`(
+    fiv_lo = is_true(fiv < fiv_lo),
+    fiv_hi = is_true(fiv > qc$fiv_range[2L]),
+    fiv_0 = is_true(otv == 0 & abs(fiv) > qc$fiv0_abs_max),
+    otv_lo = is_true(otv < 0),
+    otv_hi = is_true(otv > qc$duration_max),
+    frv_hi_fiv_lo = is_true(fiv > 0 & fiv < 50 & frv > qc$speed_fiv_lo_max),
+    frv_hi_strict = is_true(fiv >= 50 & neighbour_neg & frv > qc$speed_strict_max),
+    frv_hi = is_true(fiv >= 50 & !neighbour_neg & frv > qc$speed_range[2L]),
+    frv_0 = is_true(frv == 0 & otv > qc$idle_duration_max),
+    frv_lo = is_true(frv != 0 & abs(frv) <= qc$speed_range[1L]),
+    lwd_lo = is_true(lwd < qc$trough_diff_range[1L]),
+    lwd_hi = is_true(lwd > qc$trough_diff_range[2L]),
+    fwd_lo = is_true(fwd < qc$trough_diff_range[1L]),
+    fwd_hi = is_true(fwd > qc$trough_diff_range[2L]),
+    ltd_lo = is_true(ltd < 0),
+    ftd_lo = is_true(ftd < 0)
+  )]
+  errs <- error_types()
+  dt[, n_errors := rowSums(.SD), .SDcols = names(errs)]
+  dt[, c("prev_fiv", "next_fiv") := NULL]
+
+  # Summaries
+  feeders <- dt[, .(
+    n_visits = .N,
+    n_unidentified = sum(!identified),
+    unidentified_feed_kg = sum(fiv[!identified & fiv >= fiv_lo & fiv <= qc$fiv_range[2L]],
+                               na.rm = TRUE) / 1000,
+    error_rate = mean(n_errors[identified] > 0)
+  ), by = location]
+  idv <- dt[identified == TRUE]
+  rates <- data.table::data.table(
+    index = unname(errs),
+    error = names(errs),
+    label = error_labels()[names(errs)],
+    n = vapply(names(errs), function(e) sum(idv[[e]]), numeric(1)),
+    rate = vapply(names(errs), function(e) mean(idv[[e]]), numeric(1))
+  )
+
+  for (a in c("station", "stations", "removed", "prep_summary")) {
+    data.table::setattr(dt, a, attr(visits, a, exact = TRUE))
+  }
+  data.table::setattr(dt, "feeders", feeders)
+  data.table::setattr(dt, "error_rates", rates)
+
+  oe <- mean(idv$n_errors > 0)
+  ppt_msg("Visits with at least one error: {.strong {sprintf('%.2f%%', 100 * oe)}} of {nrow(idv)} identified visits", "info")
+  top <- rates[n > 0][order(-n)]
+  if (nrow(top) > 0L) {
+    lines <- sprintf("%s: %d (%.2f%%)", top$label, as.integer(top$n), 100 * top$rate)
+    ppt_msg(stats::setNames(lines, rep("*", length(lines))), "bullets", level = 2L)
+  }
+  big <- feeders[unidentified_feed_kg > qc$max_unidentified_feed_kg]
+  for (i in seq_len(nrow(big))) {
+    ppt_warn("Feeder {.val {big$location[i]}}: {round(big$unidentified_feed_kg[i], 1)} kg of feed disappeared in unidentified visits (> {qc$max_unidentified_feed_kg} kg). Casey et al. (2005) discarded such pens.")
+  }
+  dt
+}
+
+# Error types in the order of Casey et al. (2005), Table 3.
+error_types <- function() {
+  c(fiv_lo = 1L, fiv_hi = 2L, fiv_0 = 3L, otv_lo = 4L, otv_hi = 5L,
+    frv_hi_fiv_lo = 6L, frv_hi_strict = 7L, frv_hi = 8L, frv_0 = 9L,
+    frv_lo = 10L, lwd_lo = 11L, lwd_hi = 12L, fwd_lo = 13L, fwd_hi = 14L,
+    ltd_lo = 15L, ftd_lo = 16L)
+}
+
+error_labels <- function() {
+  c(fiv_lo = "FIV-lo", fiv_hi = "FIV-hi", fiv_0 = "FIV-0", otv_lo = "OTV-lo",
+    otv_hi = "OTV-hi", frv_hi_fiv_lo = "FRV-hi-FIV-lo",
+    frv_hi_strict = "FRV-hi-strict", frv_hi = "FRV-hi", frv_0 = "FRV-0",
+    frv_lo = "FRV-lo", lwd_lo = "LWD-lo", lwd_hi = "LWD-hi",
+    fwd_lo = "FWD-lo", fwd_hi = "FWD-hi", ltd_lo = "LTD-lo", ftd_lo = "FTD-lo")
+}
+
+# Daily covariates of Jiao et al. (2014) for each pig and day, from the
+# identified visits of a flagged visit table:
+# - y: error-free daily feed intake (sum of FIV over visits without error);
+# - pte_<error>: share of the day's visits with that error (16);
+# - otd_<error>: occupation time of visits with that error (types 1, 2, 6-14);
+# - fid_<error>: feed intake of visits with that error (types 4, 5, 15, 16).
+daily_error_covariates <- function(flagged) {
+  errs <- names(error_types())
+  otd_errs <- errs[error_types() %in% c(1:2, 6:14)]
+  fid_errs <- errs[error_types() %in% c(4:5, 15:16)]
+  idv <- flagged[identified == TRUE]
+  idv[, error_free := n_errors == 0L]
+
+  out <- idv[, c(
+    list(
+      location = names(sort(table(location), decreasing = TRUE))[1L],
+      n_visits = .N,
+      n_error_visits = sum(!error_free),
+      dfi_raw = sum(fiv),
+      y = sum(fiv[error_free])
+    ),
+    stats::setNames(lapply(errs, function(e) mean(get(e))), paste0("pte_", errs)),
+    stats::setNames(lapply(otd_errs, function(e) sum(otv[get(e)])), paste0("otd_", otd_errs)),
+    stats::setNames(lapply(fid_errs, function(e) sum(fiv[get(e)])), paste0("fid_", fid_errs))
+  ), by = .(responder, date)]
+  out[]
+}
+```
+
+```{r example-flag_feed_errors}
+visits <- prep_visits(fire, verbose = 0)
+flagged <- flag_feed_errors(visits, verbose = 2)
+attr(flagged, "feeders")
+```
+
+```{r tests-flag_feed_errors}
+# Visits on one feeder, built from entrance/exit seconds and trough weights
+feeder_visits <- function(id, entry, exit, w_in, w_out, location = "101") {
+  base <- as.POSIXct("2024-01-01", tz = "UTC")
+  data.table::data.table(
+    responder = id, identified = !is.na(id), location = location,
+    entry_time = base + entry, exit_time = base + exit,
+    duration = exit - entry, feed_intake = w_in - w_out,
+    trough_in = w_in, trough_out = w_out
+  )
+}
+
+test_that("variables match Casey et al. (2005) Table 2", {
+  v <- feeder_visits(c("2736", "1340", "598"),
+                     entry = c(756041, 756605, 757288),
+                     exit = c(756570, 757250, 758153),
+                     w_in = c(7044, 6856, 7066), w_out = c(6856, 6657, 6763))
+  f <- flag_feed_errors(v, verbose = 0)
+  expect_equal(f$fiv, c(188, 199, 303))
+  expect_equal(f$otv, c(529, 645, 865))
+  expect_equal(round(f$frv, 1), c(21.3, 18.5, 21.0))
+  expect_equal(f$lwd, c(0, 409, NA))
+  expect_equal(f$fwd, c(NA, 0, 409))
+  expect_equal(f$ltd, c(35, 38, NA))
+  expect_equal(f$ftd, c(NA, 35, 38))
+  expect_equal(f$n_errors, c(0, 0, 0))
+})
+
+test_that("each rule fires on a constructed visit", {
+  # one feeder, visits 1000 s apart; trough weights consistent unless changed
+  n <- 12
+  entry <- seq(0, by = 1000, length.out = n)
+  exit <- entry + 300
+  fi <- rep(100, n)
+  w_in <- 1000 + 0 * seq_len(n)
+  v <- feeder_visits(as.character(seq_len(n)), entry, exit, w_in, w_in - fi)
+  v[2, feed_intake := -30]                    # FIV-lo
+  v[3, feed_intake := 2500]                   # FIV-hi
+  v[4, `:=`(duration = 0, exit_time = entry_time, feed_intake = 30)]  # FIV-0
+  v[5, duration := 4000]                      # OTV-hi
+  v[6, `:=`(feed_intake = 40, duration = 3)]  # FRV-hi-FIV-lo (800 g/min)
+  v[7, `:=`(feed_intake = 600, duration = 200)] # FRV-hi (180 g/min)
+  v[8, `:=`(feed_intake = 0, duration = 600)] # FRV-0
+  v[9, `:=`(feed_intake = 5, duration = 600)] # FRV-lo (0.5 g/min)
+  f <- flag_feed_errors(v, verbose = 0)
+  expect_true(f$fiv_lo[2])
+  expect_true(f$fiv_hi[3])
+  expect_true(f$fiv_0[4])
+  expect_true(f$otv_hi[5])
+  expect_true(f$frv_hi_fiv_lo[6])
+  expect_true(f$frv_hi[7])
+  expect_true(f$frv_0[8])
+  expect_true(f$frv_lo[9])
+  # visit 1 and 3 neighbour visit 2 (FIV < -20): strict rule, not FRV-hi
+  v2 <- data.table::copy(v)
+  v2[3, `:=`(feed_intake = 600, duration = 300)]   # 120 g/min
+  f2 <- flag_feed_errors(v2, verbose = 0)
+  expect_true(f2$frv_hi_strict[3])
+  expect_false(f2$frv_hi[3])
+  # same rate without a negative neighbour is below the FRV-hi threshold
+  expect_false(f2$frv_hi_strict[7])
+  # OTV <= 0: FRV not computed
+  expect_true(is.na(f$frv[4]))
+})
+
+test_that("trough weight differences flag both neighbours", {
+  # a exits at 900 g, b enters at 3000 g (+2100), c enters at 850 g after b left 2900 g
+  v <- feeder_visits(c("a", "b", "c"), entry = c(0, 1000, 2000),
+                     exit = c(500, 1500, 2500), w_in = c(1000, 3000, 850),
+                     w_out = c(900, 2900, 800))
+  f <- flag_feed_errors(v, verbose = 0)
+  expect_equal(f$lwd, c(2100, -2050, NA))
+  expect_equal(f$fwd, c(NA, 2100, -2050))
+  expect_equal(f$lwd_hi, c(TRUE, FALSE, FALSE))
+  expect_equal(f$fwd_hi, c(FALSE, TRUE, FALSE))
+  expect_equal(f$lwd_lo, c(FALSE, TRUE, FALSE))
+  expect_equal(f$fwd_lo, c(FALSE, FALSE, TRUE))
+})
+
+test_that("time overlaps are flagged as LTD-lo / FTD-lo", {
+  v <- feeder_visits(c("a", "b"), entry = c(0, 400), exit = c(500, 800),
+                     w_in = c(1000, 900), w_out = c(900, 800))
+  f <- flag_feed_errors(v, verbose = 0)
+  expect_true(f$ltd_lo[1])
+  expect_true(f$ftd_lo[2])
+  expect_false(f$ltd_lo[2])
+})
+
+test_that("FIRE example: rates as computed from the paper's criteria", {
+  f <- flag_feed_errors(prep_visits(fire, verbose = 0), verbose = 0)
+  idv <- f[identified == TRUE]
+  expect_equal(nrow(idv), 9743L)
+  expect_equal(round(100 * mean(idv$n_errors > 0), 2), 2.62)
+  expect_equal(round(100 * mean(idv$frv_hi_strict), 2), 0.04)
+  expect_equal(nrow(f), nrow(fire))       # unidentified visits kept
+  fd <- attr(f, "feeders")
+  expect_equal(sum(fd$n_unidentified), 51L)
+  expect_lt(max(fd$unidentified_feed_kg), 90)
+})
+
+test_that("feeders are processed separately", {
+  v <- prep_visits(fire, verbose = 0)
+  all <- flag_feed_errors(v, verbose = 0)
+  one <- flag_feed_errors(v[location == "101"], verbose = 0)
+  two <- flag_feed_errors(v[location == "102"], verbose = 0)
+  cols <- c("location", "entry_time", "lwd", "fwd", "ltd", "ftd", names(error_types()))
+  for (cl in cols) expect_equal(all[[cl]], rbind(one, two)[[cl]], info = cl)
+})
+
+test_that("NEDAP: weight differences are NA, time rules still apply", {
+  f <- flag_feed_errors(prep_visits(nedap, verbose = 0), verbose = 0)
+  expect_true(all(is.na(f$lwd)) && all(is.na(f$fwd)))
+  expect_false(any(f$lwd_lo | f$fwd_hi))
+  expect_true(any(!is.na(f$ltd)))
+})
+
+test_that("a large unidentified feed disappearance gives a warning", {
+  v <- prep_visits(fire, verbose = 0)
+  q <- qc_config(max_unidentified_feed_kg = 1)
+  expect_warning(flag_feed_errors(v, q, verbose = 1), "unidentified")
+})
+
+test_that("daily covariates follow Jiao et al. (2014)", {
+  f <- flag_feed_errors(prep_visits(fire, verbose = 0), verbose = 0)
+  cv <- daily_error_covariates(f)
+  expect_equal(sum(startsWith(names(cv), "pte_")), 16L)
+  expect_equal(sum(startsWith(names(cv), "otd_")), 11L)
+  expect_equal(sum(startsWith(names(cv), "fid_")), 4L)
+  expect_true(all(cv$y <= cv$dfi_raw + 1e-9 | cv$n_error_visits > 0))
+  expect_equal(cv[n_error_visits == 0, y], cv[n_error_visits == 0, dfi_raw])
+  expect_equal(sum(cv$dfi_raw), f[identified == TRUE, sum(fiv)])
+})
+```
+
+# calc_adfi
+
+`calc_adfi()` estimates average daily feed intake (ADFI) over the same body
+weight stage as [calc_adg()], so that FCR compares like with like.
+
+**Correction** (Jiao et al. 2014, after Casey et al. 2005): for each pig and
+day, the error-free intake `y` (sum of FIV over visits without error) is
+modelled with a linear mixed model fitted on **all** pig-days:
+
+`y ~ location + BW + ADG + 16 x PTE + 11 x OTD + 4 x FID + (1 | pig)`
+
+- PTE: share of the day's visits with error type p; OTD: occupation time
+  of visits with error p (types 1, 2, 6-14); FID: feed intake of visits
+  with error p (types 4, 5, 15, 16);
+- BW: predicted body weight of the day from [calc_adg()]; ADG of the pig;
+- `location` is a fixed effect when there is more than one station.
+
+The corrected intake is `y - sum(b x error covariates)`: only the effects
+of the error covariates are removed, so a day without errors keeps its
+recorded intake. Covariates without variation or perfectly collinear with
+others are dropped before fitting. Days on which every visit has an error
+have no error-free intake and are imputed.
+
+**Checks and imputation** over the stage days of each pig:
+
+- corrected intake below 0, outside `dfi_range`, or outside the optional
+  `dfi_quantile` limits is set to missing;
+- `impute_method = "linear"` (default): linear interpolation inside the
+  recorded period (`"iii"`), robust LOESS for gaps longer than
+  `long_gap_days`, and a per-pig regression of intake on body weight
+  outside the recorded period (`"elrp"`);
+- `impute_method = "loess"`: a robust LOESS of daily intake over days,
+  used both inside and outside the recorded period.
+
+A simulation on the example data (random gaps, long gaps, late entry,
+early exit) found no curve better than the others in every situation:
+precision depends mainly on how many days are missing at the stage ends,
+which is why such pigs are flagged by [calc_fcr()].
+
+Day states: `"org"` (no error, recorded value), `"corr"` (corrected),
+`"iii"` (interpolated), `"elrp"` (extrapolated), `"missing"`.
+
+```{r function-calc_adfi}
+#' Average daily feed intake
+#'
+#' @description
+#' Correct daily feed intake for feeder errors with a linear mixed model,
+#' impute missing days and compute average daily feed intake (ADFI) over
+#' the ADG stage.
+#'
+#' @param visits Visit table from [prep_visits()], or already flagged by
+#'   [flag_feed_errors()].
+#' @param adg Result of [calc_adg()].
+#' @param qc QC settings; by default the ones used for `adg`. Used here:
+#'   the feeder error thresholds, `dfi_correct`, `dfi_range`,
+#'   `dfi_quantile`, `impute_method`, `long_gap_days`, `loess_span`.
+#' @param verbose 0 (silent), 1 (summary, default) or 2 (details).
+#'
+#' @return An object of class `ppt_adfi` (a list):
+#'   - `per_pig`: `adfi` (g/d over the stage), `adfi_raw` (mean recorded
+#'     intake of the recorded stage days), `adfi_error_free`,
+#'     `n_stage_days`, `n_observed`, `n_corrected`, `n_interpolated`,
+#'     `n_extrapolated`, `n_missing`, `n_extrap_start` / `n_extrap_end`
+#'     (consecutive extrapolated days at the start / end of the stage),
+#'     `coverage` (share of stage days with a
+#'     recorded or corrected value), `adg_type`;
+#'   - `daily`: one row per pig and day: `bw` (kg), `in_stage`,
+#'     `n_visits`, `n_error_visits`, `dfi_raw`, `dfi_error_free`,
+#'     `dfi_corrected`, `dfi` (final value, g) and `state`;
+#'   - `model`: fixed-effect estimates of the correction model;
+#'   - `removed`, `settings`.
+#'
+#' @references
+#' Jiao, S., Maltecca, C., Gray, K. A., & Cassady, J. P. (2014). Feed intake,
+#' average daily gain, feed efficiency, and real-time ultrasound traits in
+#' Duroc pigs: I. *Journal of Animal Science*, 92, 2377-2386.
+#'
+#' @seealso [flag_feed_errors()], [calc_adg()].
+#' @export
+calc_adfi <- function(visits, adg, qc = adg$settings, verbose = 1) {
+  local_verbose(verbose)
+  if (!inherits(adg, "ppt_adg")) {
+    cli::cli_abort("{.arg adg} must be the result of {.fn calc_adg}.")
+  }
+  check_qc(qc)
+  flagged <- if ("n_errors" %in% names(visits)) {
+    as_dt(visits, "visits")
+  } else {
+    flag_feed_errors(visits, qc, verbose = ppt_verbose())
+  }
+
+  ppt_msg("ADFI over {qc$stage_range[1]}-{qc$stage_range[2]} kg", "h1")
+
+  pigs <- adg$per_pig[!is.na(adg), .(responder, pig_location = location,
+                                      adg, adg_type, stage)]
+  cov <- daily_error_covariates(flagged)[responder %in% pigs$responder]
+  bw <- adg$daily[, .(responder, date, seq_days, bw = predicted, in_stage)]
+  cov <- merge(cov, bw, by = c("responder", "date"), all.x = TRUE)
+  cov <- merge(cov, pigs[, .(responder, adg)], by = "responder")
+  cov[, all_error := n_error_visits == n_visits]
+
+  # 5c. correction
+  corr <- correct_dfi(cov, qc)
+  cov <- corr$data
+
+  # range / quantile checks
+  cov[, dfi_check := dfi_corrected]
+  lim <- qc$dfi_range * 1000
+  cov[!is.na(dfi_check) & (dfi_check < max(0, lim[1L]) | dfi_check > lim[2L]),
+      `:=`(dfi_check = NA_real_, check_flag = "dfi_range")]
+  if (!is.null(qc$dfi_quantile)) {
+    q <- stats::quantile(cov$dfi_check, qc$dfi_quantile, na.rm = TRUE)
+    cov[!is.na(dfi_check) & (dfi_check < q[1L] | dfi_check > q[2L]),
+        `:=`(dfi_check = NA_real_, check_flag = "dfi_quantile")]
+  }
+  n_range <- cov[check_flag %in% "dfi_range", .N]
+  n_quant <- cov[check_flag %in% "dfi_quantile", .N]
+
+  # 5d. stage grid and imputation
+  grid <- adg$daily[responder %in% pigs$responder,
+                    .(responder, date, seq_days, bw = predicted, in_stage)]
+  keep_cols <- c("responder", "date", "location", "n_visits", "n_error_visits",
+                 "dfi_raw", "y", "dfi_corrected", "dfi_check", "all_error")
+  daily <- merge(grid, cov[, keep_cols, with = FALSE],
+                 by = c("responder", "date"), all = TRUE)
+  daily <- merge(daily, pigs[, .(responder, pig_location)], by = "responder")
+  daily[is.na(location), location := pig_location]
+  daily[, in_stage := in_stage %in% TRUE]
+  day0 <- adg$daily[, min(date - seq_days + 1L)]
+  daily[is.na(seq_days), seq_days := as.integer(date - day0) + 1L]
+  daily[, state := data.table::fcase(
+    !is.na(dfi_check) & n_error_visits == 0L, "org",
+    !is.na(dfi_check), "corr",
+    default = NA_character_
+  )]
+  data.table::setorder(daily, responder, date)
+
+  imp <- fit_by_pig(daily, impute_dfi_one_pig, step = "calc_adfi", qc = qc)
+  daily <- imp$result
+  data.table::setnames(daily, "y", "dfi_error_free")
+  daily[, c("dfi_check", "pig_location", "all_error") := NULL]
+  data.table::setcolorder(daily, c("responder", "location", "date", "seq_days",
+                                   "bw", "in_stage", "n_visits", "n_error_visits",
+                                   "dfi_raw", "dfi_error_free", "dfi_corrected",
+                                   "dfi", "state"))
+
+  st <- daily[in_stage == TRUE]
+  per_pig <- st[, .(
+    adfi = mean(dfi, na.rm = TRUE),
+    adfi_raw = mean(dfi_raw, na.rm = TRUE),
+    adfi_error_free = mean(dfi_error_free, na.rm = TRUE),
+    n_stage_days = .N,
+    n_observed = sum(state %in% c("org", "corr")),
+    n_corrected = sum(state %in% "corr"),
+    n_interpolated = sum(state %in% "iii"),
+    n_extrapolated = sum(state %in% "elrp"),
+    n_missing = sum(state %in% "missing"),
+    n_extrap_start = edge_run(state[order(date)]),
+    n_extrap_end = edge_run(rev(state[order(date)]))
+  ), by = responder]
+  per_pig[, coverage := n_observed / n_stage_days]
+  per_pig[is.nan(adfi), adfi := NA_real_]
+  per_pig <- merge(pigs[, .(responder, location = pig_location, stage, adg_type)],
+                   per_pig, by = "responder", all.x = TRUE)
+  data.table::setcolorder(per_pig, c("responder", "location", "stage", "adfi"))
+  data.table::setorder(per_pig, location, responder)
+
+  no_adfi <- per_pig[is.na(adfi)]
+  why <- imp$failed$reason[match(no_adfi$responder, imp$failed$responder)]
+  why <- data.table::fifelse(is.na(why), "no feed intake over the stage",
+                             paste("imputation failed:", why))
+  removed <- rbind(adg$removed,
+                   new_removed(no_adfi$responder, no_adfi$location, "calc_adfi", why))
+
+  report_adfi(per_pig, daily, corr, n_range, n_quant, qc)
+  new_ppt_result(per_pig = per_pig, daily = daily, removed = removed,
+                 settings = qc, class = "ppt_adfi") |>
+    add_element(model = corr$coefficients)
+}
+
+# Fit the correction model and compute dfi_corrected.
+correct_dfi <- function(cov, qc) {
+  err_cols <- grep("^(pte|otd|fid)_", names(cov), value = TRUE)
+  cov[, dfi_corrected := NA_real_]
+  empty_coef <- data.table::data.table(term = character(), estimate = numeric(),
+                                       std_error = numeric(), p_value = numeric())
+  if (qc$dfi_correct == "none") {
+    cov[, dfi_corrected := dfi_raw]
+    return(list(data = cov, coefficients = empty_coef, status = "none", n_terms = 0L))
+  }
+
+  md <- cov[all_error == FALSE & !is.na(bw)]
+  # keep error covariates that vary; drop those collinear with others
+  varies <- vapply(err_cols, function(cl) stats::var(md[[cl]]) > 0, logical(1))
+  terms <- err_cols[varies %in% TRUE]
+  multi_loc <- data.table::uniqueN(md$location) > 1L
+  base <- c(if (multi_loc) "location", "bw", "adg")
+  if (length(terms) > 0L) {
+    lfit <- stats::lm(stats::reformulate(c(base, terms), "y"), data = md)
+    aliased <- names(stats::coef(lfit))[is.na(stats::coef(lfit))]
+    terms <- setdiff(terms, aliased)
+  }
+  if (length(terms) == 0L) {
+    ppt_msg("No feeder errors to correct for: recorded intake used", "info")
+    cov[all_error == FALSE, dfi_corrected := y]
+    return(list(data = cov, coefficients = empty_coef, status = "no errors", n_terms = 0L))
+  }
+
+  if (multi_loc) md[, location := factor(location)]
+  fit <- tryCatch(
+    nlme::lme(stats::reformulate(c(base, terms), "y"), random = ~ 1 | responder,
+              data = md, method = "REML",
+              control = nlme::lmeControl(opt = "optim", returnObject = TRUE)),
+    error = function(e) e
+  )
+  if (inherits(fit, "error")) {
+    ppt_warn("The correction model failed ({conditionMessage(fit)}); error-free intake is not corrected.")
+    cov[all_error == FALSE, dfi_corrected := y]
+    return(list(data = cov, coefficients = empty_coef, status = "failed", n_terms = 0L))
+  }
+
+  tt <- summary(fit)$tTable
+  coefs <- data.table::data.table(term = rownames(tt), estimate = tt[, "Value"],
+                                  std_error = tt[, "Std.Error"],
+                                  p_value = tt[, "p-value"])
+  b <- nlme::fixef(fit)[terms]
+  x <- as.matrix(cov[, terms, with = FALSE])
+  cov[, dfi_corrected := y - as.numeric(x %*% b)]
+  cov[all_error == TRUE, dfi_corrected := NA_real_]
+  list(data = cov, coefficients = coefs, status = "fitted",
+       n_terms = length(terms), n_obs = nrow(md))
+}
+
+# Impute the stage days of one pig.
+impute_dfi_one_pig <- function(d, qc) {
+  d <- data.table::copy(d)
+  ok <- !is.na(d$dfi_check)
+  d[, dfi := dfi_check]
+  need <- d$in_stage & !ok
+  if (!any(need)) {
+    d[in_stage == TRUE & is.na(state), state := "missing"]
+    return(d)
+  }
+  x <- d$seq_days
+  if (sum(ok) < 5L) {
+    d[need, state := "missing"]
+    return(d)
+  }
+  inside <- need & (x > min(x[ok]) & x < max(x[ok])) %in% TRUE
+  outside <- need & !inside
+
+  if (qc$impute_method == "linear") {
+    if (any(inside)) {
+      val <- stats::approx(x[ok], d$dfi_check[ok], xout = x[inside])$y
+      # long gaps: robust LOESS instead of a straight line
+      long <- run_length(inside)[inside] > qc$long_gap_days
+      if (any(long) && sum(ok) >= 10L) {
+        pred <- loess_extend(x[ok], d$dfi_check[ok], qc$loess_span)
+        val[long] <- pmax(0, pred(x[inside][long]))
+      }
+      d[inside, `:=`(dfi = val, state = "iii")]
+    }
+    if (any(outside)) {
+      okb <- ok & !is.na(d$bw)
+      if (sum(okb) >= 5L && all(!is.na(d$bw[outside]))) {
+        f <- stats::lm(dfi_check ~ bw, data = d[okb])
+        d[outside, `:=`(dfi = pmax(0, stats::predict(f, newdata = d[outside])),
+                        state = "elrp")]
+      } else {
+        d[outside, state := "missing"]
+      }
+    }
+  } else {
+    pred <- loess_extend(x[ok], d$dfi_check[ok], qc$loess_span)
+    d[inside, `:=`(dfi = pmax(0, pred(x[inside])), state = "iii")]
+    d[outside, `:=`(dfi = pmax(0, pred(x[outside])), state = "elrp")]
+  }
+  d[in_stage == TRUE & is.na(state), state := "missing"]
+  d
+}
+
+# Length of the run of TRUE values each element belongs to (0 for FALSE).
+run_length <- function(flag) {
+  r <- rle(flag)
+  len <- rep(r$lengths, r$lengths)
+  len[!flag] <- 0L
+  len
+}
+
+# Number of leading "elrp" states.
+edge_run <- function(state) {
+  r <- rle(state %in% "elrp")
+  if (length(r$values) > 0L && r$values[1L]) r$lengths[1L] else 0L
+}
+
+# Robust LOESS prediction, continued linearly beyond the data range.
+loess_extend <- function(x, y, span) {
+  f <- stats::loess(y ~ x, span = span, degree = 1, family = "symmetric")
+  core <- function(z) unname(stats::predict(f, newdata = data.frame(x = z)))
+  rng <- range(x)
+  h <- min(7, diff(rng) / 2)
+  s_lo <- (core(rng[1] + h) - core(rng[1])) / h
+  s_hi <- (core(rng[2]) - core(rng[2] - h)) / h
+  function(z) {
+    p <- core(pmin(pmax(z, rng[1]), rng[2]))
+    p + pmin(z - rng[1], 0) * s_lo + pmax(z - rng[2], 0) * s_hi
+  }
+}
+
+report_adfi <- function(per_pig, daily, corr, n_range, n_quant, qc) {
+  if (corr$status == "fitted") {
+    ppt_msg("Correction model: {corr$n_obs} pig-days, {corr$n_terms} error covariate{?s}", "info")
+  }
+  st <- daily[in_stage == TRUE, .N, by = state]
+  get_n <- function(s) st[state == s, sum(N)]
+  ppt_bullets_counts(c(
+    "Stage days recorded without error (org)" = get_n("org"),
+    "Corrected (corr)" = get_n("corr"),
+    "Interpolated (iii)" = get_n("iii"),
+    "Extrapolated (elrp)" = get_n("elrp"),
+    "Missing" = get_n("missing"),
+    "Pig-days outside dfi_range" = n_range,
+    "Pig-days outside dfi_quantile" = if (is.null(qc$dfi_quantile)) NA else n_quant
+  ))
+  ok <- per_pig[!is.na(adfi)]
+  if (nrow(ok) > 0L) {
+    ppt_msg("Mean ADFI over the stage: {round(mean(ok$adfi))} g/d", "success")
+    ppt_msg("Recorded stage days only: recorded {round(mean(ok$adfi_raw, na.rm = TRUE))} g/d, error-free part {round(mean(ok$adfi_error_free, na.rm = TRUE))} g/d", "info", level = 2L)
+  }
+  if (any(is.na(per_pig$adfi))) {
+    ppt_msg("No ADFI for {sum(is.na(per_pig$adfi))} pig{?s}", "warning")
+  }
+  low <- ok[coverage < 0.7]
+  if (nrow(low) > 0L) {
+    ppt_msg("{nrow(low)} pig{?s} with less than 70% of the stage recorded", "warning")
+  }
+  invisible(NULL)
+}
+```
+
+```{r example-calc_adfi}
+visits <- prep_visits(nedap, verbose = 0)
+w <- clean_weight(visits, verbose = 0)
+adg <- calc_adg(w, verbose = 0)
+adfi <- calc_adfi(visits, adg)
+head(adfi$per_pig)
+table(adfi$daily[in_stage == TRUE, state])
+head(adfi$model)
+```
+
+```{r tests-calc_adfi}
+run_adfi <- function(data, qc = qc_config(), ...) {
+  v <- prep_visits(data, verbose = 0)
+  a <- suppressWarnings(calc_adg(clean_weight(v, qc, verbose = 0), verbose = 0))
+  list(visits = v, adg = a, adfi = calc_adfi(v, a, verbose = 0, ...))
+}
+
+test_that("calc_adfi runs on both datasets", {
+  for (data in list(nedap, fire)) {
+    r <- run_adfi(data)
+    f <- r$adfi
+    expect_s3_class(f, c("ppt_adfi", "ppt_result"))
+    expect_equal(nrow(f$per_pig), r$adg$per_pig[!is.na(adg), .N])
+    expect_false(anyNA(f$per_pig$adfi))
+    ok <- f$per_pig[!is.na(adfi)]
+    expect_true(all(ok$adfi > 800 & ok$adfi < 4500))
+    expect_true(all(ok$coverage >= 0 & ok$coverage <= 1))
+    expect_true(all(f$daily$state %in% c("org", "corr", "iii", "elrp", "missing", NA)))
+    expect_true(all(c("term", "estimate", "std_error", "p_value") %in% names(f$model)))
+  }
+})
+
+test_that("days without errors keep their recorded intake", {
+  f <- run_adfi(fire)$adfi
+  org <- f$daily[state == "org"]
+  expect_gt(nrow(org), 0)
+  expect_equal(org$dfi, org$dfi_raw)
+  expect_equal(org$dfi_corrected, org$dfi_error_free)
+})
+
+test_that("correction adds back feed lost in error visits", {
+  f <- run_adfi(fire)$adfi
+  corr <- f$daily[state == "corr"]
+  expect_gt(nrow(corr), 0)
+  # on corrected days the estimate is above the error-free part
+  expect_gt(mean(corr$dfi_corrected), mean(corr$dfi_error_free))
+  # error-share coefficients are negative, as in Jiao et al. (2014) Table 1
+  pte <- f$model[grepl("^pte_", term) & p_value < 0.05, estimate]
+  expect_gt(mean(pte < 0), 0.5)
+})
+
+test_that("visits do not need to be flagged beforehand", {
+  r <- run_adfi(fire)
+  flagged <- flag_feed_errors(r$visits, verbose = 0)
+  f2 <- calc_adfi(flagged, r$adg, verbose = 0)
+  expect_equal(f2$per_pig$adfi, r$adfi$per_pig$adfi)
+})
+
+test_that("no correction uses the recorded intake", {
+  r <- run_adfi(fire)
+  f <- calc_adfi(r$visits, r$adg, qc = qc_config(dfi_correct = "none"), verbose = 0)
+  obs <- f$daily[state %in% c("org", "corr")]
+  expect_equal(obs$dfi, obs$dfi_raw)
+  expect_equal(nrow(f$model), 0L)
+})
+
+test_that("missing days are interpolated inside and extrapolated outside", {
+  v <- prep_visits(nedap, verbose = 0)
+  pig <- v[identified == TRUE, responder][1]
+  days <- sort(unique(v[responder == pig, date]))
+  gap <- days[40:44]
+  v2 <- v[!(responder %in% pig & date %in% gap)]
+  a <- calc_adg(clean_weight(v2, verbose = 0), verbose = 0)
+  f <- calc_adfi(v2, a, verbose = 0)
+  d <- f$daily[responder == pig & date %in% gap]
+  expect_equal(d$state, rep("iii", 5))
+  around <- f$daily[responder == pig & date %in% days[c(39, 45)], dfi]
+  expect_true(all(d$dfi >= min(around) - 1 & d$dfi <= max(around) + 1))
+  # FIRE pigs enter above 30 kg: the stage start is extrapolated
+  ff <- run_adfi(fire)$adfi
+  expect_gt(ff$daily[state == "elrp", .N], 0)
+})
+
+test_that("long gaps use LOESS, short gaps a straight line", {
+  v <- prep_visits(nedap, verbose = 0)
+  pig <- v[identified == TRUE, responder][1]
+  days <- sort(unique(v[responder == pig, date]))
+  gap <- days[30:41]                                   # 12-day gap
+  v2 <- v[!(responder %in% pig & date %in% gap)]
+  a <- calc_adg(clean_weight(v2, verbose = 0), verbose = 0)
+  lin <- calc_adfi(v2, a, qc = qc_config(long_gap_days = 100), verbose = 0)
+  lo <- calc_adfi(v2, a, qc = qc_config(long_gap_days = 7), verbose = 0)
+  dl <- lin$daily[responder == pig & date %in% gap]
+  dz <- lo$daily[responder == pig & date %in% gap]
+  expect_equal(dl$state, rep("iii", 12))
+  expect_equal(dz$state, rep("iii", 12))
+  # a straight line has constant steps, LOESS does not
+  expect_lt(stats::sd(diff(dl$dfi)), 1e-6)
+  expect_gt(stats::sd(diff(dz$dfi)), 1e-6)
+  expect_equal(run_length(c(TRUE, TRUE, FALSE, TRUE)), c(2L, 2L, 0L, 1L))
+})
+
+test_that("loess imputation and edge counts work", {
+  r <- run_adfi(fire)
+  f <- calc_adfi(r$visits, r$adg, qc = qc_config(impute_method = "loess"), verbose = 0)
+  expect_gt(f$daily[state %in% c("iii", "elrp"), .N], 0)
+  expect_false(anyNA(f$per_pig$adfi))
+  p <- r$adfi$per_pig
+  expect_true(all(p$n_extrap_start + p$n_extrap_end <= p$n_extrapolated))
+  expect_gt(max(p$n_extrap_start), 15)                 # FIRE pigs enter late
+  expect_equal(edge_run(c("elrp", "elrp", "org", "elrp")), 2L)
+})
+
+test_that("dfi range and quantile limits set values to missing", {
+  r <- run_adfi(fire)
+  f <- calc_adfi(r$visits, r$adg, qc = qc_config(dfi_range = c(1, 3)), verbose = 0)
+  obs <- f$daily[state %in% c("org", "corr")]
+  expect_true(all(obs$dfi >= 1000 & obs$dfi <= 3000))
+  fq <- calc_adfi(r$visits, r$adg, qc = qc_config(dfi_quantile = c(0.1, 0.9)), verbose = 0)
+  expect_lt(fq$daily[state %in% c("org", "corr"), .N], f$daily[state %in% c("org", "corr"), .N] + 1e6)
+})
+
+test_that("inputs are not modified and bad inputs are rejected", {
+  r <- run_adfi(fire)
+  before <- data.table::copy(r$visits)
+  calc_adfi(r$visits, r$adg, verbose = 0)
+  expect_equal(as.list(r$visits), as.list(before))
+  expect_error(calc_adfi(r$visits, list()), "calc_adg")
+})
+```
+
+# calc_fcr
+
+`calc_fcr()` combines ADG and ADFI, both computed over the same body weight
+stage, into the feed conversion ratio FCR = ADFI / ADG (kg feed per kg
+gain) and its inverse, feed efficiency G:F = ADG / ADFI.
+
+Each pig gets `fcr_flag = "ok"` or `"low_confidence"`, with the reasons in
+`fcr_note`: the growth curve or the feed intake extrapolated over more
+than `max_edge_extrap_days` (default 15) at the start or end of the stage,
+ADG on part of the stage only, less than `min_coverage` (default 0.7) of
+the stage with recorded feed intake, or weight data flagged by
+[clean_weight()].
+
+```{r function-calc_fcr}
+#' Feed conversion ratio
+#'
+#' @description
+#' Compute feed conversion ratio (FCR) from ADG and ADFI over the same body
+#' weight stage, flag pigs whose values rely on extrapolation, and summarise
+#' the traits.
+#'
+#' @param adg Result of [calc_adg()].
+#' @param adfi Result of [calc_adfi()] computed from the same `adg`.
+#' @param min_coverage Minimum share of stage days with recorded feed
+#'   intake for `fcr_flag = "ok"`. Default: `min_coverage` of the QC
+#'   settings (0.7).
+#' @param verbose 0 (silent), 1 (summary, default) or 2 (details).
+#'
+#' @return An object of class `ppt_fcr` (a list):
+#'   - `per_pig`: `adg` (g/d), `adfi` (g/d), `fcr`, `gf`, `adg_type`,
+#'     `coverage`, `stage_days`, `start_weight`, `end_weight`, `fcr_flag`,
+#'     `fcr_note`;
+#'   - `daily`: the daily table of [calc_adfi()];
+#'   - `summary`: numeric summary (`n`, `min`, `max`, `median`, `mean`,
+#'     `sd`, `cv`) of the main traits, for all pigs and for pigs with
+#'     `fcr_flag = "ok"`;
+#'   - `removed`, `settings`.
+#'
+#' @seealso [calc_adg()], [calc_adfi()].
+#' @export
+calc_fcr <- function(adg, adfi, min_coverage = adg$settings$min_coverage,
+                     verbose = 1) {
+  local_verbose(verbose)
+  if (!inherits(adg, "ppt_adg")) {
+    cli::cli_abort("{.arg adg} must be the result of {.fn calc_adg}.")
+  }
+  if (!inherits(adfi, "ppt_adfi")) {
+    cli::cli_abort("{.arg adfi} must be the result of {.fn calc_adfi}.")
+  }
+  if (!identical(adg$settings$stage_range, adfi$settings$stage_range)) {
+    cli::cli_abort("{.arg adg} and {.arg adfi} use different {.field stage_range}.")
+  }
+  ppt_msg("FCR over {adg$settings$stage_range[1]}-{adg$settings$stage_range[2]} kg", "h1")
+
+  a <- adg$per_pig[, .(responder, location, stage, adg, adg_type, stage_days,
+                       start_weight, end_weight, weight_status,
+                       extrap_days_start, extrap_days_end)]
+  f <- adfi$per_pig[, .(responder, adfi, coverage, n_extrap_start, n_extrap_end)]
+  max_edge <- adg$settings$max_edge_extrap_days
+  per_pig <- merge(a, f, by = "responder", all.x = TRUE)
+  per_pig[, `:=`(fcr = adfi / adg, gf = adg / adfi)]
+
+  notes <- character(nrow(per_pig))
+  add_note <- function(cond, text) {
+    cond <- cond %in% TRUE
+    notes[cond] <<- ifelse(nzchar(notes[cond]), paste(notes[cond], text, sep = "; "), text)
+  }
+  add_note(per_pig$adg_type == "partial", "ADG on part of the stage")
+  add_note(per_pig$extrap_days_start > max_edge,
+           sprintf("growth curve extrapolated %.0f d before the first weight", per_pig$extrap_days_start))
+  add_note(per_pig$extrap_days_end > max_edge,
+           sprintf("growth curve extrapolated %.0f d after the last weight", per_pig$extrap_days_end))
+  add_note(per_pig$n_extrap_start > max_edge,
+           sprintf("feed intake extrapolated for the first %d stage days", as.integer(per_pig$n_extrap_start)))
+  add_note(per_pig$n_extrap_end > max_edge,
+           sprintf("feed intake extrapolated for the last %d stage days", as.integer(per_pig$n_extrap_end)))
+  add_note(per_pig$coverage < min_coverage,
+           sprintf("feed intake recorded on %.0f%% of the stage", 100 * per_pig$coverage))
+  add_note(per_pig$weight_status == "low_confidence", "weight data flagged")
+  add_note(is.na(per_pig$fcr), "no FCR")
+  per_pig[, `:=`(fcr_note = notes,
+                 fcr_flag = data.table::fifelse(nzchar(notes), "low_confidence", "ok"))]
+  per_pig[is.na(fcr), fcr_flag := NA_character_]
+  per_pig[, weight_status := NULL]
+  data.table::setcolorder(per_pig, c("responder", "location", "stage", "adg", "adfi",
+                                     "fcr", "gf", "adg_type", "coverage", "stage_days",
+                                     "start_weight", "end_weight", "fcr_flag", "fcr_note"))
+  data.table::setorder(per_pig, location, responder)
+
+  summary <- rbind(
+    trait_summary(per_pig, "all"),
+    trait_summary(per_pig[fcr_flag %in% "ok"], "ok")
+  )
+
+  n_ok <- per_pig[fcr_flag %in% "ok", .N]
+  n_low <- per_pig[fcr_flag %in% "low_confidence", .N]
+  ppt_msg("FCR for {sum(!is.na(per_pig$fcr))} pig{?s}: {n_ok} ok, {n_low} low confidence", "info")
+  s <- summary[group == "all" & trait == "fcr"]
+  if (nrow(s) == 1L && s$n > 0) {
+    ppt_msg("Mean FCR {sprintf('%.2f', s$mean)} (SD {sprintf('%.2f', s$sd)}), ADG {round(summary[group == 'all' & trait == 'adg', mean])} g/d, ADFI {round(summary[group == 'all' & trait == 'adfi', mean])} g/d", "success")
+  }
+  if (n_low > 0L) {
+    why <- sort(table(unlist(strsplit(per_pig[fcr_flag %in% "low_confidence", fcr_note], "; "))), decreasing = TRUE)
+    why <- unique(gsub("[0-9]+(\\.[0-9]+)?", "N", names(why)))
+    ppt_msg("Low confidence because of: {paste(unique(why), collapse = ', ')}", "info", level = 2L)
+  }
+
+  new_ppt_result(per_pig = per_pig, daily = adfi$daily, removed = adfi$removed,
+                 settings = adg$settings, class = "ppt_fcr") |>
+    add_element(summary = summary)
+}
+
+trait_summary <- function(p, group) {
+  traits <- c("adg", "adfi", "fcr", "gf", "stage_days", "start_weight", "end_weight")
+  out <- data.table::rbindlist(lapply(traits, function(tr) {
+    x <- p[[tr]]
+    x <- x[!is.na(x)]
+    n <- length(x)
+    data.table::data.table(
+      group = group, trait = tr, n = n,
+      min = if (n) min(x) else NA_real_,
+      max = if (n) max(x) else NA_real_,
+      median = if (n) stats::median(x) else NA_real_,
+      mean = if (n) mean(x) else NA_real_,
+      sd = if (n > 1L) stats::sd(x) else NA_real_
+    )
+  }))
+  out[, cv := sd / mean]
+  out[]
+}
+```
+
+```{r example-calc_fcr}
+visits <- prep_visits(nedap, verbose = 0)
+adg <- calc_adg(clean_weight(visits, verbose = 0), verbose = 0)
+adfi <- calc_adfi(visits, adg, verbose = 0)
+fcr <- calc_fcr(adg, adfi)
+head(fcr$per_pig[, .(responder, adg, adfi, fcr, fcr_flag, fcr_note)])
+fcr$summary[group == "all"]
+```
+
+```{r tests-calc_fcr}
+fcr_pipeline <- function(data) {
+  v <- prep_visits(data, verbose = 0)
+  a <- suppressWarnings(calc_adg(clean_weight(v, verbose = 0), verbose = 0))
+  f <- calc_adfi(v, a, verbose = 0)
+  list(adg = a, adfi = f, fcr = calc_fcr(a, f, verbose = 0))
+}
+
+test_that("FCR is ADFI / ADG and flags explain themselves", {
+  for (data in list(nedap, fire)) {
+    r <- fcr_pipeline(data)
+    p <- r$fcr$per_pig
+    expect_s3_class(r$fcr, c("ppt_fcr", "ppt_result"))
+    expect_equal(nrow(p), nrow(r$adg$per_pig))
+    expect_equal(p$fcr, p$adfi / p$adg)
+    expect_equal(p$gf, 1 / p$fcr)
+    ok <- p[!is.na(fcr)]
+    expect_true(all(ok$fcr > 1.5 & ok$fcr < 4.5))
+    expect_true(all(ok[fcr_flag == "ok", nchar(fcr_note)] == 0))
+    expect_true(all(ok[fcr_flag == "low_confidence", nchar(fcr_note)] > 0))
+    long <- p[extrap_days_start > 15 | extrap_days_end > 15 | n_extrap_start > 15 | n_extrap_end > 15]
+    expect_true(all(long$fcr_flag == "low_confidence"))
+    short <- p[!responder %in% long$responder]
+    expect_false(any(grepl("extrapolated", short$fcr_note)))
+  }
+})
+
+test_that("summary is numeric and consistent", {
+  r <- fcr_pipeline(nedap)
+  s <- r$fcr$summary
+  expect_true(all(vapply(s[, .(n, min, max, median, mean, sd, cv)], is.numeric, logical(1))))
+  expect_equal(s[group == "all" & trait == "fcr", mean], mean(r$fcr$per_pig$fcr, na.rm = TRUE))
+  expect_equal(s[group == "ok" & trait == "fcr", n], r$fcr$per_pig[fcr_flag %in% "ok", .N])
+  expect_equal(s$cv, s$sd / s$mean)
+})
+
+test_that("max_edge_extrap_days changes the flags", {
+  v <- prep_visits(fire, verbose = 0)
+  q <- qc_config(max_edge_extrap_days = 1000, min_coverage = 0)
+  a <- suppressWarnings(calc_adg(clean_weight(v, q, verbose = 0), verbose = 0))
+  p <- calc_fcr(a, calc_adfi(v, a, verbose = 0), verbose = 0)$per_pig
+  expect_false(any(grepl("extrapolated", p$fcr_note)))
+})
+
+test_that("min_coverage changes the flags", {
+  r <- fcr_pipeline(fire)
+  strict <- calc_fcr(r$adg, r$adfi, min_coverage = 1, verbose = 0)$per_pig
+  expect_true(all(strict$fcr_flag == "low_confidence"))
+})
+
+test_that("inputs are checked and not modified", {
+  r <- fcr_pipeline(nedap)
+  before <- data.table::copy(r$adg$per_pig)
+  calc_fcr(r$adg, r$adfi, verbose = 0)
+  expect_equal(r$adg$per_pig, before)
+  expect_error(calc_fcr(r$adfi, r$adfi), "calc_adg")
+  expect_error(calc_fcr(r$adg, r$adg), "calc_adfi")
+  other <- r$adfi
+  other$settings <- qc_config(stage_range = c(40, 110))
+  expect_error(calc_fcr(r$adg, other), "stage_range")
+})
+```
+
+# plot_adg, plot_adfi and save_plots
+
+One plot per station, one panel per pig. Axes adapt to the data and to
+`stage_range`, so no point is dropped. Colours come from a colour-blind safe
+palette (Okabe-Ito) without extra packages.
+
+```{r function-plots}
+#' Plot growth curves
+#'
+#' @description
+#' Plot body weight and the fitted growth curve of each pig, one plot per
+#' station.
+#'
+#' @param adg Result of [calc_adg()].
+#' @param weight Optional result of [clean_weight()] to also show every
+#'   weight record, with outliers highlighted.
+#' @param responders,locations Optional pig IDs and stations to plot.
+#' @param ncol Number of panel columns. Default 3.
+#' @param verbose 0 (silent), 1 (summary, default).
+#'
+#' @return A `data.table` with one row per station: `location`, `n_pigs`
+#'   and `plot` (a list of ggplot objects). Use [save_plots()] to write them
+#'   to files.
+#' @export
+plot_adg <- function(adg, weight = NULL, responders = NULL, locations = NULL,
+                     ncol = 3, verbose = 1) {
+  local_verbose(verbose)
+  if (!inherits(adg, "ppt_adg")) {
+    cli::cli_abort("{.arg adg} must be the result of {.fn calc_adg}.")
+  }
+  if (!is.null(weight) && !inherits(weight, "ppt_weight")) {
+    cli::cli_abort("{.arg weight} must be the result of {.fn clean_weight}.")
+  }
+  daily <- filter_pigs(adg$daily, responders, locations)
+  info <- adg$per_pig[responder %in% daily$responder]
+  stage_rng <- adg$settings$stage_range
+  rec <- if (!is.null(weight)) weight$records[responder %in% daily$responder] else NULL
+
+  cols <- c(record = "#BBBBBB", outlier = "#D55E00", observed = "#0072B2",
+            curve = "#009E73", stage = "#000000")
+  info[, label := sprintf("ADG %s g/d (%s)\n%s-%s kg in %s d",
+                          ifelse(is.na(adg), "NA", format(round(adg))), adg_type,
+                          stage_rng[1L], stage_rng[2L],
+                          ifelse(is.na(stage_days), "NA", sprintf("%.1f", stage_days)))]
+
+  plots <- lapply(split(daily, by = "location", sorted = TRUE), function(d) {
+    loc <- d$location[1L]
+    lv <- natural_order(unique(d$responder))
+    d[, responder := factor(responder, levels = lv)]
+    lab <- info[location == loc | responder %in% lv][, responder := factor(responder, levels = lv)]
+    lab <- lab[!is.na(responder)]
+    y_rng <- range(c(d$lower, d$upper, d$weight, stage_rng,
+                     if (!is.null(rec)) rec[responder %in% lv, weight]), na.rm = TRUE)
+    p <- ggplot2::ggplot(d, ggplot2::aes(x = date)) +
+      ggplot2::geom_hline(yintercept = stage_rng, linetype = "dashed",
+                          colour = cols[["stage"]], alpha = 0.4) +
+      ggplot2::geom_ribbon(ggplot2::aes(ymin = lower, ymax = upper),
+                           fill = cols[["curve"]], alpha = 0.15)
+    if (!is.null(rec)) {
+      r <- rec[responder %in% lv][, responder := factor(responder, levels = lv)]
+      r[, kind := data.table::fifelse(outlier, "outlier", "record")]
+      p <- p + ggplot2::geom_point(data = r, ggplot2::aes(y = weight, colour = kind),
+                                   size = 0.4, alpha = 0.6)
+    }
+    brk <- c("observed", "curve", if (!is.null(rec)) c("record", "outlier"))
+    p <- p +
+      ggplot2::geom_point(data = d[!is.na(weight)],
+                          ggplot2::aes(y = weight, colour = "observed"), size = 0.9) +
+      ggplot2::geom_line(ggplot2::aes(y = predicted, colour = "curve"), linewidth = 0.6) +
+      ggplot2::geom_text(data = lab, ggplot2::aes(label = label),
+                         x = -Inf, y = Inf, hjust = -0.05, vjust = 1.2,
+                         size = 2.8, inherit.aes = FALSE) +
+      ggplot2::facet_wrap(~responder, ncol = min(ncol, length(lv))) +
+      ggplot2::scale_y_continuous(limits = y_rng + c(-2, 12)) +
+      ggplot2::scale_colour_manual(
+        name = NULL, values = cols, breaks = brk,
+        labels = c(observed = "daily median weight", curve = "growth curve",
+                   record = "weight record", outlier = "outlier")[brk]
+      ) +
+      ggplot2::labs(title = paste("Station", loc), x = NULL, y = "Body weight (kg)") +
+      ppt_theme()
+    p
+  })
+  out <- data.table::data.table(location = names(plots),
+                                n_pigs = vapply(plots, function(p) data.table::uniqueN(p$data$responder), integer(1)),
+                                plot = unname(plots))
+  ppt_msg("Created {nrow(out)} growth plot{?s}", "success")
+  out
+}
+
+#' Plot daily feed intake
+#'
+#' @description
+#' Plot recorded and corrected daily feed intake of each pig over the stage,
+#' one plot per station. Point colours show how each day was obtained.
+#'
+#' @param adfi Result of [calc_adfi()].
+#' @inheritParams plot_adg
+#'
+#' @return A `data.table` with `location`, `n_pigs` and `plot`.
+#' @export
+plot_adfi <- function(adfi, responders = NULL, locations = NULL, ncol = 3,
+                      verbose = 1) {
+  local_verbose(verbose)
+  if (!inherits(adfi, "ppt_adfi")) {
+    cli::cli_abort("{.arg adfi} must be the result of {.fn calc_adfi}.")
+  }
+  daily <- filter_pigs(adfi$daily[in_stage == TRUE], responders, locations)
+  info <- adfi$per_pig[responder %in% daily$responder]
+  info[, label := sprintf("ADFI %s g/d\nrecorded on %s of the stage",
+                          ifelse(is.na(adfi), "NA", format(round(adfi))),
+                          ifelse(is.na(coverage), "NA", sprintf("%.0f%%", 100 * coverage)))]
+  cols <- c(raw = "#BBBBBB", org = "#0072B2", corr = "#E69F00",
+            iii = "#009E73", elrp = "#CC79A7", missing = "#D55E00")
+  labels <- c(raw = "recorded", org = "error-free", corr = "corrected",
+              iii = "interpolated", elrp = "extrapolated", missing = "missing")
+
+  plots <- lapply(split(daily, by = "location", sorted = TRUE), function(d) {
+    loc <- d$location[1L]
+    lv <- natural_order(unique(d$responder))
+    d[, responder := factor(responder, levels = lv)]
+    lab <- info[responder %in% lv][, responder := factor(responder, levels = lv)]
+    y_max <- max(c(d$dfi, d$dfi_raw), na.rm = TRUE)
+    brk <- intersect(names(cols), c("raw", unique(d$state)))
+    p <- ggplot2::ggplot(d, ggplot2::aes(x = date)) +
+      ggplot2::geom_hline(data = lab, ggplot2::aes(yintercept = adfi),
+                          linetype = "dashed", colour = "#666666", alpha = 0.6) +
+      ggplot2::geom_point(data = d[!is.na(dfi_raw)],
+                          ggplot2::aes(y = dfi_raw, colour = "raw"), size = 0.7) +
+      ggplot2::geom_line(data = d[!is.na(dfi)], ggplot2::aes(y = dfi),
+                         colour = "#666666", linewidth = 0.3, alpha = 0.5) +
+      ggplot2::geom_point(data = d[!is.na(dfi)],
+                          ggplot2::aes(y = dfi, colour = state), size = 0.9) +
+      ggplot2::geom_text(data = lab, ggplot2::aes(label = label),
+                         x = -Inf, y = Inf, hjust = -0.05, vjust = 1.2,
+                         size = 2.8, inherit.aes = FALSE) +
+      ggplot2::facet_wrap(~responder, ncol = min(ncol, length(lv))) +
+      ggplot2::scale_y_continuous(limits = c(min(0, d$dfi_raw, d$dfi, na.rm = TRUE), y_max * 1.25)) +
+      ggplot2::scale_colour_manual(name = NULL, values = cols, breaks = brk,
+                                   labels = labels[brk]) +
+      ggplot2::labs(title = paste("Station", loc), x = NULL,
+                    y = "Daily feed intake (g)") +
+      ppt_theme()
+    p
+  })
+  out <- data.table::data.table(location = names(plots),
+                                n_pigs = vapply(plots, function(p) data.table::uniqueN(p$data$responder), integer(1)),
+                                plot = unname(plots))
+  ppt_msg("Created {nrow(out)} feed intake plot{?s}", "success")
+  out
+}
+
+#' Save plots to files
+#'
+#' @param plots Result of [plot_adg()] or [plot_adfi()].
+#' @param path Folder to write to (created if needed).
+#' @param prefix,suffix File name parts: `<prefix>_<location>_<suffix>.<device>`.
+#' @param device `"png"`, `"pdf"`, `"jpeg"` or `"tiff"`.
+#' @param dpi Resolution for bitmap devices. Default 300.
+#' @param width,height Size in cm. By default computed from the number of
+#'   panels.
+#' @param verbose 0 (silent), 1 (summary, default).
+#'
+#' @return Invisibly, a `data.table` with `location`, `file` and `saved`.
+#' @export
+save_plots <- function(plots, path, prefix = "station", suffix = "plot",
+                       device = c("png", "pdf", "jpeg", "tiff"), dpi = 300,
+                       width = NULL, height = NULL, verbose = 1) {
+  local_verbose(verbose)
+  device <- match.arg(device)
+  if (!data.table::is.data.table(plots) || !all(c("location", "plot") %in% names(plots))) {
+    cli::cli_abort("{.arg plots} must be the result of {.fn plot_adg} or {.fn plot_adfi}.")
+  }
+  dir.create(path, recursive = TRUE, showWarnings = FALSE)
+  res <- data.table::rbindlist(lapply(seq_len(nrow(plots)), function(i) {
+    p <- plots$plot[[i]]
+    n <- plots$n_pigs[i]
+    nc <- p$facet$params$ncol %||% 3L
+    w <- width %||% max(16, 9 * nc)
+    h <- height %||% (6 * ceiling(n / nc) + 4)
+    file <- file.path(path, paste0(prefix, "_", plots$location[i], "_", suffix, ".", device))
+    ok <- tryCatch({
+      ggplot2::ggsave(file, p, width = w, height = h, units = "cm", dpi = dpi,
+                      device = device, limitsize = FALSE)
+      TRUE
+    }, error = function(e) {
+      ppt_warn("Could not save {.file {file}}: {conditionMessage(e)}")
+      FALSE
+    })
+    data.table::data.table(location = plots$location[i], file = file, saved = ok)
+  }))
+  ppt_msg("Saved {sum(res$saved)} of {nrow(res)} plot{?s} to {.path {path}}",
+          if (all(res$saved)) "success" else "warning")
+  invisible(res)
+}
+
+filter_pigs <- function(daily, responders, locations) {
+  out <- daily
+  if (!is.null(responders)) {
+    unknown <- setdiff(as.character(responders), out$responder)
+    if (length(unknown) > 0L) ppt_warn("Pig{?s} not found: {.val {unknown}}")
+    out <- out[responder %in% as.character(responders)]
+  }
+  if (!is.null(locations)) {
+    unknown <- setdiff(as.character(locations), out$location)
+    if (length(unknown) > 0L) ppt_warn("Station{?s} not found: {.val {unknown}}")
+    out <- out[location %in% as.character(locations)]
+  }
+  if (nrow(out) == 0L) cli::cli_abort("No data left to plot after filtering.")
+  data.table::copy(out)
+}
+
+# Numeric IDs sorted as numbers, other IDs alphabetically.
+natural_order <- function(x) {
+  x <- unique(as.character(x))
+  num <- suppressWarnings(as.numeric(sub("_.*$", "", x)))
+  x[order(is.na(num), num, x)]
+}
+
+ppt_theme <- function() {
+  ggplot2::theme_bw(base_size = 10) +
+    ggplot2::theme(
+      legend.position = "bottom",
+      strip.background = ggplot2::element_rect(fill = "#F2F2F2"),
+      plot.title = ggplot2::element_text(face = "bold"),
+      axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
+      panel.grid.minor = ggplot2::element_blank()
+    )
+}
+```
+
+```{r example-plots}
+visits <- prep_visits(nedap, verbose = 0)
+w <- clean_weight(visits, verbose = 0)
+adg <- calc_adg(w, verbose = 0)
+adfi <- calc_adfi(visits, adg, verbose = 0)
+
+g <- plot_adg(adg, weight = w, locations = "101", responders = c("13913", "13918", "13954"))
+g$plot[[1]]
+
+f <- plot_adfi(adfi, responders = c("13913", "13918", "13954"))
+f$plot[[1]]
+
+out <- save_plots(g, path = tempdir(), prefix = "loc", suffix = "growth", device = "pdf")
+file.exists(out$file)
+unlink(out$file)
+```
+
+```{r tests-plots}
+plot_inputs <- function(data = fire) {
+  v <- prep_visits(data, verbose = 0)
+  w <- clean_weight(v, verbose = 0)
+  a <- suppressWarnings(calc_adg(w, verbose = 0))
+  list(w = w, adg = a, adfi = calc_adfi(v, a, verbose = 0))
+}
+
+render_ok <- function(p) {
+  f <- tempfile(fileext = ".pdf")
+  grDevices::pdf(f)
+  on.exit({grDevices::dev.off(); unlink(f)})
+  print(p)
+  TRUE
+}
+
+test_that("plot_adg gives one plot per station and renders without warnings", {
+  r <- plot_inputs()
+  g <- plot_adg(r$adg, weight = r$w, verbose = 0)
+  expect_equal(g$location, c("101", "102"))
+  expect_true(all(vapply(g$plot, ggplot2::is.ggplot, logical(1))))
+  expect_equal(sum(g$n_pigs), nrow(r$adg$per_pig))
+  expect_no_warning(render_ok(g$plot[[1]]))
+  expect_no_warning(render_ok(plot_adg(r$adg, verbose = 0)$plot[[2]]))
+})
+
+test_that("another stage range does not drop points", {
+  v <- prep_visits(nedap, verbose = 0)
+  w <- clean_weight(v, qc = qc_config(stage_range = c(50, 100)), verbose = 0)
+  a <- calc_adg(w, verbose = 0)
+  g <- plot_adg(a, weight = w, locations = "101", verbose = 0)
+  expect_no_warning(render_ok(g$plot[[1]]))
+})
+
+test_that("plot_adfi renders and shows the states", {
+  r <- plot_inputs()
+  f <- plot_adfi(r$adfi, verbose = 0)
+  expect_equal(nrow(f), 2L)
+  expect_no_warning(render_ok(f$plot[[1]]))
+  expect_true(all(f$plot[[1]]$data$in_stage))
+})
+
+test_that("filters work and unknown IDs warn", {
+  r <- plot_inputs()
+  g <- plot_adg(r$adg, responders = c("35853", "35855"), verbose = 0)
+  expect_equal(sum(g$n_pigs), 2L)
+  expect_warning(plot_adg(r$adg, responders = c("35853", "nope"), verbose = 1), "nope")
+  expect_error(plot_adg(r$adg, locations = "999", verbose = 0), "No data")
+  expect_error(plot_adg(r$adfi), "calc_adg")
+})
+
+test_that("save_plots writes one file per station", {
+  r <- plot_inputs()
+  g <- plot_adfi(r$adfi, verbose = 0)
+  dir <- withr::local_tempdir()
+  out <- save_plots(g, dir, prefix = "loc", suffix = "adfi", device = "pdf", verbose = 0)
+  expect_true(all(out$saved))
+  expect_true(all(file.exists(out$file)))
+  expect_equal(basename(out$file), c("loc_101_adfi.pdf", "loc_102_adfi.pdf"))
+  expect_error(save_plots(list(), dir), "plot_adg")
+})
+
+test_that("natural_order sorts numeric IDs as numbers", {
+  expect_equal(natural_order(c("100", "20", "3", "a", "20_101")),
+               c("3", "20", "20_101", "100", "a"))
+})
+```
+
+# run_pipeline
+
+`run_pipeline()` runs every step with one set of QC settings and keeps all
+intermediate results.
+
+```{r function-run_pipeline}
+#' Run the whole analysis
+#'
+#' @description
+#' Run [prep_visits()], [clean_weight()], [calc_adg()], [calc_adfi()] and
+#' [calc_fcr()] in a row with the same QC settings.
+#'
+#' @param data Raw station data (see [prep_visits()]).
+#' @param station `"nedap"`, `"fire"` or `NULL` to detect it.
+#' @param qc QC settings from [qc_config()].
+#' @param verbose 0 (silent), 1 (summary, default) or 2 (details).
+#'
+#' @return An object of class `ppt_pipeline`: a list with `visits`,
+#'   `weight`, `adg`, `adfi` and `fcr`, plus `removed` (every pig removed,
+#'   with the step and the reason).
+#' @export
+run_pipeline <- function(data, station = NULL, qc = qc_config(), verbose = 1) {
+  local_verbose(verbose)
+  check_qc(qc)
+  visits <- prep_visits(data, station = station, qc = qc, verbose = verbose)
+  weight <- clean_weight(visits, qc = qc, verbose = verbose)
+  adg <- calc_adg(weight, qc = qc, verbose = verbose)
+  adfi <- calc_adfi(visits, adg, qc = qc, verbose = verbose)
+  fcr <- calc_fcr(adg, adfi, verbose = verbose)
+  structure(
+    list(visits = visits, weight = weight, adg = adg, adfi = adfi, fcr = fcr,
+         removed = fcr$removed),
+    class = "ppt_pipeline"
+  )
+}
+
+#' @export
+print.ppt_pipeline <- function(x, ...) {
+  cli::cli_h2("tidypptsda pipeline ({toupper(attr(x$visits, 'station'))}, profile {.val {attr(x$fcr$settings, 'profile')}})")
+  n_id <- data.table::uniqueN(x$visits$responder, na.rm = TRUE)
+  p <- x$fcr$per_pig
+  cli::cli_bullets(c(
+    "*" = "Pigs in the data: {n_id}",
+    "*" = "Pigs with weight data kept: {x$weight$per_pig[status != 'removed', .N]}",
+    "*" = "Pigs with ADG: {sum(!is.na(x$adg$per_pig$adg))}",
+    "*" = "Pigs with FCR: {sum(!is.na(p$fcr))} ({sum(p$fcr_flag %in% 'ok')} ok, {sum(p$fcr_flag %in% 'low_confidence')} low confidence)",
+    "*" = "Removed pigs: {data.table::uniqueN(x$removed$responder)} (see {.field $removed})"
+  ))
+  s <- x$fcr$summary[group == "all" & trait %in% c("adg", "adfi", "fcr")]
+  if (nrow(s) > 0L) {
+    cli::cli_text("Mean ADG {round(s[trait == 'adg', mean])} g/d, ADFI {round(s[trait == 'adfi', mean])} g/d, FCR {sprintf('%.2f', s[trait == 'fcr', mean])}")
+  }
+  invisible(x)
+}
+```
+
+```{r example-run_pipeline}
+res <- run_pipeline(fire, qc = qc_config(stage_range = c(60, 120)), verbose = 0)
+res
+res$fcr$summary[group == "all"]
+```
+
+```{r tests-run_pipeline}
+test_that("every pig is either analysed or listed with a reason", {
+  for (data in list(nedap, fire)) {
+    for (p in c("casey", "national", "legacy")) {
+      res <- suppressWarnings(run_pipeline(data, qc = qc_config(p), verbose = 0))
+      expect_s3_class(res, "ppt_pipeline")
+      ids <- unique(stats::na.omit(res$visits$responder))
+      with_fcr <- res$fcr$per_pig[!is.na(fcr), responder]
+      expect_setequal(union(with_fcr, res$removed$responder), ids)
+      expect_true(all(nzchar(res$removed$reason)))
+      # each step works on a subset of the previous one
+      expect_true(all(res$adg$per_pig$responder %in% res$weight$per_pig$responder))
+      expect_true(all(res$fcr$per_pig$responder %in% res$adg$per_pig$responder))
+    }
+  }
+})
+
+test_that("pipeline equals running the steps one by one", {
+  qc <- qc_config()
+  res <- run_pipeline(nedap, qc = qc, verbose = 0)
+  v <- prep_visits(nedap, qc = qc, verbose = 0)
+  a <- calc_adg(clean_weight(v, qc, verbose = 0), verbose = 0)
+  f <- calc_fcr(a, calc_adfi(v, a, verbose = 0), verbose = 0)
+  expect_equal(res$fcr$per_pig, f$per_pig)
+})
+
+test_that("print method runs and verbose = 0 is silent", {
+  expect_silent(res <- run_pipeline(fire, verbose = 0))
+  expect_message(print(res), "FCR")
+})
+```
+
+# Deprecated functions
+
+Function names of earlier versions still work for one version. They show a
+deprecation warning and call the new function. Their results have the new
+structure (see each new function).
+
+```{r function-deprecated}
+#' Deprecated functions
+#'
+#' @description
+#' These functions were renamed. They still work but give a warning; use the
+#' new names instead:
+#'
+#' | Old | New |
+#' |---|---|
+#' | `import_nedap()` | [read_station()] |
+#' | `preprocess_data()` | [prep_visits()] |
+#' | `clean_weight_get()` | [clean_weight()] |
+#' | `adg_get()` | [clean_weight()] + [calc_adg()] |
+#' | `adfi_get()` | [calc_adfi()] |
+#' | `fcr_get()` | [calc_fcr()] |
+#' | `adg_plot()` | [plot_adg()] + [save_plots()] |
+#' | `adfi_plot()` | [plot_adfi()] + [save_plots()] |
+#'
+#' `my_break` maps to the QC parameter `stage_range`, `quiet = TRUE` to
+#' `verbose = 0`, `print_details = TRUE` to `verbose = 2`. Other old
+#' arguments are ignored with a warning; set them through [qc_config()].
+#'
+#' @param filepaths,data,adg_res,adfi_res,station_type,my_break,responders,locations,save_path,file_prefix,file_suffix,dpi,device,print_details,quiet,...
+#'   Arguments of the old functions.
+#' @return The result of the new function.
+#' @name tidypptsda-deprecated
+#' @keywords internal
+#' @export
+import_nedap <- function(filepaths, ...) {
+  .Deprecated("read_station", package = "tidypptsda")
+  read_station(filepaths, station = "nedap", ...)
+}
+
+old_verbose <- function(quiet = FALSE, print_details = FALSE) {
+  if (isTRUE(quiet)) 0L else if (isTRUE(print_details)) 2L else 1L
+}
+
+ignore_old_args <- function(...) {
+  extra <- names(list(...))
+  if (length(extra) > 0L) {
+    cli::cli_warn("Ignored argument{?s} {.arg {extra}}: set QC parameters with {.fn qc_config}.")
+  }
+}
+
+old_qc <- function(my_break = NULL) {
+  if (is.null(my_break)) qc_config() else qc_config(stage_range = my_break)
+}
+
+#' @rdname tidypptsda-deprecated
+#' @export
+preprocess_data <- function(data, station_type = "nedap", print_details = FALSE,
+                            quiet = FALSE) {
+  .Deprecated("prep_visits", package = "tidypptsda")
+  prep_visits(data, station = station_type, verbose = old_verbose(quiet, print_details))
+}
+
+#' @rdname tidypptsda-deprecated
+#' @export
+clean_weight_get <- function(data, my_break, print_details = FALSE, quiet = FALSE, ...) {
+  .Deprecated("clean_weight", package = "tidypptsda")
+  ignore_old_args(...)
+  clean_weight(data, qc = old_qc(my_break), verbose = old_verbose(quiet, print_details))
+}
+
+#' @rdname tidypptsda-deprecated
+#' @export
+adg_get <- function(data, my_break, print_details = FALSE, quiet = FALSE, ...) {
+  .Deprecated("calc_adg", package = "tidypptsda")
+  ignore_old_args(...)
+  v <- old_verbose(quiet, print_details)
+  calc_adg(clean_weight(data, qc = old_qc(my_break), verbose = v), verbose = v)
+}
+
+#' @rdname tidypptsda-deprecated
+#' @export
+adfi_get <- function(data, adg_res, station_type = NULL, quiet = FALSE) {
+  .Deprecated("calc_adfi", package = "tidypptsda")
+  calc_adfi(data, adg_res, verbose = old_verbose(quiet))
+}
+
+#' @rdname tidypptsda-deprecated
+#' @export
+fcr_get <- function(adg_res, adfi_res, quiet = FALSE) {
+  .Deprecated("calc_fcr", package = "tidypptsda")
+  calc_fcr(adg_res, adfi_res, verbose = old_verbose(quiet))
+}
+
+#' @rdname tidypptsda-deprecated
+#' @export
+adg_plot <- function(data, responders = NULL, locations = NULL, save_path = NULL,
+                     file_prefix = "loc", file_suffix = "grow", dpi = 300,
+                     device = "png", quiet = FALSE, ...) {
+  .Deprecated("plot_adg", package = "tidypptsda")
+  ignore_old_args(...)
+  v <- old_verbose(quiet)
+  p <- plot_adg(data, responders = responders, locations = locations, verbose = v)
+  if (!is.null(save_path)) {
+    save_plots(p, save_path, prefix = file_prefix, suffix = file_suffix,
+               device = device, dpi = dpi, verbose = v)
+  }
+  p
+}
+
+#' @rdname tidypptsda-deprecated
+#' @export
+adfi_plot <- function(data, responders = NULL, locations = NULL, save_path = NULL,
+                      file_prefix = "loc", file_suffix = "adfi", dpi = 300,
+                      device = "png", quiet = FALSE, ...) {
+  .Deprecated("plot_adfi", package = "tidypptsda")
+  ignore_old_args(...)
+  v <- old_verbose(quiet)
+  p <- plot_adfi(data, responders = responders, locations = locations, verbose = v)
+  if (!is.null(save_path)) {
+    save_plots(p, save_path, prefix = file_prefix, suffix = file_suffix,
+               device = device, dpi = dpi, verbose = v)
+  }
+  p
+}
+```
+
+```{r tests-deprecated}
+test_that("old names still work, warn, and map their arguments", {
+  expect_warning(v <- preprocess_data(nedap, "nedap", quiet = TRUE), "prep_visits")
+  expect_equal(nrow(v), nrow(nedap))
+  expect_warning(a <- adg_get(v, my_break = c(40, 110), quiet = TRUE), "calc_adg")
+  expect_s3_class(a, "ppt_adg")
+  expect_equal(a$settings$stage_range, c(40, 110))
+  expect_warning(f <- adfi_get(v, a, quiet = TRUE), "calc_adfi")
+  expect_warning(r <- fcr_get(a, f, quiet = TRUE), "calc_fcr")
+  expect_s3_class(r, "ppt_fcr")
+  w <- testthat::capture_warnings(clean_weight_get(v, c(30, 120), w_threshold = 0.4, quiet = TRUE))
+  expect_true(any(grepl("clean_weight", w)))
+  expect_true(any(grepl("w_threshold", w)))
+  dir <- withr::local_tempdir()
+  expect_warning(adg_plot(a, save_path = dir, device = "pdf", quiet = TRUE), "plot_adg")
+  expect_length(list.files(dir, pattern = "pdf$"), 2L)
+})
+```
+
+<!--
+# Inflate your package
+-->
+
+```{r development-inflate, eval=FALSE}
+# Execute in the console directly
+fusen::inflate(flat_file = "dev/flat_tidypptsda.Rmd",
+               vignette_name = "Get started")
+```
