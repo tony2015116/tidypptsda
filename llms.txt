@@ -1,0 +1,147 @@
+# tidypptsda
+
+tidypptsda cleans and analyses visit records from automatic pig feeding
+stations (NEDAP and FIRE): body weight cleaning, average daily gain
+(ADG), feed intake correction (ADFI) and feed conversion ratio (FCR).
+
+- Feeder errors are flagged with the 16 criteria of Casey et al. (2005).
+- Daily feed intake is corrected with the linear mixed model of Jiao et
+  al. (2014).
+- ADG and ADFI are computed over the same body weight stage, and every
+  pig gets a confidence flag that explains how its values were obtained.
+- Nothing is removed silently: each step returns a `removed` table with
+  the reason.
+- Few dependencies: cli, data.table, ggplot2, and MASS / nlme which ship
+  with R.
+
+## Installation
+
+``` r
+
+# install.packages("pak")
+pak::pak("tony2015116/tidypptsda")
+```
+
+Version 0.1.0 (the earlier API) stays available:
+
+``` r
+
+pak::pak("tony2015116/tidypptsda@v0.1.0")
+```
+
+## Example
+
+``` r
+
+library(tidypptsda)
+
+res <- run_pipeline(nedap, qc = qc_config("casey"), verbose = 0)
+res
+
+head(res$fcr$per_pig[, .(responder, adg, adfi, fcr, fcr_flag)])
+#>    responder       adg     adfi      fcr fcr_flag
+#> 1:     13913 1171.8790 2616.719 2.232926       ok
+#> 2:     13918 1140.6265 2570.041 2.253183       ok
+#> 3:     13954  919.7008 2343.422 2.548026       ok
+#> 4:     13996 1265.9909 2857.824 2.257381       ok
+#> 5:     14962 1249.0465 2818.537 2.256551       ok
+#> 6:     15006 1270.5759 3084.452 2.427602       ok
+```
+
+Step by step, with any QC preset or setting:
+
+``` r
+
+qc      <- qc_config("casey", stage_range = c(30, 120))
+visits  <- prep_visits(fire, qc = qc)          # or read_station("export/")
+weight  <- clean_weight(visits, qc)
+adg     <- calc_adg(weight)
+adfi    <- calc_adfi(visits, adg)
+fcr     <- calc_fcr(adg, adfi)
+
+plot_adg(adg, weight = weight) |> save_plots("plots", suffix = "growth")
+```
+
+![](reference/figures/README-plot-1.png)
+
+## References
+
+Casey, D. S., Stern, H. S., & Dekkers, J. C. M. (2005). Identification
+of errors and factors associated with errors in data from electronic
+swine feeders. *Journal of Animal Science*, 83, 969-982.
+
+Jiao, S., Maltecca, C., Gray, K. A., & Cassady, J. P. (2014). Feed
+intake, average daily gain, feed efficiency, and real-time ultrasound
+traits in Duroc pigs: I. *Journal of Animal Science*, 92, 2377-2386.
+
+# Package index
+
+## Quality-control settings
+
+All thresholds of the pipeline, with three presets.
+
+- [`qc_config()`](https://tony2015116.github.io/tidypptsda/reference/qc_config.md)
+  : Quality-control settings
+
+## Read and prepare station data
+
+- [`read_station()`](https://tony2015116.github.io/tidypptsda/reference/read_station.md)
+  : Read feeding station export files
+- [`prep_visits()`](https://tony2015116.github.io/tidypptsda/reference/prep_visits.md)
+  : Prepare a standard visit table
+
+## Body weight and average daily gain
+
+- [`clean_weight()`](https://tony2015116.github.io/tidypptsda/reference/clean_weight.md)
+  : Clean body weight records
+- [`calc_adg()`](https://tony2015116.github.io/tidypptsda/reference/calc_adg.md)
+  : Average daily gain
+
+## Feed intake and feed conversion
+
+- [`flag_feed_errors()`](https://tony2015116.github.io/tidypptsda/reference/flag_feed_errors.md)
+  : Flag feeder errors
+- [`calc_adfi()`](https://tony2015116.github.io/tidypptsda/reference/calc_adfi.md)
+  : Average daily feed intake
+- [`calc_fcr()`](https://tony2015116.github.io/tidypptsda/reference/calc_fcr.md)
+  : Feed conversion ratio
+
+## Whole pipeline
+
+- [`run_pipeline()`](https://tony2015116.github.io/tidypptsda/reference/run_pipeline.md)
+  : Run the whole analysis
+
+## Plots
+
+- [`plot_adg()`](https://tony2015116.github.io/tidypptsda/reference/plot_adg.md)
+  : Plot growth curves
+- [`plot_adfi()`](https://tony2015116.github.io/tidypptsda/reference/plot_adfi.md)
+  : Plot daily feed intake
+- [`save_plots()`](https://tony2015116.github.io/tidypptsda/reference/save_plots.md)
+  : Save plots to files
+
+## Example data
+
+- [`nedap`](https://tony2015116.github.io/tidypptsda/reference/nedap.md)
+  : NEDAP feeding station visits
+- [`fire`](https://tony2015116.github.io/tidypptsda/reference/fire.md) :
+  FIRE feeding station visits
+
+## Deprecated
+
+- [`import_nedap()`](https://tony2015116.github.io/tidypptsda/reference/tidypptsda-deprecated.md)
+  [`preprocess_data()`](https://tony2015116.github.io/tidypptsda/reference/tidypptsda-deprecated.md)
+  [`clean_weight_get()`](https://tony2015116.github.io/tidypptsda/reference/tidypptsda-deprecated.md)
+  [`adg_get()`](https://tony2015116.github.io/tidypptsda/reference/tidypptsda-deprecated.md)
+  [`adfi_get()`](https://tony2015116.github.io/tidypptsda/reference/tidypptsda-deprecated.md)
+  [`fcr_get()`](https://tony2015116.github.io/tidypptsda/reference/tidypptsda-deprecated.md)
+  [`adg_plot()`](https://tony2015116.github.io/tidypptsda/reference/tidypptsda-deprecated.md)
+  [`adfi_plot()`](https://tony2015116.github.io/tidypptsda/reference/tidypptsda-deprecated.md)
+  : Deprecated functions
+
+# Articles
+
+### All vignettes
+
+- [Get
+  started](https://tony2015116.github.io/tidypptsda/articles/get-started.md):
