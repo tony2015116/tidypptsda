@@ -1,0 +1,232 @@
+---
+title: "中文使用说明"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{中文使用说明}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 9,
+                      fig.height = 6, out.width = "100%")
+```
+
+tidypptsda 用于处理种猪性能测定站（NEDAP、FIRE）导出的访问记录，计算日增重（ADG）、日采食量（ADFI）和料肉比（FCR）。本说明按实际分析的顺序介绍每一步：做什么、输出什么，以及结果怎么读。
+
+```{r setup, message = FALSE}
+library(tidypptsda)
+```
+
+## 1. 整体流程
+
+| 步骤 | 函数 | 作用 |
+|---|---|---|
+| 0 | `qc_config()` | 设定全部质控参数（三套预设） |
+| 1 | `read_station()` | 读取测定站导出的 csv（多个文件或整个文件夹） |
+| 2 | `prep_visits()` | 整理为标准访问表 |
+| 3 | `clean_weight()` | 体重质控：剔除异常值，判定每头猪是否可用 |
+| 4 | `calc_adg()` | 拟合生长曲线，计算体重区间内的日增重 |
+| 5 | `flag_feed_errors()` | 按 Casey 等（2005）的 16 条规则标记采食错误 |
+| 6 | `calc_adfi()` | 校正日采食量、插补缺失日，计算 ADFI |
+| 7 | `calc_fcr()` | 计算料肉比，并给出可信度标记 |
+| 8 | `plot_adg()` / `plot_adfi()` / `save_plots()` | 按测定站出图并保存 |
+
+不需要中间结果时，用 `run_pipeline()` 一次跑完：
+
+```{r pipeline}
+res <- run_pipeline(nedap, verbose = 0)
+res
+```
+
+## 2. 数据要求
+
+### NEDAP
+
+至少需要以下列：`responder`（耳标号）、`location`（站号）、`visit_time`（进站时间）、`duration`（停留秒数）、`weight`（体重，g）、`feed_intake`（采食量，g）。
+
+### FIRE
+
+至少需要以下列：`Location`、`Tag`、`Date`、`Entry`、`Exit`、`Ent Wt`、`Ext Wt`、`Consumed`、`Weight`。料槽重和采食量的单位是 kg，`Topup Amount`（下料量）为可选列。
+
+包内自带两份示例数据 `nedap` 和 `fire`，都是测定站的原始导出格式。
+
+### 读取文件
+
+```{r read, eval = FALSE}
+raw <- read_station("D:/测定站导出/2024批次")      # 读取文件夹下所有 csv
+raw <- read_station(c("101.csv", "102.csv"), station = "fire")
+```
+
+- 耳标号一律按文本读入，前导零不会丢失。
+- 多个文件的列名不一致时会报错，并指出每个文件缺哪些列；如需用 NA 补齐缺失列，设`fill = TRUE`。
+
+## 3. 质控参数：`qc_config()`
+
+所有阈值都集中在一个对象里，以下三套预设可直接使用：
+
+- `"casey"`（默认）：采食错误判定采用 Casey 等（2005），体重用稳健回归（rlm）检测异常，生长曲线为二次曲线；
+- `"national"`：用 LOESS 清洗体重、拟合生长曲线；测定期要求更长，缺失率要求更严；
+- `"legacy"`：STL、rlm 和稳健 SD 三种方法组合检测异常，生长曲线用 Gompertz。
+
+在预设的基础上可以覆盖任意参数：
+
+```{r qc}
+qc <- qc_config("casey", stage_range = c(30, 115), min_test_days = 40)
+qc$stage_range
+```
+
+最常调整的几个参数：
+
+| 参数 | 含义 | 默认值 |
+|---|---|---|
+| `stage_range` | 计算 ADG/ADFI/FCR 的体重区间（kg） | 30–120 |
+| `weight_range` | 单条体重的有效范围（kg） | 15–150 |
+| `min_test_days` | 最少测定天数 | 35 |
+| `max_missing_rate` | 最大缺失率（无有效体重的天数比例） | 0.30 |
+| `entry_weight_max` / `exit_weight_min` | 进站体重上限 / 出栏体重下限（kg），不满足时标记为低可信度 | 65 / 85 |
+| `max_extrap_days` | 生长曲线最多外推的天数 | 30 |
+| `max_edge_extrap_days` | 区间两端外推超过此天数的猪标记为低可信度 | 15 |
+| `duration_max` | 单次访问时长上限（s），对应错误类型 OTV-hi | 3600 |
+
+用 `print(qc_config())` 可以查看全部参数。参数名写错时，函数会提示最接近的正确名称。
+
+## 4. 逐步分析
+
+### 4.1 整理访问表
+
+FIRE 示例数据中的猪在 45–60 kg 才进站，因此这里按第 7 节的建议，以 60–120 kg 作为计算区间：
+
+```{r prep}
+qc_fire <- qc_config("casey", stage_range = c(60, 120))
+visits <- prep_visits(fire, qc = qc_fire, verbose = 1)
+```
+
+- 体重和采食量的单位统一为 kg 和 g，时间统一为 UTC。
+- 未识别耳标的访问会**保留**，并标记为 `identified = FALSE`：计算前后两次访问的料重差、时间差时需要用到它们。
+- FIRE 跨零点的访问会自动修正离站时间；体重为 0 的记录视为缺失。
+- 一头猪出现在多个站时，按时间关系分三种情况处理：
+  - 转栏：保留全部记录；
+  - 两段之间间隔过长：拆成两个个体，耳标号改为 `id_站号`；
+  - 两站时间交错：剔除少数站在交错时段内的记录，视为读卡误读。
+
+  每头猪的处理结果可以用 `attr(visits, "stations")` 查看。
+
+### 4.2 体重质控
+
+```{r weight}
+w <- clean_weight(visits, qc = qc_fire)
+head(w$per_pig[, .(responder, n_valid, test_days, missing_rate, status, reason)])
+```
+
+`status` 有三种取值：
+
+- `keep`：通过质控；
+- `low_confidence`：保留并参与计算，但需要注意，例如进站太重、出栏太轻，原因写在`reason` 中；
+- `removed`：剔除，例如测定天数太短、有效记录太少。
+
+每条体重记录是否为异常值，以及判定的原因，可以在 `w$records` 中查看。
+
+### 4.3 日增重
+
+```{r adg}
+adg <- calc_adg(w)
+head(adg$per_pig[, .(responder, adg_type, start_date, end_date, stage_days, adg)])
+```
+
+ADG 的计算方法：在拟合的生长曲线上，求出体重到达区间下限和上限的时间，用体重差除以天数。`adg_type` 说明这个数值是怎么来的：
+
+| adg_type | 含义 |
+|---|---|
+| observed | 区间两端都在实测期内 |
+| extrapolated | 需要外推，但外推不超过 `max_extrap_days` |
+| partial | 外推后仍到达不了区间端点，只用覆盖到的部分计算 |
+| none | 覆盖不足 7 天，不计算 ADG |
+
+### 4.4 采食错误与日采食校正
+
+```{r adfi}
+adfi <- calc_adfi(visits, adg)
+table(adfi$daily[in_stage == TRUE, state])
+```
+
+日采食量的校正分两步：
+
+1. **校正**：对每头猪的每一天，先求"无错误访问的采食量之和" Y，再用混合模型扣除错误项的影响（Jiao 等，2014）。没有错误的日子保持原值不变。
+2. **插补**：只在与 ADG 相同的体重区间内进行。区间中间缺失的日子用线性内插，连续缺失超过7 天时改用 LOESS；区间两端缺失的日子，用每头猪的"日采食 ~ 体重"回归外推。
+
+`state` 列标明每一天的来源：
+
+- `org`：原始记录，当天没有错误访问；
+- `corr`：经过校正；
+- `iii`：内插得到；
+- `elrp`：外推得到；
+- `missing`：无法估计。
+
+校正模型的系数保存在 `adfi$model` 中；各类错误的发生率可以这样查看：
+
+```{r errors}
+f <- flag_feed_errors(visits, verbose = 0)
+attr(f, "error_rates")[n > 0, .(label, n, rate = round(100 * rate, 2))]
+```
+
+### 4.5 料肉比
+
+```{r fcr}
+fcr <- calc_fcr(adg, adfi)
+head(fcr$per_pig[, .(responder, adg, adfi, fcr, fcr_flag, fcr_note)])
+fcr$summary[group == "all", lapply(.SD, function(x) if (is.numeric(x)) round(x, 2) else x)]
+```
+
+`fcr_flag = "low_confidence"` 的原因写在 `fcr_note` 中，常见的有：
+
+- 生长曲线或采食量在区间开头或结尾外推超过 15 天，通常是进站太晚或出栏太早；
+- ADG 只覆盖了区间的一部分；
+- 区间内实测采食的天数不足 70%。
+
+## 5. 作图与保存
+
+```{r plots}
+g <- plot_adg(adg, weight = w, responders = c("35853", "35855", "35877"))
+g$plot[[1]]
+```
+
+```{r plot-adfi}
+h <- plot_adfi(adfi, responders = c("35853", "35855", "35877"))
+h$plot[[1]]
+```
+
+每个测定站输出一张图，每头猪一个分面。保存为图片：
+
+```{r save, eval = FALSE}
+save_plots(g, path = "结果/生长曲线", prefix = "站", suffix = "growth", device = "png")
+```
+
+## 6. 结果怎么用
+
+- **最终结果**：`fcr$per_pig`，包含每头猪的 ADG、ADFI、FCR 及可信度标记。
+- **被剔除的猪及原因**：`fcr$removed`，或 `run_pipeline()` 结果中的 `$removed`。
+- 在育种评估中，建议**优先使用 `fcr_flag = "ok"` 的个体**。低可信度的个体可以单独核查，或在模型中加以区分。
+
+## 7. 提高数据质量的建议
+
+以下是根据示例数据和缺失模拟得到的经验：
+
+1. **进站要早于区间起点 5–10 kg**。进站后头 1–2 周的数据最差：在 nedap 示例数据中，前3 天的体重异常率高达 50%。若从 30 kg 开始计算，宜在 20–25 kg 进站。
+2. **出栏要晚于区间终点**。区间终点为 120 kg 时，宜在 125 kg 以上出栏；若只能在 115 kg左右出栏，就把 `stage_range` 设为 `c(30, 110)`。
+3. **进站较晚的批次，改用实际覆盖的体重段**。例如 FIRE 示例数据中的猪 45–60 kg 才进站，应使用 `stage_range = c(60, 120)`，而不是依靠外推补齐 30–60 kg。
+4. **避免连续多天缺数据**。区间中间的随机缺失影响很小，而连续一周以上的缺失会明显降低结果的排名准确性。每 1–2 天检查一次没有访问记录的猪和测定站。
+5. **定期校准设备，核对耳标**。每周校准料槽和体重秤，转栏时记录日期和站号。
+
+## 8. 常见问题
+
+**问：为什么 ADFI 比实测记录的平均值低？**答：ADFI 是整个体重区间内的平均值，包括体重较小、采食较少的前期；实测记录可能只覆盖了体重较大的后期。
+
+**问：旧版本的函数还能用吗？**答：`preprocess_data()`、`adg_get()` 等旧函数名仍然可以调用，但会提示已弃用，返回值是新版的结构。需要旧版行为时，可安装 0.1.0：`pak::pak("tony2015116/tidypptsda@v0.1.0")`。
+
+**问：如何只分析某个测定站或某几头猪？**答：可以在 `prep_visits()` 之后筛选，例如 `visits[location == "101"]`；作图时用`locations` 和 `responders` 参数指定。
+
+## 参考文献
+
+- Casey, D. S., Stern, H. S., & Dekkers, J. C. M. (2005). Identification of errors and factors associated with errors in data from electronic swine feeders. *Journal of Animal Science*, 83, 969-982.
+- Jiao, S., Maltecca, C., Gray, K. A., & Cassady, J. P. (2014). Feed intake, average daily gain, feed efficiency, and real-time ultrasound traits in Duroc pigs: I. *Journal of Animal Science*, 92, 2377-2386.
