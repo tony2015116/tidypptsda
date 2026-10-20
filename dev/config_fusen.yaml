@@ -1,22 +1,41 @@
-flat_teaching.Rmd:
-  path: dev/flat_teaching.Rmd
+flat_tidypptsda.Rmd:
+  path: dev/flat_tidypptsda.Rmd
   state: active
   R:
-  - R/adfi_get.R
-  - R/adfi_plot.R
-  - R/adg_get.R
-  - R/adg_plot.R
-  - R/clean_weight_get.R
-  - R/fcr_get.R
-  - R/import_nedap.R
-  - R/preprocess_data.R
-  tests: []
+  - R/calc_adfi.R
+  - R/calc_adg.R
+  - R/calc_fcr.R
+  - R/clean_weight.R
+  - R/flag_feed_errors.R
+  - R/tidypptsda-deprecated.R
+  - R/plot_adg.R
+  - R/utils.R
+  - R/prep_visits.R
+  - R/qc_config.R
+  - R/read_station.R
+  - R/run_pipeline.R
+  - R/example-datasets.R
+  tests:
+  - tests/testthat/test-datasets.R
+  - tests/testthat/test-utils.R
+  - tests/testthat/test-qc_config.R
+  - tests/testthat/test-read_station.R
+  - tests/testthat/test-prep_visits.R
+  - tests/testthat/test-clean_weight.R
+  - tests/testthat/test-calc_adg.R
+  - tests/testthat/test-flag_feed_errors.R
+  - tests/testthat/test-calc_adfi.R
+  - tests/testthat/test-calc_fcr.R
+  - tests/testthat/test-plot_adg.R
+  - tests/testthat/test-run_pipeline.R
+  - tests/testthat/test-tidypptsda-deprecated.R
   vignettes: vignettes/get-started.Rmd
   inflate:
-    flat_file: dev/flat_teaching.Rmd
+    flat_file: dev/flat_tidypptsda.Rmd
     vignette_name: Get started
-    open_vignette: true
-    check: true
+    open_vignette: false
+    check: false
     document: true
-    overwrite: ask
+    overwrite: 'yes'
     clean: ask
+    codecov: false

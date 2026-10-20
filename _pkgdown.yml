@@ -1,19 +1,50 @@
 url: https://tony2015116.github.io/tidypptsda/
 template:
-  #light-switch: true
-  #bootstrap: 5
+  bootstrap: 5
   bootswatch: cosmo
   theme: arrow-dark
-  #theme: breeze-light
-  #theme-dark: arrow-dark
+
 navbar:
   bg: light
   structure:
-    left:  [reference, articles]
-    right: [github, lightswitch]
-
+    left:  [intro, reference, news]
+    right: [search, github, lightswitch]
   components:
     github:
       icon: fab fa-github fa-lg
       href: https://github.com/tony2015116/tidypptsda
       aria-label: GitHub
+
+reference:
+- title: Quality-control settings
+  desc: All thresholds of the pipeline, with three presets.
+  contents:
+  - qc_config
+- title: Read and prepare station data
+  contents:
+  - read_station
+  - prep_visits
+- title: Body weight and average daily gain
+  contents:
+  - clean_weight
+  - calc_adg
+- title: Feed intake and feed conversion
+  contents:
+  - flag_feed_errors
+  - calc_adfi
+  - calc_fcr
+- title: Whole pipeline
+  contents:
+  - run_pipeline
+- title: Plots
+  contents:
+  - plot_adg
+  - plot_adfi
+  - save_plots
+- title: Example data
+  contents:
+  - nedap
+  - fire
+- title: Deprecated
+  contents:
+  - tidypptsda-deprecated

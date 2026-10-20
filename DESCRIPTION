@@ -1,39 +1,40 @@
 Package: tidypptsda
-Title: Learn How to Build a Package from Rmarkdown File
-Version: 0.1.0
-Authors@R: c(
-    person("Guo Meng", "Doe", , "tony2015116@163.com", role = c("aut", "cre")),
-    person("Guo Meng", role = "cph")
-  )
-Description: A Set of tools to understand packages structure. Use
-    Rmarkdown First method to build a package from a defined template.
-    Start your package with documentation. Everything can be set from a
-    Rmarkdown file in your project.
+Title: Process and Analyse Pig Performance Testing Station Data
+Version: 0.2.0
+Authors@R: 
+    person("Meng", "Guo", , "tony2015116@163.com", role = c("aut", "cre", "cph"))
+Description: Tools to clean and analyse visit records from automatic pig
+    feeding stations (NEDAP and FIRE). Covers data import, preprocessing,
+    the 16 feeder error criteria of Casey et al. (2005)
+    <doi:10.2527/2005.835969x>, body weight cleaning with robust
+    regression, average daily gain, feed intake correction with a linear
+    mixed model as in Jiao et al. (2014) <doi:10.2527/jas.2013-7338>, feed
+    conversion ratio and plotting.
 License: MIT + file LICENSE
-URL: https://tony2015116.github.io/tidypptsda/
+URL: https://tony2015116.github.io/tidypptsda/,
+    https://github.com/tony2015116/tidypptsda
 BugReports: https://github.com/tony2015116/tidypptsda/issues
+Depends: 
+    R (>= 4.1.0)
 Imports: 
-    cAIC4,
     cli,
     data.table,
     ggplot2,
-    ggsci,
-    lme4,
-    lubridate,
+    grDevices,
     MASS,
-    purrr,
-    recipes,
+    nlme,
     stats,
-    tidyr,
-    vroom,
-    zoo
+    utils
 Suggests: 
     knitr,
-    mintyr,
-    rmarkdown
+    rmarkdown,
+    testthat,
+    withr
 VignetteBuilder: 
     knitr
-Config/fusen/version: 0.6.0
+Config/fusen/version: 0.7.2
 Encoding: UTF-8
+Language: en-US
+LazyData: true
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.1
