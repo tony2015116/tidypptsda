@@ -2,7 +2,7 @@
 % Please edit documentation in R/read_station.R
 \name{read_station}
 \alias{read_station}
-\title{Read feeding station export files}
+\title{Read Feeding Station Export Files}
 \usage{
 read_station(
   files,

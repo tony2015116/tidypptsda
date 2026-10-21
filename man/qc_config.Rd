@@ -2,7 +2,7 @@
 % Please edit documentation in R/qc_config.R
 \name{qc_config}
 \alias{qc_config}
-\title{Quality-control settings}
+\title{Build Quality-Control Settings from a Preset}
 \usage{
 qc_config(profile = c("casey", "national", "legacy"), ...)
 }

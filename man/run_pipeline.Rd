@@ -2,7 +2,7 @@
 % Please edit documentation in R/run_pipeline.R
 \name{run_pipeline}
 \alias{run_pipeline}
-\title{Run the whole analysis}
+\title{Run the Whole Analysis Pipeline}
 \usage{
 run_pipeline(data, station = NULL, qc = qc_config(), verbose = 1)
 }

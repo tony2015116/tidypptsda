@@ -2,7 +2,7 @@
 % Please edit documentation in R/calc_adfi.R
 \name{calc_adfi}
 \alias{calc_adfi}
-\title{Average daily feed intake}
+\title{Correct and Impute Daily Feed Intake (ADFI)}
 \usage{
 calc_adfi(visits, adg, qc = adg$settings, verbose = 1)
 }

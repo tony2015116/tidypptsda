@@ -222,7 +222,8 @@ save_plots(g, path = "结果/生长曲线", prefix = "站", suffix = "growth", d
 
 **问：为什么 ADFI 比实测记录的平均值低？**答：ADFI 是整个体重区间内的平均值，包括体重较小、采食较少的前期；实测记录可能只覆盖了体重较大的后期。
 
-**问：旧版本的函数还能用吗？**答：`preprocess_data()`、`adg_get()` 等旧函数名仍然可以调用，但会提示已弃用，返回值是新版的结构。需要旧版行为时，可安装 0.1.0：`pak::pak("tony2015116/tidypptsda@v0.1.0")`。
+**问：旧版本的函数还能用吗？**
+答：从 0.3.0 起，`preprocess_data()`、`adg_get()` 等旧函数名已删除，请改用本文介绍的新函数。需要旧版行为时，可安装 0.1.0：`pak::pak("tony2015116/tidypptsda@v0.1.0")`。
 
 **问：如何只分析某个测定站或某几头猪？**答：可以在 `prep_visits()` 之后筛选，例如 `visits[location == "101"]`；作图时用`locations` 和 `responders` 参数指定。
 

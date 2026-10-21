@@ -1,0 +1,195 @@
+---
+title: "质控预设说明：casey、national、legacy"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{质控预设说明：casey、national、legacy}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r setup, message = FALSE}
+library(tidypptsda)
+library(data.table)
+```
+
+`qc_config()` 提供三套预设：`casey`（默认）、`national` 和 `legacy`。每套预设是 36 个质控参数的一组完整取值，只在部分参数上互不相同。本文说明三套预设各自的设计思路、它们的区别，以及如何选择。每个参数的具体含义见《质控参数详解》。
+
+## 1. 一句话区别
+
+| 预设 | 体重异常检测 | 生长曲线 | 采食插补 | 个体要求 | 适合 |
+|---|---|---|---|---|---|
+| `casey` | rlm 稳健回归 | 二次曲线 | 直线内插，长缺口用 LOESS | 测定 ≥ 35 天，缺失 ≤ 30% | 大多数批次；有文献依据，结果容易解释 |
+| `national` | LOESS | LOESS | LOESS | 测定 ≥ 60 天，缺失 ≤ 15%，曲线 R² ≥ 0.99 | 测定期长、数据完整、要求严格的批次 |
+| `legacy` | STL + rlm + SD 三法合并 | Gompertz | 直线内插 | 同 casey | 想沿用传统组合方法，或与以往结果对比 |
+
+三套预设的**采食错误判定完全相同**，都采用 Casey 等（2005）的 16 条规则，日采食都用 Jiao 等（2014）的混合模型校正。区别集中在体重清洗、生长曲线和个体判定上。
+
+## 2. 参数差异
+
+只列出与 `casey` 不同的参数：
+
+```{r diff}
+f <- function(v) if (is.null(v)) "NULL（关闭）" else paste(v, collapse = ", ")
+cs <- qc_config("casey"); na <- qc_config("national"); lg <- qc_config("legacy")
+diff_params <- names(cs)[!mapply(identical, cs, na) | !mapply(identical, cs, lg)]
+data.table(
+  参数 = diff_params,
+  casey = vapply(diff_params, function(p) f(cs[[p]]), ""),
+  national = vapply(diff_params, function(p) f(na[[p]]), ""),
+  legacy = vapply(diff_params, function(p) f(lg[[p]]), "")
+)
+```
+
+其余参数在三套预设中取值相同，包括跨站、采食错误、日采食范围、可信度等各组参数。
+
+## 3. casey（默认）
+
+### 设计思路
+
+方法全部来自两篇文献，每一步都有明确依据：
+
+- **采食错误**：Casey 等（2005）表 3 的 16 条规则；
+- **体重清洗**：Jiao 等（2014）的做法。每头猪拟合二次稳健回归（`MASS::rlm`，bisquare 权重），权重小于 0.5 的记录判为异常；
+- **日采食校正**：Jiao 等（2014）的混合模型；
+- **生长曲线**：二次曲线。在 30–120 kg 这段，猪的生长接近直线并略有减速，二次曲线足够描述，外推时也比较稳定。
+
+### 优点与局限
+
+- 优点：参数少、结果稳定、方法容易在论文中说明；二次曲线外推不容易出现离奇的结果。
+- 局限：二次曲线对生长中途停滞（生病、换料等）的猪拟合较差；rlm 把整条曲线当作参照，生长后期的离群点有时会被漏判。
+
+### 用法
+
+```{r casey, eval = FALSE}
+qc <- qc_config()                      # 等同于 qc_config("casey")
+res <- run_pipeline(nedap, qc = qc)
+```
+
+## 4. national
+
+### 设计思路
+
+这套预设整理自国内测定站数据处理中常见的参数（**原始出处未核实**，参数含义按本包的理解实现）。它的特点是：
+
+- **用 LOESS 代替参数曲线**：体重清洗、生长曲线和采食插补都使用局部加权回归（`loess_span = 0.75`），不对生长曲线的形状作任何假设；
+- **个体要求更严**：测定期 ≥ 60 天，缺失率 ≤ 15%，有效体重范围收窄到 25–140 kg；
+- **曲线质量门槛**：清洗后 LOESS 曲线的 R² < 0.99 时，标记为低可信度（不剔除）。
+
+原始资料中还有几个参数，含义不够明确，本包把它们实现为**默认关闭**的可选规则：
+
+| 原始参数 | 本包对应 | 本包的理解 |
+|---|---|---|
+| `weight_threshold = 0.25` | `rel_dev_max` | 实测体重偏离拟合曲线超过 25% 判为异常 |
+| `daily_weight_threshold = 0.90` | `daily_drop_min` | 当天体重低于前一天的 90% 判为异常 |
+| `impute_r2_min = 0.95` | 已删除 | 累积采食曲线的 R² 几乎总高于 0.95，起不到把关作用 |
+
+确认含义后，可以这样打开：
+
+```{r national-on, eval = FALSE}
+qc_config("national", rel_dev_max = 0.25, daily_drop_min = 0.90)
+```
+
+### 优点与局限
+
+- 优点：能适应形状不规则的生长曲线；对数据完整性要求高，留下的个体质量好。
+- 局限：LOESS 在数据两端的外推只按端点斜率直线延伸，进站晚或出栏早的猪误差较大；测定期 ≥ 60 天的要求会剔除较多个体，测定期较短的批次需要相应调低 `min_test_days`。
+
+## 5. legacy
+
+### 设计思路
+
+传统的"多种统计方法组合"做法：
+
+- **体重异常检测**用三种方法，任一方法判为异常即为异常（`outlier_combine = "any"`）：
+  - **STL**：对日中位体重做时间序列分解（周期 7 天，稳健模式），残差超过 3 倍 MAD 为异常；
+  - **rlm**：与 casey 相同；
+  - **SD**：二次曲线残差超过 3 倍标准差为异常；
+- **生长曲线**用 Gompertz（`nls(SSgompertz)`），这是描述动物生长的经典 S 形曲线；不收敛时自动改用二次曲线；
+- **计算区间**默认为 45–110 kg（原始资料中的"测试体重范围"），有效体重范围为 25–140 kg。
+
+### 优点与局限
+
+- 优点：三种方法互相补充，异常值检出最全；Gompertz 曲线有生物学含义。
+- 局限：
+  - 三法合并后剔除的记录最多，可能误删正常记录。需要更宽松时，改用 `outlier_combine = "majority"`（两种以上方法都判为异常才算）；
+  - 30–120 kg 只是 Gompertz 曲线的一段，参数不易估准。示例数据清洗后，53 头猪中只有 1 头不收敛（自动改用二次曲线）；但在未清洗的原始数据上，不收敛的比例约为 15%，体重噪声越大越常见；
+  - STL 是为周期性数据设计的，而生长曲线本身没有周期，它在这里的效果基本等同于稳健平滑。
+
+## 6. 在示例数据上的比较
+
+下面用两份示例数据分别运行三套预设。FIRE 的猪进站较晚，因此三套预设都统一使用 60–120 kg 区间，保证可比：
+
+```{r compare}
+run_one <- function(data, profile, ...) {
+  q <- qc_config(profile, ...)
+  r <- suppressWarnings(run_pipeline(data, qc = q, verbose = 0))
+  p <- r$fcr$per_pig
+  data.table(
+    预设 = profile,
+    异常记录_pct = round(100 * mean(r$weight$records$outlier), 1),
+    保留 = r$weight$per_pig[status == "keep", .N],
+    降级 = r$weight$per_pig[status == "low_confidence", .N],
+    剔除 = r$weight$per_pig[status == "removed", .N],
+    ADG = round(mean(p$adg, na.rm = TRUE)),
+    ADFI = round(mean(p$adfi, na.rm = TRUE)),
+    FCR = round(mean(p$fcr, na.rm = TRUE), 2),
+    FCR可信 = sum(p$fcr_flag %in% "ok")
+  )
+}
+cat("NEDAP（区间按各预设默认）\n")
+rbindlist(lapply(c("casey", "national", "legacy"), function(p) run_one(nedap, p)))
+cat("FIRE（统一使用 60-120 kg）\n")
+rbindlist(lapply(c("casey", "national", "legacy"), function(p) run_one(fire, p, stage_range = c(60, 120))))
+```
+
+注意：legacy 在 NEDAP 上使用的是它默认的 45–110 kg 区间，所以它的 ADG、ADFI 与另外两套不是在同一体重段上算的，只能看趋势，不能直接比较数值。
+
+### 个体排名是否一致
+
+育种评估最关心的是个体排序，而不是平均值。下面在相同的 30–120 kg 区间上，计算三套预设所得料肉比的 Spearman 秩相关：
+
+```{r rank}
+fcr_of <- function(profile) {
+  q <- qc_config(profile, stage_range = c(30, 120))
+  r <- suppressWarnings(run_pipeline(nedap, qc = q, verbose = 0))
+  r$fcr$per_pig[, .(responder, fcr)]
+}
+m <- Reduce(function(a, b) merge(a, b, by = "responder"),
+            Map(function(p) setnames(fcr_of(p), "fcr", p), c("casey", "national", "legacy")))
+round(cor(m[, -1], method = "spearman", use = "complete.obs"), 3)
+```
+
+相关系数越接近 1，说明换用不同的预设对个体排名的影响越小。在示例数据上，national 与 legacy 的排名很接近（0.97 左右），casey 与另外两套稍有差异（约 0.89–0.91）。差异主要来自生长曲线的形式：casey 用二次曲线，另外两套用 LOESS 和 Gompertz。这也说明，同一个育种群体应固定使用同一套预设，否则换方法本身就可能改变个体排序。
+
+## 7. 如何选择
+
+1. **没有特别要求时，用 `casey`**。它的方法有文献依据，便于写进论文的材料与方法部分。
+2. **测定期长（≥ 60 天）、数据完整、要求严格时，用 `national`**。如果剔除的个体太多，先看 `$removed` 里的原因，再适当放宽 `min_test_days` 或 `max_missing_rate`。
+3. **需要和以往用"多方法组合"处理的结果对比时，用 `legacy`**。记得把 `stage_range` 设为和以往一致。
+4. **无论用哪一套**，都应根据批次实际情况调整 `stage_range`：区间两端都要落在大多数猪的实测体重范围之内。
+5. 同一个育种群体的历年数据，应**固定使用同一套预设和参数**，否则年度之间的差异可能来自处理方法，而不是猪本身。
+
+## 8. 自定义预设
+
+预设只是起点。可以在任一预设上覆盖参数，并把这套设置保存下来，在之后的批次中重复使用：
+
+```{r custom, eval = FALSE}
+my_qc <- qc_config("casey",
+                   stage_range = c(30, 115),
+                   min_test_days = 45,
+                   weight_outlier = c("rlm", "loess"),
+                   outlier_combine = "majority")
+saveRDS(my_qc, "my_qc.rds")          # 保存
+my_qc <- readRDS("my_qc.rds")        # 下一批次读取后直接使用
+```
+
+分析结果中的 `$settings` 也会原样记录所用的参数，写论文或复查时可以直接引用。
+
+## 参考文献
+
+- Casey, D. S., Stern, H. S., & Dekkers, J. C. M. (2005). Identification of errors and factors associated with errors in data from electronic swine feeders. *Journal of Animal Science*, 83, 969-982.
+- Jiao, S., Maltecca, C., Gray, K. A., & Cassady, J. P. (2014). Feed intake, average daily gain, feed efficiency, and real-time ultrasound traits in Duroc pigs: I. *Journal of Animal Science*, 92, 2377-2386.

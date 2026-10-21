@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_adg.R
 \name{save_plots}
 \alias{save_plots}
-\title{Save plots to files}
+\title{Save Plots to Files}
 \usage{
 save_plots(
   plots,
@@ -36,5 +36,5 @@ panels.}
 Invisibly, a \code{data.table} with \code{location}, \code{file} and \code{saved}.
 }
 \description{
-Save plots to files
+Save Plots to Files
 }

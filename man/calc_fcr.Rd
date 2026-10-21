@@ -2,7 +2,7 @@
 % Please edit documentation in R/calc_fcr.R
 \name{calc_fcr}
 \alias{calc_fcr}
-\title{Feed conversion ratio}
+\title{Compute Feed Conversion Ratio (FCR) with Confidence Flags}
 \usage{
 calc_fcr(adg, adfi, min_coverage = adg$settings$min_coverage, verbose = 1)
 }

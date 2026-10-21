@@ -1,0 +1,282 @@
+---
+title: "质控参数详解：qc_config()"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{质控参数详解：qc_config()}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r setup, message = FALSE}
+library(tidypptsda)
+library(data.table)
+```
+
+tidypptsda 把整个分析流程中的全部阈值都集中在 `qc_config()` 返回的一个对象里。各分析函数通过 `qc` 参数接收这个对象，结果中的 `$settings` 也会原样保存这份设置，方便复现。本文逐一说明 36 个参数；三套预设的区别见《质控预设说明》。
+
+## 1. 基本用法
+
+```{r basic}
+qc <- qc_config()                                   # 默认预设 casey
+qc <- qc_config("national")                         # 换一套预设
+qc <- qc_config("casey", stage_range = c(30, 115))  # 在预设基础上覆盖个别参数
+qc$stage_range
+```
+
+- 第一个参数 `profile` 指定预设，其余参数必须带名字，例如 `duration_max = 1800`。
+- 被覆盖的参数会替换预设中的值，未提到的参数保持预设值不变。
+- 可选规则的默认值为 `NULL`，表示关闭。给它赋一个数值就打开；如果预设里已经打开，传 `NULL` 可以关掉。
+
+查看全部参数：
+
+```{r print}
+qc_config("casey")
+```
+
+### 参数检查
+
+`qc_config()` 会逐项检查参数的类型和取值范围，也会检查参数之间是否矛盾，出错时立即报错并指出原因：
+
+```{r errors, error = TRUE}
+qc_config(duration = 1800)               # 参数名写错，会提示正确的名称
+qc_config(stage_range = c(10, 120))      # 计算区间超出了有效体重范围
+qc_config(entry_weight_max = 90)         # 进站体重上限不小于出栏体重下限
+```
+
+需要同时满足的约束：
+
+- `stage_range` 必须落在 `weight_range` 之内；
+- `entry_weight_max` 必须小于 `exit_weight_min`；
+- `outlier_combine = "majority"` 时，`weight_outlier` 中至少要有两种方法。
+
+## 2. 参数总览
+
+| 分组 | 参数 | 默认值（casey） | 作用于 |
+|---|---|---|---|
+| 跨站 | `max_gap_days`、`max_overlap_days`、`max_jump_kg` | 3、1、10 | `prep_visits()` |
+| 体重记录 | `weight_range`、`weight_outlier`、`outlier_combine`、`rlm_cutoff`、`sd_max`、`loess_span`、`rel_dev_max`、`daily_drop_min` | 15–150、rlm、any、0.5、3、0.75、NULL、NULL | `clean_weight()` |
+| 个体判定 | `min_test_days`、`min_records`、`max_missing_rate`、`entry_weight_max`、`exit_weight_min`、`curve_r2_min` | 35、20、0.30、65、85、NULL | `clean_weight()` |
+| 生长曲线 | `stage_range`、`curve_model`、`max_extrap_days` | 30–120、poly2、30 | `calc_adg()` |
+| 采食错误 | `fiv_range`、`fiv0_abs_max`、`duration_max`、`speed_fiv_lo_max`、`speed_strict_max`、`speed_range`、`idle_duration_max`、`trough_diff_range`、`max_unidentified_feed_kg` | −20–2000、20、3600、500、110、2–170、500、−20–1800、90 | `flag_feed_errors()` |
+| 日采食 | `dfi_range`、`dfi_quantile`、`dfi_correct`、`impute_method`、`long_gap_days` | 0–6、NULL、lmm、linear、7 | `calc_adfi()` |
+| 可信度 | `max_edge_extrap_days`、`min_coverage` | 15、0.7 | `calc_fcr()` |
+
+单位约定：体重用 kg，单次访问的采食量和料槽重用 g，日采食量（`dfi_range`）用 kg，时间用秒（s）或天（d）。
+
+## 3. 跨站（转栏）参数
+
+一头猪出现在多个测定站时，`prep_visits()` 会比较它在各站的时间段，判断属于转栏、两个个体还是读卡误读，结果见 `attr(visits, "stations")`。
+
+| 参数 | 含义 | 单位 | 默认值 | 取值范围 |
+|---|---|---|---|---|
+| `max_gap_days` | 前一站末次访问与后一站首次访问之间允许的最大间隔。不超过此值视为转栏；超过则视为两个不同的个体，耳标号改为 `id_站号` | 天 | 3 | ≥ 0 |
+| `max_overlap_days` | 两站时间段允许重叠的最大天数。超过此值视为读卡误读，剔除记录较少的那一站在重叠时段内的访问 | 天 | 1 | ≥ 0 |
+| `max_jump_kg` | 转栏前后体重差的警告阈值（取衔接处前后各 20 条有效体重的中位数比较）。只发出警告，不删除数据 | kg | 10 | ≥ 0 |
+
+**调整建议**
+
+- 转栏时猪在过渡栏停留较久（例如消毒、隔离数天），可把 `max_gap_days` 调大到 5–7。
+- 如果经常出现"相邻两栏读到同一头猪"的串号情况，可把 `max_overlap_days` 调小到 0.5，误读会被更早识别出来。
+
+## 4. 体重记录参数
+
+这组参数作用于 `clean_weight()` 的前两层：单条记录规则和逐头猪的异常值检测。
+
+| 参数 | 含义 | 单位 | 默认值 | 取值范围 |
+|---|---|---|---|---|
+| `weight_range` | 单条体重的有效范围，超出的记录标记为 `weight_range` | kg | 15–150 | 两个递增的非负数 |
+| `weight_outlier` | 异常值检测方法，可多选：`"rlm"`、`"loess"`、`"stl"`、`"sd"` | — | `"rlm"` | 见下文 |
+| `outlier_combine` | 多种方法的合并方式：`"any"` 表示任一方法判为异常即为异常；`"majority"` 表示超过半数方法判为异常才算 | — | `"any"` | any / majority |
+| `rlm_cutoff` | rlm 法：稳健回归权重低于此值的记录判为异常 | — | 0.5 | 0–1 |
+| `sd_max` | loess、stl、sd 法：残差超过多少倍标准差判为异常（loess 和 stl 用稳健标准差 MAD，sd 法用普通标准差） | 倍 | 3 | ≥ 0 |
+| `loess_span` | LOESS 的平滑窗口占数据的比例，越大越平滑 | — | 0.75 | 0.1–1 |
+| `rel_dev_max` | 可选规则：实测体重与拟合曲线的相对偏差超过此值即判为异常，例如 0.25 表示偏离 25% | — | NULL（关闭） | 0–1 |
+| `daily_drop_min` | 可选规则：当天体重中位数与前一天之比低于此值时，当天全部记录判为异常，例如 0.90 | — | NULL（关闭） | 0–1 |
+
+### 四种检测方法
+
+| 方法 | 做法 | 适用情况 |
+|---|---|---|
+| `rlm` | 每头猪拟合二次稳健回归（`MASS::rlm`，bisquare 权重），权重小于 `rlm_cutoff` 的记录为异常。方法来自 Jiao 等（2014） | 通用的默认方法；对成段的离群值很稳健 |
+| `loess` | 每头猪拟合稳健 LOESS（`family = "symmetric"`），残差超过 `sd_max` 倍 MAD 为异常 | 生长曲线不规则时（如中途停滞、生病） |
+| `stl` | 对日中位体重做 STL 分解（周期 7 天，稳健模式），用"趋势 + 周期"作为参照；不足 14 天时改用 loess | 怀疑存在周期性干扰时；生长曲线本身没有周期，效果通常与 loess 接近 |
+| `sd` | 每头猪拟合二次最小二乘曲线，残差超过 `sd_max` 倍标准差为异常 | 传统做法；离群值多时，标准差会被拉大，检出率偏低 |
+
+### 示例：`rlm_cutoff` 对异常值比例的影响
+
+```{r rlm-cutoff}
+visits_n <- prep_visits(nedap, verbose = 0)
+rbindlist(lapply(c(0.3, 0.5, 0.7), function(k) {
+  w <- clean_weight(visits_n, qc_config(rlm_cutoff = k), verbose = 0)
+  data.table(rlm_cutoff = k,
+             outlier_pct = round(100 * mean(w$records$outlier), 2),
+             pigs_removed = w$per_pig[status == "removed", .N])
+}))
+```
+
+`rlm_cutoff` 越大，判定越严格，被标为异常的记录越多。默认值 0.5 来自 Jiao 等（2014）。如果检查 `w$records` 后发现大量正常体重被标为异常，可以尝试调低到 0.3–0.4。
+
+**调整建议**
+
+- 测定站的称量下限较高，或者小猪数据不可靠时，把 `weight_range` 的下限调高，例如 `c(20, 150)`。
+- `rel_dev_max` 和 `daily_drop_min` 的含义直观，但目前没有文献依据，建议先在一个批次上试用，看看被剔除的记录（`w$records[grepl("rel_dev|daily_drop", qc_flag)]`）是否合理，再决定是否长期使用。
+
+## 5. 个体判定参数
+
+体重异常值剔除之后，`clean_weight()` 逐头猪判断能否用于生长分析。下表中前三个参数不满足时**剔除**该猪，后三个不满足时只**降级**为 `low_confidence`，该猪仍参与后续计算。
+
+| 参数 | 含义 | 单位 | 默认值 | 不满足时 |
+|---|---|---|---|---|
+| `min_records` | 最少有效体重记录数 | 条 | 20 | 剔除 |
+| `min_test_days` | 最短测定期：首条到末条有效体重之间的天数 | 天 | 35 | 剔除 |
+| `max_missing_rate` | 最大缺失率：测定期内没有有效体重的天数占比 | — | 0.30 | 剔除 |
+| `entry_weight_max` | 进站体重上限，取清洗后曲线在首条记录处的拟合值 | kg | 65 | 降级 |
+| `exit_weight_min` | 出栏体重下限，取清洗后曲线在末条记录处的拟合值 | kg | 85 | 降级 |
+| `curve_r2_min` | 可选规则：清洗后生长曲线的最小 R²（用 loess 方法时为 LOESS 曲线，否则为二次曲线） | — | NULL（关闭） | 降级 |
+
+进站和出栏体重不达标的猪只降级、不剔除，因为它们的 ADG 还可以在 `calc_adg()` 中外推得到，并会带上相应的标记。
+
+**调整建议**
+
+- `min_test_days` 应短于计划测定期：计划测 60 天的批次，设为 40–45 天比较合适。
+- `curve_r2_min` 常用 0.99。在示例数据中，清洗前约有 1/4 的猪达不到这个值，所以只用来提示，不用来剔除。
+
+## 6. 生长曲线参数
+
+作用于 `calc_adg()`。
+
+| 参数 | 含义 | 单位 | 默认值 | 取值范围 |
+|---|---|---|---|---|
+| `stage_range` | 计算 ADG、ADFI、FCR 的体重区间 | kg | 30–120 | 必须落在 `weight_range` 之内 |
+| `curve_model` | 生长曲线：`"poly1"`、`"poly2"`、`"poly3"`（1–3 次多项式）、`"loess"`、`"gompertz"` | — | `"poly2"` | 见左 |
+| `max_extrap_days` | 曲线在首条记录之前、末条记录之后最多外推的天数 | 天 | 30 | ≥ 0 |
+
+ADG 的计算方法：在拟合曲线上找出体重到达 `stage_range` 下限和上限的时间点，用两端的体重差除以天数。时间点的搜索范围是首条记录前、末条记录后各 `max_extrap_days` 天。
+
+- `gompertz` 用 `nls(SSgompertz)` 拟合。不收敛时自动改用二次曲线，实际使用的曲线记录在 `curve_used` 列中。
+- `loess` 曲线超出观测范围的部分，按两端的斜率直线延伸。
+
+### 示例：`stage_range` 对 FIRE 数据的影响
+
+FIRE 示例数据中的猪在 45–60 kg 才进站，若仍按 30–120 kg 计算，前段只能靠外推：
+
+```{r stage}
+visits_f <- prep_visits(fire, verbose = 0)
+rbindlist(lapply(list(c(30, 120), c(60, 120)), function(st) {
+  q <- qc_config(stage_range = st)
+  a <- suppressWarnings(calc_adg(clean_weight(visits_f, q, verbose = 0), verbose = 0))
+  f <- calc_fcr(a, calc_adfi(visits_f, a, verbose = 0), verbose = 0)
+  data.table(stage = paste(st, collapse = "-"),
+             observed = a$per_pig[adg_type == "observed", .N],
+             extrapolated = a$per_pig[adg_type == "extrapolated", .N],
+             fcr_ok = f$per_pig[fcr_flag %in% "ok", .N],
+             fcr_low = f$per_pig[fcr_flag %in% "low_confidence", .N])
+}))
+```
+
+**调整建议**：`stage_range` 的两端都应落在大多数猪的实测体重范围之内。区间下限宜比典型进站体重高 5–10 kg，上限宜比典型出栏体重低约 5 kg。
+
+## 7. 采食错误参数（Casey 等，2005）
+
+作用于 `flag_feed_errors()`。每次访问按 16 条规则逐条判断；以下参数是这些规则的阈值，默认值全部取自 Casey 等（2005）表 3。
+
+| 参数 | 对应规则 | 含义 | 单位 | 默认值 |
+|---|---|---|---|---|
+| `fiv_range` | 1 FIV-lo、2 FIV-hi | 单次采食量的合理范围，低于下限或高于上限判为错误 | g | −20、2000 |
+| `fiv0_abs_max` | 3 FIV-0 | 停留时间为 0 秒的访问，采食量绝对值超过此值判为错误 | g | 20 |
+| `duration_max` | 5 OTV-hi | 单次访问停留时间的上限（规则 4 OTV-lo 固定为 < 0 秒） | s | 3600 |
+| `speed_fiv_lo_max` | 6 FRV-hi-FIV-lo | 0 < 采食量 < 50 g 的访问，采食速度超过此值判为错误 | g/min | 500 |
+| `speed_strict_max` | 7 FRV-hi-strict | 采食量 ≥ 50 g、且前一次或后一次访问采食量 < −20 g 的访问，采食速度上限 | g/min | 110 |
+| `speed_range` | 10 FRV-lo、8 FRV-hi | 下限：速度不为 0 但绝对值 ≤ 此值判为 FRV-lo；上限：采食量 ≥ 50 g 且前后访问都正常时的速度上限 | g/min | 2、170 |
+| `idle_duration_max` | 9 FRV-0 | 采食速度为 0（没吃料）但停留时间超过此值，判为错误 | s | 500 |
+| `trough_diff_range` | 11–14 LWD/FWD | 相邻两次访问之间料槽重的变化范围（仅 FIRE） | g | −20、1800 |
+| `max_unidentified_feed_kg` | 料槽级 | 单个料槽在整个测定期内"未识别访问"的耗料量超过此值时给出警告 | kg | 90 |
+
+规则 15、16（LTD-lo、FTD-lo：相邻访问在时间上重叠）没有参数。"前一次 / 后一次访问"指**同一料槽**上按进站时间排序的相邻访问，包括未识别耳标的访问。
+
+### 示例：`duration_max` 对 FIRE 错误率的影响
+
+```{r duration}
+rbindlist(lapply(c(1800, 3600), function(d) {
+  f <- flag_feed_errors(visits_f, qc_config(duration_max = d), verbose = 0)
+  r <- attr(f, "error_rates")
+  data.table(duration_max = d,
+             otv_hi_pct = round(100 * r[error == "otv_hi", rate], 2),
+             any_error_pct = round(100 * f[identified == TRUE, mean(n_errors > 0)], 2))
+}))
+```
+
+**调整建议**
+
+- `trough_diff_range` 的上限 1800 g 是按 FIRE 料槽的下料方式推算的（每次下料约 450 g，最多 4 次）。如果你的设备每次下料量不同，按"单次下料量 × 4"调整。
+- `duration_max` 设为 1800 s 时，FIRE 示例数据中有约 5.6% 的访问会被判为错误，而 3600 s 时几乎没有。改小之前，先确认你的猪确实不会单次采食半小时以上。
+- 其余阈值都是根据文献中的直方图定出来的，没有特别理由不建议改动。
+
+## 8. 日采食参数
+
+作用于 `calc_adfi()`。
+
+| 参数 | 含义 | 单位 | 默认值 | 取值范围 |
+|---|---|---|---|---|
+| `dfi_range` | 校正后日采食量的合理范围，超出的日子视为缺失、交给插补 | kg | 0–6 | 两个递增的非负数 |
+| `dfi_quantile` | 可选规则：按全部猪日的分位数截断，例如 `c(0.025, 0.99)` 表示低于 2.5% 分位或高于 99% 分位的日子视为缺失 | — | NULL（关闭） | 0–1 |
+| `dfi_correct` | `"lmm"`：按 Jiao 等（2014）用混合模型校正；`"none"`：不校正，直接用原始记录 | — | `"lmm"` | lmm / none |
+| `impute_method` | `"linear"`：区间内部直线内插、长缺口用 LOESS、两端用"日采食 ~ 体重"回归外推；`"loess"`：全部用 LOESS | — | `"linear"` | linear / loess |
+| `long_gap_days` | 内部连续缺失超过此天数时改用 LOESS（仅 `"linear"` 有效） | 天 | 7 | ≥ 1 |
+
+校正模型的形式是 `无错误日采食 ~ 站 + 当天体重 + ADG + 31 个错误协变量 + (1|猪)`，校正值 = 无错误日采食 − Σ(系数 × 错误协变量)。没有错误的日子不受影响。
+
+**调整建议**
+
+- 公猪后期日采食量可能超过 4 kg，`dfi_range` 的上限不宜低于 5 kg。
+- 用模拟数据比较过，几种插补方法在随机缺失时结果几乎相同；`impute_method` 保持默认即可（详见项目文档《采食插补方法模拟评估》）。
+
+## 9. 可信度参数
+
+作用于 `calc_fcr()`，决定 `fcr_flag` 是 `"ok"` 还是 `"low_confidence"`。
+
+| 参数 | 含义 | 单位 | 默认值 | 取值范围 |
+|---|---|---|---|---|
+| `max_edge_extrap_days` | 区间开头或结尾，生长曲线或采食量连续外推超过此天数时降级 | 天 | 15 | ≥ 0 |
+| `min_coverage` | 区间内有实测（或校正）采食的天数占比低于此值时降级 | — | 0.7 | 0–1 |
+
+### 示例：`max_edge_extrap_days` 对可信个体数的影响
+
+```{r edge}
+rbindlist(lapply(c(10, 15, 30), function(k) {
+  q <- qc_config(max_edge_extrap_days = k)
+  a <- suppressWarnings(calc_adg(clean_weight(visits_f, q, verbose = 0), verbose = 0))
+  f <- calc_fcr(a, calc_adfi(visits_f, a, verbose = 0), verbose = 0)
+  data.table(max_edge_extrap_days = k, fcr_ok = f$per_pig[fcr_flag %in% "ok", .N])
+}))
+```
+
+缺失模拟显示：区间两端缺 10 天以内时，ADFI 误差约 2–4%；缺 20 天时约 7%；缺 30 天时为 9–14%。默认的 15 天是在"保留更多个体"和"保证精度"之间的折中。育种评估要求更高时可设为 10，只做描述性统计时可放宽到 20。
+
+## 10. 常用设置示例
+
+```{r recipes, eval = FALSE}
+# 晚进站批次（45–60 kg 进站）
+qc_config("casey", stage_range = c(60, 120))
+
+# 115 kg 左右出栏
+qc_config("casey", stage_range = c(30, 110))
+
+# 测定期较短的批次（计划 50 天）
+qc_config("casey", min_test_days = 30)
+
+# FIRE 设备，下料量 600 g/次
+qc_config("casey", trough_diff_range = c(-20, 2400))
+
+# 更宽松的体重清洗：两种方法都判为异常才算异常值（比 "any" 标出的异常更少）
+qc_config("casey", weight_outlier = c("rlm", "loess"), outlier_combine = "majority")
+```
+
+## 参考文献
+
+- Casey, D. S., Stern, H. S., & Dekkers, J. C. M. (2005). Identification of errors and factors associated with errors in data from electronic swine feeders. *Journal of Animal Science*, 83, 969-982.
+- Jiao, S., Maltecca, C., Gray, K. A., & Cassady, J. P. (2014). Feed intake, average daily gain, feed efficiency, and real-time ultrasound traits in Duroc pigs: I. *Journal of Animal Science*, 92, 2377-2386.

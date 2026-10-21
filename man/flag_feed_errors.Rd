@@ -2,7 +2,7 @@
 % Please edit documentation in R/flag_feed_errors.R
 \name{flag_feed_errors}
 \alias{flag_feed_errors}
-\title{Flag feeder errors}
+\title{Flag Feeder Errors (Casey et al. 2005)}
 \usage{
 flag_feed_errors(visits, qc = qc_config(), verbose = 1)
 }

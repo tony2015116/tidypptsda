@@ -367,13 +367,6 @@ res$fcr$summary[group == "all"]
 
 
 
-# Deprecated functions
-
-Function names of earlier versions still work for one version. They show a
-deprecation warning and call the new function. Their results have the new
-structure (see each new function).
-
-
 <!--
 # Inflate your package
 -->

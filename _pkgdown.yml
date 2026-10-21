@@ -20,34 +20,49 @@ navbar:
 
 reference:
 - title: Quality-control settings
-  desc: All thresholds of the pipeline, with three presets.
+  desc: Set every threshold of the pipeline in one object, starting from one of three presets.
   contents:
   - qc_config
 - title: Read and prepare station data
+  desc: Read NEDAP or FIRE exports (many files or a folder) and turn them into one standard visit table.
   contents:
   - read_station
   - prep_visits
-- title: Body weight and average daily gain
+- title: Body weight and daily gain
+  desc: Flag implausible body weights, then fit growth curves and compute ADG over a body weight stage.
   contents:
   - clean_weight
   - calc_adg
 - title: Feed intake and feed conversion
+  desc: Flag feeder errors, correct and impute daily feed intake, and combine ADG and ADFI into FCR.
   contents:
   - flag_feed_errors
   - calc_adfi
   - calc_fcr
 - title: Whole pipeline
+  desc: Run every step in a row with one set of QC settings and keep all intermediate results.
   contents:
   - run_pipeline
 - title: Plots
+  desc: One plot per station and one panel per pig; write them to files.
   contents:
   - plot_adg
   - plot_adfi
   - save_plots
 - title: Example data
+  desc: Raw exports from NEDAP and FIRE stations, used in every example.
   contents:
   - nedap
   - fire
-- title: Deprecated
+
+articles:
+- title: Get started
+  navbar: ~
   contents:
-  - tidypptsda-deprecated
+  - get-started
+- title: 中文文档
+  navbar: 中文文档
+  contents:
+  - tidypptsda-zh
+  - qc-parameters-zh
+  - qc-presets-zh
