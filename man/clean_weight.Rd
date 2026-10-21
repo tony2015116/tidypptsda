@@ -2,7 +2,7 @@
 % Please edit documentation in R/clean_weight.R
 \name{clean_weight}
 \alias{clean_weight}
-\title{Clean body weight records}
+\title{Clean Body Weight Records and Check Each Pig}
 \usage{
 clean_weight(visits, qc = qc_config(), verbose = 1)
 }

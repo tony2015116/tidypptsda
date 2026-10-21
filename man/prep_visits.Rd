@@ -2,7 +2,7 @@
 % Please edit documentation in R/prep_visits.R
 \name{prep_visits}
 \alias{prep_visits}
-\title{Prepare a standard visit table}
+\title{Prepare a Standard Visit Table}
 \usage{
 prep_visits(data, station = NULL, qc = qc_config(), verbose = 1)
 }

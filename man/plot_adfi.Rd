@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_adg.R
 \name{plot_adfi}
 \alias{plot_adfi}
-\title{Plot daily feed intake}
+\title{Plot Daily Feed Intake per Station}
 \usage{
 plot_adfi(adfi, responders = NULL, locations = NULL, ncol = 3, verbose = 1)
 }

@@ -3,7 +3,7 @@
 \docType{data}
 \name{fire}
 \alias{fire}
-\title{FIRE feeding station visits}
+\title{Example Visits from FIRE Feeding Stations}
 \format{
 A data frame with 9,794 rows and 10 columns:
 \describe{

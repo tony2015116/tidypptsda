@@ -7,7 +7,6 @@ flat_tidypptsda.Rmd:
   - R/calc_fcr.R
   - R/clean_weight.R
   - R/flag_feed_errors.R
-  - R/tidypptsda-deprecated.R
   - R/plot_adg.R
   - R/utils.R
   - R/prep_visits.R
@@ -28,7 +27,6 @@ flat_tidypptsda.Rmd:
   - tests/testthat/test-calc_fcr.R
   - tests/testthat/test-plot_adg.R
   - tests/testthat/test-run_pipeline.R
-  - tests/testthat/test-tidypptsda-deprecated.R
   vignettes: vignettes/get-started.Rmd
   inflate:
     flat_file: dev/flat_tidypptsda.Rmd

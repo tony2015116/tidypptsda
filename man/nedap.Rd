@@ -3,7 +3,7 @@
 \docType{data}
 \name{nedap}
 \alias{nedap}
-\title{NEDAP feeding station visits}
+\title{Example Visits from NEDAP Feeding Stations}
 \format{
 A data frame with 31,863 rows and 9 columns:
 \describe{

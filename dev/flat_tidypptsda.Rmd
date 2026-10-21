@@ -47,7 +47,7 @@ fusen::fill_description(
   ),
   overwrite = TRUE
 )
-desc::desc_set_version("0.2.0")
+desc::desc_set_version("0.3.0")
 usethis::use_mit_license("Meng Guo")
 # Use markdown in roxygen comments
 desc::desc_set("Roxygen", "list(markdown = TRUE)")
@@ -69,7 +69,7 @@ Two example datasets ship with the package, one per station type. They
 are raw station exports, before any processing.
 
 ```{r function-datasets}
-#' NEDAP feeding station visits
+#' Example Visits from NEDAP Feeding Stations
 #'
 #' Raw visit records exported from two NEDAP feeding stations.
 #'
@@ -92,7 +92,7 @@ are raw station exports, before any processing.
 #'   30 pigs.
 "nedap"
 
-#' FIRE feeding station visits
+#' Example Visits from FIRE Feeding Stations
 #'
 #' Raw visit records exported from two FIRE (Osborne) feeding stations.
 #'
@@ -465,7 +465,7 @@ All quality-control thresholds live in one object created by `qc_config()`.
 Three presets are available, and any single parameter can be overridden.
 
 ```{r function-qc_config}
-#' Quality-control settings
+#' Build Quality-Control Settings from a Preset
 #'
 #' @description
 #' Build the set of quality-control (QC) thresholds used by the whole
@@ -870,7 +870,7 @@ station type, transponder IDs are always read as text so leading zeros are
 kept, and a `source_file` column records where each row came from.
 
 ```{r function-read_station}
-#' Read feeding station export files
+#' Read Feeding Station Export Files
 #'
 #' @description
 #' Read one or more CSV exports from NEDAP or FIRE feeding stations and
@@ -1105,7 +1105,7 @@ table that every later step uses:
 - pigs seen at more than one station are kept (see **Station transfer**).
 
 ```{r function-prep_visits}
-#' Prepare a standard visit table
+#' Prepare a Standard Visit Table
 #'
 #' @description
 #' Convert raw NEDAP or FIRE station data into a standard visit table with
@@ -1579,7 +1579,7 @@ Nothing is deleted silently: every record keeps a `qc_flag`, and every
 removed pig is listed in `removed` with the reason.
 
 ```{r function-clean_weight}
-#' Clean body weight records
+#' Clean Body Weight Records and Check Each Pig
 #'
 #' @description
 #' Flag implausible and outlying body weight records, then decide for each
@@ -2087,7 +2087,7 @@ Every pig gets an `adg_type`:
 - `"none"`: less than 7 days of the stage are covered; ADG is `NA`.
 
 ```{r function-calc_adg}
-#' Average daily gain
+#' Compute Average Daily Gain (ADG) from Growth Curves
 #'
 #' @description
 #' Fit a growth curve to the cleaned body weights of each pig and compute
@@ -2482,7 +2482,7 @@ visits (-20 g <= FIV <= 2000 g) is summed per feeder; Casey et al. discarded
 pens above 90 kg, here a warning is given above `max_unidentified_feed_kg`.
 
 ```{r function-flag_feed_errors}
-#' Flag feeder errors
+#' Flag Feeder Errors (Casey et al. 2005)
 #'
 #' @description
 #' Flag each visit with the 16 error types of Casey et al. (2005).
@@ -2835,7 +2835,7 @@ Day states: `"org"` (no error, recorded value), `"corr"` (corrected),
 `"iii"` (interpolated), `"elrp"` (extrapolated), `"missing"`.
 
 ```{r function-calc_adfi}
-#' Average daily feed intake
+#' Correct and Impute Daily Feed Intake (ADFI)
 #'
 #' @description
 #' Correct daily feed intake for feeder errors with a linear mixed model,
@@ -3277,7 +3277,7 @@ the stage with recorded feed intake, or weight data flagged by
 [clean_weight()].
 
 ```{r function-calc_fcr}
-#' Feed conversion ratio
+#' Compute Feed Conversion Ratio (FCR) with Confidence Flags
 #'
 #' @description
 #' Compute feed conversion ratio (FCR) from ADG and ADFI over the same body
@@ -3474,7 +3474,7 @@ One plot per station, one panel per pig. Axes adapt to the data and to
 palette (Okabe-Ito) without extra packages.
 
 ```{r function-plots}
-#' Plot growth curves
+#' Plot Growth Curves per Station
 #'
 #' @description
 #' Plot body weight and the fitted growth curve of each pig, one plot per
@@ -3557,7 +3557,7 @@ plot_adg <- function(adg, weight = NULL, responders = NULL, locations = NULL,
   out
 }
 
-#' Plot daily feed intake
+#' Plot Daily Feed Intake per Station
 #'
 #' @description
 #' Plot recorded and corrected daily feed intake of each pig over the stage,
@@ -3619,7 +3619,7 @@ plot_adfi <- function(adfi, responders = NULL, locations = NULL, ncol = 3,
   out
 }
 
-#' Save plots to files
+#' Save Plots to Files
 #'
 #' @param plots Result of [plot_adg()] or [plot_adfi()].
 #' @param path Folder to write to (created if needed).
@@ -3789,7 +3789,7 @@ test_that("natural_order sorts numeric IDs as numbers", {
 intermediate results.
 
 ```{r function-run_pipeline}
-#' Run the whole analysis
+#' Run the Whole Analysis Pipeline
 #'
 #' @description
 #' Run [prep_visits()], [clean_weight()], [calc_adg()], [calc_adfi()] and
@@ -3874,151 +3874,6 @@ test_that("pipeline equals running the steps one by one", {
 test_that("print method runs and verbose = 0 is silent", {
   expect_silent(res <- run_pipeline(fire, verbose = 0))
   expect_message(print(res), "FCR")
-})
-```
-
-# Deprecated functions
-
-Function names of earlier versions still work for one version. They show a
-deprecation warning and call the new function. Their results have the new
-structure (see each new function).
-
-```{r function-deprecated}
-#' Deprecated functions
-#'
-#' @description
-#' These functions were renamed. They still work but give a warning; use the
-#' new names instead:
-#'
-#' | Old | New |
-#' |---|---|
-#' | `import_nedap()` | [read_station()] |
-#' | `preprocess_data()` | [prep_visits()] |
-#' | `clean_weight_get()` | [clean_weight()] |
-#' | `adg_get()` | [clean_weight()] + [calc_adg()] |
-#' | `adfi_get()` | [calc_adfi()] |
-#' | `fcr_get()` | [calc_fcr()] |
-#' | `adg_plot()` | [plot_adg()] + [save_plots()] |
-#' | `adfi_plot()` | [plot_adfi()] + [save_plots()] |
-#'
-#' `my_break` maps to the QC parameter `stage_range`, `quiet = TRUE` to
-#' `verbose = 0`, `print_details = TRUE` to `verbose = 2`. Other old
-#' arguments are ignored with a warning; set them through [qc_config()].
-#'
-#' @param filepaths,data,adg_res,adfi_res,station_type,my_break,responders,locations,save_path,file_prefix,file_suffix,dpi,device,print_details,quiet,...
-#'   Arguments of the old functions.
-#' @return The result of the new function.
-#' @name tidypptsda-deprecated
-#' @keywords internal
-#' @export
-import_nedap <- function(filepaths, ...) {
-  .Deprecated("read_station", package = "tidypptsda")
-  read_station(filepaths, station = "nedap", ...)
-}
-
-old_verbose <- function(quiet = FALSE, print_details = FALSE) {
-  if (isTRUE(quiet)) 0L else if (isTRUE(print_details)) 2L else 1L
-}
-
-ignore_old_args <- function(...) {
-  extra <- names(list(...))
-  if (length(extra) > 0L) {
-    cli::cli_warn("Ignored argument{?s} {.arg {extra}}: set QC parameters with {.fn qc_config}.")
-  }
-}
-
-old_qc <- function(my_break = NULL) {
-  if (is.null(my_break)) qc_config() else qc_config(stage_range = my_break)
-}
-
-#' @rdname tidypptsda-deprecated
-#' @export
-preprocess_data <- function(data, station_type = "nedap", print_details = FALSE,
-                            quiet = FALSE) {
-  .Deprecated("prep_visits", package = "tidypptsda")
-  prep_visits(data, station = station_type, verbose = old_verbose(quiet, print_details))
-}
-
-#' @rdname tidypptsda-deprecated
-#' @export
-clean_weight_get <- function(data, my_break, print_details = FALSE, quiet = FALSE, ...) {
-  .Deprecated("clean_weight", package = "tidypptsda")
-  ignore_old_args(...)
-  clean_weight(data, qc = old_qc(my_break), verbose = old_verbose(quiet, print_details))
-}
-
-#' @rdname tidypptsda-deprecated
-#' @export
-adg_get <- function(data, my_break, print_details = FALSE, quiet = FALSE, ...) {
-  .Deprecated("calc_adg", package = "tidypptsda")
-  ignore_old_args(...)
-  v <- old_verbose(quiet, print_details)
-  calc_adg(clean_weight(data, qc = old_qc(my_break), verbose = v), verbose = v)
-}
-
-#' @rdname tidypptsda-deprecated
-#' @export
-adfi_get <- function(data, adg_res, station_type = NULL, quiet = FALSE) {
-  .Deprecated("calc_adfi", package = "tidypptsda")
-  calc_adfi(data, adg_res, verbose = old_verbose(quiet))
-}
-
-#' @rdname tidypptsda-deprecated
-#' @export
-fcr_get <- function(adg_res, adfi_res, quiet = FALSE) {
-  .Deprecated("calc_fcr", package = "tidypptsda")
-  calc_fcr(adg_res, adfi_res, verbose = old_verbose(quiet))
-}
-
-#' @rdname tidypptsda-deprecated
-#' @export
-adg_plot <- function(data, responders = NULL, locations = NULL, save_path = NULL,
-                     file_prefix = "loc", file_suffix = "grow", dpi = 300,
-                     device = "png", quiet = FALSE, ...) {
-  .Deprecated("plot_adg", package = "tidypptsda")
-  ignore_old_args(...)
-  v <- old_verbose(quiet)
-  p <- plot_adg(data, responders = responders, locations = locations, verbose = v)
-  if (!is.null(save_path)) {
-    save_plots(p, save_path, prefix = file_prefix, suffix = file_suffix,
-               device = device, dpi = dpi, verbose = v)
-  }
-  p
-}
-
-#' @rdname tidypptsda-deprecated
-#' @export
-adfi_plot <- function(data, responders = NULL, locations = NULL, save_path = NULL,
-                      file_prefix = "loc", file_suffix = "adfi", dpi = 300,
-                      device = "png", quiet = FALSE, ...) {
-  .Deprecated("plot_adfi", package = "tidypptsda")
-  ignore_old_args(...)
-  v <- old_verbose(quiet)
-  p <- plot_adfi(data, responders = responders, locations = locations, verbose = v)
-  if (!is.null(save_path)) {
-    save_plots(p, save_path, prefix = file_prefix, suffix = file_suffix,
-               device = device, dpi = dpi, verbose = v)
-  }
-  p
-}
-```
-
-```{r tests-deprecated}
-test_that("old names still work, warn, and map their arguments", {
-  expect_warning(v <- preprocess_data(nedap, "nedap", quiet = TRUE), "prep_visits")
-  expect_equal(nrow(v), nrow(nedap))
-  expect_warning(a <- adg_get(v, my_break = c(40, 110), quiet = TRUE), "calc_adg")
-  expect_s3_class(a, "ppt_adg")
-  expect_equal(a$settings$stage_range, c(40, 110))
-  expect_warning(f <- adfi_get(v, a, quiet = TRUE), "calc_adfi")
-  expect_warning(r <- fcr_get(a, f, quiet = TRUE), "calc_fcr")
-  expect_s3_class(r, "ppt_fcr")
-  w <- testthat::capture_warnings(clean_weight_get(v, c(30, 120), w_threshold = 0.4, quiet = TRUE))
-  expect_true(any(grepl("clean_weight", w)))
-  expect_true(any(grepl("w_threshold", w)))
-  dir <- withr::local_tempdir()
-  expect_warning(adg_plot(a, save_path = dir, device = "pdf", quiet = TRUE), "plot_adg")
-  expect_length(list.files(dir, pattern = "pdf$"), 2L)
 })
 ```
 

@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_adg.R
 \name{plot_adg}
 \alias{plot_adg}
-\title{Plot growth curves}
+\title{Plot Growth Curves per Station}
 \usage{
 plot_adg(
   adg,

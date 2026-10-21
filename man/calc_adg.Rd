@@ -2,7 +2,7 @@
 % Please edit documentation in R/calc_adg.R
 \name{calc_adg}
 \alias{calc_adg}
-\title{Average daily gain}
+\title{Compute Average Daily Gain (ADG) from Growth Curves}
 \usage{
 calc_adg(weight, qc = weight$settings, verbose = 1)
 }
