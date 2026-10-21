@@ -4,6 +4,8 @@
 <url><loc>https://tony2015116.github.io/tidypptsda/LICENSE.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/articles/get-started.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/articles/index.html</loc></url>
+<url><loc>https://tony2015116.github.io/tidypptsda/articles/qc-parameters-zh.html</loc></url>
+<url><loc>https://tony2015116.github.io/tidypptsda/articles/qc-presets-zh.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/articles/tidypptsda-zh.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/authors.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/index.html</loc></url>
@@ -23,6 +25,5 @@
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/read_station.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/run_pipeline.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/save_plots.html</loc></url>
-<url><loc>https://tony2015116.github.io/tidypptsda/reference/tidypptsda-deprecated.html</loc></url>
 </urlset>
 

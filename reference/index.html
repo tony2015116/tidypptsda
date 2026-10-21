@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.3.0</span>
       </span>
     </div>
 
@@ -34,8 +34,16 @@
   <ul class="dropdown-menu" role="menu"><li>
       <a href="../articles/get-started.html">Get started</a>
     </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">中文文档</li>
     <li>
       <a href="../articles/tidypptsda-zh.html">中文使用说明</a>
+    </li>
+    <li>
+      <a href="../articles/qc-parameters-zh.html">质控参数详解：qc_config()</a>
+    </li>
+    <li>
+      <a href="../articles/qc-presets-zh.html">质控预设说明：casey、national、legacy</a>
     </li>
   </ul></li>
       </ul><ul class="nav navbar-nav navbar-right"><li>
@@ -58,96 +66,88 @@
 
     <table class="ref-index"><colgroup><col class="alias"><col class="title"></colgroup><tbody><tr><th colspan="2">
           <h2 id="quality-control-settings">Quality-control settings <a href="#quality-control-settings" class="anchor" aria-hidden="true"></a></h2>
-          <p class="section-desc"></p><p>All thresholds of the pipeline, with three presets.</p>
+          <p class="section-desc"></p><p>Set every threshold of the pipeline in one object, starting from one of three presets.</p>
         </th>
       </tr></tbody><tbody><tr><td>
           <p><code><a href="qc_config.html">qc_config()</a></code> </p>
         </td>
-        <td><p>Quality-control settings</p></td>
+        <td><p>Build Quality-Control Settings from a Preset</p></td>
       </tr></tbody><tbody><tr><th colspan="2">
           <h2 id="read-and-prepare-station-data">Read and prepare station data <a href="#read-and-prepare-station-data" class="anchor" aria-hidden="true"></a></h2>
-          <p class="section-desc"></p>
+          <p class="section-desc"></p><p>Read NEDAP or FIRE exports (many files or a folder) and turn them into one standard visit table.</p>
         </th>
       </tr></tbody><tbody><tr><td>
           <p><code><a href="read_station.html">read_station()</a></code> </p>
         </td>
-        <td><p>Read feeding station export files</p></td>
+        <td><p>Read Feeding Station Export Files</p></td>
       </tr><tr><td>
           <p><code><a href="prep_visits.html">prep_visits()</a></code> </p>
         </td>
-        <td><p>Prepare a standard visit table</p></td>
+        <td><p>Prepare a Standard Visit Table</p></td>
       </tr></tbody><tbody><tr><th colspan="2">
-          <h2 id="body-weight-and-average-daily-gain">Body weight and average daily gain <a href="#body-weight-and-average-daily-gain" class="anchor" aria-hidden="true"></a></h2>
-          <p class="section-desc"></p>
+          <h2 id="body-weight-and-daily-gain">Body weight and daily gain <a href="#body-weight-and-daily-gain" class="anchor" aria-hidden="true"></a></h2>
+          <p class="section-desc"></p><p>Flag implausible body weights, then fit growth curves and compute ADG over a body weight stage.</p>
         </th>
       </tr></tbody><tbody><tr><td>
           <p><code><a href="clean_weight.html">clean_weight()</a></code> </p>
         </td>
-        <td><p>Clean body weight records</p></td>
+        <td><p>Clean Body Weight Records and Check Each Pig</p></td>
       </tr><tr><td>
           <p><code><a href="calc_adg.html">calc_adg()</a></code> </p>
         </td>
-        <td><p>Average daily gain</p></td>
+        <td><p>Compute Average Daily Gain (ADG) from Growth Curves</p></td>
       </tr></tbody><tbody><tr><th colspan="2">
           <h2 id="feed-intake-and-feed-conversion">Feed intake and feed conversion <a href="#feed-intake-and-feed-conversion" class="anchor" aria-hidden="true"></a></h2>
-          <p class="section-desc"></p>
+          <p class="section-desc"></p><p>Flag feeder errors, correct and impute daily feed intake, and combine ADG and ADFI into FCR.</p>
         </th>
       </tr></tbody><tbody><tr><td>
           <p><code><a href="flag_feed_errors.html">flag_feed_errors()</a></code> </p>
         </td>
-        <td><p>Flag feeder errors</p></td>
+        <td><p>Flag Feeder Errors (Casey et al. 2005)</p></td>
       </tr><tr><td>
           <p><code><a href="calc_adfi.html">calc_adfi()</a></code> </p>
         </td>
-        <td><p>Average daily feed intake</p></td>
+        <td><p>Correct and Impute Daily Feed Intake (ADFI)</p></td>
       </tr><tr><td>
           <p><code><a href="calc_fcr.html">calc_fcr()</a></code> </p>
         </td>
-        <td><p>Feed conversion ratio</p></td>
+        <td><p>Compute Feed Conversion Ratio (FCR) with Confidence Flags</p></td>
       </tr></tbody><tbody><tr><th colspan="2">
           <h2 id="whole-pipeline">Whole pipeline <a href="#whole-pipeline" class="anchor" aria-hidden="true"></a></h2>
-          <p class="section-desc"></p>
+          <p class="section-desc"></p><p>Run every step in a row with one set of QC settings and keep all intermediate results.</p>
         </th>
       </tr></tbody><tbody><tr><td>
           <p><code><a href="run_pipeline.html">run_pipeline()</a></code> </p>
         </td>
-        <td><p>Run the whole analysis</p></td>
+        <td><p>Run the Whole Analysis Pipeline</p></td>
       </tr></tbody><tbody><tr><th colspan="2">
           <h2 id="plots">Plots <a href="#plots" class="anchor" aria-hidden="true"></a></h2>
-          <p class="section-desc"></p>
+          <p class="section-desc"></p><p>One plot per station and one panel per pig; write them to files.</p>
         </th>
       </tr></tbody><tbody><tr><td>
           <p><code><a href="plot_adg.html">plot_adg()</a></code> </p>
         </td>
-        <td><p>Plot growth curves</p></td>
+        <td><p>Plot Growth Curves per Station</p></td>
       </tr><tr><td>
           <p><code><a href="plot_adfi.html">plot_adfi()</a></code> </p>
         </td>
-        <td><p>Plot daily feed intake</p></td>
+        <td><p>Plot Daily Feed Intake per Station</p></td>
       </tr><tr><td>
           <p><code><a href="save_plots.html">save_plots()</a></code> </p>
         </td>
-        <td><p>Save plots to files</p></td>
+        <td><p>Save Plots to Files</p></td>
       </tr></tbody><tbody><tr><th colspan="2">
           <h2 id="example-data">Example data <a href="#example-data" class="anchor" aria-hidden="true"></a></h2>
-          <p class="section-desc"></p>
+          <p class="section-desc"></p><p>Raw exports from NEDAP and FIRE stations, used in every example.</p>
         </th>
       </tr></tbody><tbody><tr><td>
           <p><code><a href="nedap.html">nedap</a></code> </p>
         </td>
-        <td><p>NEDAP feeding station visits</p></td>
+        <td><p>Example Visits from NEDAP Feeding Stations</p></td>
       </tr><tr><td>
           <p><code><a href="fire.html">fire</a></code> </p>
         </td>
-        <td><p>FIRE feeding station visits</p></td>
-      </tr></tbody><tbody><tr><th colspan="2">
-          <h2 id="deprecated">Deprecated <a href="#deprecated" class="anchor" aria-hidden="true"></a></h2>
-          <p class="section-desc"></p>
-        </th>
-      </tr></tbody><tbody><tr><td>
-          <p><code><a href="tidypptsda-deprecated.html">import_nedap()</a></code> <code><a href="tidypptsda-deprecated.html">preprocess_data()</a></code> <code><a href="tidypptsda-deprecated.html">clean_weight_get()</a></code> <code><a href="tidypptsda-deprecated.html">adg_get()</a></code> <code><a href="tidypptsda-deprecated.html">adfi_get()</a></code> <code><a href="tidypptsda-deprecated.html">fcr_get()</a></code> <code><a href="tidypptsda-deprecated.html">adg_plot()</a></code> <code><a href="tidypptsda-deprecated.html">adfi_plot()</a></code> </p>
-        </td>
-        <td><p>Deprecated functions</p></td>
+        <td><p>Example Visits from FIRE Feeding Stations</p></td>
       </tr></tbody></table></div>
 
   <div class="col-md-3 hidden-xs hidden-sm" id="pkgdown-sidebar">

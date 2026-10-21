@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.3.0</span>
       </span>
     </div>
 
@@ -34,8 +34,16 @@
   <ul class="dropdown-menu" role="menu"><li>
       <a href="../articles/get-started.html">Get started</a>
     </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">中文文档</li>
     <li>
       <a href="../articles/tidypptsda-zh.html">中文使用说明</a>
+    </li>
+    <li>
+      <a href="../articles/qc-parameters-zh.html">质控参数详解：qc_config()</a>
+    </li>
+    <li>
+      <a href="../articles/qc-presets-zh.html">质控预设说明：casey、national、legacy</a>
     </li>
   </ul></li>
       </ul><ul class="nav navbar-nav navbar-right"><li>
@@ -57,6 +65,18 @@
       <small>Source: <a href="https://github.com/tony2015116/tidypptsda/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="page-header" data-toc-text="0.3.0" id="tidypptsda-030">tidypptsda 0.3.0<a class="anchor" aria-label="anchor" href="#tidypptsda-030"></a></h2>
+<div class="section level3">
+<h3 id="breaking-changes-0-3-0">Breaking changes<a class="anchor" aria-label="anchor" href="#breaking-changes-0-3-0"></a></h3>
+<ul><li>The deprecated wrappers of the 0.1.0 function names were removed: <code>import_nedap()</code>, <code>preprocess_data()</code>, <code>clean_weight_get()</code>, <code>adg_get()</code>, <code>adfi_get()</code>, <code>fcr_get()</code>, <code>adg_plot()</code> and <code>adfi_plot()</code>. Use <code><a href="../reference/read_station.html">read_station()</a></code>, <code><a href="../reference/prep_visits.html">prep_visits()</a></code>, <code><a href="../reference/clean_weight.html">clean_weight()</a></code>, <code><a href="../reference/calc_adg.html">calc_adg()</a></code>, <code><a href="../reference/calc_adfi.html">calc_adfi()</a></code>, <code><a href="../reference/calc_fcr.html">calc_fcr()</a></code>, <code><a href="../reference/plot_adg.html">plot_adg()</a></code> and <code><a href="../reference/plot_adfi.html">plot_adfi()</a></code>. Version 0.1.0 stays installable with <code>pak::pak("tony2015116/tidypptsda@v0.1.0")</code>.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="documentation-0-3-0">Documentation<a class="anchor" aria-label="anchor" href="#documentation-0-3-0"></a></h3>
+<ul><li>New Chinese articles: a guide to every <code><a href="../reference/qc_config.html">qc_config()</a></code> parameter and a guide to the three QC presets.</li>
+<li>The reference index has a short description for every group.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="page-header" data-toc-text="0.2.0" id="tidypptsda-020">tidypptsda 0.2.0<a class="anchor" aria-label="anchor" href="#tidypptsda-020"></a></h2>
 <div class="section level3">

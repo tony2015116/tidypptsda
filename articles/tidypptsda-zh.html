@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.3.0</span>
       </span>
     </div>
 
@@ -55,8 +55,16 @@
 <li>
       <a href="../articles/get-started.html">Get started</a>
     </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">中文文档</li>
     <li>
       <a href="../articles/tidypptsda-zh.html">中文使用说明</a>
+    </li>
+    <li>
+      <a href="../articles/qc-parameters-zh.html">质控参数详解：qc_config()</a>
+    </li>
+    <li>
+      <a href="../articles/qc-presets-zh.html">质控预设说明：casey、national、legacy</a>
     </li>
   </ul>
 </li>
@@ -566,8 +574,9 @@ kg。</li>
 </h2>
 <p><strong>问：为什么 ADFI 比实测记录的平均值低？</strong>答：ADFI
 是整个体重区间内的平均值，包括体重较小、采食较少的前期；实测记录可能只覆盖了体重较大的后期。</p>
-<p><strong>问：旧版本的函数还能用吗？</strong>答：<code><a href="../reference/tidypptsda-deprecated.html">preprocess_data()</a></code>、<code><a href="../reference/tidypptsda-deprecated.html">adg_get()</a></code>
-等旧函数名仍然可以调用，但会提示已弃用，返回值是新版的结构。需要旧版行为时，可安装
+<p><strong>问：旧版本的函数还能用吗？</strong> 答：从 0.3.0
+起，<code>preprocess_data()</code>、<code>adg_get()</code>
+等旧函数名已删除，请改用本文介绍的新函数。需要旧版行为时，可安装
 0.1.0：<code>pak::pak("tony2015116/tidypptsda@v0.1.0")</code>。</p>
 <p><strong>问：如何只分析某个测定站或某几头猪？</strong>答：可以在
 <code><a href="../reference/prep_visits.html">prep_visits()</a></code> 之后筛选，例如
