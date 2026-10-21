@@ -4,7 +4,7 @@
 \alias{calc_adfi}
 \title{Correct and Impute Daily Feed Intake (ADFI)}
 \usage{
-calc_adfi(visits, adg, qc = adg$settings, verbose = 1)
+calc_adfi(visits, adg, qc = adg$settings, verbose = 1, cores = 1)
 }
 \arguments{
 \item{visits}{Visit table from \code{\link[=prep_visits]{prep_visits()}}, or already flagged by
@@ -17,6 +17,8 @@ the feeder error thresholds, \code{dfi_correct}, \code{dfi_range},
 \code{dfi_quantile}, \code{impute_method}, \code{long_gap_days}, \code{loess_span}.}
 
 \item{verbose}{0 (silent), 1 (summary, default) or 2 (details).}
+
+\item{cores}{Number of CPU cores for the per-pig computations. Default 1.}
 }
 \value{
 An object of class \code{ppt_adfi} (a list):

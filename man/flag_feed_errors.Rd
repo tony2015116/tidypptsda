@@ -4,7 +4,7 @@
 \alias{flag_feed_errors}
 \title{Flag Feeder Errors (Casey et al. 2005)}
 \usage{
-flag_feed_errors(visits, qc = qc_config(), verbose = 1)
+flag_feed_errors(visits, qc = qc_config(), bw = NULL, verbose = 1)
 }
 \arguments{
 \item{visits}{Visit table from \code{\link[=prep_visits]{prep_visits()}}. Keep the unidentified
@@ -13,7 +13,14 @@ visits: they are part of the feeder sequence.}
 \item{qc}{QC settings from \code{\link[=qc_config]{qc_config()}}. Used here: \code{fiv_range},
 \code{fiv0_abs_max}, \code{duration_max}, \code{speed_fiv_lo_max},
 \code{speed_strict_max}, \code{speed_range}, \code{idle_duration_max},
-\code{trough_diff_range}, \code{max_unidentified_feed_kg}.}
+\code{trough_diff_range}, \code{max_unidentified_feed_kg}, \code{fiv_max_by_weight}.}
+
+\item{bw}{Optional daily body weight of each pig, used to look up
+\code{fiv_max_by_weight}: a data frame with \code{responder}, \code{date} and \code{bw}
+(kg), such as the fitted weights of \code{\link[=calc_adg]{calc_adg()}}. \code{\link[=calc_adfi]{calc_adfi()}} passes
+them automatically. Without it, the daily median of the recorded
+weights is used; early in the test these are often biased upwards by
+outliers.}
 
 \item{verbose}{0 (silent), 1 (summary, default) or 2 (rate of each
 error type).}
@@ -27,6 +34,8 @@ variables;
 \code{otv_lo}, \code{otv_hi}, \code{frv_hi_fiv_lo}, \code{frv_hi_strict}, \code{frv_hi},
 \code{frv_0}, \code{frv_lo}, \code{lwd_lo}, \code{lwd_hi}, \code{fwd_lo}, \code{fwd_hi}, \code{ltd_lo},
 \code{ftd_lo});
+\item \code{fiv_max}: the FIV-hi limit used for the visit (g), fixed or from
+\code{fiv_max_by_weight};
 \item \code{n_errors}: number of error types of the visit (0 = error-free).
 }
 

@@ -11,6 +11,7 @@
 #'   Used here: `stage_range`, `curve_model`, `loess_span`,
 #'   `max_extrap_days`.
 #' @param verbose 0 (silent), 1 (summary, default) or 2 (details).
+#' @param cores Number of CPU cores for the per-pig computations. Default 1.
 #'
 #' @return An object of class `ppt_adg` (a list):
 #'   - `per_pig`: one row per pig (pigs removed by [clean_weight()] are not
@@ -41,8 +42,9 @@
 #' # Gompertz curve, with quadratic fallback
 #' adg_g <- calc_adg(w, qc = qc_config("casey", curve_model = "gompertz"), verbose = 0)
 #' table(adg_g$per_pig$curve_used)
-calc_adg <- function(weight, qc = weight$settings, verbose = 1) {
+calc_adg <- function(weight, qc = weight$settings, verbose = 1, cores = 1) {
   local_verbose(verbose)
+  local_cores(cores)
   if (!inherits(weight, "ppt_weight")) {
     cli::cli_abort("{.arg weight} must be the result of {.fn clean_weight}.")
   }
@@ -50,9 +52,9 @@ calc_adg <- function(weight, qc = weight$settings, verbose = 1) {
   stage <- qc$stage_range
   ppt_msg("ADG over {stage[1]}-{stage[2]} kg ({.field {qc$curve_model}} curve)", "h1")
 
-  kept <- weight$per_pig[status != "removed", .(responder, location,
-                                                 weight_status = status,
-                                                 weight_reason = reason)]
+  kcols <- intersect(c("responder", "location", "breed", "status", "reason"), names(weight$per_pig))
+  kept <- weight$per_pig[status != "removed", kcols, with = FALSE]
+  data.table::setnames(kept, c("status", "reason"), c("weight_status", "weight_reason"))
   rec <- weight$records[outlier == FALSE & responder %in% kept$responder]
   day0 <- weight$daily[, min(date - seq_days + 1L)]   # date with seq_days = 1
 
@@ -75,7 +77,7 @@ calc_adg <- function(weight, qc = weight$settings, verbose = 1) {
     data.table::setorder(daily, location, responder, date)
   }
 
-  cols <- c("responder", "location", "stage", "curve_used", "curve_r2",
+  cols <- c("responder", "location", "breed", "stage", "curve_used", "curve_r2",
             "adg_type", "start_date", "end_date", "start_weight", "end_weight",
             "stage_days", "extrap_days_start", "extrap_days_end", "adg", "lm_slope",
             "r_squared", "weight_status",

@@ -4,7 +4,7 @@
 \alias{calc_adg}
 \title{Compute Average Daily Gain (ADG) from Growth Curves}
 \usage{
-calc_adg(weight, qc = weight$settings, verbose = 1)
+calc_adg(weight, qc = weight$settings, verbose = 1, cores = 1)
 }
 \arguments{
 \item{weight}{Result of \code{\link[=clean_weight]{clean_weight()}}.}
@@ -14,6 +14,8 @@ Used here: \code{stage_range}, \code{curve_model}, \code{loess_span},
 \code{max_extrap_days}.}
 
 \item{verbose}{0 (silent), 1 (summary, default) or 2 (details).}
+
+\item{cores}{Number of CPU cores for the per-pig computations. Default 1.}
 }
 \value{
 An object of class \code{ppt_adg} (a list):

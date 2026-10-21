@@ -10,7 +10,13 @@
 #' @param qc QC settings from [qc_config()]. Used here: `fiv_range`,
 #'   `fiv0_abs_max`, `duration_max`, `speed_fiv_lo_max`,
 #'   `speed_strict_max`, `speed_range`, `idle_duration_max`,
-#'   `trough_diff_range`, `max_unidentified_feed_kg`.
+#'   `trough_diff_range`, `max_unidentified_feed_kg`, `fiv_max_by_weight`.
+#' @param bw Optional daily body weight of each pig, used to look up
+#'   `fiv_max_by_weight`: a data frame with `responder`, `date` and `bw`
+#'   (kg), such as the fitted weights of [calc_adg()]. [calc_adfi()] passes
+#'   them automatically. Without it, the daily median of the recorded
+#'   weights is used; early in the test these are often biased upwards by
+#'   outliers.
 #' @param verbose 0 (silent), 1 (summary, default) or 2 (rate of each
 #'   error type).
 #'
@@ -21,6 +27,8 @@
 #'     `otv_lo`, `otv_hi`, `frv_hi_fiv_lo`, `frv_hi_strict`, `frv_hi`,
 #'     `frv_0`, `frv_lo`, `lwd_lo`, `lwd_hi`, `fwd_lo`, `fwd_hi`, `ltd_lo`,
 #'     `ftd_lo`);
+#'   - `fiv_max`: the FIV-hi limit used for the visit (g), fixed or from
+#'     `fiv_max_by_weight`;
 #'   - `n_errors`: number of error types of the visit (0 = error-free).
 #'
 #'   Attributes `"feeders"` (per feeder: visits, unidentified visits, feed
@@ -40,7 +48,7 @@
 #' visits <- prep_visits(fire, verbose = 0)
 #' flagged <- flag_feed_errors(visits, verbose = 2)
 #' attr(flagged, "feeders")
-flag_feed_errors <- function(visits, qc = qc_config(), verbose = 1) {
+flag_feed_errors <- function(visits, qc = qc_config(), bw = NULL, verbose = 1) {
   local_verbose(verbose)
   check_qc(qc)
   dt <- as_dt(visits, "visits")
@@ -69,10 +77,12 @@ flag_feed_errors <- function(visits, qc = qc_config(), verbose = 1) {
 
   fiv_lo <- qc$fiv_range[1L]
   is_true <- function(x) x %in% TRUE
+  # upper limit of FIV: fixed, or by body weight (and breed)
+  dt[, fiv_max := if (is.null(qc$fiv_max_by_weight)) qc$fiv_range[2L] else fiv_limit_by_weight(dt, qc, bw)]
   neighbour_neg <- dt[, is_true(prev_fiv < fiv_lo) | is_true(next_fiv < fiv_lo)]
   dt[, `:=`(
     fiv_lo = is_true(fiv < fiv_lo),
-    fiv_hi = is_true(fiv > qc$fiv_range[2L]),
+    fiv_hi = is_true(fiv > fiv_max),
     fiv_0 = is_true(otv == 0 & abs(fiv) > qc$fiv0_abs_max),
     otv_lo = is_true(otv < 0),
     otv_hi = is_true(otv > qc$duration_max),
@@ -127,6 +137,60 @@ flag_feed_errors <- function(visits, qc = qc_config(), verbose = 1) {
     ppt_warn("Feeder {.val {big$location[i]}}: {round(big$unidentified_feed_kg[i], 1)} kg of feed disappeared in unidentified visits (> {qc$max_unidentified_feed_kg} kg). Casey et al. (2005) discarded such pens.")
   }
   dt
+}
+
+# Body weight of the pig at each visit: from `bw` (daily fitted weights)
+# when given, otherwise the daily median of the valid recorded weights;
+# interpolated between days. NA for unidentified visits.
+visit_body_weight <- function(dt, qc, bw = NULL) {
+  day <- as.numeric(as.Date(dt$entry_time, tz = "UTC"))
+  if (!is.null(bw)) {
+    bw <- data.table::as.data.table(bw)
+    check_cols(bw, c("responder", "date", "bw"), arg = "bw")
+    daily <- bw[!is.na(bw), .(responder = as.character(responder),
+                              day = as.numeric(as.Date(date)), w = bw)]
+  } else {
+    ok <- dt$identified & !is.na(dt$weight) &
+      dt$weight >= qc$weight_range[1L] & dt$weight <= qc$weight_range[2L]
+    daily <- data.table::data.table(responder = dt$responder[ok], day = day[ok],
+                                    w = dt$weight[ok])
+  }
+  daily <- daily[, .(w = stats::median(w)), by = .(responder, day)]
+  out <- rep(NA_real_, nrow(dt))
+  for (pig in unique(daily$responder)) {
+    d <- daily[responder == pig][order(day)]
+    idx <- which(dt$identified & dt$responder %in% pig)
+    out[idx] <- if (nrow(d) == 1L) d$w else stats::approx(d$day, d$w, xout = day[idx], rule = 2)$y
+  }
+  out
+}
+
+# FIV-hi limit of each visit from the table qc$fiv_max_by_weight.
+# Visits without body weight, or of a breed absent from the table, keep the
+# fixed limit fiv_range[2].
+fiv_limit_by_weight <- function(dt, qc, bw_table = NULL) {
+  tab <- data.table::as.data.table(qc$fiv_max_by_weight)
+  bw <- visit_body_weight(dt, qc, bw_table)
+  lim <- rep(qc$fiv_range[2L], nrow(dt))
+  pick <- function(rows, t) {
+    t <- t[order(weight_from)]
+    k <- findInterval(bw[rows], t$weight_from)
+    k[k == 0L] <- 1L
+    ifelse(is.na(bw[rows]), qc$fiv_range[2L], t$fiv_max[k])
+  }
+  if ("breed" %in% names(tab)) {
+    visit_breed <- if ("breed" %in% names(dt)) as.character(dt$breed) else rep(NA_character_, nrow(dt))
+    for (b in unique(stats::na.omit(tab$breed))) {
+      rows <- which(visit_breed %in% b)
+      if (length(rows)) lim[rows] <- pick(rows, tab[breed %in% b])
+    }
+    default <- tab[is.na(breed)]
+    rows <- which(!visit_breed %in% tab$breed)
+    if (nrow(default) > 0L && length(rows)) lim[rows] <- pick(rows, default)
+  } else {
+    lim <- pick(seq_len(nrow(dt)), tab)
+  }
+  lim
 }
 
 # Error types in the order of Casey et al. (2005), Table 3.

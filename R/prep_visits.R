@@ -20,6 +20,8 @@
 #'   `entry_time`:
 #'   - `responder`: pig ID (character, `NA` for unidentified visits);
 #'     `responder_raw`: transponder number as recorded;
+#'   - `breed`: kept when the input has a `breed` column; otherwise add it
+#'     with [add_breed()];
 #'   - `identified`: `FALSE` for visits without a transponder read;
 #'   - `location`: station (feeder) ID, character;
 #'   - `date`, `seq_days` (day number from the first day in the data, 1 =
@@ -119,8 +121,8 @@ prep_visits <- function(data, station = NULL, qc = qc_config(), verbose = 1) {
   dt[, seq_in_location := seq_len(.N), by = .(location, date)]
   dt[identified == TRUE, seq_in_day := seq_len(.N), by = .(responder, date)]
 
-  cols <- c("responder", "responder_raw", "identified", "location", "date",
-            "seq_days", "seq_in_day", "seq_in_location", "entry_time",
+  cols <- c("responder", "responder_raw", "identified", "breed", "location",
+            "date", "seq_days", "seq_in_day", "seq_in_location", "entry_time",
             "exit_time", "duration", "feed_intake", "weight", "trough_in",
             "trough_out", "topup", "source_file")
   cols <- intersect(cols, names(dt))
@@ -136,6 +138,9 @@ prep_visits <- function(data, station = NULL, qc = qc_config(), verbose = 1) {
   ))
 
   ppt_msg("{data.table::uniqueN(dt$responder, na.rm = TRUE)} pigs at {data.table::uniqueN(dt$location)} station{?s}, {nrow(dt)} visits over {max(dt$seq_days)} days", "success")
+  if (!"breed" %in% names(dt)) {
+    ppt_msg("No {.field breed} column. To use breed in the feed intake model and breed-specific limits, add it with {.fn add_breed}.", "info")
+  }
   dt
 }
 
@@ -158,6 +163,7 @@ standardise_nedap <- function(dt) {
     topup = NA_real_
   )]
   if ("source_file" %in% names(dt)) out[, source_file := dt$source_file]
+  if ("breed" %in% names(dt)) out[, breed := as.character(dt$breed)]
   out[, exit_time := entry_time + duration]
   finish_ids(out)
   data.table::setattr(out, "n_midnight", 0L)
@@ -188,6 +194,7 @@ standardise_fire <- function(dt, duration_max) {
     topup = if ("Topup Amount" %in% names(dt)) as.numeric(dt$`Topup Amount`) * 1000 else NA_real_
   )
   if ("source_file" %in% names(dt)) out[, source_file := dt$source_file]
+  if ("breed" %in% names(dt)) out[, breed := as.character(dt$breed)]
   finish_ids(out)
   data.table::setattr(out, "n_midnight", sum(crossing))
   out

@@ -129,6 +129,39 @@ test_that("a pig whose fit fails is removed, others continue", {
   expect_equal(w$per_pig[responder == "p1", status], "keep")
 })
 
+test_that("daily weight jumps are measured and only flag pigs when asked", {
+  v <- prep_visits(nedap, verbose = 0)
+  w <- clean_weight(v, verbose = 0)
+  expect_true("max_daily_jump" %in% names(w$per_pig))
+  expect_false(any(grepl("day-to-day", w$per_pig$reason)))
+  w4 <- clean_weight(v, qc = qc_config(max_daily_jump_kg = 4), verbose = 0)
+  flagged <- w4$per_pig[grepl("day-to-day", reason)]
+  expect_gt(nrow(flagged), 0)
+  expect_true(all(flagged$status %in% c("low_confidence", "removed")))
+  expect_equal(w4$per_pig[status == "removed", .N], w$per_pig[status == "removed", .N])
+})
+
+test_that("parallel computing gives the same result", {
+  skip_on_cran()
+  skip_on_os("windows")
+  v <- prep_visits(nedap, verbose = 0)
+  one <- clean_weight(v, verbose = 0, cores = 1)
+  two <- clean_weight(v, verbose = 0, cores = 2)
+  expect_equal(one$per_pig, two$per_pig)
+  expect_equal(one$records, two$records)
+  expect_error(clean_weight(v, verbose = 0, cores = 0), "cores")
+})
+
+test_that("breed is carried to the pig tables", {
+  v <- prep_visits(fire, verbose = 0)
+  pigs <- unique(v[identified == TRUE, responder])
+  v <- add_breed(v, data.frame(responder = pigs, breed = rep(c("YY", "LL"), length.out = length(pigs))), verbose = 0)
+  w <- clean_weight(v, verbose = 0)
+  expect_true("breed" %in% names(w$per_pig))
+  a <- suppressWarnings(calc_adg(w, verbose = 0))
+  expect_setequal(unique(a$per_pig$breed), c("YY", "LL"))
+})
+
 test_that("verbose = 0 is silent and bad inputs are rejected", {
   v <- prep_visits(fire, verbose = 0)
   expect_silent(clean_weight(v, verbose = 0))

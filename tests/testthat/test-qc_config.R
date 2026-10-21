@@ -46,6 +46,19 @@ test_that("invalid values are rejected", {
   expect_error(qc_config(rlm_cutoff = NULL), "NULL")
 })
 
+test_that("table parameters are validated", {
+  expect_silent(qc_config(fiv_max_by_weight = fiv_max_example(),
+                          bin_fcr_limits = bin_fcr_example()))
+  expect_error(qc_config(fiv_max_by_weight = data.frame(weight_from = 20)), "fiv_max")
+  expect_error(qc_config(fiv_max_by_weight = data.frame(weight_from = c(20, 20), fiv_max = 1:2)), "duplicated")
+  expect_silent(qc_config(fiv_max_by_weight = data.frame(breed = c("A", "B"), weight_from = c(20, 20), fiv_max = 1:2)))
+  expect_error(qc_config(bin_fcr_limits = data.frame(weight_from = 30, fcr_min = 3, fcr_max = 2)), "fcr_min")
+  expect_error(qc_config(bin_fcr_limits = "x"), "data frame")
+  expect_error(qc_config(min_bin_coverage_kg = 12), "bin_width")
+  expect_message(print(qc_config(bin_fcr_limits = bin_fcr_example())), "table")
+  expect_equal(nrow(fiv_max_example()), 36L)
+})
+
 test_that("cross-parameter checks work", {
   expect_error(qc_config(stage_range = c(10, 120)), "stage_range")
   expect_error(qc_config(entry_weight_max = 90), "entry_weight_max")

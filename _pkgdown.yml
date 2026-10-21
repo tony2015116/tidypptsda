@@ -23,11 +23,13 @@ reference:
   desc: Set every threshold of the pipeline in one object, starting from one of three presets.
   contents:
   - qc_config
+  - fiv_max_example
 - title: Read and prepare station data
-  desc: Read NEDAP or FIRE exports (many files or a folder) and turn them into one standard visit table.
+  desc: Read NEDAP or FIRE exports (many files or a folder), turn them into one standard visit table and add breed information.
   contents:
   - read_station
   - prep_visits
+  - add_breed
 - title: Body weight and daily gain
   desc: Flag implausible body weights, then fit growth curves and compute ADG over a body weight stage.
   contents:
@@ -43,6 +45,10 @@ reference:
   desc: Run every step in a row with one set of QC settings and keep all intermediate results.
   contents:
   - run_pipeline
+- title: Export
+  desc: Write all result tables to CSV files for the testing station.
+  contents:
+  - write_results
 - title: Plots
   desc: One plot per station and one panel per pig; write them to files.
   contents:

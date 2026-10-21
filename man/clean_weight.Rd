@@ -4,7 +4,7 @@
 \alias{clean_weight}
 \title{Clean Body Weight Records and Check Each Pig}
 \usage{
-clean_weight(visits, qc = qc_config(), verbose = 1)
+clean_weight(visits, qc = qc_config(), verbose = 1, cores = 1)
 }
 \arguments{
 \item{visits}{Visit table from \code{\link[=prep_visits]{prep_visits()}}.}
@@ -16,6 +16,8 @@ clean_weight(visits, qc = qc_config(), verbose = 1)
 \code{exit_weight_min}, \code{curve_r2_min}.}
 
 \item{verbose}{0 (silent), 1 (summary, default) or 2 (details).}
+
+\item{cores}{Number of CPU cores for the per-pig computations. Default 1.}
 }
 \value{
 An object of class \code{ppt_weight} (a list):
@@ -44,8 +46,10 @@ Pig checks use the valid (non-outlier) records only:
 \item \code{n_valid < min_records}, \code{test_days < min_test_days} or
 \code{missing_rate > max_missing_rate} (share of test days without a valid
 weight) remove the pig;
-\item \code{entry_weight > entry_weight_max}, \code{exit_weight < exit_weight_min} or
-\code{r2 < curve_r2_min} mark the pig \code{"low_confidence"} but keep it: its
+\item \code{entry_weight > entry_weight_max}, \code{exit_weight < exit_weight_min},
+\code{r2 < curve_r2_min} or \code{max_daily_jump > max_daily_jump_kg} (the
+largest change of the daily median weight between consecutive recorded
+days, kg/d) mark the pig \code{"low_confidence"} but keep it: its
 growth can still be estimated by extrapolation in \code{\link[=calc_adg]{calc_adg()}}, with a
 flag.
 }

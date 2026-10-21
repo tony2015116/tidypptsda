@@ -25,8 +25,14 @@ An object of class \code{ppt_fcr} (a list):
 \code{fcr_note};
 \item \code{daily}: the daily table of \code{\link[=calc_adfi]{calc_adfi()}};
 \item \code{summary}: numeric summary (\code{n}, \code{min}, \code{max}, \code{median}, \code{mean},
-\code{sd}, \code{cv}) of the main traits, for all pigs and for pigs with
-\code{fcr_flag = "ok"};
+\code{sd}, \code{cv}) of the main traits, for all pigs, for pigs with
+\code{fcr_flag = "ok"} and, with a \code{breed} column, for each breed;
+\item \code{by_bin}: one row per pig and body weight class of \code{bin_width} kg:
+feed (\code{feed_kg}), gain (\code{gain_kg}), segment \code{fcr},
+\code{weight_coverage_kg} (span of recorded body weights in the class),
+\code{low_coverage} (inner class covered by less than
+\code{min_bin_coverage_kg}) and \code{fcr_out} (segment FCR outside
+\code{bin_fcr_limits});
 \item \code{removed}, \code{settings}.
 }
 }

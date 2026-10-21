@@ -26,6 +26,17 @@ test_that("FCR is ADFI / ADG and flags explain themselves", {
   }
 })
 
+test_that("each note describes its own pig", {
+  r <- fcr_pipeline(fire)
+  p <- r$fcr$per_pig[grepl("feed intake recorded on", fcr_note)]
+  expect_gt(nrow(p), 0)
+  shown <- as.numeric(sub(".*feed intake recorded on ([0-9]+)%.*", "\\1", p$fcr_note))
+  expect_equal(shown, round(100 * p$coverage))
+  e <- r$fcr$per_pig[grepl("extrapolated .* d before", fcr_note)]
+  shown_d <- as.numeric(sub(".*extrapolated ([0-9]+) d before.*", "\\1", e$fcr_note))
+  expect_equal(shown_d, round(e$extrap_days_start))
+})
+
 test_that("summary is numeric and consistent", {
   r <- fcr_pipeline(nedap)
   s <- r$fcr$summary
@@ -33,6 +44,38 @@ test_that("summary is numeric and consistent", {
   expect_equal(s[group == "all" & trait == "fcr", mean], mean(r$fcr$per_pig$fcr, na.rm = TRUE))
   expect_equal(s[group == "ok" & trait == "fcr", n], r$fcr$per_pig[fcr_flag %in% "ok", .N])
   expect_equal(s$cv, s$sd / s$mean)
+})
+
+test_that("breed enters the correction model and the summary", {
+  v <- prep_visits(nedap, verbose = 0)
+  pigs <- unique(v[identified == TRUE, responder])
+  v <- add_breed(v, data.frame(responder = pigs, breed = rep(c("YY", "LL"), length.out = length(pigs))), verbose = 0)
+  a <- calc_adg(clean_weight(v, verbose = 0), verbose = 0)
+  f <- calc_adfi(v, a, verbose = 0)
+  expect_true(any(grepl("^breed", f$model$term)))
+  expect_true("breed" %in% names(f$per_pig))
+  r <- calc_fcr(a, f, verbose = 0)
+  expect_true(all(c("breed LL", "breed YY") %in% r$summary$group))
+  expect_true("breed" %in% names(r$per_pig))
+})
+
+test_that("weight classes: coverage and optional FCR limits", {
+  r <- fcr_pipeline(nedap)
+  b <- r$fcr$by_bin
+  expect_true(all(c("weight_from", "weight_to", "feed_kg", "gain_kg", "fcr",
+                    "weight_coverage_kg", "low_coverage", "fcr_out") %in% names(b)))
+  expect_true(all(b$weight_from >= 30 & b$weight_to <= 120))
+  expect_false(any(b$fcr_out))                         # no limits by default
+  low <- b[low_coverage == TRUE, unique(responder)]
+  expect_true(all(r$fcr$per_pig[responder %in% low, fcr_flag] == "low_confidence"))
+  expect_true(all(grepl("weight records cover", r$fcr$per_pig[responder %in% low, fcr_note])))
+  # very narrow limits flag every pig
+  q <- qc_config(bin_fcr_limits = data.frame(weight_from = seq(30, 110, 10), fcr_min = 2.40, fcr_max = 2.41))
+  v <- prep_visits(nedap, verbose = 0)
+  a <- calc_adg(clean_weight(v, q, verbose = 0), verbose = 0)
+  f2 <- calc_fcr(a, calc_adfi(v, a, verbose = 0), verbose = 0)
+  expect_true(any(f2$by_bin$fcr_out))
+  expect_true(all(grepl("segment FCR", f2$per_pig[responder %in% f2$by_bin[fcr_out == TRUE, responder], fcr_note])))
 })
 
 test_that("max_edge_extrap_days changes the flags", {

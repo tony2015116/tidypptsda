@@ -47,6 +47,9 @@
 #'   body weight, kg.
 #' - `curve_r2_min`: optional, pigs whose growth curve R² is below this are
 #'   flagged as low confidence (not removed). `NULL` = off.
+#' - `max_daily_jump_kg`: optional, pigs whose daily median weight changes
+#'   by more than this many kg per day between consecutive days are flagged
+#'   as low confidence (not removed). `NULL` = off.
 #'
 #' **Growth and ADG**
 #' - `stage_range`: body weight interval for ADG and FCR, kg.
@@ -68,6 +71,11 @@
 #'   subsequent visits, g.
 #' - `max_unidentified_feed_kg`: feed disappearance in unidentified visits
 #'   per feeder above which a warning is given.
+#' - `fiv_max_by_weight`: optional table that replaces the upper limit of
+#'   `fiv_range` (FIV-hi) by a limit that depends on body weight, and
+#'   optionally on breed. Columns `weight_from` (kg, lower bound of the
+#'   weight class), `fiv_max` (g) and optionally `breed`. See
+#'   [fiv_max_example()]. `NULL` = off.
 #'
 #' **Daily feed intake**
 #' - `dfi_range`: valid daily feed intake, kg.
@@ -87,6 +95,13 @@
 #'   at the start or the end of the stage. Default 15.
 #' - `min_coverage`: minimum share of stage days with recorded feed intake.
 #'   Default 0.7.
+#' - `bin_width`: width of the body weight classes used for the segment
+#'   checks of [calc_fcr()], kg. Default 10.
+#' - `min_bin_coverage_kg`: an inner weight class whose recorded body
+#'   weights span less than this many kg flags the pig. Default 6.
+#' - `bin_fcr_limits`: optional table of plausible FCR per weight class,
+#'   columns `weight_from` (kg), `fcr_min`, `fcr_max`. See
+#'   [bin_fcr_example()]. `NULL` = off.
 #'
 #' @return An object of class `ppt_qc`: a named list of parameters with the
 #'   preset name in attribute `"profile"`.
@@ -100,18 +115,8 @@
 #' average daily gain, feed efficiency, and real-time ultrasound traits in
 #' Duroc pigs: I. *Journal of Animal Science*, 92, 2377-2386.
 #'
+#'
 #' @export
-#' @examples
-#' # Default preset
-#' qc <- qc_config()
-#' qc$duration_max
-#'
-#' # Another preset with one parameter overridden
-#' qc_national <- qc_config("national", min_test_days = 50)
-#' qc_national
-#'
-#' # Optional rules are off (NULL) unless switched on
-#' qc_config("casey", daily_drop_min = 0.90)$daily_drop_min
 qc_config <- function(profile = c("casey", "national", "legacy"), ...) {
   if (!is.character(profile)) {
     cli::cli_abort(c(
@@ -153,6 +158,7 @@ print.ppt_qc <- function(x, ...) {
   groups <- qc_groups()
   fmt <- function(v) {
     if (is.null(v)) return("NULL (off)")
+    if (is.data.frame(v)) return(sprintf("table (%d rows)", nrow(v)))
     paste(format(v), collapse = ", ")
   }
   for (g in unique(groups)) {
@@ -162,6 +168,60 @@ print.ppt_qc <- function(x, ...) {
     cli::cli_bullets(stats::setNames(lines, rep(" ", length(lines))))
   }
   invisible(x)
+}
+
+#' Example threshold tables
+#'
+#' @description
+#' Example tables for the optional QC parameters `fiv_max_by_weight` and
+#' `bin_fcr_limits` of [qc_config()].
+#'
+#' - `fiv_max_example()`: maximum feed intake per visit (g) by breed
+#'   (`"YY"`, `"LL"`, `"DD"`) and 10 kg body weight class from 20 to 140 kg.
+#' - `bin_fcr_example()`: plausible feed conversion ratio per 10 kg body
+#'   weight class from 30 to 120 kg.
+#'
+#' The values come from in-house quality-control scripts of a pig testing
+#' station, not from the literature. Check them against your own data
+#' before use.
+#'
+#' @return A `data.table`. `fiv_max_example()`: `breed`, `weight_from`
+#'   (kg), `fiv_max` (g). `bin_fcr_example()`: `weight_from` (kg),
+#'   `fcr_min`, `fcr_max`.
+#' @export
+#' @examples
+#' fiv_max_example()
+#' qc <- qc_config(fiv_max_by_weight = fiv_max_example(),
+#'                 bin_fcr_limits = bin_fcr_example())
+#' # Default preset
+#' qc <- qc_config()
+#' qc$duration_max
+#'
+#' # Another preset with one parameter overridden
+#' qc_national <- qc_config("national", min_test_days = 50)
+#' qc_national
+#'
+#' # Optional rules are off (NULL) unless switched on
+#' qc_config("casey", daily_drop_min = 0.90)$daily_drop_min
+fiv_max_example <- function() {
+  w <- seq(20, 130, by = 10)
+  data.table::data.table(
+    breed = rep(c("YY", "LL", "DD"), each = length(w)),
+    weight_from = rep(w, 3L),
+    fiv_max = c(747.0, 936.0, 1125.1, 1314.1, 1503.2, 1692.2, 1881.2, 2070.3, 2259.3, 2448.4, 2637.4, 2826.5,
+                821.6, 1044.8, 1268.0, 1491.2, 1714.4, 1937.7, 2160.9, 2384.1, 2607.3, 2830.5, 3053.7, 3277.0,
+                712.6, 916.9, 1121.2, 1325.4, 1529.7, 1734.0, 1938.2, 2142.5, 2346.8, 2551.0, 2755.3, 2959.6)
+  )
+}
+
+#' @rdname fiv_max_example
+#' @export
+bin_fcr_example <- function() {
+  data.table::data.table(
+    weight_from = seq(30, 110, by = 10),
+    fcr_min = c(0.76, 1.06, 1.14, 1.28, 1.35, 1.36, 1.34, 1.34, 1.31),
+    fcr_max = c(3.16, 3.08, 3.30, 3.41, 3.59, 3.86, 4.12, 4.27, 4.50)
+  )
 }
 
 # Assign values one by one so that NULL values are kept, not dropped.
@@ -194,6 +254,7 @@ qc_defaults <- function() {
     entry_weight_max = 65,
     exit_weight_min = 85,
     curve_r2_min = NULL,
+    max_daily_jump_kg = NULL,
     # growth and ADG
     stage_range = c(30, 120),
     curve_model = "poly2",
@@ -208,6 +269,7 @@ qc_defaults <- function() {
     idle_duration_max = 500,
     trough_diff_range = c(-20, 1800),
     max_unidentified_feed_kg = 90,
+    fiv_max_by_weight = NULL,
     # daily feed intake
     dfi_range = c(0, 6),
     dfi_quantile = NULL,
@@ -216,7 +278,10 @@ qc_defaults <- function() {
     long_gap_days = 7,
     # confidence flags
     max_edge_extrap_days = 15,
-    min_coverage = 0.7
+    min_coverage = 0.7,
+    bin_width = 10,
+    min_bin_coverage_kg = 6,
+    bin_fcr_limits = NULL
   )
 }
 
@@ -252,17 +317,20 @@ qc_groups <- function() {
     min_test_days = "Pig-level checks", min_records = "Pig-level checks",
     max_missing_rate = "Pig-level checks", entry_weight_max = "Pig-level checks",
     exit_weight_min = "Pig-level checks", curve_r2_min = "Pig-level checks",
+    max_daily_jump_kg = "Pig-level checks",
     stage_range = "Growth and ADG", curve_model = "Growth and ADG",
     max_extrap_days = "Growth and ADG",
     fiv_range = "Feeder errors", fiv0_abs_max = "Feeder errors",
     duration_max = "Feeder errors", speed_fiv_lo_max = "Feeder errors",
     speed_strict_max = "Feeder errors", speed_range = "Feeder errors",
     idle_duration_max = "Feeder errors", trough_diff_range = "Feeder errors",
-    max_unidentified_feed_kg = "Feeder errors",
+    max_unidentified_feed_kg = "Feeder errors", fiv_max_by_weight = "Feeder errors",
     dfi_range = "Daily feed intake", dfi_quantile = "Daily feed intake",
     dfi_correct = "Daily feed intake", impute_method = "Daily feed intake",
     long_gap_days = "Daily feed intake",
-    max_edge_extrap_days = "Confidence flags", min_coverage = "Confidence flags"
+    max_edge_extrap_days = "Confidence flags", min_coverage = "Confidence flags",
+    bin_width = "Confidence flags", min_bin_coverage_kg = "Confidence flags",
+    bin_fcr_limits = "Confidence flags"
   )
   g[names(qc_defaults())]
 }
@@ -272,6 +340,7 @@ qc_spec <- function() {
   num <- function(min = -Inf, max = Inf, null = FALSE) list(type = "num", min = min, max = max, null = null)
   rng <- function(min = -Inf, max = Inf, null = FALSE) list(type = "range", min = min, max = max, null = null)
   chc <- function(choices, multiple = FALSE) list(type = "choice", choices = choices, multiple = multiple, null = FALSE)
+  tbl <- function(cols, optional = character()) list(type = "table", cols = cols, optional = optional, null = TRUE)
   list(
     max_gap_days = num(0), max_overlap_days = num(0), max_jump_kg = num(0),
     weight_range = rng(0), weight_outlier = chc(c("rlm", "loess", "stl", "sd"), multiple = TRUE),
@@ -280,18 +349,21 @@ qc_spec <- function() {
     rel_dev_max = num(0, 1, null = TRUE), daily_drop_min = num(0, 1, null = TRUE),
     min_test_days = num(1), min_records = num(3), max_missing_rate = num(0, 1),
     entry_weight_max = num(0), exit_weight_min = num(0),
-    curve_r2_min = num(0, 1, null = TRUE),
+    curve_r2_min = num(0, 1, null = TRUE), max_daily_jump_kg = num(0, null = TRUE),
     stage_range = rng(0), curve_model = chc(c("poly1", "poly2", "poly3", "loess", "gompertz")),
     max_extrap_days = num(0),
     fiv_range = rng(), fiv0_abs_max = num(0), duration_max = num(0),
     speed_fiv_lo_max = num(0), speed_strict_max = num(0), speed_range = rng(0),
     idle_duration_max = num(0), trough_diff_range = rng(),
     max_unidentified_feed_kg = num(0),
+    fiv_max_by_weight = tbl(c("weight_from", "fiv_max"), optional = "breed"),
     dfi_range = rng(0), dfi_quantile = rng(0, 1, null = TRUE),
     dfi_correct = chc(c("lmm", "none")),
     impute_method = chc(c("linear", "loess")),
     long_gap_days = num(1),
-    max_edge_extrap_days = num(0), min_coverage = num(0, 1)
+    max_edge_extrap_days = num(0), min_coverage = num(0, 1),
+    bin_width = num(1), min_bin_coverage_kg = num(0),
+    bin_fcr_limits = tbl(c("weight_from", "fcr_min", "fcr_max"))
   )
 }
 
@@ -313,6 +385,8 @@ qc_validate <- function(cfg) {
           any(v < s$min) || any(v > s$max)) {
         cli::cli_abort("QC parameter {.field {nm}} must be two increasing numbers between {s$min} and {s$max}, not {.val {v}}.")
       }
+    } else if (s$type == "table") {
+      check_qc_table(v, nm, s$cols, s$optional)
     } else if (s$type == "choice") {
       ok <- is.character(v) && length(v) >= 1L && all(v %in% s$choices) &&
         (s$multiple || length(v) == 1L) && !anyDuplicated(v)
@@ -331,6 +405,39 @@ qc_validate <- function(cfg) {
   }
   if (cfg$outlier_combine == "majority" && length(cfg$weight_outlier) < 2L) {
     cli::cli_abort("{.field outlier_combine = \"majority\"} needs at least two methods in {.field weight_outlier}.")
+  }
+  if (cfg$min_bin_coverage_kg > cfg$bin_width) {
+    cli::cli_abort("{.field min_bin_coverage_kg} cannot be larger than {.field bin_width}.")
+  }
+  invisible(TRUE)
+}
+
+# Table parameters: required numeric columns, optional character columns,
+# one row per (optional key, weight_from).
+check_qc_table <- function(v, nm, cols, optional) {
+  if (!is.data.frame(v)) {
+    cli::cli_abort("QC parameter {.field {nm}} must be a data frame with columns {.val {cols}}.")
+  }
+  miss <- setdiff(cols, names(v))
+  if (length(miss) > 0L) {
+    cli::cli_abort("QC parameter {.field {nm}} is missing column{?s} {.val {miss}}.")
+  }
+  for (cl in cols) {
+    if (!is.numeric(v[[cl]]) || anyNA(v[[cl]])) {
+      cli::cli_abort("Column {.field {cl}} of {.field {nm}} must be numeric without NA.")
+    }
+  }
+  if (nrow(v) == 0L) cli::cli_abort("QC parameter {.field {nm}} has no rows.")
+  keys <- intersect(optional, names(v))
+  key <- do.call(paste, c(lapply(c(keys, "weight_from"), function(k) v[[k]]), sep = "|"))
+  if (anyDuplicated(key)) {
+    cli::cli_abort("QC parameter {.field {nm}} has duplicated {.field weight_from} rows{if (length(keys)) ' within a breed' else ''}.")
+  }
+  if (all(c("fcr_min", "fcr_max") %in% names(v)) && any(v$fcr_min >= v$fcr_max)) {
+    cli::cli_abort("In {.field {nm}}, {.field fcr_min} must be smaller than {.field fcr_max}.")
+  }
+  if ("fiv_max" %in% names(v) && any(v$fiv_max <= 0)) {
+    cli::cli_abort("In {.field {nm}}, {.field fiv_max} must be positive.")
   }
   invisible(TRUE)
 }

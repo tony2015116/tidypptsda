@@ -4,7 +4,14 @@
 \alias{run_pipeline}
 \title{Run the Whole Analysis Pipeline}
 \usage{
-run_pipeline(data, station = NULL, qc = qc_config(), verbose = 1)
+run_pipeline(
+  data,
+  station = NULL,
+  qc = qc_config(),
+  breeds = NULL,
+  verbose = 1,
+  cores = 1
+)
 }
 \arguments{
 \item{data}{Raw station data (see \code{\link[=prep_visits]{prep_visits()}}).}
@@ -13,7 +20,12 @@ run_pipeline(data, station = NULL, qc = qc_config(), verbose = 1)
 
 \item{qc}{QC settings from \code{\link[=qc_config]{qc_config()}}.}
 
+\item{breeds}{Optional breed table passed to \code{\link[=add_breed]{add_breed()}} (columns
+\code{responder} and \code{breed}).}
+
 \item{verbose}{0 (silent), 1 (summary, default) or 2 (details).}
+
+\item{cores}{Number of CPU cores for the per-pig computations. Default 1.}
 }
 \value{
 An object of class \code{ppt_pipeline}: a list with \code{visits},

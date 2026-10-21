@@ -14,6 +14,7 @@
 #'   the feeder error thresholds, `dfi_correct`, `dfi_range`,
 #'   `dfi_quantile`, `impute_method`, `long_gap_days`, `loess_span`.
 #' @param verbose 0 (silent), 1 (summary, default) or 2 (details).
+#' @param cores Number of CPU cores for the per-pig computations. Default 1.
 #'
 #' @return An object of class `ppt_adfi` (a list):
 #'   - `per_pig`: `adfi` (g/d over the stage), `adfi_raw` (mean recorded
@@ -44,8 +45,9 @@
 #' head(adfi$per_pig)
 #' table(adfi$daily[in_stage == TRUE, state])
 #' head(adfi$model)
-calc_adfi <- function(visits, adg, qc = adg$settings, verbose = 1) {
+calc_adfi <- function(visits, adg, qc = adg$settings, verbose = 1, cores = 1) {
   local_verbose(verbose)
+  local_cores(cores)
   if (!inherits(adg, "ppt_adg")) {
     cli::cli_abort("{.arg adg} must be the result of {.fn calc_adg}.")
   }
@@ -53,17 +55,21 @@ calc_adfi <- function(visits, adg, qc = adg$settings, verbose = 1) {
   flagged <- if ("n_errors" %in% names(visits)) {
     as_dt(visits, "visits")
   } else {
-    flag_feed_errors(visits, qc, verbose = ppt_verbose())
+    flag_feed_errors(visits, qc, bw = adg$daily[, .(responder, date, bw = predicted)],
+                     verbose = ppt_verbose())
   }
 
   ppt_msg("ADFI over {qc$stage_range[1]}-{qc$stage_range[2]} kg", "h1")
 
-  pigs <- adg$per_pig[!is.na(adg), .(responder, pig_location = location,
-                                      adg, adg_type, stage)]
+  has_breed <- "breed" %in% names(adg$per_pig)
+  pigs <- adg$per_pig[!is.na(adg), intersect(c("responder", "location", "breed", "adg", "adg_type", "stage"),
+                                             names(adg$per_pig)), with = FALSE]
+  data.table::setnames(pigs, "location", "pig_location")
   cov <- daily_error_covariates(flagged)[responder %in% pigs$responder]
   bw <- adg$daily[, .(responder, date, seq_days, bw = predicted, in_stage)]
   cov <- merge(cov, bw, by = c("responder", "date"), all.x = TRUE)
-  cov <- merge(cov, pigs[, .(responder, adg)], by = "responder")
+  cov <- merge(cov, pigs[, intersect(c("responder", "adg", "breed"), names(pigs)), with = FALSE],
+               by = "responder")
   cov[, all_error := n_error_visits == n_visits]
 
   # 5c. correction
@@ -127,9 +133,11 @@ calc_adfi <- function(visits, adg, qc = adg$settings, verbose = 1) {
   ), by = responder]
   per_pig[, coverage := n_observed / n_stage_days]
   per_pig[is.nan(adfi), adfi := NA_real_]
-  per_pig <- merge(pigs[, .(responder, location = pig_location, stage, adg_type)],
+  per_pig <- merge(pigs[, intersect(c("responder", "pig_location", "breed", "stage", "adg_type"), names(pigs)),
+                        with = FALSE],
                    per_pig, by = "responder", all.x = TRUE)
-  data.table::setcolorder(per_pig, c("responder", "location", "stage", "adfi"))
+  data.table::setnames(per_pig, "pig_location", "location")
+  data.table::setcolorder(per_pig, intersect(c("responder", "location", "breed", "stage", "adfi"), names(per_pig)))
   data.table::setorder(per_pig, location, responder)
 
   no_adfi <- per_pig[is.na(adfi)]
@@ -161,7 +169,9 @@ correct_dfi <- function(cov, qc) {
   varies <- vapply(err_cols, function(cl) stats::var(md[[cl]]) > 0, logical(1))
   terms <- err_cols[varies %in% TRUE]
   multi_loc <- data.table::uniqueN(md$location) > 1L
-  base <- c(if (multi_loc) "location", "bw", "adg")
+  multi_breed <- "breed" %in% names(md) && data.table::uniqueN(stats::na.omit(md$breed)) > 1L
+  if (multi_breed) md[is.na(breed), breed := "unknown"]
+  base <- c(if (multi_loc) "location", if (multi_breed) "breed", "bw", "adg")
   if (length(terms) > 0L) {
     lfit <- stats::lm(stats::reformulate(c(base, terms), "y"), data = md)
     aliased <- names(stats::coef(lfit))[is.na(stats::coef(lfit))]
@@ -174,6 +184,7 @@ correct_dfi <- function(cov, qc) {
   }
 
   if (multi_loc) md[, location := factor(location)]
+  if (multi_breed) md[, breed := factor(breed)]
   fit <- tryCatch(
     nlme::lme(stats::reformulate(c(base, terms), "y"), random = ~ 1 | responder,
               data = md, method = "REML",
