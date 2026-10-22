@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.5.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.6.0</span>
       </span>
     </div>
 
@@ -44,6 +44,9 @@
     </li>
     <li>
       <a href="../articles/qc-presets-zh.html">质控预设说明：casey、national、legacy</a>
+    </li>
+    <li>
+      <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线与采食插补</a>
     </li>
   </ul></li>
       </ul><ul class="nav navbar-nav navbar-right"><li>
@@ -136,6 +139,22 @@
           <p><code><a href="write_results.html">write_results()</a></code> </p>
         </td>
         <td><p>Write Analysis Results to CSV Files</p></td>
+      </tr></tbody><tbody><tr><th colspan="2">
+          <h2 id="validation">Validation <a href="#validation" class="anchor" aria-hidden="true"></a></h2>
+          <p class="section-desc"></p><p>Check the outlier methods, growth curve models and feed intake imputation on your own data, by spoiling or hiding part of it on purpose.</p>
+        </th>
+      </tr></tbody><tbody><tr><td>
+          <p><code><a href="validate_outliers.html">validate_outliers()</a></code> </p>
+        </td>
+        <td><p>Validate Weight Outlier Methods with Artificial Errors</p></td>
+      </tr><tr><td>
+          <p><code><a href="validate_adg.html">validate_adg()</a></code> </p>
+        </td>
+        <td><p>Validate Growth Curve Models</p></td>
+      </tr><tr><td>
+          <p><code><a href="validate_adfi.html">validate_adfi()</a></code> </p>
+        </td>
+        <td><p>Validate Feed Intake Imputation</p></td>
       </tr></tbody><tbody><tr><th colspan="2">
           <h2 id="plots">Plots <a href="#plots" class="anchor" aria-hidden="true"></a></h2>
           <p class="section-desc"></p><p>One plot per station and one panel per pig; write them to files.</p>

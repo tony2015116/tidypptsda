@@ -7,6 +7,7 @@
 <url><loc>https://tony2015116.github.io/tidypptsda/articles/qc-parameters-zh.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/articles/qc-presets-zh.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/articles/tidypptsda-zh.html</loc></url>
+<url><loc>https://tony2015116.github.io/tidypptsda/articles/validation-zh.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/authors.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/index.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/news/index.html</loc></url>
@@ -27,6 +28,9 @@
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/read_station.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/run_pipeline.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/save_plots.html</loc></url>
+<url><loc>https://tony2015116.github.io/tidypptsda/reference/validate_adfi.html</loc></url>
+<url><loc>https://tony2015116.github.io/tidypptsda/reference/validate_adg.html</loc></url>
+<url><loc>https://tony2015116.github.io/tidypptsda/reference/validate_outliers.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/write_results.html</loc></url>
 </urlset>
 

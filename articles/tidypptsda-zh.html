@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.5.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.6.0</span>
       </span>
     </div>
 
@@ -65,6 +65,9 @@
     </li>
     <li>
       <a href="../articles/qc-presets-zh.html">质控预设说明：casey、national、legacy</a>
+    </li>
+    <li>
+      <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线与采食插补</a>
     </li>
   </ul>
 </li>
@@ -687,8 +690,9 @@ Windows 上，并行要求本包是正式安装的（而不是用
 <code>$removed</code> 或 <code>adg_type</code>、<code>fcr_note</code>
 等列中，<code>verbose = 0</code> 时也不会丢失。</p>
 <p>逐头猪拟合的步骤（<code><a href="../reference/clean_weight.html">clean_weight()</a></code>、<code><a href="../reference/calc_adg.html">calc_adg()</a></code>、<code><a href="../reference/calc_adfi.html">calc_adfi()</a></code>
-的插补）超过 2 秒时会显示进度条。在约 1650 头猪、175
-万条访问记录的模拟数据上，整个流程约 45 秒（单核）：</p>
+的插补）和 <code><a href="../reference/save_plots.html">save_plots()</a></code> 超过 2
+秒时会显示进度条，<code>cores &gt; 1</code> 并行时也会显示。在约 1650
+头猪、175 万条访问记录的模拟数据上，整个流程约 45 秒（单核）：</p>
 <table class="table">
 <thead><tr class="header">
 <th>步骤</th>
@@ -721,6 +725,13 @@ Windows 上，并行要求本包是正式安装的（而不是用
 </tr>
 </tbody>
 </table>
+</div>
+<div class="section level3">
+<h3 id="方法验证">方法验证<a class="anchor" aria-label="anchor" href="#%E6%96%B9%E6%B3%95%E9%AA%8C%E8%AF%81"></a>
+</h3>
+<p>想知道哪种异常值检测方法、生长曲线或插补方法更适合自己的数据，可以用
+<code><a href="../reference/validate_outliers.html">validate_outliers()</a></code>、<code><a href="../reference/validate_adg.html">validate_adg()</a></code> 和
+<code><a href="../reference/validate_adfi.html">validate_adfi()</a></code> 在本批次数据上检验，详见《方法验证》。</p>
 </div>
 </div>
 <div class="section level2">

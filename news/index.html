@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.5.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.6.0</span>
       </span>
     </div>
 
@@ -45,6 +45,9 @@
     <li>
       <a href="../articles/qc-presets-zh.html">质控预设说明：casey、national、legacy</a>
     </li>
+    <li>
+      <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线与采食插补</a>
+    </li>
   </ul></li>
       </ul><ul class="nav navbar-nav navbar-right"><li>
   <a href="https://github.com/tony2015116/tidypptsda" class="external-link">
@@ -65,6 +68,24 @@
       <small>Source: <a href="https://github.com/tony2015116/tidypptsda/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="page-header" data-toc-text="0.6.0" id="tidypptsda-060">tidypptsda 0.6.0<a class="anchor" aria-label="anchor" href="#tidypptsda-060"></a></h2>
+<div class="section level3">
+<h3 id="validation-0-6-0">Validation<a class="anchor" aria-label="anchor" href="#validation-0-6-0"></a></h3>
+<ul><li>
+<code><a href="../reference/validate_outliers.html">validate_outliers()</a></code> adds artificial errors to clean body weight records and reports, for each outlier method, the share of errors found (<code>sensitivity</code>), the share of good records removed, precision and the effect on ADG. <code>direction = "down"</code> checks weights that are too low only.</li>
+<li>
+<code><a href="../reference/validate_adg.html">validate_adg()</a></code> compares growth curve models by k-fold cross-validation on recorded days, and by how much ADG changes when the first or last days are hidden (late entry, early exit).</li>
+<li>
+<code><a href="../reference/validate_adfi.html">validate_adfi()</a></code> hides recorded feed intake days (random days, blocks, start or end of the stage), imputes them again and compares ADFI with the recorded value.</li>
+<li>All three take <code>seed</code>, <code>max_pigs</code> (random sample of pigs for large data) and <code>cores</code>, show a progress bar, and return <code>$summary</code> plus per-pig details. New Chinese article “方法验证”.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="progress-0-6-0">Progress<a class="anchor" aria-label="anchor" href="#progress-0-6-0"></a></h3>
+<ul><li>The progress bar of <code><a href="../reference/clean_weight.html">clean_weight()</a></code>, <code><a href="../reference/calc_adg.html">calc_adg()</a></code>, <code><a href="../reference/calc_adfi.html">calc_adfi()</a></code> and <code><a href="../reference/save_plots.html">save_plots()</a></code> is now also shown with <code>cores &gt; 1</code>. On Linux/macOS one process per core is started and the bar moves while it works; on Windows the bar moves after each of 10 chunks.</li>
+<li>With <code>cores &gt; 1</code>, the function sent to the workers no longer carries the data of all pigs (faster start-up, less memory).</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="page-header" data-toc-text="0.5.0" id="tidypptsda-050">tidypptsda 0.5.0<a class="anchor" aria-label="anchor" href="#tidypptsda-050"></a></h2>
 <div class="section level3">
