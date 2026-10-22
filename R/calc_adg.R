@@ -20,8 +20,9 @@
 #'     curve reaches the stage limits, kg), `stage_days`,
 #'     `extrap_days_start` / `extrap_days_end` (days the curve is
 #'     extrapolated before the first / after the last weight), `adg` (g/d),
-#'     `lm_slope` (g/d, linear regression on the records inside the stage,
-#'     for comparison), `r_squared` (of that regression), `weight_status`
+#'     `lm_slope` (g/d, linear regression on all valid records between the
+#'     stage start and end times, for comparison), `r_squared` (of that
+#'     regression), `weight_status`
 #'     and `weight_reason` (from [clean_weight()]);
 #'   - `daily`: one row per pig and day from `start_date` to `end_date` and
 #'     over the recorded days: observed `weight` (daily median, kg, `NA` on
@@ -117,8 +118,10 @@ adg_one_pig <- function(d, qc, day0) {
   from <- tmin - qc$max_extrap_days
   to <- tmax + qc$max_extrap_days
 
-  t_lo <- first_cross(curve$pred, lo, from, to)
-  t_hi <- first_cross(curve$pred, hi, if (is.na(t_lo)) from else t_lo, to)
+  # end: first time the curve reaches `hi`; start: last time it rises
+  # through `lo` before that end
+  t_hi <- first_cross(curve$pred, hi, from, to)
+  t_lo <- last_up_cross(curve$pred, lo, from, if (is.na(t_hi)) to else t_hi)
   a <- if (is.na(t_lo)) tmin else t_lo
   b <- if (is.na(t_hi)) tmax else t_hi
   tol <- 0.5
@@ -137,8 +140,10 @@ adg_one_pig <- function(d, qc, day0) {
     }
   }
 
-  # Linear regression on the records inside the stage, for comparison.
-  inside <- y >= lo & y <= hi
+  # Linear regression on all records between the stage start and end times
+  # (cut by time, not by weight, so that a dip below `lo` after the start
+  # does not leave isolated early records in the regression).
+  inside <- adg_type != "none" & t >= a & t <= b
   lm_slope <- r_squared <- NA_real_
   if (sum(inside) >= 5L && diff(range(t[inside])) >= 7) {
     lfit <- stats::lm(y[inside] ~ t[inside])
@@ -231,6 +236,18 @@ fit_growth_curve <- function(t, y, model, span = 0.75) {
 
 # First time in [from, to] at which `pred` rises to `target`. NA if the
 # curve is already above the target at `from` or never reaches it.
+# Last time in [from, to] at which the curve rises through `target`, NA if it
+# never does (e.g. it is above `target` the whole time).
+last_up_cross <- function(pred, target, from, to, step = 0.1) {
+  if (to - from < step) return(NA_real_)
+  g <- seq(from, to, by = step)
+  p <- pred(g)
+  up <- which(p[-length(p)] < target & p[-1L] >= target)
+  if (length(up) == 0L) return(NA_real_)
+  i <- max(up)
+  g[i] + (target - p[i]) / (p[i + 1L] - p[i]) * step
+}
+
 first_cross <- function(pred, target, from, to, step = 0.1) {
   if (to <= from) return(NA_real_)
   g <- seq(from, to, by = step)

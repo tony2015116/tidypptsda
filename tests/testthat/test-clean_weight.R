@@ -83,12 +83,93 @@ test_that("weight range and optional rules flag records", {
   pig2 <- make_pig()
   d <- pig2$date[pig2$date == pig2$date[300]]
   pig2[date == d[1], weight := weight * 0.8]
-  w2 <- clean_weight(pig2, qc = qc_config(daily_drop_min = 0.9, weight_outlier = "rlm", rlm_cutoff = 0), verbose = 0)
+  # (double-layer check off: a whole day 20% lighter is also a lower layer)
+  w2 <- clean_weight(pig2, qc = qc_config(daily_drop_min = 0.9, weight_outlier = "rlm", rlm_cutoff = 0,
+                                          double_layer_gap = NULL), verbose = 0)
   expect_true(all(w2$records[date == d[1], outlier]))
   expect_true(all(grepl("daily_drop", w2$records[date == d[1], qc_flag])))
   # relative deviation
   w3 <- clean_weight(pig, qc = qc_config(rel_dev_max = 0.25), verbose = 0)
   expect_false(any(grepl("rel_dev", w3$records$qc_flag)))
+})
+
+test_that("double layers: the lower layer is removed, persistent layers flag the pig", {
+  q <- qc_config()
+  # weeks 1-2: 35% of records from a pig standing partly on the scale (75%)
+  pig <- make_pig(per_day = 12)
+  t <- as.numeric(pig$entry_time - min(pig$entry_time), units = "days")
+  set.seed(2)
+  partial <- t < 14 & stats::runif(nrow(pig)) < 0.35
+  pig[partial, weight := weight * 0.75]
+  w <- clean_weight(pig, q, verbose = 0)
+  r <- w$records
+  expect_gt(mean(r$outlier[partial]), 0.95)            # lower layer removed
+  expect_lt(mean(r$outlier[!partial]), 0.05)           # upper layer kept
+  expect_true(all(r[partial & outlier == TRUE, qc_flag] %in% c("double_layer", "rlm")))
+  expect_equal(w$per_pig$double_layer_weeks, 2L)
+  expect_equal(w$per_pig$status, "keep")
+
+  # first days: readings about twice the weight (two pigs): upper layer removed
+  two <- make_pig(per_day = 12)
+  t2 <- as.numeric(two$entry_time - min(two$entry_time), units = "days")
+  dbl <- t2 < 7 & seq_len(nrow(two)) %% 3 == 0
+  two[dbl, weight := weight * 2]
+  r2 <- clean_weight(two, q, verbose = 0)$records
+  expect_true(all(r2$outlier[dbl]))
+  expect_lt(mean(r2$outlier[!dbl]), 0.05)
+
+  # two pigs on one transponder for the whole test: flagged
+  mix <- make_pig(per_day = 12)
+  other <- seq_len(nrow(mix)) %% 2 == 0
+  mix[other, weight := weight + 8]
+  wm <- clean_weight(mix, q, verbose = 0)
+  expect_equal(wm$per_pig$status, "low_confidence")
+  expect_match(wm$per_pig$reason, "double-layer")
+})
+
+test_that("unstable weights after entry are tracked back from the stable days", {
+  pig <- make_pig(per_day = 12, start = 22)
+  pig[, tt := as.numeric(entry_time - min(entry_time), units = "days")]
+  t <- pig$tt
+  # the new pig loses 2 kg over the first 8 days, then grows
+  pig[tt < 8, weight := 22 + 2 - 0.25 * tt + stats::rnorm(.N, 0, 0.4)]
+  pig[tt >= 8, weight := 22 + 0.9 * (tt - 8) + stats::rnorm(.N, 0, 0.4)]
+  # 45% of the readings in the first 10 days come from heavier pen mates
+  set.seed(3)
+  mate <- t < 10 & stats::runif(nrow(pig)) < 0.45
+  pig[mate, weight := weight + stats::runif(.N, 6, 22)]
+  w <- clean_weight(pig, verbose = 0)
+  r <- w$records
+  expect_gt(mean(r$outlier[mate]), 0.95)
+  expect_lt(mean(r$outlier[!mate & t < 10]), 0.1)    # the real (falling) weights stay
+  expect_true(any(r$qc_flag == "entry_noise"))
+  expect_gte(w$per_pig$entry_noise_days, 5L)
+  expect_false(grepl("unstable", w$per_pig$reason))
+  # without tracking, the quadratic curve removes much of the real weight loss
+  off <- clean_weight(pig, qc_config(entry_noise_days = NULL), verbose = 0)
+  expect_equal(off$per_pig$entry_noise_days, 0L)
+  expect_gt(mean(off$records$outlier[!mate & t < 10]), 0.3)
+  # a long unstable period flags the pig
+  long <- clean_weight(pig, qc_config(entry_noise_flag_days = 3), verbose = 0)
+  expect_equal(long$per_pig$status, "low_confidence")
+  expect_match(long$per_pig$reason, "unstable weights")
+})
+
+test_that("daily_iqr matches stats::IQR", {
+  set.seed(1)
+  day <- sample(0:9, 200, TRUE)
+  y <- stats::rnorm(200)
+  d <- daily_iqr(day, y)
+  ref <- tapply(y, day, stats::IQR)
+  expect_equal(d$iqr, unname(as.numeric(ref[as.character(d$day)])))
+  expect_equal(d$n, as.integer(table(day)[as.character(d$day)]))
+})
+
+test_that("clean pigs have no double layers", {
+  w <- clean_weight(make_pig(per_day = 12), verbose = 0)
+  expect_equal(w$per_pig$double_layer_weeks, 0L)
+  expect_false(any(w$records$qc_flag == "double_layer"))
+  expect_equal(w$per_pig$entry_noise_days, 0L)
 })
 
 test_that("length rules remove pigs, entry/exit rules only flag them", {

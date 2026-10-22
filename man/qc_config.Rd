@@ -54,6 +54,25 @@ outliers. Default 0.5.
 a record is an outlier (e.g. 0.25). \code{NULL} = off.
 \item \code{daily_drop_min}: optional, a day whose weight is below this ratio of
 the previous day is an outlier (e.g. 0.90). \code{NULL} = off.
+\item \code{double_layer_gap}: double-layer detection. Within each week of a pig,
+the records are split into two groups; when the groups are clearly
+separated, their mean weights differ by at least this share of the
+upper mean (default 0.08), both groups are tight bands (difference of
+means at least 3 times the SD of each group) and the smaller group holds
+at least \code{double_layer_min_share} of the records (default 0.15), the
+layer that does not continue the pig's growth in the other weeks is
+removed. \code{NULL} = off.
+\item \code{entry_noise_days}: unstable weights after entry. Within this many days
+after the first record (default 21), a day is unstable when the
+interquartile range of its records exceeds \code{entry_noise_iqr_kg}
+(default 3 kg) and 4 times the pig's usual daily range. The unstable
+period runs from entry to the last unstable day such that at least half
+of the days up to it are unstable. From the stable days after it, the
+weight is tracked back day by
+day: a record is kept when it lies within \code{entry_noise_tol} (default
+8\%, at least 2 kg, widened by 0.5 kg per day without accepted records)
+of the next day's accepted weight; other records are removed
+(\code{qc_flag = "entry_noise"}). \code{NULL} = off.
 }
 
 \strong{Pig-level checks}
@@ -68,6 +87,12 @@ flagged as low confidence (not removed). \code{NULL} = off.
 \item \code{max_daily_jump_kg}: optional, pigs whose daily median weight changes
 by more than this many kg per day between consecutive days are flagged
 as low confidence (not removed). \code{NULL} = off.
+\item \code{double_layer_flag_weeks}: pigs with double-layer weights in at least
+this many weeks are flagged as low confidence: two pigs may share one
+transponder. Default 3.
+\item \code{entry_noise_flag_days}: pigs whose unstable period after entry is
+longer than this many days, or in which less than 30\% of the records
+are kept, are flagged as low confidence. Default 14.
 }
 
 \strong{Growth and ADG}

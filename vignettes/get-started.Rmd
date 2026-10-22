@@ -200,9 +200,12 @@ table(w_national$per_pig$status)
 1. a growth curve is fitted to the valid weight records of each pig
    (`curve_model`: polynomial, robust LOESS or Gompertz; Gompertz falls back
    to a quadratic curve when it does not converge);
-2. the times at which the curve reaches the lower and upper stage weight
-   are found, searching up to `max_extrap_days` before the first and after
-   the last record;
+2. the stage end is the first time the curve reaches the upper stage
+   weight; the stage start is the **last** time the curve rises through the
+   lower stage weight before that. A curve that dips back below 30 kg (for
+   example after noisy early records) therefore starts the stage only once
+   the pig has really entered it. The search runs up to `max_extrap_days`
+   before the first and after the last record;
 3. ADG = weight difference / days between these two times.
 
 Every pig gets an `adg_type`:

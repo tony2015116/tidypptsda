@@ -72,6 +72,24 @@ test_that("calc_adg works on both datasets and every curve", {
   }
 })
 
+test_that("the stage starts at the last rise through the lower limit", {
+  # a curve that rises above 30, dips below and rises again
+  pred <- function(x) ifelse(x < 10, 28 + 0.5 * x,
+                             ifelse(x < 15, 33 - (x - 10), 28 + 0.8 * (x - 15)))
+  expect_equal(first_cross(pred, 30, 0, 40), 4, tolerance = 0.01)
+  t_last <- last_up_cross(pred, 30, 0, 40)
+  expect_equal(t_last, 17.5, tolerance = 0.01)
+  expect_true(all(pred(seq(t_last + 0.1, 40, 0.1)) >= 30))
+  expect_true(is.na(last_up_cross(function(x) 50 + x, 30, 0, 10)))
+})
+
+test_that("lm_slope uses the records between the stage start and end times", {
+  pig <- line_pig(start = 25, rate = 1, days = 100, noise = 0.3)
+  q <- no_checks(curve_model = "poly1")
+  a <- calc_adg(clean_weight(pig, q, verbose = 0), verbose = 0)$per_pig
+  expect_equal(a$lm_slope, a$adg, tolerance = 0.02)
+})
+
 test_that("calc_adg explains when no pig is left", {
   n <- data.table::as.data.table(nedap)
   short <- n[visit_time < min(visit_time) + 10 * 86400]
