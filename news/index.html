@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.6.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.6.1</span>
       </span>
     </div>
 
@@ -68,6 +68,18 @@
       <small>Source: <a href="https://github.com/tony2015116/tidypptsda/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="page-header" data-toc-text="0.6.1" id="tidypptsda-061">tidypptsda 0.6.1<a class="anchor" aria-label="anchor" href="#tidypptsda-061"></a></h2>
+<div class="section level3">
+<h3 id="bug-fixes-0-6-1">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-6-1"></a></h3>
+<ul><li>Visit times given as POSIXct in a time zone other than UTC (for example read from a database as Asia/Shanghai) were split into days at 00:00 UTC, i.e. 08:00 Beijing time: on the example data 27% of visits got the previous day’s date and ADFI changed by up to 50 g/d. Clock times are now kept, so a day always runs from 00:00 to 24:00 local time.</li>
+<li>
+<code><a href="../reference/calc_adg.html">calc_adg()</a></code> failed with a cryptic data.table error when <code><a href="../reference/clean_weight.html">clean_weight()</a></code> had removed every pig (e.g. a test period that is too short); it now says so and lists the most common reasons.</li>
+<li>
+<code><a href="../reference/calc_fcr.html">calc_fcr()</a></code> printed R warnings (<code>no non-missing arguments to min</code>) when no body weight record fell inside <code>stage_range</code>.</li>
+<li>With <code>cores &gt; 1</code> on Linux/macOS, stopping a run (Esc / Ctrl+C, or an error) left the worker processes running in the background; they are now stopped.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="page-header" data-toc-text="0.6.0" id="tidypptsda-060">tidypptsda 0.6.0<a class="anchor" aria-label="anchor" href="#tidypptsda-060"></a></h2>
 <div class="section level3">
