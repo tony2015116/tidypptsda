@@ -10,8 +10,8 @@ calc_adg(weight, qc = weight$settings, verbose = 1, cores = 1)
 \item{weight}{Result of \code{\link[=clean_weight]{clean_weight()}}.}
 
 \item{qc}{QC settings; by default the ones used by \code{\link[=clean_weight]{clean_weight()}}.
-Used here: \code{stage_range}, \code{curve_model}, \code{loess_span},
-\code{max_extrap_days}.}
+Used here: \code{stage_range}, \code{curve_model}, \code{curve_margin_kg},
+\code{loess_span}, \code{max_extrap_days}.}
 
 \item{verbose}{0 (silent), 1 (summary, default) or 2 (details).}
 
@@ -21,7 +21,9 @@ Used here: \code{stage_range}, \code{curve_model}, \code{loess_span},
 An object of class \code{ppt_adg} (a list):
 \itemize{
 \item \code{per_pig}: one row per pig (pigs removed by \code{\link[=clean_weight]{clean_weight()}} are not
-included) with \code{stage}, \code{curve_used}, \code{curve_r2}, \code{adg_type},
+included) with \code{stage}, \code{curve_used}, \code{curve_r2}, \code{curve_start} /
+\code{curve_end} (first and last day of the records the curve was fitted
+to, see \code{curve_margin_kg}), \code{adg_type},
 \code{start_date} / \code{end_date} and \code{start_weight} / \code{end_weight} (when the
 curve reaches the stage limits, kg), \code{stage_days},
 \code{extrap_days_start} / \code{extrap_days_end} (days the curve is

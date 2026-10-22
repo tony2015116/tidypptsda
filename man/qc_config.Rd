@@ -54,25 +54,22 @@ outliers. Default 0.5.
 a record is an outlier (e.g. 0.25). \code{NULL} = off.
 \item \code{daily_drop_min}: optional, a day whose weight is below this ratio of
 the previous day is an outlier (e.g. 0.90). \code{NULL} = off.
-\item \code{double_layer_gap}: double-layer detection. Within each week of a pig,
-the records are split into two groups; when the groups are clearly
-separated, their mean weights differ by at least this share of the
-upper mean (default 0.08), both groups are tight bands (difference of
-means at least 3 times the SD of each group) and the smaller group holds
-at least \code{double_layer_min_share} of the records (default 0.15), the
-layer that does not continue the pig's growth in the other weeks is
-removed. \code{NULL} = off.
-\item \code{entry_noise_days}: unstable weights after entry. Within this many days
-after the first record (default 21), a day is unstable when the
-interquartile range of its records exceeds \code{entry_noise_iqr_kg}
-(default 3 kg) and 4 times the pig's usual daily range. The unstable
-period runs from entry to the last unstable day such that at least half
-of the days up to it are unstable. From the stable days after it, the
-weight is tracked back day by
-day: a record is kept when it lies within \code{entry_noise_tol} (default
-8\%, at least 2 kg, widened by 0.5 kg per day without accepted records)
-of the next day's accepted weight; other records are removed
-(\code{qc_flag = "entry_noise"}). \code{NULL} = off.
+\item \code{weight_track}: track the weight of each pig back from the end of the
+test (default \code{TRUE}). The scale only counts a pig standing on it with
+all four feet, so a reading is too light only rarely, while several
+small pigs on the scale at once give readings that are too heavy. At
+the end of the test the pigs are large and only one fits on the scale,
+so the last days are the most reliable. Starting from the median of the
+last 3 recorded days and the daily gain of the last 14 days, the weight
+is tracked back day by day: a record is kept when it lies within
+\code{track_tol} (default 8\%, at least 2 kg, widened by 0.5 kg per day
+without kept records) of the weight expected for that day; the daily
+gain is updated from the kept daily weights of the next 10 days. Other
+records are removed (\code{qc_flag = "track"}). The outlier methods
+(\code{weight_outlier}) do not remove kept records, since a smooth curve
+cannot follow e.g. slow growth for weeks after entry; they are used
+for pigs that are not tracked (less than 7 recorded days or a test
+shorter than 14 days) and when \code{weight_track = FALSE}.
 }
 
 \strong{Pig-level checks}
@@ -87,12 +84,10 @@ flagged as low confidence (not removed). \code{NULL} = off.
 \item \code{max_daily_jump_kg}: optional, pigs whose daily median weight changes
 by more than this many kg per day between consecutive days are flagged
 as low confidence (not removed). \code{NULL} = off.
-\item \code{double_layer_flag_weeks}: pigs with double-layer weights in at least
-this many weeks are flagged as low confidence: two pigs may share one
-transponder. Default 3.
-\item \code{entry_noise_flag_days}: pigs whose unstable period after entry is
-longer than this many days, or in which less than 30\% of the records
-are kept, are flagged as low confidence. Default 14.
+\item \code{track_flag_share}: pigs whose tracking removes more than this share
+of their records are flagged as low confidence: the scale probably did
+not weigh them correctly for a long time (e.g. a faulty load cell).
+Default 0.4.
 }
 
 \strong{Growth and ADG}
@@ -100,6 +95,13 @@ are kept, are flagged as low confidence. Default 14.
 \item \code{stage_range}: body weight interval for ADG and FCR, kg.
 \item \code{curve_model}: \code{"poly1"}, \code{"poly2"}, \code{"poly3"}, \code{"loess"} or
 \code{"gompertz"} (falls back to \code{"poly2"} when it does not converge).
+\item \code{curve_margin_kg}: optional, fit the growth curve only to the records
+around the stage: from the last day whose daily median weight is below
+\code{stage_range[1] - curve_margin_kg} to the first day above
+\code{stage_range[2] + curve_margin_kg} (cut by time, not by weight). Early
+weeks far below the stage (e.g. slow growth after entry) then no longer
+bend the curve. Falls back to all records when fewer than 10 records or
+7 days remain. \code{NULL} (default) = all records; 5 is a sensible value.
 \item \code{max_extrap_days}: maximum extrapolation of the curve, days.
 }
 

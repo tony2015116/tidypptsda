@@ -90,6 +90,23 @@ test_that("lm_slope uses the records between the stage start and end times", {
   expect_equal(a$lm_slope, a$adg, tolerance = 0.02)
 })
 
+test_that("curve_margin_kg fits the curve around the stage only", {
+  # slow growth for 4 weeks after entry at 20 kg, then 1 kg/d
+  pig <- line_pig(start = 20, rate = 1, days = 140, noise = 0.3)
+  tt <- as.numeric(pig$entry_time - min(pig$entry_time), units = "days")
+  pig[, weight := 20 + ifelse(tt < 28, 0.1 * tt, 2.8 + (tt - 28)) + stats::rnorm(.N, 0, 0.3)]
+  q <- no_checks(curve_model = "poly2", weight_track = FALSE)
+  w <- clean_weight(pig, q, verbose = 0)
+  all <- calc_adg(w, verbose = 0)$per_pig
+  cut <- calc_adg(w, qc = qc_set(q, list(curve_margin_kg = 5)), verbose = 0)$per_pig
+  expect_lt(abs(cut$adg - 1000), abs(all$adg - 1000))
+  expect_equal(cut$adg, 1000, tolerance = 0.02)
+  expect_gt(cut$curve_start, all$curve_start)
+  expect_lt(cut$curve_end, all$curve_end)
+  # too few records left: all records are used
+  expect_true(all(curve_window(as.Date("2024-01-01") + 0:5, 10 + 0:5, qc_set(q, list(curve_margin_kg = 5)))))
+})
+
 test_that("calc_adg explains when no pig is left", {
   n <- data.table::as.data.table(nedap)
   short <- n[visit_time < min(visit_time) + 10 * 86400]

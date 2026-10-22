@@ -347,8 +347,7 @@ utils::globalVariables(c(
   "injected", "key", "method", "adg_true", "adg_rmse", "fold", "type", "model",
   "rmse", "mae", "adg_full", "truncation", "cv_rmse", "observed", "dfi_true",
   "masks", "err_pct", "sq_err", "n_hidden", "adfi_est", "adfi_true", "scenario",
-  "spearman", "n_weeks", "double_layer_weeks", "entry_noise_days",
-  "entry_noise_kept", "iqr"
+  "spearman", "track_removed", "tt"
 ))
 
 #' @export
