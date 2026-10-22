@@ -117,41 +117,11 @@ fit_by_pig <- function(data, fun, step, by = "responder", ...) {
   n <- length(groups)
   args <- list(...)
 
-  one_pig <- function(g) {
-    w <- character()
-    res <- withCallingHandlers(
-      tryCatch(do.call(fun, c(list(g), args)), error = function(e) e),
-      warning = function(cnd) {
-        w <<- c(w, conditionMessage(cnd))
-        invokeRestart("muffleWarning")
-      }
-    )
-    list(res = res, warnings = unique(w))
-  }
+  one_pig <- pig_runner(fun, args)
 
-  cores <- getOption("tidypptsda.cores", 1L)
-  runs <- if (cores > 1L && n > 1L) {
-    if (.Platform$OS.type == "windows") {
-      cl <- parallel::makeCluster(min(cores, n))
-      on.exit(parallel::stopCluster(cl), add = TRUE)
-      parallel::parLapply(cl, groups, one_pig)
-    } else {
-      parallel::mclapply(groups, one_pig, mc.cores = min(cores, n))
-    }
-  } else if (ppt_verbose() >= 1L && n > 1L) {
-    # a cli progress bar; cli only draws it when the step takes > 2 s
-    res <- vector("list", n)
-    cli::cli_progress_bar(paste0(step, ": fitting pigs"), total = n,
-                          clear = TRUE, .envir = environment())
-    for (i in seq_len(n)) {
-      res[[i]] <- one_pig(groups[[i]])
-      cli::cli_progress_update(.envir = environment())
-    }
-    cli::cli_progress_done(.envir = environment())
-    res
-  } else {
-    lapply(groups, one_pig)
-  }
+  cores <- min(getOption("tidypptsda.cores", 1L), n)
+  runs <- run_with_progress(groups, one_pig, cores = cores,
+                            label = paste0(step, ": fitting pigs"))
 
   out <- vector("list", n)
   failed <- vector("list", n)
@@ -192,6 +162,109 @@ fit_by_pig <- function(data, fun, step, by = "responder", ...) {
     failed = failed,
     warnings = warns
   )
+}
+
+# Wrap `fun` for one pig: errors are returned, warnings collected. Built by a
+# top-level function so that the closure sent to parallel workers does not
+# carry the data of all pigs.
+pig_runner <- function(fun, args) {
+  force(fun)
+  force(args)
+  function(g) {
+    w <- character()
+    res <- withCallingHandlers(
+      tryCatch(do.call(fun, c(list(g), args)), error = function(e) e),
+      warning = function(cnd) {
+        w <<- c(w, conditionMessage(cnd))
+        invokeRestart("muffleWarning")
+      }
+    )
+    list(res = res, warnings = unique(w))
+  }
+}
+
+# lapply(x, fun) with a cli progress bar (shown when verbose >= 1 and the
+# work takes more than 2 s). With cores > 1 the items run in parallel:
+# - Linux/macOS: one forked process per core works through its share; each
+#   finished item is counted in a small file that the bar reads, so the bar
+#   moves while the work runs and only `cores` processes are started;
+# - Windows: a PSOCK cluster (needs the installed package) runs the items in
+#   10 chunks, and the bar moves after each chunk.
+run_with_progress <- function(x, fun, cores = 1L, label = "Working", ...) {
+  n <- length(x)
+  if (n == 0L) return(list())
+  show <- ppt_verbose() >= 1L && n > 1L
+  bar <- if (show) {
+    cli::cli_progress_bar(label, total = n, clear = TRUE, .envir = environment())
+  }
+  set_bar <- function(k) if (show) cli::cli_progress_update(set = k, id = bar, .envir = environment())
+  out <- if (cores > 1L && .Platform$OS.type != "windows") {
+    run_forked(x, fun, cores, set_bar, ...)
+  } else {
+    if (cores > 1L) {
+      cl <- parallel::makeCluster(cores)
+      on.exit(parallel::stopCluster(cl), add = TRUE)
+      size <- max(cores, ceiling(n / 10 / cores) * cores)
+      run_chunk <- function(idx) parallel::parLapply(cl, x[idx], fun, ...)
+    } else {
+      size <- 1L
+      run_chunk <- function(idx) lapply(x[idx], fun, ...)
+    }
+    res <- vector("list", n)
+    for (idx in split(seq_len(n), ceiling(seq_len(n) / size))) {
+      res[idx] <- run_chunk(idx)
+      set_bar(max(idx))
+    }
+    res
+  }
+  if (show) cli::cli_progress_done(id = bar, .envir = environment())
+  out
+}
+
+# Fork one process per core (interleaved shares for an even load) and poll
+# their progress files until all are done.
+run_forked <- function(x, fun, cores, set_bar, ...) {
+  n <- length(x)
+  share <- split(seq_len(n), (seq_len(n) - 1L) %% min(cores, n))
+  files <- vapply(seq_along(share), function(i) tempfile("ppt_progress_"), "")
+  on.exit(unlink(files), add = TRUE)
+  jobs <- lapply(seq_along(share), function(i) {
+    parallel::mcparallel({
+      con <- file(files[i], "wb")
+      res <- lapply(x[share[[i]]], function(el) {
+        r <- fun(el, ...)
+        writeBin(as.raw(1L), con)
+        flush(con)
+        r
+      })
+      close(con)
+      res
+    }, silent = TRUE)
+  })
+  pids <- vapply(jobs, function(j) j$pid, integer(1))
+  got <- vector("list", length(jobs))
+  left <- seq_along(jobs)
+  while (length(left) > 0L) {
+    r <- parallel::mccollect(jobs[left], wait = FALSE, timeout = 0.25)
+    if (!is.null(r)) {
+      for (nm in names(r)) {
+        k <- match(as.integer(nm), pids)
+        got[k] <- list(r[[nm]])
+        left <- setdiff(left, k)
+      }
+    }
+    set_bar(sum(file.size(files), na.rm = TRUE))
+  }
+  out <- vector("list", n)
+  for (k in seq_along(share)) {
+    res <- got[[k]]
+    if (inherits(res, "try-error") || is.null(res)) {
+      msg <- if (inherits(res, "try-error")) as.character(res) else "parallel worker failed"
+      res <- rep(list(list(res = simpleError(msg), warnings = character())), length(share[[k]]))
+    }
+    out[share[[k]]] <- res
+  }
+  out
 }
 
 # ---- removal log ------------------------------------------------------------
@@ -264,7 +337,12 @@ utils::globalVariables(c(
   "n_observed_feed", "weight_coverage_kg", "first_bin", "last_bin", "inner",
   "low_coverage", "fcr_min", "fcr_max", "fcr_out", "i.fcr_min", "i.fcr_max",
   # plots
-  "label", "lower", "upper", "kind"
+  "label", "lower", "upper", "kind",
+  # validation
+  "injected", "key", "method", "adg_true", "adg_rmse", "fold", "type", "model",
+  "rmse", "mae", "adg_full", "truncation", "cv_rmse", "observed", "dfi_true",
+  "masks", "err_pct", "sq_err", "n_hidden", "adfi_est", "adfi_true", "scenario",
+  "spearman"
 ))
 
 #' @export

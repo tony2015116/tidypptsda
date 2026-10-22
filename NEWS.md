@@ -1,3 +1,30 @@
+# tidypptsda 0.6.0
+
+## Validation
+
+* `validate_outliers()` adds artificial errors to clean body weight records
+  and reports, for each outlier method, the share of errors found
+  (`sensitivity`), the share of good records removed, precision and the
+  effect on ADG. `direction = "down"` checks weights that are too low only.
+* `validate_adg()` compares growth curve models by k-fold cross-validation
+  on recorded days, and by how much ADG changes when the first or last days
+  are hidden (late entry, early exit).
+* `validate_adfi()` hides recorded feed intake days (random days, blocks,
+  start or end of the stage), imputes them again and compares ADFI with the
+  recorded value.
+* All three take `seed`, `max_pigs` (random sample of pigs for large data)
+  and `cores`, show a progress bar, and return `$summary` plus per-pig
+  details. New Chinese article "方法验证".
+
+## Progress
+
+* The progress bar of `clean_weight()`, `calc_adg()`, `calc_adfi()` and
+  `save_plots()` is now also shown with `cores > 1`. On Linux/macOS one
+  process per core is started and the bar moves while it works; on Windows
+  the bar moves after each of 10 chunks.
+* With `cores > 1`, the function sent to the workers no longer carries the
+  data of all pigs (faster start-up, less memory).
+
 # tidypptsda 0.5.0
 
 ## Faster on large data

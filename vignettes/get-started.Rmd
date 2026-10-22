@@ -408,6 +408,43 @@ unlink(file.path(tempdir(), "results"), recursive = TRUE)
 
 
 
+# validate_outliers, validate_adg and validate_adfi
+
+Three functions check how well the methods work **on your own data**, by
+hiding or spoiling part of the data on purpose and measuring how close the
+result comes to what is known:
+
+- `validate_outliers()` adds artificial errors to clean weight records and
+  measures how many each outlier method finds, how many good records it
+  removes, and how much ADG is affected;
+- `validate_adg()` compares growth curve models by k-fold cross-validation on
+  recorded days, and by how much ADG changes when the first or last days of
+  the test are hidden (late entry, early exit);
+- `validate_adfi()` hides recorded feed intake days (random days, blocks,
+  start or end of the stage), imputes them again and compares ADFI with the
+  recorded value.
+
+```{r example-validate}
+visits <- prep_visits(nedap, verbose = 0)
+w <- clean_weight(visits, verbose = 0)
+
+# 1. weight outlier methods: 5% artificial errors of 3-15 kg
+vo <- validate_outliers(visits, reps = 1)
+vo$summary
+
+# 2. growth curve models
+va <- validate_adg(w, models = c("poly1", "poly2", "loess"))
+va$summary
+
+# 3. feed intake imputation
+adfi <- calc_adfi(visits, calc_adg(w, verbose = 0), verbose = 0)
+vf <- validate_adfi(adfi, scenarios = c("random30", "late20"), reps = 2)
+vf$summary
+```
+
+
+
+
 <!--
 # Inflate your package
 -->
