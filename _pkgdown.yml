@@ -49,6 +49,12 @@ reference:
   desc: Write all result tables to CSV files for the testing station.
   contents:
   - write_results
+- title: Validation
+  desc: Check the outlier methods, growth curve models and feed intake imputation on your own data, by spoiling or hiding part of it on purpose.
+  contents:
+  - validate_outliers
+  - validate_adg
+  - validate_adfi
 - title: Plots
   desc: One plot per station and one panel per pig; write them to files.
   contents:
@@ -72,3 +78,4 @@ articles:
   - tidypptsda-zh
   - qc-parameters-zh
   - qc-presets-zh
+  - validation-zh

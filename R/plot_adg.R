@@ -144,28 +144,8 @@ save_plots <- function(plots, path, prefix = "station", suffix = "plot",
          height = height %||% (6 * ceiling(plots$n_pigs[i] / nc) + 4))
   })
 
-  errs <- if (cores > 1L && n > 1L) {
-    if (.Platform$OS.type == "windows") {
-      cl <- parallel::makeCluster(min(cores, n))
-      on.exit(parallel::stopCluster(cl), add = TRUE)
-      parallel::parLapply(cl, jobs, save_one_plot, device = device, dpi = dpi)
-    } else {
-      parallel::mclapply(jobs, save_one_plot, device = device, dpi = dpi,
-                         mc.cores = min(cores, n), mc.preschedule = FALSE)
-    }
-  } else if (ppt_verbose() >= 1L && n > 1L) {
-    out <- vector("list", n)
-    cli::cli_progress_bar("Saving plots", total = n, clear = TRUE,
-                          .envir = environment())
-    for (i in seq_len(n)) {
-      out[[i]] <- save_one_plot(jobs[[i]], device = device, dpi = dpi)
-      cli::cli_progress_update(.envir = environment())
-    }
-    cli::cli_progress_done(.envir = environment())
-    out
-  } else {
-    lapply(jobs, save_one_plot, device = device, dpi = dpi)
-  }
+  errs <- run_with_progress(jobs, save_one_plot, cores = min(cores, n),
+                            label = "Saving plots", device = device, dpi = dpi)
 
   files <- vapply(jobs, `[[`, "", "file")
   ok <- vapply(errs, function(e) is.character(e) && length(e) == 1L && is.na(e), logical(1))
