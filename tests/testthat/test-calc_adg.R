@@ -39,7 +39,7 @@ test_that("extrapolation and partial stages are flagged", {
   expect_equal(part$adg_type, "partial")
   expect_equal(part$adg, 1000, tolerance = 0.01)
   expect_true(is.na(part$end_date))
-  expect_warning(calc_adg(clean_weight(line_pig(days = 40), q, verbose = 0), verbose = 1), "partial")
+  expect_message(calc_adg(clean_weight(line_pig(days = 40), q, verbose = 0), verbose = 1), "partial")
   # a larger extrapolation window turns it into "extrapolated"
   q60 <- no_checks(max_extrap_days = 60)
   ext60 <- calc_adg(clean_weight(line_pig(days = 40), q60, verbose = 0), verbose = 0)$per_pig

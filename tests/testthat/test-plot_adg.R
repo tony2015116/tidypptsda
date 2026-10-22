@@ -45,7 +45,7 @@ test_that("filters work and unknown IDs warn", {
   r <- plot_inputs()
   g <- plot_adg(r$adg, responders = c("35853", "35855"), verbose = 0)
   expect_equal(sum(g$n_pigs), 2L)
-  expect_warning(plot_adg(r$adg, responders = c("35853", "nope"), verbose = 1), "nope")
+  expect_message(plot_adg(r$adg, responders = c("35853", "nope"), verbose = 1), "nope")
   expect_error(plot_adg(r$adg, locations = "999", verbose = 0), "No data")
   expect_error(plot_adg(r$adfi), "calc_adg")
 })

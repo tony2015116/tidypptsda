@@ -126,7 +126,7 @@ qc_config("national", rel_dev_max = 0.25, daily_drop_min = 0.90)
 ```{r compare}
 run_one <- function(data, profile, ...) {
   q <- qc_config(profile, ...)
-  r <- suppressWarnings(run_pipeline(data, qc = q, verbose = 0))
+  r <- run_pipeline(data, qc = q, verbose = 0)
   p <- r$fcr$per_pig
   data.table(
     预设 = profile,
@@ -155,7 +155,7 @@ rbindlist(lapply(c("casey", "national", "legacy"), function(p) run_one(fire, p, 
 ```{r rank}
 fcr_of <- function(profile) {
   q <- qc_config(profile, stage_range = c(30, 120))
-  r <- suppressWarnings(run_pipeline(nedap, qc = q, verbose = 0))
+  r <- run_pipeline(nedap, qc = q, verbose = 0)
   r$fcr$per_pig[, .(responder, fcr)]
 }
 m <- Reduce(function(a, b) merge(a, b, by = "responder"),

@@ -182,7 +182,10 @@ adg_one_pig <- function(d, qc, day0) {
 fit_growth_curve <- function(t, y, model, span = 0.75) {
   fit_poly <- function(k, name = paste0("poly", k)) {
     f <- stats::lm(y ~ poly(t, k, raw = TRUE))
-    list(pred = function(x) unname(stats::predict(f, newdata = data.frame(t = x))),
+    b <- stats::coef(f)
+    b[is.na(b)] <- 0                     # aliased terms, as predict() drops them
+    # evaluate the polynomial directly: much faster than predict.lm()
+    list(pred = function(x) as.numeric(outer(x, 0:k, `^`) %*% b),
          fitted = stats::fitted(f), name = name)
   }
   curve <- switch(model,
@@ -245,7 +248,7 @@ report_adg <- function(per_pig, fits) {
     ppt_msg("Gompertz did not converge for {fallback} pig{?s}: quadratic curve used", "warning")
   }
   if (types[["partial"]] > 0L) {
-    ppt_warn("{types[['partial']]} pig{?s} do not reach the whole stage: ADG is based on part of it (adg_type = \"partial\").")
+    ppt_warn("{types[['partial']]} pig{?s} {?does/do} not reach the whole stage: ADG is based on part of it (adg_type = \"partial\").")
   }
   if (any(!is.na(per_pig$adg))) {
     ppt_msg("Mean ADG: {round(mean(per_pig$adg, na.rm = TRUE))} g/d (SD {round(stats::sd(per_pig$adg, na.rm = TRUE))})", "success")

@@ -15,7 +15,7 @@ test_that("add_breed merges by transponder and keeps attributes", {
 test_that("missing pigs warn and conflicting breeds stop", {
   v <- prep_visits(fire, verbose = 0)
   pigs <- unique(v[identified == TRUE, responder])
-  expect_warning(add_breed(v, data.frame(responder = pigs[1:3], breed = "YY"), verbose = 1), "not found")
+  expect_message(add_breed(v, data.frame(responder = pigs[1:3], breed = "YY"), verbose = 1), "not found")
   expect_error(add_breed(v, data.frame(responder = c(pigs[1], pigs[1]), breed = c("YY", "LL"))), "more than one")
   expect_error(add_breed(v, data.frame(id = pigs)), "breed")
 })

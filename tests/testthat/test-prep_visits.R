@@ -109,7 +109,7 @@ test_that("a weight jump at a transfer gives a warning", {
   m <- mid_time(d)
   d[visit_time > m, `:=`(location = 102L, weight = weight + 25000L)]
   d[visit_time > m & weight == 25000L, weight := 0L]
-  expect_warning(v <- prep_visits(d, verbose = 1), "transfer")
+  expect_message(v <- prep_visits(d, verbose = 1), "transfer")
   expect_gt(attr(v, "stations")$weight_jump_kg, 10)
   expect_silent(prep_visits(d, verbose = 0))
 })

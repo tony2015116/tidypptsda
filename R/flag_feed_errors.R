@@ -219,20 +219,32 @@ daily_error_covariates <- function(flagged) {
   errs <- names(error_types())
   otd_errs <- errs[error_types() %in% c(1:2, 6:14)]
   fid_errs <- errs[error_types() %in% c(4:5, 15:16)]
-  idv <- flagged[identified == TRUE]
-  idv[, error_free := n_errors == 0L]
+  cols <- c("responder", "date", "location", "fiv", "otv", "n_errors", errs)
+  idv <- flagged[identified == TRUE, cols, with = FALSE]
 
-  out <- idv[, c(
-    list(
-      location = names(sort(table(location), decreasing = TRUE))[1L],
-      n_visits = .N,
-      n_error_visits = sum(!error_free),
-      dfi_raw = sum(fiv),
-      y = sum(fiv[error_free])
-    ),
-    stats::setNames(lapply(errs, function(e) mean(get(e))), paste0("pte_", errs)),
-    stats::setNames(lapply(otd_errs, function(e) sum(otv[get(e)])), paste0("otd_", otd_errs)),
-    stats::setNames(lapply(fid_errs, function(e) sum(fiv[get(e)])), paste0("fid_", fid_errs))
-  ), by = .(responder, date)]
+  # per-visit numeric columns, then one grouped sum/mean each (GForce, fast)
+  idv[, `:=`(error_free = as.numeric(n_errors == 0L), error_visit = as.numeric(n_errors > 0L))]
+  idv[, y_part := fiv * error_free]
+  pte <- paste0("pte_", errs)
+  otd <- paste0("otd_", otd_errs)
+  fid <- paste0("fid_", fid_errs)
+  idv[, (pte) := lapply(.SD, as.numeric), .SDcols = errs]
+  idv[, (otd) := lapply(.SD, function(e) otv * e), .SDcols = otd_errs]
+  idv[, (fid) := lapply(.SD, function(e) fiv * e), .SDcols = fid_errs]
+
+  keys <- c("responder", "date")
+  out <- idv[, .(n_visits = .N, n_error_visits = sum(error_visit),
+                 dfi_raw = sum(fiv), y = sum(y_part)), by = keys]
+  out[, n_error_visits := as.integer(n_error_visits)]
+  m <- idv[, lapply(.SD, mean), by = keys, .SDcols = pte]
+  sm <- idv[, lapply(.SD, sum), by = keys, .SDcols = c(otd, fid)]
+  # station of the day: the one with most visits
+  loc <- idv[, .N, by = c(keys, "location")]
+  data.table::setorderv(loc, c(keys, "N", "location"), c(1L, 1L, -1L, 1L))
+  loc <- loc[, .(location = location[1L]), by = keys]
+
+  out <- Reduce(function(x, z) x[z, on = keys], list(out, loc, m, sm))
+  data.table::setcolorder(out, c(keys, "location", "n_visits", "n_error_visits", "dfi_raw", "y"))
+  data.table::setorderv(out, keys)
   out[]
 }

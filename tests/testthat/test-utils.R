@@ -34,6 +34,12 @@ test_that("ppt_msg and ppt_warn respect verbose", {
     "done"
   }
   expect_silent(silent())
+  warn_now <- function() {
+    local_verbose(1)
+    ppt_warn("shown at once")
+  }
+  expect_message(warn_now(), "shown at once")
+  expect_no_warning(suppressMessages(warn_now()))
   loud <- function() {
     local_verbose(1)
     ppt_msg("shown")
