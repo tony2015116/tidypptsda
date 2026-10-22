@@ -148,11 +148,20 @@ fcr_by_bin <- function(adg, adfi, qc) {
   # how much of each class is covered by recorded body weights
   ob <- adg$daily[source == "observed" & !is.na(weight)]
   ob[, weight_from := cls(weight)]
-  cov <- ob[weight_from >= lo & weight_from < hi,
-            .(weight_coverage_kg = max(weight) - min(weight)), by = .(responder, weight_from)]
+  ob <- ob[weight_from >= lo & weight_from < hi]
+  cov <- if (nrow(ob) > 0L) {
+    ob[, .(weight_coverage_kg = max(weight) - min(weight)), by = .(responder, weight_from)]
+  } else {
+    data.table::data.table(responder = character(), weight_from = numeric(),
+                           weight_coverage_kg = numeric())
+  }
   bins <- merge(bins, cov, by = c("responder", "weight_from"), all.x = TRUE)
   bins[is.na(weight_coverage_kg), weight_coverage_kg := 0]
-  rng <- cov[, .(first_bin = min(weight_from), last_bin = max(weight_from)), by = responder]
+  rng <- if (nrow(cov) > 0L) {
+    cov[, .(first_bin = min(weight_from), last_bin = max(weight_from)), by = responder]
+  } else {
+    data.table::data.table(responder = character(), first_bin = numeric(), last_bin = numeric())
+  }
   bins <- merge(bins, rng, by = "responder", all.x = TRUE)
   bins[, inner := (weight_from > first_bin & weight_from < last_bin) %in% TRUE]
   bins[, low_coverage := inner & weight_coverage_kg < qc$min_bin_coverage_kg]

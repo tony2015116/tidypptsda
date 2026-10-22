@@ -72,6 +72,13 @@ test_that("calc_adg works on both datasets and every curve", {
   }
 })
 
+test_that("calc_adg explains when no pig is left", {
+  n <- data.table::as.data.table(nedap)
+  short <- n[visit_time < min(visit_time) + 10 * 86400]
+  w <- clean_weight(prep_visits(short, verbose = 0), verbose = 0)
+  expect_error(calc_adg(w, verbose = 0), "No pig is left")
+})
+
 test_that("Gompertz falls back to a quadratic curve when nls fails", {
   # a straight line has no Gompertz shape
   w <- clean_weight(line_pig(), no_checks(curve_model = "gompertz"), verbose = 0)

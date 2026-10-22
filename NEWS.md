@@ -1,3 +1,20 @@
+# tidypptsda 0.6.1
+
+## Bug fixes
+
+* Visit times given as POSIXct in a time zone other than UTC (for example
+  read from a database as Asia/Shanghai) were split into days at 00:00 UTC,
+  i.e. 08:00 Beijing time: on the example data 27% of visits got the
+  previous day's date and ADFI changed by up to 50 g/d. Clock times are now
+  kept, so a day always runs from 00:00 to 24:00 local time.
+* `calc_adg()` failed with a cryptic data.table error when `clean_weight()`
+  had removed every pig (e.g. a test period that is too short); it now says
+  so and lists the most common reasons.
+* `calc_fcr()` printed R warnings (`no non-missing arguments to min`) when no
+  body weight record fell inside `stage_range`.
+* With `cores > 1` on Linux/macOS, stopping a run (Esc / Ctrl+C, or an error)
+  left the worker processes running in the background; they are now stopped.
+
 # tidypptsda 0.6.0
 
 ## Validation
