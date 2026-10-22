@@ -75,6 +75,13 @@
 #' - `stage_range`: body weight interval for ADG and FCR, kg.
 #' - `curve_model`: `"poly1"`, `"poly2"`, `"poly3"`, `"loess"` or
 #'   `"gompertz"` (falls back to `"poly2"` when it does not converge).
+#' - `curve_margin_kg`: optional, fit the growth curve only to the records
+#'   around the stage: from the last day whose daily median weight is below
+#'   `stage_range[1] - curve_margin_kg` to the first day above
+#'   `stage_range[2] + curve_margin_kg` (cut by time, not by weight). Early
+#'   weeks far below the stage (e.g. slow growth after entry) then no longer
+#'   bend the curve. Falls back to all records when fewer than 10 records or
+#'   7 days remain. `NULL` (default) = all records; 5 is a sensible value.
 #' - `max_extrap_days`: maximum extrapolation of the curve, days.
 #'
 #' **Feeder errors** (Casey et al. 2005, Table 3)
@@ -281,6 +288,7 @@ qc_defaults <- function() {
     # growth and ADG
     stage_range = c(30, 120),
     curve_model = "poly2",
+    curve_margin_kg = NULL,
     max_extrap_days = 30,
     # feeder errors, Casey et al. (2005) Table 3
     fiv_range = c(-20, 2000),
@@ -344,6 +352,7 @@ qc_groups <- function() {
     exit_weight_min = "Pig-level checks", curve_r2_min = "Pig-level checks",
     max_daily_jump_kg = "Pig-level checks",
     stage_range = "Growth and ADG", curve_model = "Growth and ADG",
+    curve_margin_kg = "Growth and ADG",
     max_extrap_days = "Growth and ADG",
     fiv_range = "Feeder errors", fiv0_abs_max = "Feeder errors",
     duration_max = "Feeder errors", speed_fiv_lo_max = "Feeder errors",
@@ -378,6 +387,7 @@ qc_spec <- function() {
     entry_weight_max = num(0), exit_weight_min = num(0),
     curve_r2_min = num(0, 1, null = TRUE), max_daily_jump_kg = num(0, null = TRUE),
     stage_range = rng(0), curve_model = chc(c("poly1", "poly2", "poly3", "loess", "gompertz")),
+    curve_margin_kg = num(0, null = TRUE),
     max_extrap_days = num(0),
     fiv_range = rng(), fiv0_abs_max = num(0), duration_max = num(0),
     speed_fiv_lo_max = num(0), speed_strict_max = num(0), speed_range = rng(0),

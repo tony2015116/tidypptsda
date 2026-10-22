@@ -690,6 +690,13 @@ Three presets are available, and any single parameter can be overridden.
 #' - `stage_range`: body weight interval for ADG and FCR, kg.
 #' - `curve_model`: `"poly1"`, `"poly2"`, `"poly3"`, `"loess"` or
 #'   `"gompertz"` (falls back to `"poly2"` when it does not converge).
+#' - `curve_margin_kg`: optional, fit the growth curve only to the records
+#'   around the stage: from the last day whose daily median weight is below
+#'   `stage_range[1] - curve_margin_kg` to the first day above
+#'   `stage_range[2] + curve_margin_kg` (cut by time, not by weight). Early
+#'   weeks far below the stage (e.g. slow growth after entry) then no longer
+#'   bend the curve. Falls back to all records when fewer than 10 records or
+#'   7 days remain. `NULL` (default) = all records; 5 is a sensible value.
 #' - `max_extrap_days`: maximum extrapolation of the curve, days.
 #'
 #' **Feeder errors** (Casey et al. 2005, Table 3)
@@ -886,6 +893,7 @@ qc_defaults <- function() {
     # growth and ADG
     stage_range = c(30, 120),
     curve_model = "poly2",
+    curve_margin_kg = NULL,
     max_extrap_days = 30,
     # feeder errors, Casey et al. (2005) Table 3
     fiv_range = c(-20, 2000),
@@ -949,6 +957,7 @@ qc_groups <- function() {
     exit_weight_min = "Pig-level checks", curve_r2_min = "Pig-level checks",
     max_daily_jump_kg = "Pig-level checks",
     stage_range = "Growth and ADG", curve_model = "Growth and ADG",
+    curve_margin_kg = "Growth and ADG",
     max_extrap_days = "Growth and ADG",
     fiv_range = "Feeder errors", fiv0_abs_max = "Feeder errors",
     duration_max = "Feeder errors", speed_fiv_lo_max = "Feeder errors",
@@ -983,6 +992,7 @@ qc_spec <- function() {
     entry_weight_max = num(0), exit_weight_min = num(0),
     curve_r2_min = num(0, 1, null = TRUE), max_daily_jump_kg = num(0, null = TRUE),
     stage_range = rng(0), curve_model = chc(c("poly1", "poly2", "poly3", "loess", "gompertz")),
+    curve_margin_kg = num(0, null = TRUE),
     max_extrap_days = num(0),
     fiv_range = rng(), fiv0_abs_max = num(0), duration_max = num(0),
     speed_fiv_lo_max = num(0), speed_strict_max = num(0), speed_range = rng(0),
@@ -2743,14 +2753,16 @@ Every pig gets an `adg_type`:
 #'
 #' @param weight Result of [clean_weight()].
 #' @param qc QC settings; by default the ones used by [clean_weight()].
-#'   Used here: `stage_range`, `curve_model`, `loess_span`,
-#'   `max_extrap_days`.
+#'   Used here: `stage_range`, `curve_model`, `curve_margin_kg`,
+#'   `loess_span`, `max_extrap_days`.
 #' @param verbose 0 (silent), 1 (summary, default) or 2 (details).
 #' @param cores Number of CPU cores for the per-pig computations. Default 1.
 #'
 #' @return An object of class `ppt_adg` (a list):
 #'   - `per_pig`: one row per pig (pigs removed by [clean_weight()] are not
-#'     included) with `stage`, `curve_used`, `curve_r2`, `adg_type`,
+#'     included) with `stage`, `curve_used`, `curve_r2`, `curve_start` /
+#'     `curve_end` (first and last day of the records the curve was fitted
+#'     to, see `curve_margin_kg`), `adg_type`,
 #'     `start_date` / `end_date` and `start_weight` / `end_weight` (when the
 #'     curve reaches the stage limits, kg), `stage_days`,
 #'     `extrap_days_start` / `extrap_days_end` (days the curve is
@@ -2811,6 +2823,7 @@ calc_adg <- function(weight, qc = weight$settings, verbose = 1, cores = 1) {
   }
 
   cols <- c("responder", "location", "breed", "stage", "curve_used", "curve_r2",
+            "curve_start", "curve_end",
             "adg_type", "start_date", "end_date", "start_weight", "end_weight",
             "stage_days", "extrap_days_start", "extrap_days_end", "adg", "lm_slope",
             "r_squared", "weight_status",
@@ -2835,12 +2848,13 @@ adg_one_pig <- function(d, qc, day0) {
   t <- as.numeric(difftime(d$entry_time, as.POSIXct(first_day, tz = "UTC"),
                            units = "days"))
   y <- d$weight
-  curve <- fit_growth_curve(t, y, qc$curve_model, qc$loess_span)
+  win <- curve_window(d$date, y, qc)
+  curve <- fit_growth_curve(t[win], y[win], qc$curve_model, qc$loess_span)
 
   lo <- qc$stage_range[1L]
   hi <- qc$stage_range[2L]
-  tmin <- min(t)
-  tmax <- max(t)
+  tmin <- min(t[win])
+  tmax <- max(t[win])
   from <- tmin - qc$max_extrap_days
   to <- tmax + qc$max_extrap_days
 
@@ -2899,6 +2913,8 @@ adg_one_pig <- function(d, qc, day0) {
   data.table::data.table(
     curve_used = curve$name,
     curve_r2 = curve$r2,
+    curve_start = min(d$date[win]),
+    curve_end = max(d$date[win]),
     adg_type = adg_type,
     start_date = if (is.na(t_lo)) as.Date(NA) else first_day + floor(t_lo),
     end_date = if (is.na(t_hi)) as.Date(NA) else first_day + floor(t_hi),
@@ -2962,6 +2978,26 @@ fit_growth_curve <- function(t, y, model, span = 0.75) {
 
 # First time in [from, to] at which `pred` rises to `target`. NA if the
 # curve is already above the target at `from` or never reaches it.
+# Records used for the growth curve (see `curve_margin_kg` in qc_config()):
+# from the last day below the stage minus the margin to the first day above
+# the stage plus the margin, by time.
+curve_window <- function(date, y, qc) {
+  all <- rep(TRUE, length(y))
+  m <- qc$curve_margin_kg
+  if (is.null(m)) return(all)
+  dm <- vapply(split(y, date), stats::median, numeric(1))
+  days <- as.Date(names(dm))
+  lo <- qc$stage_range[1L] - m
+  hi <- qc$stage_range[2L] + m
+  above <- which(dm > hi)
+  end <- if (length(above) > 0L) days[above[1L]] else max(days)
+  below <- which(dm < lo & days < end)
+  start <- if (length(below) > 0L) days[max(below)] else min(days)
+  win <- date >= start & date <= end
+  if (sum(win) < 10L || data.table::uniqueN(date[win]) < 7L) return(all)
+  win
+}
+
 # Last time in [from, to] at which the curve rises through `target`, NA if it
 # never does (e.g. it is above `target` the whole time).
 last_up_cross <- function(pred, target, from, to, step = 0.1) {
@@ -3109,6 +3145,23 @@ test_that("lm_slope uses the records between the stage start and end times", {
   q <- no_checks(curve_model = "poly1")
   a <- calc_adg(clean_weight(pig, q, verbose = 0), verbose = 0)$per_pig
   expect_equal(a$lm_slope, a$adg, tolerance = 0.02)
+})
+
+test_that("curve_margin_kg fits the curve around the stage only", {
+  # slow growth for 4 weeks after entry at 20 kg, then 1 kg/d
+  pig <- line_pig(start = 20, rate = 1, days = 140, noise = 0.3)
+  tt <- as.numeric(pig$entry_time - min(pig$entry_time), units = "days")
+  pig[, weight := 20 + ifelse(tt < 28, 0.1 * tt, 2.8 + (tt - 28)) + stats::rnorm(.N, 0, 0.3)]
+  q <- no_checks(curve_model = "poly2", weight_track = FALSE)
+  w <- clean_weight(pig, q, verbose = 0)
+  all <- calc_adg(w, verbose = 0)$per_pig
+  cut <- calc_adg(w, qc = qc_set(q, list(curve_margin_kg = 5)), verbose = 0)$per_pig
+  expect_lt(abs(cut$adg - 1000), abs(all$adg - 1000))
+  expect_equal(cut$adg, 1000, tolerance = 0.02)
+  expect_gt(cut$curve_start, all$curve_start)
+  expect_lt(cut$curve_end, all$curve_end)
+  # too few records left: all records are used
+  expect_true(all(curve_window(as.Date("2024-01-01") + 0:5, 10 + 0:5, qc_set(q, list(curve_margin_kg = 5)))))
 })
 
 test_that("calc_adg explains when no pig is left", {

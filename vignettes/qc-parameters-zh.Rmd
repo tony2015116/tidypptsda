@@ -16,7 +16,7 @@ library(tidypptsda)
 library(data.table)
 ```
 
-tidypptsda 把整个分析流程中的全部阈值都集中在 `qc_config()` 返回的一个对象里。各分析函数通过 `qc` 参数接收这个对象，结果中的 `$settings` 也会原样保存这份设置，方便复现。本文逐一说明 44 个参数；三套预设的区别见《质控预设说明》。
+tidypptsda 把整个分析流程中的全部阈值都集中在 `qc_config()` 返回的一个对象里。各分析函数通过 `qc` 参数接收这个对象，结果中的 `$settings` 也会原样保存这份设置，方便复现。本文逐一说明 45 个参数；三套预设的区别见《质控预设说明》。
 
 ## 1. 基本用法
 
@@ -60,7 +60,7 @@ qc_config(entry_weight_max = 90)         # 进站体重上限不小于出栏体�
 | 跨站 | `max_gap_days`、`max_overlap_days`、`max_jump_kg` | 3、1、10 | `prep_visits()` |
 | 体重记录 | `weight_range`、`weight_outlier`、`outlier_combine`、`rlm_cutoff`、`sd_max`、`loess_span`、`rel_dev_max`、`daily_drop_min`、`weight_track`、`track_tol` | 15–150、rlm、any、0.5、3、0.75、NULL、NULL、TRUE、0.08 | `clean_weight()` |
 | 个体判定 | `min_test_days`、`min_records`、`max_missing_rate`、`entry_weight_max`、`exit_weight_min`、`curve_r2_min`、`max_daily_jump_kg`、`track_flag_share` | 35、20、0.30、65、85、NULL、NULL、0.4 | `clean_weight()` |
-| 生长曲线 | `stage_range`、`curve_model`、`max_extrap_days` | 30–120、poly2、30 | `calc_adg()` |
+| 生长曲线 | `stage_range`、`curve_model`、`curve_margin_kg`、`max_extrap_days` | 30–120、poly2、NULL、30 | `calc_adg()` |
 | 采食错误 | `fiv_range`、`fiv0_abs_max`、`duration_max`、`speed_fiv_lo_max`、`speed_strict_max`、`speed_range`、`idle_duration_max`、`trough_diff_range`、`max_unidentified_feed_kg`、`fiv_max_by_weight` | −20–2000、20、3600、500、110、2–170、500、−20–1800、90、NULL | `flag_feed_errors()` |
 | 日采食 | `dfi_range`、`dfi_quantile`、`dfi_correct`、`impute_method`、`long_gap_days` | 0–6、NULL、lmm、linear、7 | `calc_adfi()` |
 | 可信度 | `max_edge_extrap_days`、`min_coverage`、`bin_width`、`min_bin_coverage_kg`、`bin_fcr_limits` | 15、0.7、10、6、NULL | `calc_fcr()` |
@@ -178,6 +178,7 @@ summary(w_n$per_pig$max_daily_jump)
 |---|---|---|---|---|
 | `stage_range` | 计算 ADG、ADFI、FCR 的体重区间 | kg | 30–120 | 必须落在 `weight_range` 之内 |
 | `curve_model` | 生长曲线：`"poly1"`、`"poly2"`、`"poly3"`（1–3 次多项式）、`"loess"`、`"gompertz"` | — | `"poly2"` | 见左 |
+| `curve_margin_kg` | 可选：只用区间附近的记录拟合生长曲线，见下文 | kg | NULL（用全部记录） | ≥ 0 |
 | `max_extrap_days` | 曲线在首条记录之前、末条记录之后最多外推的天数 | 天 | 30 | ≥ 0 |
 
 ADG 的计算方法：在拟合曲线上找出区间的起止时间，用两端的体重差除以天数。
@@ -190,6 +191,26 @@ ADG 的计算方法：在拟合曲线上找出区间的起止时间，用两端�
 
 - `gompertz` 用 `nls(SSgompertz)` 拟合。不收敛时自动改用二次曲线，实际使用的曲线记录在 `curve_used` 列中。
 - `loess` 曲线超出观测范围的部分，按两端的斜率直线延伸。
+
+### 只用区间附近的记录拟合：`curve_margin_kg`
+
+默认用一头猪的全部有效记录拟合生长曲线。如果进站后有几周长得很慢（进站适应期），二次曲线要同时贴合"前期平、后期陡"两段，会把穿过区间下限的时间点拉早，日增重偏低。
+
+设置 `curve_margin_kg` 后，只用区间附近的记录拟合：从日中位体重**最后一次**低于"下限 − `curve_margin_kg`"的那天，到**第一次**超过"上限 + `curve_margin_kg`"的那天，按时间截取。剩余记录不足 10 条或不足 7 天时，自动改用全部记录。实际使用的起止日期记录在 `curve_start`、`curve_end` 列中。
+
+```{r margin}
+w_n <- clean_weight(prep_visits(nedap, verbose = 0), verbose = 0)
+rbindlist(lapply(list(NULL, 10, 5, 2), function(m) {
+  a <- calc_adg(w_n, qc = qc_config(curve_margin_kg = m), verbose = 0)$per_pig
+  data.table(curve_margin_kg = if (is.null(m)) "NULL（全部）" else m,
+             mean_adg = round(mean(a$adg)),
+             mean_abs_diff_lm_slope = round(mean(abs(a$adg - a$lm_slope), na.rm = TRUE), 1))
+}))
+```
+
+`mean_abs_diff_lm_slope` 是 ADG 与 `lm_slope`（起止时间之间的直线回归斜率）的平均差距。截取后，曲线主要由区间内的数据决定，两种算法更接近。
+
+**调整建议**：进站体重明显低于区间下限、进站后有适应期的批次，建议设为 5。注意：没有到达区间上限、需要外推终点的猪（`adg_type = "extrapolated"`），截取后曲线只剩区间内的一段，外推更依赖末段走势，ADG 可能比不截取时略低，应结合 `lm_slope` 一起看。
 
 ### 示例：`stage_range` 对 FIRE 数据的影响
 

@@ -8,14 +8,16 @@
 #'
 #' @param weight Result of [clean_weight()].
 #' @param qc QC settings; by default the ones used by [clean_weight()].
-#'   Used here: `stage_range`, `curve_model`, `loess_span`,
-#'   `max_extrap_days`.
+#'   Used here: `stage_range`, `curve_model`, `curve_margin_kg`,
+#'   `loess_span`, `max_extrap_days`.
 #' @param verbose 0 (silent), 1 (summary, default) or 2 (details).
 #' @param cores Number of CPU cores for the per-pig computations. Default 1.
 #'
 #' @return An object of class `ppt_adg` (a list):
 #'   - `per_pig`: one row per pig (pigs removed by [clean_weight()] are not
-#'     included) with `stage`, `curve_used`, `curve_r2`, `adg_type`,
+#'     included) with `stage`, `curve_used`, `curve_r2`, `curve_start` /
+#'     `curve_end` (first and last day of the records the curve was fitted
+#'     to, see `curve_margin_kg`), `adg_type`,
 #'     `start_date` / `end_date` and `start_weight` / `end_weight` (when the
 #'     curve reaches the stage limits, kg), `stage_days`,
 #'     `extrap_days_start` / `extrap_days_end` (days the curve is
@@ -85,6 +87,7 @@ calc_adg <- function(weight, qc = weight$settings, verbose = 1, cores = 1) {
   }
 
   cols <- c("responder", "location", "breed", "stage", "curve_used", "curve_r2",
+            "curve_start", "curve_end",
             "adg_type", "start_date", "end_date", "start_weight", "end_weight",
             "stage_days", "extrap_days_start", "extrap_days_end", "adg", "lm_slope",
             "r_squared", "weight_status",
@@ -109,12 +112,13 @@ adg_one_pig <- function(d, qc, day0) {
   t <- as.numeric(difftime(d$entry_time, as.POSIXct(first_day, tz = "UTC"),
                            units = "days"))
   y <- d$weight
-  curve <- fit_growth_curve(t, y, qc$curve_model, qc$loess_span)
+  win <- curve_window(d$date, y, qc)
+  curve <- fit_growth_curve(t[win], y[win], qc$curve_model, qc$loess_span)
 
   lo <- qc$stage_range[1L]
   hi <- qc$stage_range[2L]
-  tmin <- min(t)
-  tmax <- max(t)
+  tmin <- min(t[win])
+  tmax <- max(t[win])
   from <- tmin - qc$max_extrap_days
   to <- tmax + qc$max_extrap_days
 
@@ -173,6 +177,8 @@ adg_one_pig <- function(d, qc, day0) {
   data.table::data.table(
     curve_used = curve$name,
     curve_r2 = curve$r2,
+    curve_start = min(d$date[win]),
+    curve_end = max(d$date[win]),
     adg_type = adg_type,
     start_date = if (is.na(t_lo)) as.Date(NA) else first_day + floor(t_lo),
     end_date = if (is.na(t_hi)) as.Date(NA) else first_day + floor(t_hi),
@@ -236,6 +242,26 @@ fit_growth_curve <- function(t, y, model, span = 0.75) {
 
 # First time in [from, to] at which `pred` rises to `target`. NA if the
 # curve is already above the target at `from` or never reaches it.
+# Records used for the growth curve (see `curve_margin_kg` in qc_config()):
+# from the last day below the stage minus the margin to the first day above
+# the stage plus the margin, by time.
+curve_window <- function(date, y, qc) {
+  all <- rep(TRUE, length(y))
+  m <- qc$curve_margin_kg
+  if (is.null(m)) return(all)
+  dm <- vapply(split(y, date), stats::median, numeric(1))
+  days <- as.Date(names(dm))
+  lo <- qc$stage_range[1L] - m
+  hi <- qc$stage_range[2L] + m
+  above <- which(dm > hi)
+  end <- if (length(above) > 0L) days[above[1L]] else max(days)
+  below <- which(dm < lo & days < end)
+  start <- if (length(below) > 0L) days[max(below)] else min(days)
+  win <- date >= start & date <= end
+  if (sum(win) < 10L || data.table::uniqueN(date[win]) < 7L) return(all)
+  win
+}
+
 # Last time in [from, to] at which the curve rises through `target`, NA if it
 # never does (e.g. it is above `target` the whole time).
 last_up_cross <- function(pred, target, from, to, step = 0.1) {

@@ -28,6 +28,17 @@
 * `validate_outliers()` compares `"track"` with the other methods (which run
   without tracking).
 
+## ADG
+
+* New QC parameter `curve_margin_kg` (default `NULL` = all records): fit the
+  growth curve only to the records from the last day below
+  `stage_range[1] - curve_margin_kg` to the first day above
+  `stage_range[2] + curve_margin_kg` (cut by time). Slow growth for weeks
+  after entry then no longer bends the curve and pulls the stage start
+  earlier. With 5 kg, the mean difference between ADG and `lm_slope` drops
+  from 29 to 19 g/d on the NEDAP example. New `per_pig` columns
+  `curve_start` and `curve_end`.
+
 ## Website
 
 * "Get started" and "News" are now in the navigation bar.

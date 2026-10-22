@@ -95,6 +95,13 @@ Default 0.4.
 \item \code{stage_range}: body weight interval for ADG and FCR, kg.
 \item \code{curve_model}: \code{"poly1"}, \code{"poly2"}, \code{"poly3"}, \code{"loess"} or
 \code{"gompertz"} (falls back to \code{"poly2"} when it does not converge).
+\item \code{curve_margin_kg}: optional, fit the growth curve only to the records
+around the stage: from the last day whose daily median weight is below
+\code{stage_range[1] - curve_margin_kg} to the first day above
+\code{stage_range[2] + curve_margin_kg} (cut by time, not by weight). Early
+weeks far below the stage (e.g. slow growth after entry) then no longer
+bend the curve. Falls back to all records when fewer than 10 records or
+7 days remain. \code{NULL} (default) = all records; 5 is a sensible value.
 \item \code{max_extrap_days}: maximum extrapolation of the curve, days.
 }
 
