@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.3.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.4.0</span>
       </span>
     </div>
 
@@ -65,6 +65,27 @@
       <small>Source: <a href="https://github.com/tony2015116/tidypptsda/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="page-header" data-toc-text="0.4.0" id="tidypptsda-040">tidypptsda 0.4.0<a class="anchor" aria-label="anchor" href="#tidypptsda-040"></a></h2>
+<div class="section level3">
+<h3 id="new-features-0-4-0">New features<a class="anchor" aria-label="anchor" href="#new-features-0-4-0"></a></h3>
+<ul><li>
+<code><a href="../reference/add_breed.html">add_breed()</a></code> merges a breed (line) table from your own records into the visit table. <code><a href="../reference/prep_visits.html">prep_visits()</a></code> keeps a <code>breed</code> column of the raw data and otherwise reminds you to add one. With breed, <code><a href="../reference/calc_adfi.html">calc_adfi()</a></code> adds it as a fixed effect to the correction model and <code><a href="../reference/calc_fcr.html">calc_fcr()</a></code> summarises traits by breed. <code><a href="../reference/run_pipeline.html">run_pipeline()</a></code> gains <code>breeds</code>.</li>
+<li>QC parameter <code>fiv_max_by_weight</code>: the FIV-hi limit can depend on body weight (and breed) instead of the fixed 2000 g. The limit used for each visit is kept in column <code>fiv_max</code>. Example table: <code><a href="../reference/fiv_max_example.html">fiv_max_example()</a></code>.</li>
+<li>QC parameter <code>max_daily_jump_kg</code> (off by default): flags pigs whose daily median weight changes too fast; <code><a href="../reference/clean_weight.html">clean_weight()</a></code> always reports <code>max_daily_jump</code>.</li>
+<li>
+<code><a href="../reference/calc_fcr.html">calc_fcr()</a></code> returns <code>$by_bin</code>: feed, gain and FCR per body weight class (<code>bin_width</code>, default 10 kg). Inner classes covered by less than <code>min_bin_coverage_kg</code> (default 6 kg) of recorded weights, and segment FCR outside the optional <code>bin_fcr_limits</code> (example: <code><a href="../reference/fiv_max_example.html">bin_fcr_example()</a></code>), flag the pig as low confidence.</li>
+<li>
+<code><a href="../reference/write_results.html">write_results()</a></code> writes all result tables to CSV files named <code>&lt;farm&gt;_&lt;table&gt;_&lt;date&gt;.csv</code> (UTF-8 with BOM for Excel).</li>
+<li>
+<code><a href="../reference/clean_weight.html">clean_weight()</a></code>, <code><a href="../reference/calc_adg.html">calc_adg()</a></code>, <code><a href="../reference/calc_adfi.html">calc_adfi()</a></code> and <code><a href="../reference/run_pipeline.html">run_pipeline()</a></code> gain <code>cores</code> for parallel per-pig computation (base package parallel).</li>
+</ul></div>
+<div class="section level3">
+<h3 id="bug-fixes-0-4-0">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-4-0"></a></h3>
+<ul><li>
+<code><a href="../reference/calc_fcr.html">calc_fcr()</a></code>: the numbers in <code>fcr_note</code> (coverage, extrapolated days) could belong to another pig when several pigs were flagged. The flags themselves were right.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="page-header" data-toc-text="0.3.0" id="tidypptsda-030">tidypptsda 0.3.0<a class="anchor" aria-label="anchor" href="#tidypptsda-030"></a></h2>
 <div class="section level3">

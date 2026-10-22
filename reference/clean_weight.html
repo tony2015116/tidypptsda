@@ -18,7 +18,7 @@ pig whether its weight data are good enough for growth analysis."><meta property
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.3.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.4.0</span>
       </span>
     </div>
 
@@ -73,7 +73,7 @@ pig whether its weight data are good enough for growth analysis.</p>
     </div>
 
     <div id="ref-usage">
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">clean_weight</span><span class="op">(</span><span class="va">visits</span>, qc <span class="op">=</span> <span class="fu"><a href="qc_config.html">qc_config</a></span><span class="op">(</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">clean_weight</span><span class="op">(</span><span class="va">visits</span>, qc <span class="op">=</span> <span class="fu"><a href="qc_config.html">qc_config</a></span><span class="op">(</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">1</span>, cores <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div id="arguments">
@@ -94,6 +94,10 @@ pig whether its weight data are good enough for growth analysis.</p>
 
 <dt id="arg-verbose">verbose<a class="anchor" aria-label="anchor" href="#arg-verbose"></a></dt>
 <dd><p>0 (silent), 1 (summary, default) or 2 (details).</p></dd>
+
+
+<dt id="arg-cores">cores<a class="anchor" aria-label="anchor" href="#arg-cores"></a></dt>
+<dd><p>Number of CPU cores for the per-pig computations. Default 1.</p></dd>
 
 </dl></div>
     <div id="value">
@@ -116,8 +120,10 @@ valid weights (<code>weight</code>, kg), <code>n_records</code>, <code>n_outlier
     <p>Pig checks use the valid (non-outlier) records only:</p><ul><li><p><code>n_valid &lt; min_records</code>, <code>test_days &lt; min_test_days</code> or
 <code>missing_rate &gt; max_missing_rate</code> (share of test days without a valid
 weight) remove the pig;</p></li>
-<li><p><code>entry_weight &gt; entry_weight_max</code>, <code>exit_weight &lt; exit_weight_min</code> or
-<code>r2 &lt; curve_r2_min</code> mark the pig <code>"low_confidence"</code> but keep it: its
+<li><p><code>entry_weight &gt; entry_weight_max</code>, <code>exit_weight &lt; exit_weight_min</code>,
+<code>r2 &lt; curve_r2_min</code> or <code>max_daily_jump &gt; max_daily_jump_kg</code> (the
+largest change of the daily median weight between consecutive recorded
+days, kg/d) mark the pig <code>"low_confidence"</code> but keep it: its
 growth can still be estimated by extrapolation in <code><a href="calc_adg.html">calc_adg()</a></code>, with a
 flag.</p></li>
 </ul></div>
@@ -142,7 +148,7 @@ settings.</p></div>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> ── <span style="color: #0000BB; font-weight: bold;">&lt;ppt_weight&gt;</span> ──</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Pigs: 30 (keep 28, low confidence 1, removed 1)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">$per_pig</span>: 30 rows x 14 columns</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">$per_pig</span>: 30 rows x 15 columns</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">$daily</span>: 2789 rows x 7 columns</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">$removed</span>: 1 row x 4 columns</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">$records</span>: 31472 rows x 9 columns</span>

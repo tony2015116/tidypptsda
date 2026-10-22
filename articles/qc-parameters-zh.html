@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.3.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.4.0</span>
       </span>
     </div>
 
@@ -105,7 +105,7 @@
 <p>tidypptsda 把整个分析流程中的全部阈值都集中在
 <code><a href="../reference/qc_config.html">qc_config()</a></code> 返回的一个对象里。各分析函数通过
 <code>qc</code> 参数接收这个对象，结果中的 <code>$settings</code>
-也会原样保存这份设置，方便复现。本文逐一说明 36
+也会原样保存这份设置，方便复现。本文逐一说明 41
 个参数；三套预设的区别见《质控预设说明》。</p>
 <div class="section level2">
 <h2 id="基本用法">1. 基本用法<a class="anchor" aria-label="anchor" href="#%E5%9F%BA%E6%9C%AC%E7%94%A8%E6%B3%95"></a>
@@ -150,6 +150,7 @@
 <span><span class="co">#&gt;   <span style="color: #00BB00;">entry_weight_max</span>: 65</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">exit_weight_min</span>: 85</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">curve_r2_min</span>: NULL (off)</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">max_daily_jump_kg</span>: NULL (off)</span></span>
 <span><span class="co">#&gt; <span style="font-weight: bold;">Growth and ADG</span></span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">stage_range</span>: 30, 120</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">curve_model</span>: poly2</span></span>
@@ -164,6 +165,7 @@
 <span><span class="co">#&gt;   <span style="color: #00BB00;">idle_duration_max</span>: 500</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">trough_diff_range</span>: -20, 1800</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">max_unidentified_feed_kg</span>: 90</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">fiv_max_by_weight</span>: NULL (off)</span></span>
 <span><span class="co">#&gt; <span style="font-weight: bold;">Daily feed intake</span></span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">dfi_range</span>: 0, 6</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">dfi_quantile</span>: NULL (off)</span></span>
@@ -172,7 +174,10 @@
 <span><span class="co">#&gt;   <span style="color: #00BB00;">long_gap_days</span>: 7</span></span>
 <span><span class="co">#&gt; <span style="font-weight: bold;">Confidence flags</span></span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">max_edge_extrap_days</span>: 15</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">min_coverage</span>: 0.7</span></span></code></pre></div>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">min_coverage</span>: 0.7</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">bin_width</span>: 10</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">min_bin_coverage_kg</span>: 6</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">bin_fcr_limits</span>: NULL (off)</span></span></code></pre></div>
 <div class="section level3">
 <h3 id="参数检查">参数检查<a class="anchor" aria-label="anchor" href="#%E5%8F%82%E6%95%B0%E6%A3%80%E6%9F%A5"></a>
 </h3>
@@ -239,9 +244,9 @@
 <tr class="odd">
 <td>个体判定</td>
 <td>
-<code>min_test_days</code>、<code>min_records</code>、<code>max_missing_rate</code>、<code>entry_weight_max</code>、<code>exit_weight_min</code>、<code>curve_r2_min</code>
+<code>min_test_days</code>、<code>min_records</code>、<code>max_missing_rate</code>、<code>entry_weight_max</code>、<code>exit_weight_min</code>、<code>curve_r2_min</code>、<code>max_daily_jump_kg</code>
 </td>
-<td>35、20、0.30、65、85、NULL</td>
+<td>35、20、0.30、65、85、NULL、NULL</td>
 <td><code><a href="../reference/clean_weight.html">clean_weight()</a></code></td>
 </tr>
 <tr class="even">
@@ -255,9 +260,9 @@
 <tr class="odd">
 <td>采食错误</td>
 <td>
-<code>fiv_range</code>、<code>fiv0_abs_max</code>、<code>duration_max</code>、<code>speed_fiv_lo_max</code>、<code>speed_strict_max</code>、<code>speed_range</code>、<code>idle_duration_max</code>、<code>trough_diff_range</code>、<code>max_unidentified_feed_kg</code>
+<code>fiv_range</code>、<code>fiv0_abs_max</code>、<code>duration_max</code>、<code>speed_fiv_lo_max</code>、<code>speed_strict_max</code>、<code>speed_range</code>、<code>idle_duration_max</code>、<code>trough_diff_range</code>、<code>max_unidentified_feed_kg</code>、<code>fiv_max_by_weight</code>
 </td>
-<td>−20–2000、20、3600、500、110、2–170、500、−20–1800、90</td>
+<td>−20–2000、20、3600、500、110、2–170、500、−20–1800、90、NULL</td>
 <td><code><a href="../reference/flag_feed_errors.html">flag_feed_errors()</a></code></td>
 </tr>
 <tr class="even">
@@ -271,9 +276,9 @@
 <tr class="odd">
 <td>可信度</td>
 <td>
-<code>max_edge_extrap_days</code>、<code>min_coverage</code>
+<code>max_edge_extrap_days</code>、<code>min_coverage</code>、<code>bin_width</code>、<code>min_bin_coverage_kg</code>、<code>bin_fcr_limits</code>
 </td>
-<td>15、0.7</td>
+<td>15、0.7、10、6、NULL</td>
 <td><code><a href="../reference/calc_fcr.html">calc_fcr()</a></code></td>
 </tr>
 </tbody>
@@ -502,7 +507,7 @@ g，日采食量（<code>dfi_range</code>）用 kg，时间用秒（s）或天�
 <h2 id="个体判定参数">5. 个体判定参数<a class="anchor" aria-label="anchor" href="#%E4%B8%AA%E4%BD%93%E5%88%A4%E5%AE%9A%E5%8F%82%E6%95%B0"></a>
 </h2>
 <p>体重异常值剔除之后，<code><a href="../reference/clean_weight.html">clean_weight()</a></code>
-逐头猪判断能否用于生长分析。下表中前三个参数不满足时<strong>剔除</strong>该猪，后三个不满足时只<strong>降级</strong>为
+逐头猪判断能否用于生长分析。下表中前三个参数不满足时<strong>剔除</strong>该猪，后四个不满足时只<strong>降级</strong>为
 <code>low_confidence</code>，该猪仍参与后续计算。</p>
 <table class="table">
 <colgroup>
@@ -563,6 +568,14 @@ g，日采食量（<code>dfi_range</code>）用 kg，时间用秒（s）或天�
 <td>NULL（关闭）</td>
 <td>降级</td>
 </tr>
+<tr class="odd">
+<td><code>max_daily_jump_kg</code></td>
+<td>可选规则：相邻两个有记录的日子之间，日体重中位数的变化超过此值（按天折算），例如
+4</td>
+<td>kg/天</td>
+<td>NULL（关闭）</td>
+<td>降级</td>
+</tr>
 </tbody>
 </table>
 <p>进站和出栏体重不达标的猪只降级、不剔除，因为它们的 ADG 还可以在
@@ -575,7 +588,17 @@ g，日采食量（<code>dfi_range</code>）用 kg，时间用秒（s）或天�
 <li>
 <code>curve_r2_min</code> 常用 0.99。在示例数据中，清洗前约有 1/4
 的猪达不到这个值，所以只用来提示，不用来剔除。</li>
+<li>每头猪的最大日体重变化都记录在 <code>per_pig$max_daily_jump</code>
+列中，即使 <code>max_daily_jump_kg</code>
+是关闭的。体重突变通常意味着串号（两头猪共用一个耳标）或秤上同时站了两头猪。在示例数据中，日中位体重的噪声较大：阈值取
+4 kg 时，NEDAP 有 12/29 头猪会被标记，所以这条规则默认关闭。建议先看
+<code>max_daily_jump</code> 的分布，再决定阈值：</li>
 </ul>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">w_n</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/clean_weight.html">clean_weight</a></span><span class="op">(</span><span class="fu"><a href="../reference/prep_visits.html">prep_visits</a></span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">w_n</span><span class="op">$</span><span class="va">per_pig</span><span class="op">$</span><span class="va">max_daily_jump</span><span class="op">)</span></span>
+<span><span class="co">#&gt;    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. </span></span>
+<span><span class="co">#&gt;   1.750   3.312   3.812   4.408   4.969  10.750</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="生长曲线参数">6. 生长曲线参数<a class="anchor" aria-label="anchor" href="#%E7%94%9F%E9%95%BF%E6%9B%B2%E7%BA%BF%E5%8F%82%E6%95%B0"></a>
@@ -639,7 +662,7 @@ g，日采食量（<code>dfi_range</code>）用 kg，时间用秒（s）或天�
 </h3>
 <p>FIRE 示例数据中的猪在 45–60 kg 才进站，若仍按 30–120 kg
 计算，前段只能靠外推：</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">visits_f</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/prep_visits.html">prep_visits</a></span><span class="op">(</span><span class="va">fire</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/data.table/man/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>, <span class="fl">120</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">60</span>, <span class="fl">120</span><span class="op">)</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">st</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">q</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>stage_range <span class="op">=</span> <span class="va">st</span><span class="op">)</span></span>
@@ -653,8 +676,8 @@ g，日采食量（<code>dfi_range</code>）用 kg，时间用秒（s）或天�
 <span><span class="op">}</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;     stage observed extrapolated fcr_ok fcr_low</span></span>
 <span><span class="co">#&gt;    &lt;char&gt;    &lt;int&gt;        &lt;int&gt;  &lt;int&gt;   &lt;int&gt;</span></span>
-<span><span class="co">#&gt; 1: 30-120        0           24      8      17</span></span>
-<span><span class="co">#&gt; 2: 60-120       17            8     25       0</span></span></code></pre></div>
+<span><span class="co">#&gt; 1: 30-120        0           24      7      18</span></span>
+<span><span class="co">#&gt; 2: 60-120       17            8     23       2</span></span></code></pre></div>
 <p><strong>调整建议</strong>：<code>stage_range</code>
 的两端都应落在大多数猪的实测体重范围之内。区间下限宜比典型进站体重高
 5–10 kg，上限宜比典型出栏体重低约 5 kg。</p>
@@ -747,15 +770,71 @@ g，日采食量（<code>dfi_range</code>）用 kg，时间用秒（s）或天�
 <td>kg</td>
 <td>90</td>
 </tr>
+<tr class="even">
+<td><code>fiv_max_by_weight</code></td>
+<td>2 FIV-hi</td>
+<td>可选：按体重段（可再按品种）设定单次采食上限，代替
+<code>fiv_range</code> 的上限</td>
+<td>g</td>
+<td>NULL（关闭）</td>
+</tr>
 </tbody>
 </table>
 <p>规则 15、16（LTD-lo、FTD-lo：相邻访问在时间上重叠）没有参数。“前一次
 /
 后一次访问”指<strong>同一料槽</strong>上按进站时间排序的相邻访问，包括未识别耳标的访问。</p>
 <div class="section level3">
+<h3 id="按体重和品种设定单次采食上限fiv_max_by_weight">按体重和品种设定单次采食上限：<code>fiv_max_by_weight</code><a class="anchor" aria-label="anchor" href="#%E6%8C%89%E4%BD%93%E9%87%8D%E5%92%8C%E5%93%81%E7%A7%8D%E8%AE%BE%E5%AE%9A%E5%8D%95%E6%AC%A1%E9%87%87%E9%A3%9F%E4%B8%8A%E9%99%90fiv_max_by_weight"></a>
+</h3>
+<p>固定的 2000 g 上限对小猪偏宽、对大猪偏严：25 kg 的猪一次吃不了 2
+kg，而 120 kg 的猪一次吃 2.2 kg 也属正常。<code>fiv_max_by_weight</code>
+是一张表，每行给出一个体重段的上限：</p>
+<ul>
+<li>
+<code>weight_from</code>：体重段的下限（kg），一行的上限对”体重 ≥
+该值、且小于下一行”的访问生效；</li>
+<li>
+<code>fiv_max</code>：单次采食上限（g）；</li>
+<li>
+<code>breed</code>（可选）：品种。有这一列时按品种查表，没有出现在表中的品种仍使用
+2000 g；<code>breed</code> 为 NA 的行作为其他品种的默认值。</li>
+</ul>
+<p>每次访问时猪的体重：在 <code><a href="../reference/calc_adfi.html">calc_adfi()</a></code> 中，自动使用
+<code><a href="../reference/calc_adg.html">calc_adg()</a></code> 清洗、拟合后的日体重；单独调用
+<code><a href="../reference/flag_feed_errors.html">flag_feed_errors()</a></code> 时，可以用 <code>bw</code>
+参数传入同样的日体重表，否则使用当天原始体重的中位数（测定初期常被异常值抬高，查到的体重段会偏重）。没有体重的日子用前后两天插值。未识别耳标的访问没有体重，仍使用
+<code>fiv_range</code> 的上限。实际使用的上限保存在结果的
+<code>fiv_max</code> 列中。</p>
+<p>包里附带一张示例表
+<code><a href="../reference/fiv_max_example.html">fiv_max_example()</a></code>，来自测定站内部的质控脚本（<strong>不是文献值</strong>），包括
+YY、LL、DD 三个品种和 20–140 kg 的体重段：</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="../reference/fiv_max_example.html">fiv_max_example</a></span><span class="op">(</span><span class="op">)</span>, <span class="fl">4</span><span class="op">)</span></span>
+<span><span class="co">#&gt;     breed weight_from fiv_max</span></span>
+<span><span class="co">#&gt;    &lt;char&gt;       &lt;num&gt;   &lt;num&gt;</span></span>
+<span><span class="co">#&gt; 1:     YY          20   747.0</span></span>
+<span><span class="co">#&gt; 2:     YY          30   936.0</span></span>
+<span><span class="co">#&gt; 3:     YY          40  1125.1</span></span>
+<span><span class="co">#&gt; 4:     YY          50  1314.1</span></span>
+<span><span class="va">tab</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>weight_from <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq</a></span><span class="op">(</span><span class="fl">20</span>, <span class="fl">130</span>, <span class="fl">10</span><span class="op">)</span>,</span>
+<span>                  fiv_max <span class="op">=</span> <span class="fu"><a href="../reference/fiv_max_example.html">fiv_max_example</a></span><span class="op">(</span><span class="op">)</span><span class="op">[</span><span class="va">breed</span> <span class="op">==</span> <span class="st">"DD"</span>, <span class="va">fiv_max</span><span class="op">]</span><span class="op">)</span>     <span class="co"># 不分品种</span></span>
+<span><span class="va">visits_n</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/prep_visits.html">prep_visits</a></span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
+<span><span class="va">adg_n</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calc_adg.html">calc_adg</a></span><span class="op">(</span><span class="fu"><a href="../reference/clean_weight.html">clean_weight</a></span><span class="op">(</span><span class="va">visits_n</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
+<span><span class="va">bw_fit</span> <span class="op">&lt;-</span> <span class="va">adg_n</span><span class="op">$</span><span class="va">daily</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">date</span>, bw <span class="op">=</span> <span class="va">predicted</span><span class="op">)</span><span class="op">]</span>        <span class="co"># 清洗后的日体重</span></span>
+<span><span class="va">fixed</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flag_feed_errors.html">flag_feed_errors</a></span><span class="op">(</span><span class="va">visits_n</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
+<span><span class="va">raw_bw</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flag_feed_errors.html">flag_feed_errors</a></span><span class="op">(</span><span class="va">visits_n</span>, <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>fiv_max_by_weight <span class="op">=</span> <span class="va">tab</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
+<span><span class="va">fit_bw</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flag_feed_errors.html">flag_feed_errors</a></span><span class="op">(</span><span class="va">visits_n</span>, <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>fiv_max_by_weight <span class="op">=</span> <span class="va">tab</span><span class="op">)</span>, bw <span class="op">=</span> <span class="va">bw_fit</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>fixed_2000g <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">fixed</span><span class="op">$</span><span class="va">fiv_hi</span><span class="op">)</span>, by_weight_raw_bw <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">raw_bw</span><span class="op">$</span><span class="va">fiv_hi</span><span class="op">)</span>,</span>
+<span>  by_weight_fitted_bw <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">fit_bw</span><span class="op">$</span><span class="va">fiv_hi</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt;         fixed_2000g    by_weight_raw_bw by_weight_fitted_bw </span></span>
+<span><span class="co">#&gt;                   3                   1                   3</span></span></code></pre></div>
+<p>按品种使用时，先用 <code><a href="../reference/add_breed.html">add_breed()</a></code>
+把品种列加进访问表（见《中文使用说明》）。</p>
+</div>
+<div class="section level3">
 <h3 id="示例duration_max-对-fire-错误率的影响">示例：<code>duration_max</code> 对 FIRE 错误率的影响<a class="anchor" aria-label="anchor" href="#%E7%A4%BA%E4%BE%8Bduration_max-%E5%AF%B9-fire-%E9%94%99%E8%AF%AF%E7%8E%87%E7%9A%84%E5%BD%B1%E5%93%8D"></a>
 </h3>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/pkg/data.table/man/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1800</span>, <span class="fl">3600</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">d</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">f</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flag_feed_errors.html">flag_feed_errors</a></span><span class="op">(</span><span class="va">visits_f</span>, <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>duration_max <span class="op">=</span> <span class="va">d</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span>  <span class="va">r</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">f</span>, <span class="st">"error_rates"</span><span class="op">)</span></span>
@@ -846,8 +925,9 @@ LOESS</td>
 </tbody>
 </table>
 <p>校正模型的形式是
-<code>无错误日采食 ~ 站 + 当天体重 + ADG + 31 个错误协变量 + (1|猪)</code>，校正值
-= 无错误日采食 − Σ(系数 × 错误协变量)。没有错误的日子不受影响。</p>
+<code>无错误日采食 ~ 站 + 品种 + 当天体重 + ADG + 31 个错误协变量 + (1|猪)</code>（品种只在数据中有
+<code>breed</code> 列、且不止一个品种时加入），校正值 = 无错误日采食 −
+Σ(系数 × 错误协变量)。没有错误的日子不受影响。</p>
 <p><strong>调整建议</strong></p>
 <ul>
 <li>公猪后期日采食量可能超过 4 kg，<code>dfi_range</code> 的上限不宜低于
@@ -891,12 +971,35 @@ LOESS</td>
 <td>0.7</td>
 <td>0–1</td>
 </tr>
+<tr class="odd">
+<td><code>bin_width</code></td>
+<td>分段检查的体重段宽度</td>
+<td>kg</td>
+<td>10</td>
+<td>≥ 1</td>
+</tr>
+<tr class="even">
+<td><code>min_bin_coverage_kg</code></td>
+<td>中间体重段内，实测体重覆盖的范围小于此值时降级</td>
+<td>kg</td>
+<td>6</td>
+<td>0 至 <code>bin_width</code>
+</td>
+</tr>
+<tr class="odd">
+<td><code>bin_fcr_limits</code></td>
+<td>可选：每个体重段料肉比的合理范围，超出时降级</td>
+<td>—</td>
+<td>NULL（关闭）</td>
+<td>表：<code>weight_from</code>、<code>fcr_min</code>、<code>fcr_max</code>
+</td>
+</tr>
 </tbody>
 </table>
 <div class="section level3">
 <h3 id="示例max_edge_extrap_days-对可信个体数的影响">示例：<code>max_edge_extrap_days</code> 对可信个体数的影响<a class="anchor" aria-label="anchor" href="#%E7%A4%BA%E4%BE%8Bmax_edge_extrap_days-%E5%AF%B9%E5%8F%AF%E4%BF%A1%E4%B8%AA%E4%BD%93%E6%95%B0%E7%9A%84%E5%BD%B1%E5%93%8D"></a>
 </h3>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/pkg/data.table/man/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">10</span>, <span class="fl">15</span>, <span class="fl">30</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">k</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">q</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>max_edge_extrap_days <span class="op">=</span> <span class="va">k</span><span class="op">)</span></span>
 <span>  <span class="va">a</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/warning.html" class="external-link">suppressWarnings</a></span><span class="op">(</span><span class="fu"><a href="../reference/calc_adg.html">calc_adg</a></span><span class="op">(</span><span class="fu"><a href="../reference/clean_weight.html">clean_weight</a></span><span class="op">(</span><span class="va">visits_f</span>, <span class="va">q</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span><span class="op">)</span></span>
@@ -906,18 +1009,53 @@ LOESS</td>
 <span><span class="co">#&gt;    max_edge_extrap_days fcr_ok</span></span>
 <span><span class="co">#&gt;                   &lt;num&gt;  &lt;int&gt;</span></span>
 <span><span class="co">#&gt; 1:                   10      0</span></span>
-<span><span class="co">#&gt; 2:                   15      8</span></span>
-<span><span class="co">#&gt; 3:                   30     21</span></span></code></pre></div>
+<span><span class="co">#&gt; 2:                   15      7</span></span>
+<span><span class="co">#&gt; 3:                   30     19</span></span></code></pre></div>
 <p>缺失模拟显示：区间两端缺 10 天以内时，ADFI 误差约 2–4%；缺 20 天时约
 7%；缺 30 天时为 9–14%。默认的 15
 天是在”保留更多个体”和”保证精度”之间的折中。育种评估要求更高时可设为
 10，只做描述性统计时可放宽到 20。</p>
 </div>
+<div class="section level3">
+<h3 id="分段检查by_bin">分段检查：<code>$by_bin</code><a class="anchor" aria-label="anchor" href="#%E5%88%86%E6%AE%B5%E6%A3%80%E6%9F%A5by_bin"></a>
+</h3>
+<p><code><a href="../reference/calc_fcr.html">calc_fcr()</a></code> 把计算区间按 <code>bin_width</code>（默认 10
+kg）分段，对每头猪的每一段计算采食量、增重和分段料肉比，结果保存在
+<code>$by_bin</code> 中。有两项检查：</p>
+<ol style="list-style-type: decimal">
+<li>
+<strong>体重记录是否断档</strong>：对首尾段之间的中间段，如果实测体重覆盖的范围小于
+<code>min_bin_coverage_kg</code>（默认 6
+kg），说明这一段体重记录不足，例如耳标脱落、不会进站或设备故障，该猪降级。首尾段不做这项检查，它们由
+<code>max_edge_extrap_days</code> 管理。</li>
+<li>
+<strong>分段料肉比是否合理</strong>（可选）：设置
+<code>bin_fcr_limits</code>
+后，分段料肉比超出范围的段会被标出，该猪降级。包里附带的示例表
+<code><a href="../reference/fiv_max_example.html">bin_fcr_example()</a></code>
+同样来自测定站内部脚本，<strong>不是文献值</strong>。</li>
+</ol>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">res_n</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">nedap</span>, qc <span class="op">=</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>bin_fcr_limits <span class="op">=</span> <span class="fu"><a href="../reference/fiv_max_example.html">bin_fcr_example</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
+<span><span class="va">b</span> <span class="op">&lt;-</span> <span class="va">res_n</span><span class="op">$</span><span class="va">fcr</span><span class="op">$</span><span class="va">by_bin</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>segments <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">b</span><span class="op">)</span>, low_coverage <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">b</span><span class="op">$</span><span class="va">low_coverage</span><span class="op">)</span>, fcr_outside <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">b</span><span class="op">$</span><span class="va">fcr_out</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt;     segments low_coverage  fcr_outside </span></span>
+<span><span class="co">#&gt;          258            5            2</span></span>
+<span><span class="va">b</span><span class="op">[</span><span class="va">fcr_out</span> <span class="op">==</span> <span class="cn">TRUE</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">weight_from</span>, <span class="va">weight_to</span>, fcr <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">fcr</span>, <span class="fl">2</span><span class="op">)</span>, <span class="va">fcr_min</span>, <span class="va">fcr_max</span><span class="op">)</span><span class="op">]</span></span>
+<span><span class="co">#&gt; Key: &lt;responder&gt;</span></span>
+<span><span class="co">#&gt;    responder weight_from weight_to   fcr fcr_min fcr_max</span></span>
+<span><span class="co">#&gt;       &lt;char&gt;       &lt;num&gt;     &lt;num&gt; &lt;num&gt;   &lt;num&gt;   &lt;num&gt;</span></span>
+<span><span class="co">#&gt; 1:     15967          50        60   3.4    1.14    3.30</span></span>
+<span><span class="co">#&gt; 2:     15967          60        70   3.5    1.28    3.41</span></span></code></pre></div>
+<p>在示例数据中，分段料肉比超出范围的只有 15967 号的 50–70 kg
+段。这头猪在 4
+月下旬采食骤降、体重停止增长，很可能生过病，分段检查正好把它找了出来。</p>
+</div>
 </div>
 <div class="section level2">
 <h2 id="常用设置示例">10. 常用设置示例<a class="anchor" aria-label="anchor" href="#%E5%B8%B8%E7%94%A8%E8%AE%BE%E7%BD%AE%E7%A4%BA%E4%BE%8B"></a>
 </h2>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># 晚进站批次（45–60 kg 进站）</span></span>
 <span><span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"casey"</span>, stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">60</span>, <span class="fl">120</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
@@ -929,6 +1067,12 @@ LOESS</td>
 <span></span>
 <span><span class="co"># FIRE 设备，下料量 600 g/次</span></span>
 <span><span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"casey"</span>, trough_diff_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">-</span><span class="fl">20</span>, <span class="fl">2400</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># 单次采食上限随体重变化，并检查分段料肉比</span></span>
+<span><span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"casey"</span>, fiv_max_by_weight <span class="op">=</span> <span class="fu"><a href="../reference/fiv_max_example.html">fiv_max_example</a></span><span class="op">(</span><span class="op">)</span>, bin_fcr_limits <span class="op">=</span> <span class="fu"><a href="../reference/fiv_max_example.html">bin_fcr_example</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># 标记日体重突变超过 5 kg/天的猪</span></span>
+<span><span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"casey"</span>, max_daily_jump_kg <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># 更宽松的体重清洗：两种方法都判为异常才算异常值（比 "any" 标出的异常更少）</span></span>
 <span><span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"casey"</span>, weight_outlier <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"rlm"</span>, <span class="st">"loess"</span><span class="op">)</span>, outlier_combine <span class="op">=</span> <span class="st">"majority"</span><span class="op">)</span></span></code></pre></div>

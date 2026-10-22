@@ -10,11 +10,13 @@
 <url><loc>https://tony2015116.github.io/tidypptsda/authors.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/index.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/news/index.html</loc></url>
+<url><loc>https://tony2015116.github.io/tidypptsda/reference/add_breed.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/calc_adfi.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/calc_adg.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/calc_fcr.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/clean_weight.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/fire.html</loc></url>
+<url><loc>https://tony2015116.github.io/tidypptsda/reference/fiv_max_example.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/flag_feed_errors.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/index.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/nedap.html</loc></url>
@@ -25,5 +27,6 @@
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/read_station.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/run_pipeline.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/save_plots.html</loc></url>
+<url><loc>https://tony2015116.github.io/tidypptsda/reference/write_results.html</loc></url>
 </urlset>
 

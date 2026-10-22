@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.3.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.4.0</span>
       </span>
     </div>
 
@@ -71,7 +71,7 @@
     </div>
 
     <div id="ref-usage">
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">flag_feed_errors</span><span class="op">(</span><span class="va">visits</span>, qc <span class="op">=</span> <span class="fu"><a href="qc_config.html">qc_config</a></span><span class="op">(</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">flag_feed_errors</span><span class="op">(</span><span class="va">visits</span>, qc <span class="op">=</span> <span class="fu"><a href="qc_config.html">qc_config</a></span><span class="op">(</span><span class="op">)</span>, bw <span class="op">=</span> <span class="cn">NULL</span>, verbose <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div id="arguments">
@@ -87,7 +87,16 @@ visits: they are part of the feeder sequence.</p></dd>
 <dd><p>QC settings from <code><a href="qc_config.html">qc_config()</a></code>. Used here: <code>fiv_range</code>,
 <code>fiv0_abs_max</code>, <code>duration_max</code>, <code>speed_fiv_lo_max</code>,
 <code>speed_strict_max</code>, <code>speed_range</code>, <code>idle_duration_max</code>,
-<code>trough_diff_range</code>, <code>max_unidentified_feed_kg</code>.</p></dd>
+<code>trough_diff_range</code>, <code>max_unidentified_feed_kg</code>, <code>fiv_max_by_weight</code>.</p></dd>
+
+
+<dt id="arg-bw">bw<a class="anchor" aria-label="anchor" href="#arg-bw"></a></dt>
+<dd><p>Optional daily body weight of each pig, used to look up
+<code>fiv_max_by_weight</code>: a data frame with <code>responder</code>, <code>date</code> and <code>bw</code>
+(kg), such as the fitted weights of <code><a href="calc_adg.html">calc_adg()</a></code>. <code><a href="calc_adfi.html">calc_adfi()</a></code> passes
+them automatically. Without it, the daily median of the recorded
+weights is used; early in the test these are often biased upwards by
+outliers.</p></dd>
 
 
 <dt id="arg-verbose">verbose<a class="anchor" aria-label="anchor" href="#arg-verbose"></a></dt>
@@ -103,6 +112,8 @@ variables;</p></li>
 <code>otv_lo</code>, <code>otv_hi</code>, <code>frv_hi_fiv_lo</code>, <code>frv_hi_strict</code>, <code>frv_hi</code>,
 <code>frv_0</code>, <code>frv_lo</code>, <code>lwd_lo</code>, <code>lwd_hi</code>, <code>fwd_lo</code>, <code>fwd_hi</code>, <code>ltd_lo</code>,
 <code>ftd_lo</code>);</p></li>
+<li><p><code>fiv_max</code>: the FIV-hi limit used for the visit (g), fixed or from
+<code>fiv_max_by_weight</code>;</p></li>
 <li><p><code>n_errors</code>: number of error types of the visit (0 = error-free).</p></li>
 </ul><p>Attributes <code>"feeders"</code> (per feeder: visits, unidentified visits, feed
 disappearance in unidentified visits, error rate) and <code>"error_rates"</code>

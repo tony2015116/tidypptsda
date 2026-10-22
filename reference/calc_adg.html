@@ -18,7 +18,7 @@ average daily gain (ADG) over a body weight stage."><meta property="og:image" co
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.3.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.4.0</span>
       </span>
     </div>
 
@@ -73,7 +73,7 @@ average daily gain (ADG) over a body weight stage.</p>
     </div>
 
     <div id="ref-usage">
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">calc_adg</span><span class="op">(</span><span class="va">weight</span>, qc <span class="op">=</span> <span class="va">weight</span><span class="op">$</span><span class="va">settings</span>, verbose <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">calc_adg</span><span class="op">(</span><span class="va">weight</span>, qc <span class="op">=</span> <span class="va">weight</span><span class="op">$</span><span class="va">settings</span>, verbose <span class="op">=</span> <span class="fl">1</span>, cores <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div id="arguments">
@@ -92,6 +92,10 @@ Used here: <code>stage_range</code>, <code>curve_model</code>, <code>loess_span<
 
 <dt id="arg-verbose">verbose<a class="anchor" aria-label="anchor" href="#arg-verbose"></a></dt>
 <dd><p>0 (silent), 1 (summary, default) or 2 (details).</p></dd>
+
+
+<dt id="arg-cores">cores<a class="anchor" aria-label="anchor" href="#arg-cores"></a></dt>
+<dd><p>Number of CPU cores for the per-pig computations. Default 1.</p></dd>
 
 </dl></div>
     <div id="value">

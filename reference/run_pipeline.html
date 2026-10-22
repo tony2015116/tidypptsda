@@ -18,7 +18,7 @@ calc_fcr() in a row with the same QC settings."><meta property="og:image" conten
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.3.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.4.0</span>
       </span>
     </div>
 
@@ -73,7 +73,14 @@ calc_fcr() in a row with the same QC settings."><meta property="og:image" conten
     </div>
 
     <div id="ref-usage">
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">run_pipeline</span><span class="op">(</span><span class="va">data</span>, station <span class="op">=</span> <span class="cn">NULL</span>, qc <span class="op">=</span> <span class="fu"><a href="qc_config.html">qc_config</a></span><span class="op">(</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">run_pipeline</span><span class="op">(</span></span>
+<span>  <span class="va">data</span>,</span>
+<span>  station <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  qc <span class="op">=</span> <span class="fu"><a href="qc_config.html">qc_config</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  breeds <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  verbose <span class="op">=</span> <span class="fl">1</span>,</span>
+<span>  cores <span class="op">=</span> <span class="fl">1</span></span>
+<span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div id="arguments">
@@ -92,8 +99,17 @@ calc_fcr() in a row with the same QC settings."><meta property="og:image" conten
 <dd><p>QC settings from <code><a href="qc_config.html">qc_config()</a></code>.</p></dd>
 
 
+<dt id="arg-breeds">breeds<a class="anchor" aria-label="anchor" href="#arg-breeds"></a></dt>
+<dd><p>Optional breed table passed to <code><a href="add_breed.html">add_breed()</a></code> (columns
+<code>responder</code> and <code>breed</code>).</p></dd>
+
+
 <dt id="arg-verbose">verbose<a class="anchor" aria-label="anchor" href="#arg-verbose"></a></dt>
 <dd><p>0 (silent), 1 (summary, default) or 2 (details).</p></dd>
+
+
+<dt id="arg-cores">cores<a class="anchor" aria-label="anchor" href="#arg-cores"></a></dt>
+<dd><p>Number of CPU cores for the per-pig computations. Default 1.</p></dd>
 
 </dl></div>
     <div id="value">
@@ -113,7 +129,7 @@ with the step and the reason).</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Pigs in the data: 26</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Pigs with weight data kept: 25</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Pigs with ADG: 25</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Pigs with FCR: 25 (25 ok, 0 low confidence)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Pigs with FCR: 25 (23 ok, 2 low confidence)</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Removed pigs: 1 (see <span style="color: #00BB00;">$removed</span>)</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Mean ADG 1226 g/d, ADFI 3266 g/d, FCR 2.67</span>
 <span class="r-in"><span><span class="va">res</span><span class="op">$</span><span class="va">fcr</span><span class="op">$</span><span class="va">summary</span><span class="op">[</span><span class="va">group</span> <span class="op">==</span> <span class="st">"all"</span><span class="op">]</span></span></span>

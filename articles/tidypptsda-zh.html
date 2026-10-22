@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.3.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.4.0</span>
       </span>
     </div>
 
@@ -134,37 +134,47 @@
 <td>整理为标准访问表</td>
 </tr>
 <tr class="even">
+<td>2+</td>
+<td><code><a href="../reference/add_breed.html">add_breed()</a></code></td>
+<td>可选：合并你自己的品种（品系）表</td>
+</tr>
+<tr class="odd">
 <td>3</td>
 <td><code><a href="../reference/clean_weight.html">clean_weight()</a></code></td>
 <td>体重质控：剔除异常值，判定每头猪是否可用</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>4</td>
 <td><code><a href="../reference/calc_adg.html">calc_adg()</a></code></td>
 <td>拟合生长曲线，计算体重区间内的日增重</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>5</td>
 <td><code><a href="../reference/flag_feed_errors.html">flag_feed_errors()</a></code></td>
 <td>按 Casey 等（2005）的 16 条规则标记采食错误</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>6</td>
 <td><code><a href="../reference/calc_adfi.html">calc_adfi()</a></code></td>
 <td>校正日采食量、插补缺失日，计算 ADFI</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>7</td>
 <td><code><a href="../reference/calc_fcr.html">calc_fcr()</a></code></td>
 <td>计算料肉比，并给出可信度标记</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>8</td>
 <td>
 <code><a href="../reference/plot_adg.html">plot_adg()</a></code> / <code><a href="../reference/plot_adfi.html">plot_adfi()</a></code> /
 <code><a href="../reference/save_plots.html">save_plots()</a></code>
 </td>
 <td>按测定站出图并保存</td>
+</tr>
+<tr class="odd">
+<td>9</td>
+<td><code><a href="../reference/write_results.html">write_results()</a></code></td>
+<td>把全部结果表导出为 csv</td>
 </tr>
 </tbody>
 </table>
@@ -178,7 +188,7 @@
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Pigs in the data: 30</span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Pigs with weight data kept: 29</span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Pigs with ADG: 29</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Pigs with FCR: 29 (28 ok, 1 low confidence)</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Pigs with FCR: 29 (23 ok, 6 low confidence)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Removed pigs: 1 (see <span style="color: #00BB00;">$removed</span>)</span></span>
 <span><span class="co">#&gt; Mean ADG 1160 g/d, ADFI 2801 g/d, FCR 2.41</span></span></code></pre></div>
 </div>
@@ -210,6 +220,34 @@ kg，<code>Topup Amount</code>（下料量）为可选列。</p>
 补齐缺失列，设<code>fill = TRUE</code>。</li>
 </ul>
 </div>
+<div class="section level3">
+<h3 id="添加品种信息">添加品种信息<a class="anchor" aria-label="anchor" href="#%E6%B7%BB%E5%8A%A0%E5%93%81%E7%A7%8D%E4%BF%A1%E6%81%AF"></a>
+</h3>
+<p>测定站导出的数据一般不含品种，耳标号前缀也不一定能对应品种，所以需要你<strong>手动准备一张品种表</strong>（每头猪一行：耳标号、品种），再合并进访问表：</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">visits_b</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/prep_visits.html">prep_visits</a></span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
+<span><span class="va">pigs</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">visits_b</span><span class="op">[</span><span class="va">identified</span> <span class="op">==</span> <span class="cn">TRUE</span>, <span class="va">responder</span><span class="op">]</span><span class="op">)</span></span>
+<span><span class="co"># 实际使用时从种猪档案读取，例如 breeds &lt;- read.csv("品种表.csv")</span></span>
+<span><span class="va">breeds</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>responder <span class="op">=</span> <span class="va">pigs</span>, breed <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"YY"</span>, <span class="st">"LL"</span><span class="op">)</span>, length.out <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">pigs</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">visits_b</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/add_breed.html">add_breed</a></span><span class="op">(</span><span class="va">visits_b</span>, <span class="va">breeds</span><span class="op">)</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Breed added for 30 of 30 pigs: LL (15), YY (15)</span></span></code></pre></div>
+<ul>
+<li>品种表的列名不同时，用
+<code>id = "耳标列名", breed = "品种列名"</code> 指定。</li>
+<li>耳标号先按测定站记录的原始号匹配，所以被拆成 <code>id_站号</code>
+的个体也能拿到品种。</li>
+<li>品种表里找不到的猪会给出警告，这些猪的品种记为 NA。</li>
+</ul>
+<p>有了品种列以后：</p>
+<ul>
+<li>日采食校正模型会把品种作为固定效应；</li>
+<li>
+<code>fiv_max_by_weight</code> 可以按品种设定单次采食上限；</li>
+<li>料肉比汇总表 <code>fcr$summary</code> 会按品种分组。</li>
+</ul>
+<p><code><a href="../reference/run_pipeline.html">run_pipeline()</a></code>
+也可以直接传入品种表：<code>run_pipeline(nedap, breeds = breeds)</code>。</p>
+</div>
 </div>
 <div class="section level2">
 <h2 id="质控参数qc_config">3. 质控参数：<code>qc_config()</code><a class="anchor" aria-label="anchor" href="#%E8%B4%A8%E6%8E%A7%E5%8F%82%E6%95%B0qc_config"></a>
@@ -227,7 +265,7 @@ kg，<code>Topup Amount</code>（下料量）为可选列。</p>
 三种方法组合检测异常，生长曲线用 Gompertz。</li>
 </ul>
 <p>在预设的基础上可以覆盖任意参数：</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">qc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"casey"</span>, stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>, <span class="fl">115</span><span class="op">)</span>, min_test_days <span class="op">=</span> <span class="fl">40</span><span class="op">)</span></span>
 <span><span class="va">qc</span><span class="op">$</span><span class="va">stage_range</span></span>
 <span><span class="co">#&gt; [1]  30 115</span></span></code></pre></div>
@@ -299,7 +337,7 @@ kg，<code>Topup Amount</code>（下料量）为可选列。</p>
 </h3>
 <p>FIRE 示例数据中的猪在 45–60 kg 才进站，因此这里按第 7 节的建议，以
 60–120 kg 作为计算区间：</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">qc_fire</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"casey"</span>, stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">60</span>, <span class="fl">120</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">visits</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/prep_visits.html">prep_visits</a></span><span class="op">(</span><span class="va">fire</span>, qc <span class="op">=</span> <span class="va">qc_fire</span>, verbose <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
@@ -311,7 +349,8 @@ kg，<code>Topup Amount</code>（下料量）为可选列。</p>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Rows without entry time (dropped): <span style="font-weight: bold;">0</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Duplicated rows (dropped): <span style="font-weight: bold;">0</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> No pig was seen at more than one station</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> 26 pigs at 2 stations, 9794 visits over 66 days</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> 26 pigs at 2 stations, 9794 visits over 66 days</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> No <span style="color: #00BB00;">breed</span> column. To use breed in the feed intake model and breed-specific limits, add it with `add_breed()`.</span></span></code></pre></div>
 <ul>
 <li>体重和采食量的单位统一为 kg 和 g，时间统一为 UTC。</li>
 <li>未识别耳标的访问会<strong>保留</strong>，并标记为
@@ -330,7 +369,7 @@ kg，<code>Topup Amount</code>（下料量）为可选列。</p>
 <div class="section level3">
 <h3 id="体重质控">4.2 体重质控<a class="anchor" aria-label="anchor" href="#%E4%BD%93%E9%87%8D%E8%B4%A8%E6%8E%A7"></a>
 </h3>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">w</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/clean_weight.html">clean_weight</a></span><span class="op">(</span><span class="va">visits</span>, qc <span class="op">=</span> <span class="va">qc_fire</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Cleaning body weight (</span><span style="color: #00BB00; font-weight: bold;">rlm</span><span style="font-weight: bold;">)</span> <span style="color: #00BBBB;">──────────────────────────────────────────────────</span></span></span>
@@ -363,7 +402,7 @@ kg，<code>Topup Amount</code>（下料量）为可选列。</p>
 <div class="section level3">
 <h3 id="日增重">4.3 日增重<a class="anchor" aria-label="anchor" href="#%E6%97%A5%E5%A2%9E%E9%87%8D"></a>
 </h3>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">adg</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calc_adg.html">calc_adg</a></span><span class="op">(</span><span class="va">w</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">ADG over 60-120 kg (</span><span style="color: #00BB00; font-weight: bold;">poly2</span><span style="font-weight: bold;"> curve)</span> <span style="color: #00BBBB;">────────────────────────────────────────────</span></span></span>
@@ -413,7 +452,7 @@ kg，<code>Topup Amount</code>（下料量）为可选列。</p>
 <div class="section level3">
 <h3 id="采食错误与日采食校正">4.4 采食错误与日采食校正<a class="anchor" aria-label="anchor" href="#%E9%87%87%E9%A3%9F%E9%94%99%E8%AF%AF%E4%B8%8E%E6%97%A5%E9%87%87%E9%A3%9F%E6%A0%A1%E6%AD%A3"></a>
 </h3>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">adfi</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calc_adfi.html">calc_adfi</a></span><span class="op">(</span><span class="va">visits</span>, <span class="va">adg</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Flagging feeder errors (Casey et al. 2005)</span> <span style="color: #00BBBB;">──────────────────────────────────</span></span></span>
@@ -459,7 +498,7 @@ Y，再用混合模型扣除错误项的影响（Jiao
 </ul>
 <p>校正模型的系数保存在 <code>adfi$model</code>
 中；各类错误的发生率可以这样查看：</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">f</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flag_feed_errors.html">flag_feed_errors</a></span><span class="op">(</span><span class="va">visits</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">f</span>, <span class="st">"error_rates"</span><span class="op">)</span><span class="op">[</span><span class="va">n</span> <span class="op">&gt;</span> <span class="fl">0</span>, <span class="fu">.</span><span class="op">(</span><span class="va">label</span>, <span class="va">n</span>, rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fl">100</span> <span class="op">*</span> <span class="va">rate</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span><span class="op">]</span></span>
 <span><span class="co">#&gt;             label     n  rate</span></span>
@@ -478,21 +517,29 @@ Y，再用混合模型扣除错误项的影响（Jiao
 <div class="section level3">
 <h3 id="料肉比">4.5 料肉比<a class="anchor" aria-label="anchor" href="#%E6%96%99%E8%82%89%E6%AF%94"></a>
 </h3>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fcr</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calc_fcr.html">calc_fcr</a></span><span class="op">(</span><span class="va">adg</span>, <span class="va">adfi</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">FCR over 60-120 kg</span> <span style="color: #00BBBB;">──────────────────────────────────────────────────────────</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> FCR for 25 pigs: 25 ok, 0 low confidence</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> FCR for 25 pigs: 23 ok, 2 low confidence</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Mean FCR 2.67 (SD 0.18), ADG 1226 g/d, ADFI 3266 g/d</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">fcr</span><span class="op">$</span><span class="va">per_pig</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">adg</span>, <span class="va">adfi</span>, <span class="va">fcr</span>, <span class="va">fcr_flag</span>, <span class="va">fcr_note</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
-<span><span class="co">#&gt;    responder      adg     adfi      fcr fcr_flag fcr_note</span></span>
-<span><span class="co">#&gt;       &lt;char&gt;    &lt;num&gt;    &lt;num&gt;    &lt;num&gt;   &lt;char&gt;   &lt;char&gt;</span></span>
-<span><span class="co">#&gt; 1:     25822 1238.276 3211.014 2.593133       ok         </span></span>
-<span><span class="co">#&gt; 2:     35853 1245.986 3250.765 2.608989       ok         </span></span>
-<span><span class="co">#&gt; 3:     35855 1372.660 3874.462 2.822594       ok         </span></span>
-<span><span class="co">#&gt; 4:     35862 1185.138 3243.167 2.736531       ok         </span></span>
-<span><span class="co">#&gt; 5:     35865 1200.438 3157.234 2.630069       ok         </span></span>
-<span><span class="co">#&gt; 6:     35869 1137.056 3511.199 3.087974       ok</span></span>
+<span><span class="co">#&gt;    responder      adg     adfi      fcr       fcr_flag</span></span>
+<span><span class="co">#&gt;       &lt;char&gt;    &lt;num&gt;    &lt;num&gt;    &lt;num&gt;         &lt;char&gt;</span></span>
+<span><span class="co">#&gt; 1:     25822 1238.276 3211.014 2.593133 low_confidence</span></span>
+<span><span class="co">#&gt; 2:     35853 1245.986 3250.765 2.608989             ok</span></span>
+<span><span class="co">#&gt; 3:     35855 1372.660 3874.462 2.822594             ok</span></span>
+<span><span class="co">#&gt; 4:     35862 1185.138 3243.167 2.736531             ok</span></span>
+<span><span class="co">#&gt; 5:     35865 1200.438 3157.234 2.630069             ok</span></span>
+<span><span class="co">#&gt; 6:     35869 1137.056 3511.199 3.087974             ok</span></span>
+<span><span class="co">#&gt;                                   fcr_note</span></span>
+<span><span class="co">#&gt;                                     &lt;char&gt;</span></span>
+<span><span class="co">#&gt; 1: weight records cover 5.1 kg of 70-80 kg</span></span>
+<span><span class="co">#&gt; 2:                                        </span></span>
+<span><span class="co">#&gt; 3:                                        </span></span>
+<span><span class="co">#&gt; 4:                                        </span></span>
+<span><span class="co">#&gt; 5:                                        </span></span>
+<span><span class="co">#&gt; 6:</span></span>
 <span><span class="va">fcr</span><span class="op">$</span><span class="va">summary</span><span class="op">[</span><span class="va">group</span> <span class="op">==</span> <span class="st">"all"</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">.SD</span>, <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">is.numeric</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">x</span>, <span class="fl">2</span><span class="op">)</span> <span class="kw">else</span> <span class="va">x</span><span class="op">)</span><span class="op">]</span></span>
 <span><span class="co">#&gt;     group        trait     n     min     max  median    mean     sd    cv</span></span>
 <span><span class="co">#&gt;    &lt;char&gt;       &lt;char&gt; &lt;num&gt;   &lt;num&gt;   &lt;num&gt;   &lt;num&gt;   &lt;num&gt;  &lt;num&gt; &lt;num&gt;</span></span>
@@ -509,29 +556,118 @@ Y，再用混合模型扣除错误项的影响（Jiao
 <li>生长曲线或采食量在区间开头或结尾外推超过 15
 天，通常是进站太晚或出栏太早；</li>
 <li>ADG 只覆盖了区间的一部分；</li>
-<li>区间内实测采食的天数不足 70%。</li>
+<li>区间内实测采食的天数不足 70%；</li>
+<li>中间某个 10 kg 体重段的体重记录覆盖不足 6 kg（记录断档）；</li>
+<li>设置了 <code>bin_fcr_limits</code>
+时，某一段的料肉比超出了合理范围。</li>
 </ul>
+<p>每头猪每个 10 kg 体重段的采食量、增重和分段料肉比保存在
+<code>fcr$by_bin</code> 中，可以用来定位问题出在哪一段：</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">fcr</span><span class="op">$</span><span class="va">by_bin</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">weight_from</span>, <span class="va">weight_to</span>, feed_kg <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">feed_kg</span>, <span class="fl">1</span><span class="op">)</span>,</span>
+<span>                    gain_kg <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">gain_kg</span>, <span class="fl">1</span><span class="op">)</span>, fcr <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">fcr</span>, <span class="fl">2</span><span class="op">)</span>, weight_coverage_kg <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">weight_coverage_kg</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Key: &lt;responder&gt;</span></span>
+<span><span class="co">#&gt;    responder weight_from weight_to feed_kg gain_kg   fcr weight_coverage_kg</span></span>
+<span><span class="co">#&gt;       &lt;char&gt;       &lt;num&gt;     &lt;num&gt;   &lt;num&gt;   &lt;num&gt; &lt;num&gt;              &lt;num&gt;</span></span>
+<span><span class="co">#&gt; 1:     25822          60        70    22.1     9.8  2.27                9.1</span></span>
+<span><span class="co">#&gt; 2:     25822          70        80    23.8     9.8  2.42                5.1</span></span>
+<span><span class="co">#&gt; 3:     25822          80        90    25.7     9.9  2.60                8.1</span></span>
+<span><span class="co">#&gt; 4:     25822          90       100    28.4     9.9  2.85                9.2</span></span>
+<span><span class="co">#&gt; 5:     25822         100       110    30.1    10.0  3.01                8.1</span></span>
+<span><span class="co">#&gt; 6:     25822         110       120    23.7    10.1  2.35                8.0</span></span></code></pre></div>
 </div>
 </div>
 <div class="section level2">
 <h2 id="作图与保存">5. 作图与保存<a class="anchor" aria-label="anchor" href="#%E4%BD%9C%E5%9B%BE%E4%B8%8E%E4%BF%9D%E5%AD%98"></a>
 </h2>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">g</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/plot_adg.html">plot_adg</a></span><span class="op">(</span><span class="va">adg</span>, weight <span class="op">=</span> <span class="va">w</span>, responders <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"35853"</span>, <span class="st">"35855"</span>, <span class="st">"35877"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Created 1 growth plot</span></span>
 <span><span class="va">g</span><span class="op">$</span><span class="va">plot</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span></span></code></pre></div>
 <p><img src="tidypptsda-zh_files/figure-html/plots-1.png" class="r-plt" alt="" width="100%"></p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">h</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/plot_adfi.html">plot_adfi</a></span><span class="op">(</span><span class="va">adfi</span>, responders <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"35853"</span>, <span class="st">"35855"</span>, <span class="st">"35877"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Created 1 feed intake plot</span></span>
 <span><span class="va">h</span><span class="op">$</span><span class="va">plot</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span></span></code></pre></div>
 <p><img src="tidypptsda-zh_files/figure-html/plot-adfi-1.png" class="r-plt" alt="" width="100%"></p>
 <p>每个测定站输出一张图，每头猪一个分面。保存为图片：</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/save_plots.html">save_plots</a></span><span class="op">(</span><span class="va">g</span>, path <span class="op">=</span> <span class="st">"结果/生长曲线"</span>, prefix <span class="op">=</span> <span class="st">"站"</span>, suffix <span class="op">=</span> <span class="st">"growth"</span>, device <span class="op">=</span> <span class="st">"png"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="结果怎么用">6. 结果怎么用<a class="anchor" aria-label="anchor" href="#%E7%BB%93%E6%9E%9C%E6%80%8E%E4%B9%88%E7%94%A8"></a>
+<h2 id="导出结果与并行计算">6. 导出结果与并行计算<a class="anchor" aria-label="anchor" href="#%E5%AF%BC%E5%87%BA%E7%BB%93%E6%9E%9C%E4%B8%8E%E5%B9%B6%E8%A1%8C%E8%AE%A1%E7%AE%97"></a>
+</h2>
+<div class="section level3">
+<h3 id="导出为-csv">导出为 csv<a class="anchor" aria-label="anchor" href="#%E5%AF%BC%E5%87%BA%E4%B8%BA-csv"></a>
+</h3>
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">fire</span>, qc <span class="op">=</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">60</span>, <span class="fl">120</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/write_results.html">write_results</a></span><span class="op">(</span><span class="va">res</span>, dir <span class="op">=</span> <span class="st">"结果"</span>, farm <span class="op">=</span> <span class="st">"A01"</span><span class="op">)</span></span></code></pre></div>
+<p>文件按”场名_内容_日期.csv”命名，例如
+<code>A01_fcr_20261022.csv</code>。全部文件如下：</p>
+<table class="table">
+<thead><tr class="header">
+<th>文件</th>
+<th>内容</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><code>fcr</code></td>
+<td>每头猪的 ADG、ADFI、FCR 和可信度标记</td>
+</tr>
+<tr class="even">
+<td><code>by_bin</code></td>
+<td>每个体重段的采食、增重和分段料肉比</td>
+</tr>
+<tr class="odd">
+<td><code>daily_feed</code></td>
+<td>每天的采食量（原始、校正、插补）</td>
+</tr>
+<tr class="even">
+<td><code>daily_weight</code></td>
+<td>每天的体重（实测和拟合）</td>
+</tr>
+<tr class="odd">
+<td><code>weight_pigs</code></td>
+<td>每头猪的体重质控结果</td>
+</tr>
+<tr class="even">
+<td><code>feed_model</code></td>
+<td>采食校正模型的系数</td>
+</tr>
+<tr class="odd">
+<td><code>summary</code></td>
+<td>性状汇总统计</td>
+</tr>
+<tr class="even">
+<td><code>removed</code></td>
+<td>被剔除的猪及原因</td>
+</tr>
+<tr class="odd">
+<td><code>settings</code></td>
+<td>本次使用的质控参数</td>
+</tr>
+</tbody>
+</table>
+<p>文件带有 UTF-8 BOM，用 Excel 直接打开时中文不会乱码。</p>
+</div>
+<div class="section level3">
+<h3 id="并行计算">并行计算<a class="anchor" aria-label="anchor" href="#%E5%B9%B6%E8%A1%8C%E8%AE%A1%E7%AE%97"></a>
+</h3>
+<p>猪的头数很多时，逐头猪拟合曲线是最耗时的步骤。<code><a href="../reference/clean_weight.html">clean_weight()</a></code>、<code><a href="../reference/calc_adg.html">calc_adg()</a></code>、<code><a href="../reference/calc_adfi.html">calc_adfi()</a></code>
+和 <code><a href="../reference/run_pipeline.html">run_pipeline()</a></code> 都有 <code>cores</code> 参数：</p>
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">nedap</span>, cores <span class="op">=</span> <span class="fl">4</span><span class="op">)</span>          <span class="co"># 用 4 个 CPU 核心</span></span>
+<span><span class="fu">parallel</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/parallel/detectCores.html" class="external-link">detectCores</a></span><span class="op">(</span><span class="op">)</span>                         <span class="co"># 查看电脑有几个核心</span></span></code></pre></div>
+<p>并行使用 R 自带的 parallel 包，不增加依赖，结果与
+<code>cores = 1</code>
+完全相同。几十头猪时并行没有必要；上千头猪时才有明显的加速效果。在
+Windows 上，并行要求本包是正式安装的（而不是用
+<code>devtools::load_all()</code> 临时加载）。</p>
+</div>
+</div>
+<div class="section level2">
+<h2 id="结果怎么用">7. 结果怎么用<a class="anchor" aria-label="anchor" href="#%E7%BB%93%E6%9E%9C%E6%80%8E%E4%B9%88%E7%94%A8"></a>
 </h2>
 <ul>
 <li>
@@ -545,7 +681,7 @@ ADG、ADFI、FCR 及可信度标记。</li>
 </ul>
 </div>
 <div class="section level2">
-<h2 id="提高数据质量的建议">7. 提高数据质量的建议<a class="anchor" aria-label="anchor" href="#%E6%8F%90%E9%AB%98%E6%95%B0%E6%8D%AE%E8%B4%A8%E9%87%8F%E7%9A%84%E5%BB%BA%E8%AE%AE"></a>
+<h2 id="提高数据质量的建议">8. 提高数据质量的建议<a class="anchor" aria-label="anchor" href="#%E6%8F%90%E9%AB%98%E6%95%B0%E6%8D%AE%E8%B4%A8%E9%87%8F%E7%9A%84%E5%BB%BA%E8%AE%AE"></a>
 </h2>
 <p>以下是根据示例数据和缺失模拟得到的经验：</p>
 <ol style="list-style-type: decimal">
@@ -570,7 +706,7 @@ kg。</li>
 </ol>
 </div>
 <div class="section level2">
-<h2 id="常见问题">8. 常见问题<a class="anchor" aria-label="anchor" href="#%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"></a>
+<h2 id="常见问题">9. 常见问题<a class="anchor" aria-label="anchor" href="#%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"></a>
 </h2>
 <p><strong>问：为什么 ADFI 比实测记录的平均值低？</strong>答：ADFI
 是整个体重区间内的平均值，包括体重较小、采食较少的前期；实测记录可能只覆盖了体重较大的后期。</p>

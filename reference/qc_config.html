@@ -19,7 +19,7 @@ through ...."><meta property="og:image" content="https://tony2015116.github.io/t
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.3.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.4.0</span>
       </span>
     </div>
 
@@ -130,6 +130,9 @@ of valid weight records.</p></li>
 body weight, kg.</p></li>
 <li><p><code>curve_r2_min</code>: optional, pigs whose growth curve R² is below this are
 flagged as low confidence (not removed). <code>NULL</code> = off.</p></li>
+<li><p><code>max_daily_jump_kg</code>: optional, pigs whose daily median weight changes
+by more than this many kg per day between consecutive days are flagged
+as low confidence (not removed). <code>NULL</code> = off.</p></li>
 </ul><p><strong>Growth and ADG</strong></p><ul><li><p><code>stage_range</code>: body weight interval for ADG and FCR, kg.</p></li>
 <li><p><code>curve_model</code>: <code>"poly1"</code>, <code>"poly2"</code>, <code>"poly3"</code>, <code>"loess"</code> or
 <code>"gompertz"</code> (falls back to <code>"poly2"</code> when it does not converge).</p></li>
@@ -147,6 +150,11 @@ preceding or following visit has FIV &lt; -20 g, g/min.</p></li>
 subsequent visits, g.</p></li>
 <li><p><code>max_unidentified_feed_kg</code>: feed disappearance in unidentified visits
 per feeder above which a warning is given.</p></li>
+<li><p><code>fiv_max_by_weight</code>: optional table that replaces the upper limit of
+<code>fiv_range</code> (FIV-hi) by a limit that depends on body weight, and
+optionally on breed. Columns <code>weight_from</code> (kg, lower bound of the
+weight class), <code>fiv_max</code> (g) and optionally <code>breed</code>. See
+<code><a href="fiv_max_example.html">fiv_max_example()</a></code>. <code>NULL</code> = off.</p></li>
 </ul><p><strong>Daily feed intake</strong></p><ul><li><p><code>dfi_range</code>: valid daily feed intake, kg.</p></li>
 <li><p><code>dfi_quantile</code>: optional, lower and upper quantile cut-offs (e.g.
 <code>c(0.025, 0.99)</code>). <code>NULL</code> = off.</p></li>
@@ -162,6 +170,13 @@ curve or the feed intake is extrapolated over more than this many days
 at the start or the end of the stage. Default 15.</p></li>
 <li><p><code>min_coverage</code>: minimum share of stage days with recorded feed intake.
 Default 0.7.</p></li>
+<li><p><code>bin_width</code>: width of the body weight classes used for the segment
+checks of <code><a href="calc_fcr.html">calc_fcr()</a></code>, kg. Default 10.</p></li>
+<li><p><code>min_bin_coverage_kg</code>: an inner weight class whose recorded body
+weights span less than this many kg flags the pig. Default 6.</p></li>
+<li><p><code>bin_fcr_limits</code>: optional table of plausible FCR per weight class,
+columns <code>weight_from</code> (kg), <code>fcr_min</code>, <code>fcr_max</code>. See
+<code><a href="fiv_max_example.html">bin_fcr_example()</a></code>. <code>NULL</code> = off.</p></li>
 </ul></div>
     <div id="references">
     <h2>References</h2>
@@ -173,68 +188,6 @@ average daily gain, feed efficiency, and real-time ultrasound traits in
 Duroc pigs: I. <em>Journal of Animal Science</em>, 92, 2377-2386.</p>
     </div>
 
-    <div id="ref-examples">
-    <h2>Examples</h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># Default preset</span></span></span>
-<span class="r-in"><span><span class="va">qc</span> <span class="op">&lt;-</span> <span class="fu">qc_config</span><span class="op">(</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">qc</span><span class="op">$</span><span class="va">duration_max</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 3600</span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Another preset with one parameter overridden</span></span></span>
-<span class="r-in"><span><span class="va">qc_national</span> <span class="op">&lt;-</span> <span class="fu">qc_config</span><span class="op">(</span><span class="st">"national"</span>, min_test_days <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">qc_national</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> ── <span style="font-weight: bold;">QC settings: profile </span><span style="color: #0000BB; font-weight: bold;">"national"</span> ──</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">Station transfer</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">max_gap_days</span>: 3</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">max_overlap_days</span>: 1</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">max_jump_kg</span>: 10</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">Body weight records</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">weight_range</span>: 25, 140</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">weight_outlier</span>: loess</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">outlier_combine</span>: any</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">rlm_cutoff</span>: 0.5</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">sd_max</span>: 3</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">loess_span</span>: 0.75</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">rel_dev_max</span>: NULL (off)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">daily_drop_min</span>: NULL (off)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">Pig-level checks</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">min_test_days</span>: 50</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">min_records</span>: 20</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">max_missing_rate</span>: 0.15</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">entry_weight_max</span>: 65</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">exit_weight_min</span>: 85</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">curve_r2_min</span>: 0.99</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">Growth and ADG</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">stage_range</span>: 30, 120</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">curve_model</span>: loess</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">max_extrap_days</span>: 30</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">Feeder errors</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">fiv_range</span>: -20, 2000</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">fiv0_abs_max</span>: 20</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">duration_max</span>: 3600</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">speed_fiv_lo_max</span>: 500</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">speed_strict_max</span>: 110</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">speed_range</span>: 2, 170</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">idle_duration_max</span>: 500</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">trough_diff_range</span>: -20, 1800</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">max_unidentified_feed_kg</span>: 90</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">Daily feed intake</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">dfi_range</span>: 0, 6</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">dfi_quantile</span>: NULL (off)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">dfi_correct</span>: lmm</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">impute_method</span>: loess</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">long_gap_days</span>: 7</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">Confidence flags</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">max_edge_extrap_days</span>: 15</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">min_coverage</span>: 0.7</span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Optional rules are off (NULL) unless switched on</span></span></span>
-<span class="r-in"><span><span class="fu">qc_config</span><span class="op">(</span><span class="st">"casey"</span>, daily_drop_min <span class="op">=</span> <span class="fl">0.90</span><span class="op">)</span><span class="op">$</span><span class="va">daily_drop_min</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.9</span>
-</code></pre></div>
-    </div>
   </div>
   <div class="col-md-3 hidden-xs hidden-sm" id="pkgdown-sidebar">
     <nav id="toc" data-toggle="toc" class="sticky-top"><h2 data-toc-skip>Contents</h2>

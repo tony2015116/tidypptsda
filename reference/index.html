@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.3.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.4.0</span>
       </span>
     </div>
 
@@ -72,9 +72,13 @@
           <p><code><a href="qc_config.html">qc_config()</a></code> </p>
         </td>
         <td><p>Build Quality-Control Settings from a Preset</p></td>
+      </tr><tr><td>
+          <p><code><a href="fiv_max_example.html">fiv_max_example()</a></code> <code><a href="fiv_max_example.html">bin_fcr_example()</a></code> </p>
+        </td>
+        <td><p>Example threshold tables</p></td>
       </tr></tbody><tbody><tr><th colspan="2">
           <h2 id="read-and-prepare-station-data">Read and prepare station data <a href="#read-and-prepare-station-data" class="anchor" aria-hidden="true"></a></h2>
-          <p class="section-desc"></p><p>Read NEDAP or FIRE exports (many files or a folder) and turn them into one standard visit table.</p>
+          <p class="section-desc"></p><p>Read NEDAP or FIRE exports (many files or a folder), turn them into one standard visit table and add breed information.</p>
         </th>
       </tr></tbody><tbody><tr><td>
           <p><code><a href="read_station.html">read_station()</a></code> </p>
@@ -84,6 +88,10 @@
           <p><code><a href="prep_visits.html">prep_visits()</a></code> </p>
         </td>
         <td><p>Prepare a Standard Visit Table</p></td>
+      </tr><tr><td>
+          <p><code><a href="add_breed.html">add_breed()</a></code> </p>
+        </td>
+        <td><p>Add Breed Information to a Visit Table</p></td>
       </tr></tbody><tbody><tr><th colspan="2">
           <h2 id="body-weight-and-daily-gain">Body weight and daily gain <a href="#body-weight-and-daily-gain" class="anchor" aria-hidden="true"></a></h2>
           <p class="section-desc"></p><p>Flag implausible body weights, then fit growth curves and compute ADG over a body weight stage.</p>
@@ -120,6 +128,14 @@
           <p><code><a href="run_pipeline.html">run_pipeline()</a></code> </p>
         </td>
         <td><p>Run the Whole Analysis Pipeline</p></td>
+      </tr></tbody><tbody><tr><th colspan="2">
+          <h2 id="export">Export <a href="#export" class="anchor" aria-hidden="true"></a></h2>
+          <p class="section-desc"></p><p>Write all result tables to CSV files for the testing station.</p>
+        </th>
+      </tr></tbody><tbody><tr><td>
+          <p><code><a href="write_results.html">write_results()</a></code> </p>
+        </td>
+        <td><p>Write Analysis Results to CSV Files</p></td>
       </tr></tbody><tbody><tr><th colspan="2">
           <h2 id="plots">Plots <a href="#plots" class="anchor" aria-hidden="true"></a></h2>
           <p class="section-desc"></p><p>One plot per station and one panel per pig; write them to files.</p>
