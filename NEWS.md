@@ -15,6 +15,21 @@
   columns `n_weeks` and `double_layer_weeks`. Set `double_layer_gap = NULL`
   to switch it off.
 
+* `clean_weight()` also handles **unstable weights after entry**: new pigs
+  often show a wide smear of readings for days (pen mates' weights mixed in
+  while the pig itself hardly eats and may lose weight). Within
+  `entry_noise_days` (default 21) after the first record, days whose
+  interquartile range exceeds `entry_noise_iqr_kg` (default 3 kg) and 4 times
+  the pig's usual range are unstable; the period runs from entry to the last
+  such day as long as at least half of the days are unstable. From the
+  stable days after it, the weight is tracked back day by day and only
+  records within `entry_noise_tol` (default 8%, at least 2 kg) of the next
+  day's weight are kept (`qc_flag = "entry_noise"`); the curve methods do
+  not overrule the kept records. Pigs with a period longer than
+  `entry_noise_flag_days` (default 14) or less than 30% of its records kept
+  are flagged as low confidence. New `per_pig` columns `entry_noise_days`
+  and `entry_noise_kept`.
+
 ## ADG
 
 * The stage now starts at the **last** time the growth curve rises through
@@ -26,8 +41,8 @@
   `stage_range`. A dip below 30 kg after the start no longer leaves a few
   isolated early records in the regression.
 
-On the example data ADG changes by less than 1 g/d on average (largest
-change 33 g/d, rank correlation with 0.6.1 above 0.99).
+On the example data ADG changes by 2 g/d on average; pig 15961 (wide smear
+of readings for two weeks after entry) changes most, from 1211 to 1320 g/d.
 
 # tidypptsda 0.6.1
 

@@ -27,12 +27,15 @@ An object of class \code{ppt_weight} (a list):
 \code{missing_rate}, \code{entry_weight}, \code{exit_weight} (kg, from the fitted
 curve), \code{r2}, \code{n_weeks} (weeks with at least 20 records),
 \code{double_layer_weeks} (of these, weeks with two weight layers),
+\code{entry_noise_days} (length of the unstable period after entry, 0 if
+none) and \code{entry_noise_kept} (share of its records kept),
 \code{status} (\code{"keep"}, \code{"low_confidence"} or \code{"removed"}) and \code{reason};
 \item \code{daily}: one row per pig and day for pigs not removed: median of the
 valid weights (\code{weight}, kg), \code{n_records}, \code{n_outliers};
 \item \code{records}: every weight record with \code{fitted}, \code{outlier} and
 \code{qc_flag} (why it was flagged; \code{"double_layer"} for records removed
-by the double-layer check);
+by the double-layer check, \code{"entry_noise"} for unstable records after
+entry);
 \item \code{removed}: pigs removed here, plus misreads logged by
 \code{\link[=prep_visits]{prep_visits()}};
 \item \code{settings}: the QC settings used.
@@ -52,7 +55,9 @@ weight) remove the pig;
 \code{r2 < curve_r2_min}, \code{max_daily_jump > max_daily_jump_kg} (the
 largest change of the daily median weight between consecutive recorded
 days, kg/d), or double-layer weights in at least
-\code{double_layer_flag_weeks} weeks mark the pig \code{"low_confidence"}
+\code{double_layer_flag_weeks} weeks, or an unstable period after entry
+longer than \code{entry_noise_flag_days} (or with less than 30\% of its
+records kept) mark the pig \code{"low_confidence"}
 but keep it: its
 growth can still be estimated by extrapolation in \code{\link[=calc_adg]{calc_adg()}}, with a
 flag.
