@@ -347,7 +347,9 @@ utils::globalVariables(c(
   "injected", "key", "method", "adg_true", "adg_rmse", "fold", "type", "model",
   "rmse", "mae", "adg_full", "truncation", "cv_rmse", "observed", "dfi_true",
   "masks", "err_pct", "sq_err", "n_hidden", "adfi_est", "adfi_true", "scenario",
-  "spearman", "track_removed", "tt"
+  "spearman", "track_removed", "tt", "first_day", "i.first_day", "adg_source",
+  "adg_curve", "rlm_w", "i.rlm_w", "feed_missing", "r2_daily", "w_obs",
+  "i.weight", "i.dfi", "i.state", "in_band", "removed", "cfi", "w_first", "w_last", "extrap_kg_start", "extrap_kg_end"
 ))
 
 #' @export

@@ -1,0 +1,244 @@
+---
+title: "输出结果说明"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{输出结果说明}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+options(width = 100)
+```
+
+```{r setup, message = FALSE}
+library(tidypptsda)
+library(data.table)
+res <- run_pipeline(nedap, verbose = 0)
+```
+
+本文逐一说明 tidypptsda 输出的每一张表、每一列的含义。体重单位为 kg，日增重（ADG）和日采食量（ADFI、`dfi_*`）单位为 g/d，日期为 `Date` 类型。
+
+## 1. 结果的整体结构
+
+`run_pipeline()` 返回一个列表，每个元素对应流程中的一步：
+
+| 元素 | 来自 | 内容 |
+|---|---|---|
+| `$visits` | `prep_visits()` | 整理后的访问记录，每次访问一行 |
+| `$weight` | `clean_weight()` | 体重质控结果 |
+| `$adg` | `calc_adg()` | 日增重 |
+| `$adfi` | `calc_adfi()` | 日采食量 |
+| `$fcr` | `calc_fcr()` | 料肉比及最终结果 |
+| `$removed` | 各步汇总 | 被剔除的猪及原因 |
+
+`$weight`、`$adg`、`$adfi`、`$fcr` 的结构相同，都包含：
+
+- `per_pig`：每头猪一行的结果；
+- `daily`：每头猪每天一行的结果；
+- `removed`：截至这一步被剔除的猪；
+- `settings`：本次使用的全部质控参数（`qc_config()` 的结果）。
+
+部分步骤另有附加的表，下文分别说明。**最常用的是 `res$fcr$per_pig`，它就是最终结果表。**
+
+```{r final}
+head(res$fcr$per_pig[, .(responder, location, adg, adfi, fcr, fcr_flag, fcr_note)])
+```
+
+## 2. `$visits`：整理后的访问记录
+
+| 列 | 含义 |
+|---|---|
+| `responder` | 耳标号（统一后的个体号；同一耳标被判为两个个体时改为 `耳标_站号`） |
+| `responder_raw` | 原始耳标号 |
+| `identified` | 是否为已识别的访问；未识别访问（耳标为 0 或缺失）保留下来，用于采食错误判定 |
+| `location` | 测定站编号 |
+| `date`、`seq_days` | 访问日期；测定第几天（全批次第一天为 1） |
+| `seq_in_day`、`seq_in_location` | 当天第几次访问（按猪）；当天第几次访问（按站） |
+| `entry_time`、`exit_time`、`duration` | 进入、离开时间；停留时长（秒） |
+| `feed_intake` | 单次采食量（g） |
+| `weight` | 访问时的体重（kg），0 已改为 `NA` |
+| `trough_in`、`trough_out`、`topup` | 进入、离开时的料槽重（g）和加料量（仅 FIRE 数据） |
+| `breed` | 品种（原始数据中有，或用 `add_breed()` 加入时才有） |
+
+`attr(res$visits, "stations")` 记录跨站猪的处理结果（转栏、拆分为两个个体或读卡误读）。
+
+## 3. `$weight`：体重质控
+
+### `per_pig`
+
+| 列 | 含义 |
+|---|---|
+| `n_records`、`n_valid`、`n_outliers` | 体重记录数；有效记录数；判为异常（含适应期、范围外）的记录数 |
+| `first_date`、`last_date`、`test_days` | 首条、末条有效体重的日期；两者之间的天数 |
+| `missing_rate` | 测定期内没有有效体重的天数占比 |
+| `r2` | 有效体重拟合曲线的 R² |
+| `entry_weight`、`exit_weight` | 拟合曲线在首条、末条有效记录处的体重 |
+| `track_removed` | 逐日回溯追踪剔除的记录比例（未追踪时为 `NA`） |
+| `r2_daily` | 日体重拟合二次曲线的 R²（national 方法用来剔除） |
+| `feed_missing` | 测定期内没有任何采食记录的天数占比（national 方法用来剔除） |
+| `max_daily_jump` | 相邻两个有记录日子之间，日体重的最大变化（kg/天） |
+| `status` | `keep`（通过）、`low_confidence`（保留但需注意）、`removed`（剔除） |
+| `reason` | 降级或剔除的原因 |
+
+### `records`：每一条体重记录
+
+| 列 | 含义 |
+|---|---|
+| `entry_time`、`weight` | 访问时间和体重 |
+| `fitted` | 拟合曲线在该时刻的值 |
+| `rlm_w` | 稳健回归给这条记录的权重（0–1，越小越像异常值；未用 rlm 时为 `NA`） |
+| `outlier` | 是否判为异常（不参与后续计算） |
+| `qc_flag` | 判为异常的原因，空字符串表示正常，见下表 |
+
+```{r flags}
+res$weight$records[, .N, by = qc_flag]
+```
+
+| `qc_flag` | 含义 |
+|---|---|
+| `""` | 正常 |
+| `adaptation` | 进站适应期（`adapt_days`）内的体重，不参与分析 |
+| `weight_range` | 超出 `weight_range` |
+| `track` | 逐日回溯追踪时与预测体重不衔接 |
+| `rlm`、`loess`、`stl`、`sd` | 被相应的异常值方法判为异常（多种方法时用 `;` 连接） |
+| `day_weight` | 整天的记录都偏离曲线（`day_weight_min`） |
+| `rel_dev`、`daily_drop` | 可选规则 `rel_dev_max`、`daily_drop_min` |
+
+### `daily`：每头猪每天的体重
+
+`weight` 为当天的体重代表值（默认为有效记录的中位数，national 方法为加权平均），`n_records`、`n_outliers` 为当天的记录数和异常记录数。
+
+## 4. `$adg`：日增重
+
+### `per_pig`
+
+| 列 | 含义 |
+|---|---|
+| `stage` | 计算区间，如 `30-120` |
+| `adg` | 日增重（g/d），算法由 `adg_method` 决定 |
+| `adg_source` | 实际采用的算法：`lm`（直线回归斜率）或 `curve`（曲线法） |
+| `lm_slope`、`r_squared` | 区间起止时间之间全部有效体重的直线回归斜率（g/d）及其 R² |
+| `lm_weight_from`、`lm_weight_to` | 回归线覆盖的体重范围（kg）；测定未到区间上限的猪，斜率只代表到这里为止的一段 |
+| `adg_curve` | 曲线法日增重：区间体重差 ÷ 曲线从起点到终点所需天数 |
+| `curve_used`、`curve_r2` | 实际使用的生长曲线和它的 R² |
+| `curve_start`、`curve_end` | 拟合曲线所用记录的首末日期（`curve_margin_kg` 时会截取） |
+| `adg_type` | `observed`：区间两端都在测定期内；`extrapolated`：需要外推，但不超过 `max_extrap_days`；`partial`：外推后仍到不了端点，只算覆盖到的部分；`none`：覆盖不足 7 天，没有日增重 |
+| `start_date`、`end_date` | 曲线到达区间下限、上限的日期（区间的起止） |
+| `start_weight`、`end_weight` | 起止处的体重 |
+| `stage_days` | 区间天数 |
+| `extrap_days_start`、`extrap_days_end` | 起点在首条记录之前、终点在末条记录之后外推的天数 |
+| `weight_status`、`weight_reason` | 体重质控的结论（来自 `$weight`） |
+
+### `daily`
+
+区间内的每一天和有体重记录的每一天：`weight`（实测日体重，没有记录时为 `NA`）、`predicted`（曲线预测体重）、`lower`、`upper`（预测的 95% 范围）、`source`（`observed` 实测 / `predicted` 预测）、`in_stage`（是否在区间内）。
+
+## 5. `$adfi`：日采食量
+
+### `daily`：每头猪每天的采食
+
+| 列 | 含义 |
+|---|---|
+| `bw` | 当天体重（曲线预测值） |
+| `in_stage` | 是否在区间内 |
+| `n_visits`、`n_error_visits` | 当天访问次数、有采食错误的访问次数 |
+| `dfi_raw` | 记录的日采食量（全部访问相加） |
+| `dfi_error_free` | 无错误访问的采食量之和 |
+| `dfi_corrected` | 用混合模型校正后的日采食量 |
+| `dfi` | 最终使用的日采食量（校正值，缺失的天为插补值） |
+| `state` | 这一天 `dfi` 的来源，见下表 |
+
+| `state` | 含义 |
+|---|---|
+| `org` | 实测，当天没有错误访问 |
+| `corr` | 当天有错误访问，用模型校正 |
+| `iii` | 区间内部缺失，插补得到 |
+| `elrp` | 区间两端缺失，外推得到 |
+| `missing` | 无法估计 |
+| `NA` | 区间外的日子，不需要插补 |
+
+### `per_pig`
+
+| 列 | 含义 |
+|---|---|
+| `adfi` | 区间内日采食量的平均值（g/d） |
+| `adfi_raw`、`adfi_error_free` | 未校正、仅无错误访问的平均日采食，供对照 |
+| `n_stage_days` | 区间天数 |
+| `n_observed`、`n_corrected`、`n_interpolated`、`n_extrapolated`、`n_missing` | 各来源的天数 |
+| `n_extrap_start`、`n_extrap_end` | 区间开头、结尾连续外推的天数 |
+| `coverage` | 有实测（含校正）采食的天数占区间天数的比例 |
+
+### `model`：校正模型的系数
+
+`term`（变量）、`estimate`（系数）、`std_error`、`p_value`。错误协变量以 `pte_`（该类错误的访问占比）、`otd_`（该类错误访问的停留时长）、`fid_`（该类错误访问的采食量）开头。
+
+## 6. `$fcr`：料肉比与最终结果
+
+### `per_pig`（默认方法）
+
+| 列 | 含义 |
+|---|---|
+| `adg`、`adfi` | 日增重、日采食量（g/d） |
+| `fcr` | 料肉比 = `adfi` ÷ `adg` |
+| `gf` | 饲料效率 = `adg` ÷ `adfi` |
+| `adg_type`、`coverage`、`stage_days`、`start_weight`、`end_weight` | 同上文 |
+| `extrap_days_start`、`extrap_days_end`、`n_extrap_start`、`n_extrap_end` | 体重曲线、采食量在区间两端的外推天数 |
+| `fcr_flag` | `ok`（可信）、`low_confidence`（低可信度）、`NA`（没有料肉比） |
+| `fcr_note` | 低可信度的原因，例如外推天数过多、采食实测比例不足、某体重段记录断档等 |
+
+### `per_pig`（national 方法另有的列）
+
+| 列 | 含义 |
+|---|---|
+| `fcr` | (区间上限处累计采食 − 下限处累计采食) ÷ 区间宽度 |
+| `cfi_start`、`cfi_end` | 区间下限、上限处的累计采食量（kg） |
+| `cfi_r2`、`cfi_slope` | 累计采食对体重线性回归的 R² 和斜率 |
+| `weight_first`、`weight_last` | 保留天中首日、末日的体重 |
+| `extrap_kg_start`、`extrap_kg_end` | 用回归斜率外推的体重范围（kg）；超过一个体重段宽度时 `fcr_flag` 为低可信度 |
+| `n_classes`、`n_classes_removed` | 保留的体重段数、被删除的体重段数 |
+
+### `by_bin`：每头猪每个体重段
+
+| 列 | 含义 |
+|---|---|
+| `weight_from`、`weight_to` | 体重段（从区间下限起每 `bin_width` kg 一段） |
+| `n_days` | 段内天数 |
+| `feed_kg`、`gain_kg`、`fcr` | 段内采食量、增重和段料肉比 |
+| `n_observed_feed` | 段内有实测采食的天数（默认方法） |
+| `weight_coverage_kg`、`inner`、`low_coverage` | 段内实测体重覆盖的范围；是否为中间段；中间段覆盖不足（默认方法） |
+| `fcr_min`、`fcr_max`、`fcr_out` | 段料肉比的合理范围（`bin_fcr_limits`）及是否超出 |
+| `removed` | national 方法：该段被删除的原因，`NA` 表示保留 |
+
+### `summary`：汇总统计
+
+`group`（`all` 为全部猪，`ok` 为可信的猪，`breed X` 为各品种）、`trait`（`adg`、`adfi`、`fcr`、`gf`、`stage_days`、`start_weight`、`end_weight`）以及 `n`、`min`、`max`、`median`、`mean`、`sd`、`cv`。
+
+## 7. `$removed`：被剔除的猪
+
+| 列 | 含义 |
+|---|---|
+| `responder`、`location` | 耳标号、测定站 |
+| `step` | 在哪一步被剔除：`prep_visits`（读卡误读）、`clean_weight`（体重质控）、`calc_adg`（没有日增重）、`calc_adfi`（没有日采食）、`calc_fcr`（national 方法的分段和累计采食检查） |
+| `reason` | 原因 |
+
+```{r removed}
+res$removed
+```
+
+## 8. 导出文件
+
+`write_results(res, dir, farm)` 把结果写成 csv（UTF-8 带 BOM，Excel 可以直接打开），文件名为"场名_内容_日期.csv"：
+
+| 文件 | 对应的表 |
+|---|---|
+| `fcr` | `res$fcr$per_pig` |
+| `by_bin` | `res$fcr$by_bin` |
+| `daily_feed` | `res$adfi$daily` |
+| `daily_weight` | `res$adg$daily` |
+| `weight_pigs` | `res$weight$per_pig` |
+| `feed_model` | `res$adfi$model` |
+| `summary` | `res$fcr$summary` |
+| `removed` | `res$removed` |
+| `settings` | 本次使用的全部质控参数，每个参数一行 |

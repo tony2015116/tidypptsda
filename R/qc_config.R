@@ -11,13 +11,24 @@
 #'   - `"casey"` (default): feeder error criteria of Casey et al. (2005),
 #'     robust regression (`MASS::rlm`) for body weight outliers and a
 #'     quadratic growth curve.
-#'   - `"national"`: LOESS-based weight cleaning and growth curve, a
-#'     minimum curve R², longer test period and lower missing rate.
+#'   - `"national"`: the national FCR procedure (chapter 6, "FCR raw data
+#'     processing"): rlm weights <= 0.25 removed, whole days whose records
+#'     all have rlm weights < 0.90 removed, daily weight = mean weighted by
+#'     the rlm weights, pigs with a daily-weight R² < 0.995 (quadratic) or
+#'     more than 10% of days without feed removed, 10 kg weight classes
+#'     checked and FCR from cumulative feed intake (`method = "national"`).
+#'     Feed errors and their correction are those of the package.
 #'   - `"legacy"`: STL + robust regression + robust SD outlier detection
 #'     and a Gompertz growth curve.
 #' @param ... Parameters to override, as `name = value`. See **Parameters**.
 #'
 #' @section Parameters:
+#' **Method**
+#' - `method`: `"standard"` (default): FCR = ADFI / ADG over the stage;
+#'   `"national"`: FCR from the cumulative feed intake between the stage
+#'   limits, with the weight-class checks of the national procedure (see
+#'   [calc_fcr()]).
+#'
 #' **Station transfer** (pigs seen at several stations)
 #' - `max_gap_days`: maximum gap between two stations to treat the pig as
 #'   transferred. A larger gap splits it into two animals. Default 3.
@@ -28,10 +39,22 @@
 #'
 #' **Body weight records**
 #' - `weight_range`: valid body weight of a single record, kg.
+#' - `adapt_days`: adaptation period after entry, days (default 7). Body
+#'   weights of the first `adapt_days` days after a pig's first visit are
+#'   not used (`qc_flag = "adaptation"`). Its feed intake is kept: it counts
+#'   for ADFI and FCR when these days lie inside `stage_range` (e.g. a pig
+#'   that enters at 45 kg with a 30-120 kg stage), and not when the pig is
+#'   still below the stage. 0 = off.
 #' - `weight_outlier`: one or more of `"rlm"`, `"loess"`, `"stl"`, `"sd"`.
 #' - `outlier_combine`: `"any"` (outlier for any method) or `"majority"`.
 #' - `rlm_cutoff`: records with a robust regression weight below this are
-#'   outliers. Default 0.5.
+#'   outliers (at or below with `method = "national"`). Default 0.5.
+#' - `day_weight_min`: optional, a day on which every record has an rlm
+#'   weight below this is removed as a whole (`qc_flag = "day_weight"`;
+#'   national: 0.90). Needs `"rlm"` in `weight_outlier`. `NULL` = off.
+#' - `daily_weight`: daily body weight from the valid records: `"median"`
+#'   (default) or `"weighted_mean"` (mean weighted by the rlm weights,
+#'   national).
 #' - `sd_max`: residuals beyond this many robust SDs (MAD) are outliers.
 #' - `loess_span`: smoothing span for LOESS. Default 0.75.
 #' - `rel_dev_max`: optional, relative deviation from the curve above which
@@ -59,6 +82,11 @@
 #' - `min_test_days`, `min_records`: minimum test length (days) and number
 #'   of valid weight records.
 #' - `max_missing_rate`: maximum share of days without a valid weight.
+#' - `daily_r2_min`: optional, pigs whose daily weights fit a quadratic
+#'   curve with an R² below this are removed (national: 0.995). `NULL` = off.
+#' - `max_feed_missing`: optional, pigs without any feed record on more than
+#'   this share of their test days are removed (national: 0.10). `NULL` =
+#'   off.
 #' - `entry_weight_max`, `exit_weight_min`: maximum entry and minimum exit
 #'   body weight, kg.
 #' - `curve_r2_min`: optional, pigs whose growth curve R² is below this are
@@ -75,6 +103,13 @@
 #' - `stage_range`: body weight interval for ADG and FCR, kg.
 #' - `curve_model`: `"poly1"`, `"poly2"`, `"poly3"`, `"loess"` or
 #'   `"gompertz"` (falls back to `"poly2"` when it does not converge).
+#' - `adg_method`: `"lm"` (default): ADG is the slope of a linear
+#'   regression of all valid weight records between the stage start and end
+#'   times (`lm_slope`; its R² is `r_squared`); `"curve"`: ADG is the weight
+#'   difference of the stage divided by the days the growth curve needs for
+#'   it. Both are always reported (`lm_slope`, `adg_curve`). With `"lm"`, a
+#'   pig without enough records in the stage (< 5 records or < 7 days) gets
+#'   the curve ADG (`adg_source`).
 #' - `curve_margin_kg`: optional, fit the growth curve only to the records
 #'   around the stage: from the last day whose daily median weight is below
 #'   `stage_range[1] - curve_margin_kg` to the first day above
@@ -110,11 +145,13 @@
 #'   `c(0.025, 0.99)`). `NULL` = off.
 #' - `dfi_correct`: `"lmm"` (Jiao et al. 2014) or `"none"`.
 #' - `impute_method`: `"linear"` (linear interpolation, LOESS for long
-#'   gaps, intake ~ body weight regression at the stage ends) or `"loess"`
-#'   (robust LOESS over days everywhere).
+#'   gaps, intake ~ body weight regression at the stage ends), `"loess"`
+#'   (robust LOESS over days everywhere) or `"national"` (gaps of up to
+#'   `long_gap_days` days: LOESS over days; longer gaps: linear regression
+#'   of intake on body weight).
 #' - `long_gap_days`: inside gaps longer than this many days are imputed
-#'   with LOESS instead of a straight line (`impute_method = "linear"`).
-#'   Default 7.
+#'   with LOESS instead of a straight line (`impute_method = "linear"`), or
+#'   by regression on body weight (`"national"`, 3 days). Default 7.
 #'
 #' **Confidence flags** (used by [calc_fcr()])
 #' - `max_edge_extrap_days`: a pig is `"low_confidence"` when the growth
@@ -128,7 +165,12 @@
 #'   weights span less than this many kg flags the pig. Default 6.
 #' - `bin_fcr_limits`: optional table of plausible FCR per weight class,
 #'   columns `weight_from` (kg), `fcr_min`, `fcr_max`. See
-#'   [bin_fcr_example()]. `NULL` = off.
+#'   [bin_fcr_example()]. `NULL` = off (national: table 5 of the procedure).
+#' - `bin_min_gain_kg`: national method: a weight class whose weight gain is
+#'   below this is removed. Default 6.
+#' - `cfi_r2_min`: national method: pigs whose cumulative feed intake fits
+#'   body weight (linear) with an R² at or below this are removed. Default
+#'   0.95.
 #'
 #' @return An object of class `ppt_qc`: a named list of parameters with the
 #'   preset name in attribute `"profile"`.
@@ -261,15 +303,20 @@ qc_set <- function(cfg, values) {
 
 qc_defaults <- function() {
   list(
+    # analysis method
+    method = "standard",
     # station transfer
     max_gap_days = 3,
     max_overlap_days = 1,
     max_jump_kg = 10,
     # body weight records
     weight_range = c(15, 150),
+    adapt_days = 7,
     weight_outlier = "rlm",
     outlier_combine = "any",
     rlm_cutoff = 0.5,
+    day_weight_min = NULL,
+    daily_weight = "median",
     sd_max = 3,
     loess_span = 0.75,
     rel_dev_max = NULL,
@@ -284,10 +331,13 @@ qc_defaults <- function() {
     entry_weight_max = 65,
     exit_weight_min = 85,
     curve_r2_min = NULL,
+    daily_r2_min = NULL,
+    max_feed_missing = NULL,
     max_daily_jump_kg = NULL,
     # growth and ADG
     stage_range = c(30, 120),
     curve_model = "poly2",
+    adg_method = "lm",
     curve_margin_kg = NULL,
     max_extrap_days = 30,
     # feeder errors, Casey et al. (2005) Table 3
@@ -312,6 +362,8 @@ qc_defaults <- function() {
     min_coverage = 0.7,
     bin_width = 10,
     min_bin_coverage_kg = 6,
+    bin_min_gain_kg = 6,
+    cfi_r2_min = 0.95,
     bin_fcr_limits = NULL
   )
 }
@@ -320,13 +372,27 @@ qc_presets <- function() {
   list(
     casey = list(),
     national = list(
-      weight_range = c(25, 140),
-      weight_outlier = "loess",
-      curve_model = "loess",
-      curve_r2_min = 0.99,
-      min_test_days = 60,
-      max_missing_rate = 0.15,
-      impute_method = "loess"
+      method = "national",
+      weight_range = c(20, 140),
+      weight_track = FALSE,
+      weight_outlier = "rlm",
+      rlm_cutoff = 0.25,
+      day_weight_min = 0.90,
+      daily_weight = "weighted_mean",
+      curve_model = "poly2",
+      daily_r2_min = 0.995,
+      min_test_days = 40,
+      max_missing_rate = 1,
+      max_feed_missing = 0.10,
+      impute_method = "national",
+      long_gap_days = 3,
+      bin_min_gain_kg = 6,
+      cfi_r2_min = 0.95,
+      bin_fcr_limits = data.frame(
+        weight_from = seq(30, 110, by = 10),
+        fcr_min = c(0.76, 1.06, 1.14, 1.28, 1.35, 1.36, 1.34, 1.34, 1.31),
+        fcr_max = c(3.16, 3.08, 3.30, 3.41, 3.59, 3.86, 4.12, 4.27, 4.50)
+      )
     ),
     legacy = list(
       weight_range = c(25, 140),
@@ -341,18 +407,21 @@ qc_groups <- function() {
   g <- c(
     max_gap_days = "Station transfer", max_overlap_days = "Station transfer",
     max_jump_kg = "Station transfer",
-    weight_range = "Body weight records", weight_outlier = "Body weight records",
+    weight_range = "Body weight records", adapt_days = "Body weight records",
+    weight_outlier = "Body weight records",
     outlier_combine = "Body weight records", rlm_cutoff = "Body weight records",
+    day_weight_min = "Body weight records", daily_weight = "Body weight records",
     sd_max = "Body weight records", loess_span = "Body weight records",
     rel_dev_max = "Body weight records", daily_drop_min = "Body weight records",
-    weight_track = "Body weight records", track_tol = "Body weight records",
+    method = "Method", weight_track = "Body weight records", track_tol = "Body weight records",
     track_flag_share = "Pig-level checks",
     min_test_days = "Pig-level checks", min_records = "Pig-level checks",
     max_missing_rate = "Pig-level checks", entry_weight_max = "Pig-level checks",
     exit_weight_min = "Pig-level checks", curve_r2_min = "Pig-level checks",
+    daily_r2_min = "Pig-level checks", max_feed_missing = "Pig-level checks",
     max_daily_jump_kg = "Pig-level checks",
     stage_range = "Growth and ADG", curve_model = "Growth and ADG",
-    curve_margin_kg = "Growth and ADG",
+    curve_margin_kg = "Growth and ADG", adg_method = "Growth and ADG",
     max_extrap_days = "Growth and ADG",
     fiv_range = "Feeder errors", fiv0_abs_max = "Feeder errors",
     duration_max = "Feeder errors", speed_fiv_lo_max = "Feeder errors",
@@ -364,6 +433,7 @@ qc_groups <- function() {
     long_gap_days = "Daily feed intake",
     max_edge_extrap_days = "Confidence flags", min_coverage = "Confidence flags",
     bin_width = "Confidence flags", min_bin_coverage_kg = "Confidence flags",
+    bin_min_gain_kg = "Confidence flags", cfi_r2_min = "Confidence flags",
     bin_fcr_limits = "Confidence flags"
   )
   g[names(qc_defaults())]
@@ -378,16 +448,19 @@ qc_spec <- function() {
   lgl <- function() list(type = "logical", null = FALSE)
   list(
     max_gap_days = num(0), max_overlap_days = num(0), max_jump_kg = num(0),
-    weight_range = rng(0), weight_outlier = chc(c("rlm", "loess", "stl", "sd"), multiple = TRUE),
+    weight_range = rng(0), adapt_days = num(0), weight_outlier = chc(c("rlm", "loess", "stl", "sd"), multiple = TRUE),
     outlier_combine = chc(c("any", "majority")),
     rlm_cutoff = num(0, 1), sd_max = num(0), loess_span = num(0.1, 1),
+    day_weight_min = num(0, 1, null = TRUE), daily_weight = chc(c("median", "weighted_mean")),
     rel_dev_max = num(0, 1, null = TRUE), daily_drop_min = num(0, 1, null = TRUE),
+    method = chc(c("standard", "national")),
     weight_track = lgl(), track_tol = num(0, 1), track_flag_share = num(0, 1),
     min_test_days = num(1), min_records = num(3), max_missing_rate = num(0, 1),
     entry_weight_max = num(0), exit_weight_min = num(0),
     curve_r2_min = num(0, 1, null = TRUE), max_daily_jump_kg = num(0, null = TRUE),
+    daily_r2_min = num(0, 1, null = TRUE), max_feed_missing = num(0, 1, null = TRUE),
     stage_range = rng(0), curve_model = chc(c("poly1", "poly2", "poly3", "loess", "gompertz")),
-    curve_margin_kg = num(0, null = TRUE),
+    curve_margin_kg = num(0, null = TRUE), adg_method = chc(c("lm", "curve")),
     max_extrap_days = num(0),
     fiv_range = rng(), fiv0_abs_max = num(0), duration_max = num(0),
     speed_fiv_lo_max = num(0), speed_strict_max = num(0), speed_range = rng(0),
@@ -396,10 +469,11 @@ qc_spec <- function() {
     fiv_max_by_weight = tbl(c("weight_from", "fiv_max"), optional = "breed"),
     dfi_range = rng(0), dfi_quantile = rng(0, 1, null = TRUE),
     dfi_correct = chc(c("lmm", "none")),
-    impute_method = chc(c("linear", "loess")),
+    impute_method = chc(c("linear", "loess", "national")),
     long_gap_days = num(1),
     max_edge_extrap_days = num(0), min_coverage = num(0, 1),
-    bin_width = num(1), min_bin_coverage_kg = num(0),
+    bin_width = num(1), min_bin_coverage_kg = num(0), bin_min_gain_kg = num(0),
+    cfi_r2_min = num(0, 1),
     bin_fcr_limits = tbl(c("weight_from", "fcr_min", "fcr_max"))
   )
 }

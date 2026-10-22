@@ -47,7 +47,7 @@ fusen::fill_description(
   ),
   overwrite = TRUE
 )
-desc::desc_set_version("0.8.0")
+desc::desc_set_version("0.9.0")
 usethis::use_mit_license("Meng Guo")
 # Use markdown in roxygen comments
 desc::desc_set("Roxygen", "list(markdown = TRUE)")
@@ -485,7 +485,9 @@ utils::globalVariables(c(
   "injected", "key", "method", "adg_true", "adg_rmse", "fold", "type", "model",
   "rmse", "mae", "adg_full", "truncation", "cv_rmse", "observed", "dfi_true",
   "masks", "err_pct", "sq_err", "n_hidden", "adfi_est", "adfi_true", "scenario",
-  "spearman", "track_removed", "tt"
+  "spearman", "track_removed", "tt", "first_day", "i.first_day", "adg_source",
+  "adg_curve", "rlm_w", "i.rlm_w", "feed_missing", "r2_daily", "w_obs",
+  "i.weight", "i.dfi", "i.state", "in_band", "removed", "cfi", "w_first", "w_last", "extrap_kg_start", "extrap_kg_end"
 ))
 
 #' @export
@@ -626,13 +628,24 @@ Three presets are available, and any single parameter can be overridden.
 #'   - `"casey"` (default): feeder error criteria of Casey et al. (2005),
 #'     robust regression (`MASS::rlm`) for body weight outliers and a
 #'     quadratic growth curve.
-#'   - `"national"`: LOESS-based weight cleaning and growth curve, a
-#'     minimum curve R², longer test period and lower missing rate.
+#'   - `"national"`: the national FCR procedure (chapter 6, "FCR raw data
+#'     processing"): rlm weights <= 0.25 removed, whole days whose records
+#'     all have rlm weights < 0.90 removed, daily weight = mean weighted by
+#'     the rlm weights, pigs with a daily-weight R² < 0.995 (quadratic) or
+#'     more than 10% of days without feed removed, 10 kg weight classes
+#'     checked and FCR from cumulative feed intake (`method = "national"`).
+#'     Feed errors and their correction are those of the package.
 #'   - `"legacy"`: STL + robust regression + robust SD outlier detection
 #'     and a Gompertz growth curve.
 #' @param ... Parameters to override, as `name = value`. See **Parameters**.
 #'
 #' @section Parameters:
+#' **Method**
+#' - `method`: `"standard"` (default): FCR = ADFI / ADG over the stage;
+#'   `"national"`: FCR from the cumulative feed intake between the stage
+#'   limits, with the weight-class checks of the national procedure (see
+#'   [calc_fcr()]).
+#'
 #' **Station transfer** (pigs seen at several stations)
 #' - `max_gap_days`: maximum gap between two stations to treat the pig as
 #'   transferred. A larger gap splits it into two animals. Default 3.
@@ -643,10 +656,22 @@ Three presets are available, and any single parameter can be overridden.
 #'
 #' **Body weight records**
 #' - `weight_range`: valid body weight of a single record, kg.
+#' - `adapt_days`: adaptation period after entry, days (default 7). Body
+#'   weights of the first `adapt_days` days after a pig's first visit are
+#'   not used (`qc_flag = "adaptation"`). Its feed intake is kept: it counts
+#'   for ADFI and FCR when these days lie inside `stage_range` (e.g. a pig
+#'   that enters at 45 kg with a 30-120 kg stage), and not when the pig is
+#'   still below the stage. 0 = off.
 #' - `weight_outlier`: one or more of `"rlm"`, `"loess"`, `"stl"`, `"sd"`.
 #' - `outlier_combine`: `"any"` (outlier for any method) or `"majority"`.
 #' - `rlm_cutoff`: records with a robust regression weight below this are
-#'   outliers. Default 0.5.
+#'   outliers (at or below with `method = "national"`). Default 0.5.
+#' - `day_weight_min`: optional, a day on which every record has an rlm
+#'   weight below this is removed as a whole (`qc_flag = "day_weight"`;
+#'   national: 0.90). Needs `"rlm"` in `weight_outlier`. `NULL` = off.
+#' - `daily_weight`: daily body weight from the valid records: `"median"`
+#'   (default) or `"weighted_mean"` (mean weighted by the rlm weights,
+#'   national).
 #' - `sd_max`: residuals beyond this many robust SDs (MAD) are outliers.
 #' - `loess_span`: smoothing span for LOESS. Default 0.75.
 #' - `rel_dev_max`: optional, relative deviation from the curve above which
@@ -674,6 +699,11 @@ Three presets are available, and any single parameter can be overridden.
 #' - `min_test_days`, `min_records`: minimum test length (days) and number
 #'   of valid weight records.
 #' - `max_missing_rate`: maximum share of days without a valid weight.
+#' - `daily_r2_min`: optional, pigs whose daily weights fit a quadratic
+#'   curve with an R² below this are removed (national: 0.995). `NULL` = off.
+#' - `max_feed_missing`: optional, pigs without any feed record on more than
+#'   this share of their test days are removed (national: 0.10). `NULL` =
+#'   off.
 #' - `entry_weight_max`, `exit_weight_min`: maximum entry and minimum exit
 #'   body weight, kg.
 #' - `curve_r2_min`: optional, pigs whose growth curve R² is below this are
@@ -690,6 +720,13 @@ Three presets are available, and any single parameter can be overridden.
 #' - `stage_range`: body weight interval for ADG and FCR, kg.
 #' - `curve_model`: `"poly1"`, `"poly2"`, `"poly3"`, `"loess"` or
 #'   `"gompertz"` (falls back to `"poly2"` when it does not converge).
+#' - `adg_method`: `"lm"` (default): ADG is the slope of a linear
+#'   regression of all valid weight records between the stage start and end
+#'   times (`lm_slope`; its R² is `r_squared`); `"curve"`: ADG is the weight
+#'   difference of the stage divided by the days the growth curve needs for
+#'   it. Both are always reported (`lm_slope`, `adg_curve`). With `"lm"`, a
+#'   pig without enough records in the stage (< 5 records or < 7 days) gets
+#'   the curve ADG (`adg_source`).
 #' - `curve_margin_kg`: optional, fit the growth curve only to the records
 #'   around the stage: from the last day whose daily median weight is below
 #'   `stage_range[1] - curve_margin_kg` to the first day above
@@ -725,11 +762,13 @@ Three presets are available, and any single parameter can be overridden.
 #'   `c(0.025, 0.99)`). `NULL` = off.
 #' - `dfi_correct`: `"lmm"` (Jiao et al. 2014) or `"none"`.
 #' - `impute_method`: `"linear"` (linear interpolation, LOESS for long
-#'   gaps, intake ~ body weight regression at the stage ends) or `"loess"`
-#'   (robust LOESS over days everywhere).
+#'   gaps, intake ~ body weight regression at the stage ends), `"loess"`
+#'   (robust LOESS over days everywhere) or `"national"` (gaps of up to
+#'   `long_gap_days` days: LOESS over days; longer gaps: linear regression
+#'   of intake on body weight).
 #' - `long_gap_days`: inside gaps longer than this many days are imputed
-#'   with LOESS instead of a straight line (`impute_method = "linear"`).
-#'   Default 7.
+#'   with LOESS instead of a straight line (`impute_method = "linear"`), or
+#'   by regression on body weight (`"national"`, 3 days). Default 7.
 #'
 #' **Confidence flags** (used by [calc_fcr()])
 #' - `max_edge_extrap_days`: a pig is `"low_confidence"` when the growth
@@ -743,7 +782,12 @@ Three presets are available, and any single parameter can be overridden.
 #'   weights span less than this many kg flags the pig. Default 6.
 #' - `bin_fcr_limits`: optional table of plausible FCR per weight class,
 #'   columns `weight_from` (kg), `fcr_min`, `fcr_max`. See
-#'   [bin_fcr_example()]. `NULL` = off.
+#'   [bin_fcr_example()]. `NULL` = off (national: table 5 of the procedure).
+#' - `bin_min_gain_kg`: national method: a weight class whose weight gain is
+#'   below this is removed. Default 6.
+#' - `cfi_r2_min`: national method: pigs whose cumulative feed intake fits
+#'   body weight (linear) with an R² at or below this are removed. Default
+#'   0.95.
 #'
 #' @return An object of class `ppt_qc`: a named list of parameters with the
 #'   preset name in attribute `"profile"`.
@@ -866,15 +910,20 @@ qc_set <- function(cfg, values) {
 
 qc_defaults <- function() {
   list(
+    # analysis method
+    method = "standard",
     # station transfer
     max_gap_days = 3,
     max_overlap_days = 1,
     max_jump_kg = 10,
     # body weight records
     weight_range = c(15, 150),
+    adapt_days = 7,
     weight_outlier = "rlm",
     outlier_combine = "any",
     rlm_cutoff = 0.5,
+    day_weight_min = NULL,
+    daily_weight = "median",
     sd_max = 3,
     loess_span = 0.75,
     rel_dev_max = NULL,
@@ -889,10 +938,13 @@ qc_defaults <- function() {
     entry_weight_max = 65,
     exit_weight_min = 85,
     curve_r2_min = NULL,
+    daily_r2_min = NULL,
+    max_feed_missing = NULL,
     max_daily_jump_kg = NULL,
     # growth and ADG
     stage_range = c(30, 120),
     curve_model = "poly2",
+    adg_method = "lm",
     curve_margin_kg = NULL,
     max_extrap_days = 30,
     # feeder errors, Casey et al. (2005) Table 3
@@ -917,6 +969,8 @@ qc_defaults <- function() {
     min_coverage = 0.7,
     bin_width = 10,
     min_bin_coverage_kg = 6,
+    bin_min_gain_kg = 6,
+    cfi_r2_min = 0.95,
     bin_fcr_limits = NULL
   )
 }
@@ -925,13 +979,27 @@ qc_presets <- function() {
   list(
     casey = list(),
     national = list(
-      weight_range = c(25, 140),
-      weight_outlier = "loess",
-      curve_model = "loess",
-      curve_r2_min = 0.99,
-      min_test_days = 60,
-      max_missing_rate = 0.15,
-      impute_method = "loess"
+      method = "national",
+      weight_range = c(20, 140),
+      weight_track = FALSE,
+      weight_outlier = "rlm",
+      rlm_cutoff = 0.25,
+      day_weight_min = 0.90,
+      daily_weight = "weighted_mean",
+      curve_model = "poly2",
+      daily_r2_min = 0.995,
+      min_test_days = 40,
+      max_missing_rate = 1,
+      max_feed_missing = 0.10,
+      impute_method = "national",
+      long_gap_days = 3,
+      bin_min_gain_kg = 6,
+      cfi_r2_min = 0.95,
+      bin_fcr_limits = data.frame(
+        weight_from = seq(30, 110, by = 10),
+        fcr_min = c(0.76, 1.06, 1.14, 1.28, 1.35, 1.36, 1.34, 1.34, 1.31),
+        fcr_max = c(3.16, 3.08, 3.30, 3.41, 3.59, 3.86, 4.12, 4.27, 4.50)
+      )
     ),
     legacy = list(
       weight_range = c(25, 140),
@@ -946,18 +1014,21 @@ qc_groups <- function() {
   g <- c(
     max_gap_days = "Station transfer", max_overlap_days = "Station transfer",
     max_jump_kg = "Station transfer",
-    weight_range = "Body weight records", weight_outlier = "Body weight records",
+    weight_range = "Body weight records", adapt_days = "Body weight records",
+    weight_outlier = "Body weight records",
     outlier_combine = "Body weight records", rlm_cutoff = "Body weight records",
+    day_weight_min = "Body weight records", daily_weight = "Body weight records",
     sd_max = "Body weight records", loess_span = "Body weight records",
     rel_dev_max = "Body weight records", daily_drop_min = "Body weight records",
-    weight_track = "Body weight records", track_tol = "Body weight records",
+    method = "Method", weight_track = "Body weight records", track_tol = "Body weight records",
     track_flag_share = "Pig-level checks",
     min_test_days = "Pig-level checks", min_records = "Pig-level checks",
     max_missing_rate = "Pig-level checks", entry_weight_max = "Pig-level checks",
     exit_weight_min = "Pig-level checks", curve_r2_min = "Pig-level checks",
+    daily_r2_min = "Pig-level checks", max_feed_missing = "Pig-level checks",
     max_daily_jump_kg = "Pig-level checks",
     stage_range = "Growth and ADG", curve_model = "Growth and ADG",
-    curve_margin_kg = "Growth and ADG",
+    curve_margin_kg = "Growth and ADG", adg_method = "Growth and ADG",
     max_extrap_days = "Growth and ADG",
     fiv_range = "Feeder errors", fiv0_abs_max = "Feeder errors",
     duration_max = "Feeder errors", speed_fiv_lo_max = "Feeder errors",
@@ -969,6 +1040,7 @@ qc_groups <- function() {
     long_gap_days = "Daily feed intake",
     max_edge_extrap_days = "Confidence flags", min_coverage = "Confidence flags",
     bin_width = "Confidence flags", min_bin_coverage_kg = "Confidence flags",
+    bin_min_gain_kg = "Confidence flags", cfi_r2_min = "Confidence flags",
     bin_fcr_limits = "Confidence flags"
   )
   g[names(qc_defaults())]
@@ -983,16 +1055,19 @@ qc_spec <- function() {
   lgl <- function() list(type = "logical", null = FALSE)
   list(
     max_gap_days = num(0), max_overlap_days = num(0), max_jump_kg = num(0),
-    weight_range = rng(0), weight_outlier = chc(c("rlm", "loess", "stl", "sd"), multiple = TRUE),
+    weight_range = rng(0), adapt_days = num(0), weight_outlier = chc(c("rlm", "loess", "stl", "sd"), multiple = TRUE),
     outlier_combine = chc(c("any", "majority")),
     rlm_cutoff = num(0, 1), sd_max = num(0), loess_span = num(0.1, 1),
+    day_weight_min = num(0, 1, null = TRUE), daily_weight = chc(c("median", "weighted_mean")),
     rel_dev_max = num(0, 1, null = TRUE), daily_drop_min = num(0, 1, null = TRUE),
+    method = chc(c("standard", "national")),
     weight_track = lgl(), track_tol = num(0, 1), track_flag_share = num(0, 1),
     min_test_days = num(1), min_records = num(3), max_missing_rate = num(0, 1),
     entry_weight_max = num(0), exit_weight_min = num(0),
     curve_r2_min = num(0, 1, null = TRUE), max_daily_jump_kg = num(0, null = TRUE),
+    daily_r2_min = num(0, 1, null = TRUE), max_feed_missing = num(0, 1, null = TRUE),
     stage_range = rng(0), curve_model = chc(c("poly1", "poly2", "poly3", "loess", "gompertz")),
-    curve_margin_kg = num(0, null = TRUE),
+    curve_margin_kg = num(0, null = TRUE), adg_method = chc(c("lm", "curve")),
     max_extrap_days = num(0),
     fiv_range = rng(), fiv0_abs_max = num(0), duration_max = num(0),
     speed_fiv_lo_max = num(0), speed_strict_max = num(0), speed_range = rng(0),
@@ -1001,10 +1076,11 @@ qc_spec <- function() {
     fiv_max_by_weight = tbl(c("weight_from", "fiv_max"), optional = "breed"),
     dfi_range = rng(0), dfi_quantile = rng(0, 1, null = TRUE),
     dfi_correct = chc(c("lmm", "none")),
-    impute_method = chc(c("linear", "loess")),
+    impute_method = chc(c("linear", "loess", "national")),
     long_gap_days = num(1),
     max_edge_extrap_days = num(0), min_coverage = num(0, 1),
-    bin_width = num(1), min_bin_coverage_kg = num(0),
+    bin_width = num(1), min_bin_coverage_kg = num(0), bin_min_gain_kg = num(0),
+    cfi_r2_min = num(0, 1),
     bin_fcr_limits = tbl(c("weight_from", "fcr_min", "fcr_max"))
   )
 }
@@ -1115,8 +1191,15 @@ test_that("all presets are valid and differ where documented", {
   expect_equal(casey$duration_max, 3600)
   expect_equal(casey$speed_range, c(2, 170))
   expect_null(casey$rel_dev_max)
-  expect_equal(national$weight_range, c(25, 140))
-  expect_equal(national$impute_method, "loess")
+  expect_equal(national$method, "national")
+  expect_equal(national$weight_range, c(20, 140))
+  expect_equal(national$rlm_cutoff, 0.25)
+  expect_equal(national$day_weight_min, 0.90)
+  expect_equal(national$daily_r2_min, 0.995)
+  expect_equal(national$impute_method, "national")
+  expect_equal(casey$method, "standard")
+  expect_equal(casey$adapt_days, 7)
+  expect_equal(casey$adg_method, "lm")
   expect_equal(casey$max_edge_extrap_days, 15)
   expect_error(qc_config(impute_method = "cumulative_loess"), "impute_method")
   expect_equal(legacy$stage_range, c(45, 110))
@@ -1127,7 +1210,7 @@ test_that("overrides apply on top of the preset", {
   q <- qc_config("national", min_test_days = 50, daily_drop_min = 0.9)
   expect_equal(q$min_test_days, 50)
   expect_equal(q$daily_drop_min, 0.9)
-  expect_equal(q$max_missing_rate, 0.15)
+  expect_equal(q$max_feed_missing, 0.10)
   # NULL switches an optional rule off
   expect_null(qc_config("national", curve_r2_min = NULL)$curve_r2_min)
   expect_true("curve_r2_min" %in% names(qc_config("national", curve_r2_min = NULL)))
@@ -2116,15 +2199,22 @@ clean_weight <- function(visits, qc = qc_config(), verbose = 1, cores = 1) {
   rec[weight < qc$weight_range[1L] | weight > qc$weight_range[2L],
       qc_flag := "weight_range"]
   n_range <- rec[qc_flag == "weight_range", .N]
+  # adaptation after entry: weights of the first adapt_days days are not used
+  if (qc$adapt_days > 0) {
+    first <- dt[identified == TRUE, .(first_day = min(date)), by = responder]
+    rec[first, on = "responder", first_day := i.first_day]
+    rec[qc_flag == "" & date < first_day + qc$adapt_days, qc_flag := "adaptation"]
+    rec[, first_day := NULL]
+  }
 
   # 2. outlier detection per pig
   fits <- fit_by_pig(rec[qc_flag == ""], detect_weight_outliers,
                      step = "clean_weight", qc = qc)
   rec[fits$result, on = "row_id", `:=`(
-    fitted = i.fitted, outlier = i.outlier,
+    fitted = i.fitted, rlm_w = i.rlm_w, outlier = i.outlier,
     qc_flag = data.table::fifelse(i.outlier, i.outlier_by, qc_flag)
   )]
-  rec[qc_flag == "weight_range", outlier := TRUE]
+  rec[qc_flag %in% c("weight_range", "adaptation"), outlier := TRUE]
   rec[is.na(outlier), outlier := FALSE]
 
   # 3. pig checks
@@ -2148,6 +2238,14 @@ clean_weight <- function(visits, qc = qc_config(), verbose = 1, cores = 1) {
   per_pig[, test_days := as.integer(last_date - first_date) + 1L]
   per_pig[, missing_rate := 1 - valid_days / test_days]
   per_pig <- merge(per_pig, pig_fit, by = "responder", all.x = TRUE)
+  # R2 of a quadratic fit of the daily weights, and days without feed records
+  dw <- rec[outlier == FALSE, .(w = daily_weight_value(weight, rlm_w, qc$daily_weight)),
+            by = .(responder, date)]
+  per_pig <- merge(per_pig, dw[, .(r2_daily = daily_r2(date, w)), by = responder],
+                   by = "responder", all.x = TRUE)
+  fm <- dt[identified == TRUE, .(feed_missing = 1 - data.table::uniqueN(date) /
+                                   (as.integer(max(date) - min(date)) + 1)), by = responder]
+  per_pig <- merge(per_pig, fm, by = "responder", all.x = TRUE)
   per_pig <- merge(per_pig, daily_jumps(rec), by = "responder", all.x = TRUE)
   per_pig <- merge(main_loc, per_pig, by = "responder", all.y = TRUE)
   pig_breed <- breed_of(dt)
@@ -2167,7 +2265,7 @@ clean_weight <- function(visits, qc = qc_config(), verbose = 1, cores = 1) {
   daily <- rec[kept_pig == TRUE, .(
     location = location[1L],
     seq_days = seq_days[1L],
-    weight = if (any(!outlier)) stats::median(weight[!outlier]) else NA_real_,
+    weight = daily_weight_value(weight[!outlier], rlm_w[!outlier], qc$daily_weight),
     n_records = .N,
     n_outliers = sum(outlier)
   ), by = .(responder, date)]
@@ -2179,7 +2277,7 @@ clean_weight <- function(visits, qc = qc_config(), verbose = 1, cores = 1) {
             new_removed(responder, location, "clean_weight", reason)]
   )
   records <- rec[, .(responder, location, date, seq_days, entry_time, weight,
-                     fitted, outlier, qc_flag)]
+                     fitted, rlm_w, outlier, qc_flag)]
 
   report_clean_weight(rec, per_pig, n_range, fits, qc)
 
@@ -2191,6 +2289,27 @@ clean_weight <- function(visits, qc = qc_config(), verbose = 1, cores = 1) {
 # ---- helpers ----------------------------------------------------------------
 
 `%||%` <- function(x, y) if (is.null(x)) y else x
+
+# Representative weight of one day: median, or the mean weighted by the rlm
+# weights (national method; falls back to the median without rlm weights).
+daily_weight_value <- function(y, w, how = "median") {
+  if (length(y) == 0L) return(NA_real_)
+  if (identical(how, "weighted_mean") && !is.null(w) && any(!is.na(w)) && sum(w, na.rm = TRUE) > 0) {
+    ok <- !is.na(w)
+    return(sum(y[ok] * w[ok]) / sum(w[ok]))
+  }
+  stats::median(y)
+}
+
+# R2 of a quadratic fit of the daily weights over the days.
+daily_r2 <- function(day, w) {
+  ok <- !is.na(w)
+  if (sum(ok) < 5L) return(NA_real_)
+  x <- as.numeric(day[ok])
+  y <- w[ok]
+  f <- stats::lm(y ~ x + I(x^2))
+  1 - sum(stats::residuals(f)^2) / sum((y - mean(y))^2)
+}
 
 # Breed of each identified pig (first non-missing value), or NULL.
 breed_of <- function(dt) {
@@ -2265,12 +2384,15 @@ detect_weight_outliers <- function(d, qc) {
   y <- y_all[keep]
   flags <- list()
   fits <- list()
+  rlm_w <- NULL
 
   for (m in qc$weight_outlier) {
     if (m == "rlm") {
       fit <- MASS::rlm(cbind(1, t, t^2), y, psi = MASS::psi.bisquare, maxit = 100)
       fits$rlm <- stats::fitted(fit)
-      flags$rlm <- fit$w < qc$rlm_cutoff
+      rlm_w <- fit$w
+      # the national method removes weights <= the cutoff
+      flags$rlm <- if (identical(qc$method, "national")) fit$w <= qc$rlm_cutoff else fit$w < qc$rlm_cutoff
     } else if (m == "loess") {
       fits$loess <- loess_fit(t, y, qc$loess_span)
       r <- y - fits$loess
@@ -2292,6 +2414,16 @@ detect_weight_outliers <- function(d, qc) {
   by <- character(nrow(mat))
   for (m in colnames(mat)) by <- add_reason(by, mat[, m] %in% TRUE, m)
   ref <- fits[[1L]]
+
+  # a whole day off the curve: every record of the day has an rlm weight
+  # below day_weight_min
+  if (!is.null(qc$day_weight_min) && !is.null(rlm_w)) {
+    day_k <- d$date[keep]
+    bad <- tapply(rlm_w, day_k, function(v) all(v < qc$day_weight_min))
+    day_off <- as.character(day_k) %in% names(bad)[bad]
+    by <- add_reason(by, day_off & !outlier, "day_weight")
+    outlier <- outlier | day_off
+  }
 
   if (!is.null(qc$rel_dev_max)) {
     rel <- abs(y - ref) / ref > qc$rel_dev_max
@@ -2331,9 +2463,11 @@ detect_weight_outliers <- function(d, qc) {
   by_all <- ifelse(keep, "", "track")
   by_all[keep] <- by
   fit_all <- if (all(keep)) ref else stats::approx(t, ref, xout = t_all, rule = 2, ties = mean)$y
+  w_all <- rep(NA_real_, length(keep))
+  if (!is.null(rlm_w)) w_all[keep] <- rlm_w
 
-  data.table::data.table(row_id = d$row_id, fitted = fit_all, outlier = out_all,
-                         outlier_by = by_all, r2 = r2,
+  data.table::data.table(row_id = d$row_id, fitted = fit_all, rlm_w = w_all,
+                         outlier = out_all, outlier_by = by_all, r2 = r2,
                          entry_weight = entry_weight, exit_weight = exit_weight,
                          track_removed = tr$removed)
 }
@@ -2445,6 +2579,15 @@ pig_reasons <- function(p, qc, failed, type = c("remove", "flag")) {
       sprintf("%d valid weights < %d", p$n_valid, as.integer(qc$min_records)))
   add(p$n_valid > 0 & p$test_days < qc$min_test_days,
       sprintf("test period %d d < %d d", p$test_days, as.integer(qc$min_test_days)))
+  if (!is.null(qc$daily_r2_min)) {
+    add(p$r2_daily < qc$daily_r2_min,
+        sprintf("R2 of the daily weights %.4f < %s", p$r2_daily, qc$daily_r2_min))
+  }
+  if (!is.null(qc$max_feed_missing)) {
+    add(p$feed_missing > qc$max_feed_missing,
+        sprintf("no feed record on %.0f%% of the test days > %.0f%%",
+                100 * p$feed_missing, 100 * qc$max_feed_missing))
+  }
   add(p$n_valid > 0 & p$missing_rate > qc$max_missing_rate,
       sprintf("missing rate %.0f%% > %.0f%%", 100 * p$missing_rate, 100 * qc$max_missing_rate))
   vapply(reasons, function(x) paste(unique(x), collapse = "; "), character(1))
@@ -2459,8 +2602,10 @@ report_clean_weight <- function(rec, per_pig, n_range, fits, qc) {
   ppt_bullets_counts(c(
     "Weight records" = n_rec,
     "Outside weight range" = n_range,
+    "Adaptation after entry (not used)" = rec[qc_flag == "adaptation", .N],
     "Outliers" = n_out,
-    "  of which removed by tracking" = rec[qc_flag == "track", .N]
+    "  of which removed by tracking" = if (isTRUE(qc$weight_track)) rec[qc_flag == "track", .N] else NULL,
+    "  of which whole days off the curve" = if (!is.null(qc$day_weight_min)) rec[qc_flag == "day_weight", .N] else NULL
   ))
   if (length(qc$weight_outlier) > 1L) {
     ppt_bullets_counts(stats::setNames(method_counts, paste0("  flagged by ", names(method_counts))), level = 2L)
@@ -2558,7 +2703,8 @@ test_that("every outlier method finds the spikes", {
   spike_w <- pig$weight[pig$is_spike]
   for (m in c("rlm", "loess", "sd", "stl")) {
     # tracking off: it would already remove the spikes before the methods
-    w <- clean_weight(pig, qc = qc_config(weight_outlier = m, weight_track = FALSE), verbose = 0)
+    w <- clean_weight(pig, qc = qc_config(weight_outlier = m, weight_track = FALSE, adapt_days = 0),
+                      verbose = 0)
     flagged <- w$records[outlier == TRUE, weight]
     expect_true(all(spike_w %in% flagged), info = m)
     expect_lt(length(flagged), 30, label = m)
@@ -2605,7 +2751,7 @@ test_that("tracking from the end removes readings of several pigs on the scale",
   set.seed(3)
   multi <- t < 35 & stats::runif(nrow(pig)) < 0.5
   pig[multi, weight := weight * stats::runif(.N, 1.25, 2.2)]
-  w <- clean_weight(pig, verbose = 0)
+  w <- clean_weight(pig, qc_config(adapt_days = 0), verbose = 0)
   r <- w$records
   expect_gt(mean(r$outlier[multi]), 0.95)
   expect_lt(mean(r$outlier[!multi]), 0.05)        # also the slow early growth
@@ -2640,6 +2786,39 @@ test_that("clean and short pigs are not changed by the tracking", {
   expect_error(qc_config(weight_track = "yes"), "TRUE or FALSE")
 })
 
+test_that("weights of the adaptation days are not used", {
+  pig <- make_pig(per_day = 12)
+  w <- clean_weight(pig, verbose = 0)
+  r <- w$records
+  first <- min(r$date)
+  expect_true(all(r[date < first + 7, qc_flag] == "adaptation"))
+  expect_true(all(r[date < first + 7, outlier]))
+  expect_false(any(r[date >= first + 7, qc_flag] == "adaptation"))
+  w0 <- clean_weight(pig, qc_config(adapt_days = 0), verbose = 0)
+  expect_false(any(w0$records$qc_flag == "adaptation"))
+})
+
+test_that("national weight rules: whole days off the curve, weighted daily means", {
+  pig <- make_pig(per_day = 12)
+  d5 <- sort(unique(pig$date))[30]
+  pig[date == d5, weight := weight + 1.7]        # a whole day 1.7 kg too heavy
+  q <- qc_config(adapt_days = 0, weight_track = FALSE, rlm_cutoff = 0.01,
+                 day_weight_min = 0.9, daily_weight = "weighted_mean")
+  w <- clean_weight(pig, q, verbose = 0)
+  expect_true(all(w$records[date == d5, outlier]))
+  expect_true(all(w$records[date == d5, qc_flag] %in% c("day_weight", "rlm")))
+  expect_true(any(w$records[date == d5, qc_flag] == "day_weight"))
+  expect_equal(daily_weight_value(c(10, 20), c(1, 3), "weighted_mean"), 17.5)
+  expect_equal(daily_weight_value(c(10, 20, 90), c(1, 1, 1), "median"), 20)
+  expect_equal(daily_r2(1:10, 30 + 1:10), 1)
+  expect_true(w$per_pig$r2_daily > 0.99)
+  # feed missing and daily R2 remove pigs in the national method
+  short_feed <- clean_weight(pig, qc_set(q, list(max_feed_missing = 0, daily_r2_min = 0.99999)),
+                             verbose = 0)
+  expect_equal(short_feed$per_pig$status, "removed")
+  expect_match(short_feed$per_pig$reason, "R2 of the daily weights")
+})
+
 test_that("length rules remove pigs, entry/exit rules only flag them", {
   heavy <- make_pig("heavy", start = 80)          # entry weight too high
   light <- make_pig("light", start = 20, adg = 0.5, seed = 2)  # exit too low
@@ -2672,7 +2851,7 @@ test_that("curve R2 only lowers confidence", {
 test_that("a pig whose fit fails is removed, others continue", {
   pig <- make_pig()
   tiny <- make_pig("tiny")[1:3]
-  w <- clean_weight(rbind(pig, tiny), qc = qc_config(min_records = 3), verbose = 0)
+  w <- clean_weight(rbind(pig, tiny), qc = qc_config(min_records = 3, adapt_days = 0), verbose = 0)
   expect_equal(w$per_pig[responder == "tiny", status], "removed")
   expect_match(w$per_pig[responder == "tiny", reason], "fit failed")
   expect_equal(w$per_pig[responder == "p1", status], "keep")
@@ -2753,7 +2932,7 @@ Every pig gets an `adg_type`:
 #'
 #' @param weight Result of [clean_weight()].
 #' @param qc QC settings; by default the ones used by [clean_weight()].
-#'   Used here: `stage_range`, `curve_model`, `curve_margin_kg`,
+#'   Used here: `stage_range`, `curve_model`, `adg_method`, `curve_margin_kg`,
 #'   `loess_span`, `max_extrap_days`.
 #' @param verbose 0 (silent), 1 (summary, default) or 2 (details).
 #' @param cores Number of CPU cores for the per-pig computations. Default 1.
@@ -2766,9 +2945,12 @@ Every pig gets an `adg_type`:
 #'     `start_date` / `end_date` and `start_weight` / `end_weight` (when the
 #'     curve reaches the stage limits, kg), `stage_days`,
 #'     `extrap_days_start` / `extrap_days_end` (days the curve is
-#'     extrapolated before the first / after the last weight), `adg` (g/d),
+#'     extrapolated before the first / after the last weight), `adg` (g/d,
+#'     by `adg_method`), `adg_source` (`"lm"` or `"curve"`), `adg_curve`
+#'     (g/d, stage weight difference / days of the growth curve),
 #'     `lm_slope` (g/d, linear regression on all valid records between the
-#'     stage start and end times, for comparison), `r_squared` (of that
+#'     stage start and end times), `r_squared` (of that regression),
+#'     `lm_weight_from` / `lm_weight_to` (kg, weight range covered by that
 #'     regression), `weight_status`
 #'     and `weight_reason` (from [clean_weight()]);
 #'   - `daily`: one row per pig and day from `start_date` to `end_date` and
@@ -2825,8 +3007,9 @@ calc_adg <- function(weight, qc = weight$settings, verbose = 1, cores = 1) {
   cols <- c("responder", "location", "breed", "stage", "curve_used", "curve_r2",
             "curve_start", "curve_end",
             "adg_type", "start_date", "end_date", "start_weight", "end_weight",
-            "stage_days", "extrap_days_start", "extrap_days_end", "adg", "lm_slope",
-            "r_squared", "weight_status",
+            "stage_days", "extrap_days_start", "extrap_days_end", "adg", "adg_source",
+            "adg_curve", "lm_slope", "r_squared", "lm_weight_from", "lm_weight_to",
+            "weight_status",
             "weight_reason")
   per_pig <- per_pig[, intersect(cols, names(per_pig)), with = FALSE]
   data.table::setorder(per_pig, location, responder)
@@ -2884,15 +3067,22 @@ adg_one_pig <- function(d, qc, day0) {
   # (cut by time, not by weight, so that a dip below `lo` after the start
   # does not leave isolated early records in the regression).
   inside <- adg_type != "none" & t >= a & t <= b
-  lm_slope <- r_squared <- NA_real_
+  lm_slope <- r_squared <- lm_from <- lm_to <- NA_real_
   if (sum(inside) >= 5L && diff(range(t[inside])) >= 7) {
     lfit <- stats::lm(y[inside] ~ t[inside])
     lm_slope <- unname(stats::coef(lfit)[2L]) * 1000
     r_squared <- summary(lfit)$r.squared
+    lm_from <- min(stats::fitted(lfit))
+    lm_to <- max(stats::fitted(lfit))
   }
+  adg_curve <- adg
+  use_lm <- identical(qc$adg_method, "lm") && !is.na(lm_slope)
+  if (use_lm) adg <- lm_slope
+  adg_source <- if (is.na(adg)) NA_character_ else if (use_lm) "lm" else "curve"
 
   # Daily table: the stage period plus the recorded days.
-  obs <- d[, .(weight = stats::median(weight)), by = date]
+  obs <- d[, .(weight = daily_weight_value(weight, if ("rlm_w" %in% names(d)) rlm_w else NULL,
+                                            qc$daily_weight)), by = date]
   stage_days_idx <- if (adg_type == "none") integer() else seq(floor(a), ceiling(b) - 1)
   idx <- sort(unique(c(stage_days_idx, as.integer(obs$date - first_day))))
   dates <- first_day + idx
@@ -2924,8 +3114,12 @@ adg_one_pig <- function(d, qc, day0) {
     extrap_days_start = if (adg_type == "none") NA_real_ else max(0, tmin - a),
     extrap_days_end = if (adg_type == "none") NA_real_ else max(0, b - tmax),
     adg = adg,
+    adg_source = adg_source,
+    adg_curve = adg_curve,
     lm_slope = lm_slope,
     r_squared = r_squared,
+    lm_weight_from = lm_from,
+    lm_weight_to = lm_to,
     daily = list(daily)
   )
 }
@@ -3071,7 +3265,7 @@ line_pig <- function(id = "p1", start = 30, rate = 1, days = 95, noise = 0.3,
   )
 }
 no_checks <- function(...) {
-  qc_config(min_test_days = 7, min_records = 5, max_missing_rate = 1, ...)
+  qc_config(min_test_days = 7, min_records = 5, max_missing_rate = 1, adapt_days = 0, ...)
 }
 
 test_that("a perfectly linear pig gives the exact ADG", {
@@ -3156,12 +3350,30 @@ test_that("curve_margin_kg fits the curve around the stage only", {
   w <- clean_weight(pig, q, verbose = 0)
   all <- calc_adg(w, verbose = 0)$per_pig
   cut <- calc_adg(w, qc = qc_set(q, list(curve_margin_kg = 5)), verbose = 0)$per_pig
-  expect_lt(abs(cut$adg - 1000), abs(all$adg - 1000))
-  expect_equal(cut$adg, 1000, tolerance = 0.02)
+  expect_lt(abs(cut$adg_curve - 1000), abs(all$adg_curve - 1000))
+  expect_equal(cut$adg_curve, 1000, tolerance = 0.02)
   expect_gt(cut$curve_start, all$curve_start)
   expect_lt(cut$curve_end, all$curve_end)
   # too few records left: all records are used
   expect_true(all(curve_window(as.Date("2024-01-01") + 0:5, 10 + 0:5, qc_set(q, list(curve_margin_kg = 5)))))
+})
+
+test_that("adg_method chooses between the regression slope and the curve", {
+  pig <- line_pig(start = 25, rate = 1, days = 100, noise = 0.3)
+  w <- clean_weight(pig, no_checks(), verbose = 0)
+  a_lm <- calc_adg(w, verbose = 0)$per_pig
+  a_cv <- calc_adg(w, qc = qc_set(no_checks(), list(adg_method = "curve")), verbose = 0)$per_pig
+  expect_equal(a_lm$adg, a_lm$lm_slope)
+  expect_equal(a_lm$adg_source, "lm")
+  expect_equal(a_cv$adg, a_cv$adg_curve)
+  expect_equal(a_cv$adg_source, "curve")
+  expect_equal(a_lm$adg_curve, a_cv$adg_curve)
+  expect_true(a_lm$lm_weight_from >= 29 && a_lm$lm_weight_to <= 121)
+  # another stage moves everything with it
+  a2 <- calc_adg(w, qc = qc_set(no_checks(), list(stage_range = c(40, 100))), verbose = 0)$per_pig
+  expect_equal(a2$stage, "40-100")
+  expect_equal(a2$start_weight, 40, tolerance = 1e-6)
+  expect_true(a2$lm_weight_from >= 39 && a2$lm_weight_to <= 101)
 })
 
 test_that("calc_adg explains when no pig is left", {
@@ -4006,6 +4218,24 @@ impute_dfi_one_pig <- function(d, qc) {
         d[outside, state := "missing"]
       }
     }
+  } else if (qc$impute_method == "national") {
+    # gaps of <= long_gap_days days: LOESS smoothing over the days; longer
+    # gaps: linear regression of daily intake on body weight
+    run <- run_length(need)
+    short <- need & run <= qc$long_gap_days
+    long <- need & !short
+    if (any(short)) {
+      pred <- loess_extend(x[ok], d$dfi_check[ok], qc$loess_span)
+      d[short, dfi := pmax(0, pred(x[short]))]
+    }
+    if (any(long)) {
+      okb <- ok & !is.na(d$bw)
+      if (sum(okb) >= 5L && all(!is.na(d$bw[long]))) {
+        f <- stats::lm(dfi_check ~ bw, data = d[okb])
+        d[long, dfi := pmax(0, stats::predict(f, newdata = d[long]))]
+      }
+    }
+    d[need & !is.na(dfi), state := data.table::fifelse(inside[need & !is.na(dfi)], "iii", "elrp")]
   } else {
     pred <- loess_extend(x[ok], d$dfi_check[ok], qc$loess_span)
     d[inside, `:=`(dfi = pmax(0, pred(x[inside])), state = "iii")]
@@ -4272,6 +4502,30 @@ the stage with recorded feed intake, or weight data flagged by
 #'     `bin_fcr_limits`);
 #'   - `removed`, `settings`.
 #'
+#' @details
+#' With `method = "national"` in the QC settings ([qc_config()] preset
+#' `"national"`), FCR follows the national procedure instead:
+#' 1. daily weights over the test period (missing days interpolated
+#'    linearly inside, predicted by a quadratic curve at the ends) and daily
+#'    feed intake (missing days imputed by `impute_method`);
+#' 2. days whose weight lies in `stage_range` are split into `bin_width` kg
+#'    classes; a class with a weight gain below `bin_min_gain_kg` or an FCR
+#'    outside `bin_fcr_limits` is removed, and a pig with a removed class
+#'    between two kept ones is removed;
+#' 3. cumulative feed intake over the kept days is regressed on body weight
+#'    (pigs with R² <= `cfi_r2_min` are removed) and extended with that
+#'    slope to the stage limits;
+#' 4. FCR = (cumulative intake at the upper limit - at the lower limit) /
+#'    stage width.
+#'
+#' `per_pig` then also has `cfi_start`, `cfi_end` (kg), `cfi_r2`,
+#' `cfi_slope`, `weight_first`, `weight_last` (first and last kept daily
+#' weight), `extrap_kg_start`, `extrap_kg_end` (kg extended by the
+#' regression; more than `bin_width` gives `fcr_flag = "low_confidence"`),
+#' `n_classes` and `n_classes_removed`; `by_bin` gives `removed` (reason or
+#' `NA`) for each class. ADG and ADFI are those of [calc_adg()] and
+#' [calc_adfi()].
+#'
 #' @seealso [calc_adg()], [calc_adfi()].
 #' @export
 calc_fcr <- function(adg, adfi, min_coverage = adg$settings$min_coverage,
@@ -4285,6 +4539,9 @@ calc_fcr <- function(adg, adfi, min_coverage = adg$settings$min_coverage,
   }
   if (!identical(adg$settings$stage_range, adfi$settings$stage_range)) {
     cli::cli_abort("{.arg adg} and {.arg adfi} use different {.field stage_range}.")
+  }
+  if (identical(adg$settings$method, "national")) {
+    return(calc_fcr_national(adg, adfi))
   }
   ppt_msg("FCR over {adg$settings$stage_range[1]}-{adg$settings$stage_range[2]} kg", "h1")
 
@@ -4364,6 +4621,158 @@ calc_fcr <- function(adg, adfi, min_coverage = adg$settings$min_coverage,
 }
 
 # Feed intake, gain and FCR per body weight class of each pig.
+# FCR by the national method (qc_config("national")):
+# 1. daily weights (weighted means) of the test period, missing days
+#    interpolated linearly inside and predicted by a quadratic curve at the
+#    ends; daily feed intake from calc_adfi(), missing days imputed by the
+#    national rule;
+# 2. days whose weight lies in stage_range are split into bin_width classes;
+#    a class whose weight gain is below bin_min_gain_kg, or whose FCR is
+#    outside bin_fcr_limits, is removed; a pig with a removed (or missing)
+#    class between two kept classes is removed;
+# 3. cumulative feed intake over the kept days; it is regressed on body
+#    weight (linear) - pigs with R2 <= cfi_r2_min are removed - and the
+#    regression slope extends it from the first / last kept day to the
+#    stage limits;
+# 4. FCR = (CFI at the upper limit - CFI at the lower limit) / stage width.
+calc_fcr_national <- function(adg, adfi) {
+  qc <- adg$settings
+  lo <- qc$stage_range[1L]
+  hi <- qc$stage_range[2L]
+  ppt_msg("FCR over {lo}-{hi} kg (national method: cumulative feed intake)", "h1")
+  pigs <- adg$per_pig[!is.na(adg), responder]
+  dly <- adg$daily[responder %in% pigs, .(responder, location, date, seq_days, weight, predicted)]
+  feed <- adfi$daily[, .(responder, date, dfi, state)]
+
+  one <- function(id) {
+    d <- dly[responder == id]
+    data.table::setorder(d, date)
+    obs <- d[!is.na(weight)]
+    if (nrow(obs) < 5L) return(list(error = "fewer than 5 daily weights"))
+    days <- seq(min(obs$date), max(obs$date), by = 1)
+    g <- data.table::data.table(responder = id, date = days)
+    g[obs, on = "date", w_obs := i.weight]
+    # weights: linear interpolation inside, quadratic prediction at the ends
+    x <- as.numeric(g$date - min(g$date))
+    ok <- !is.na(g$w_obs)
+    g[, w := stats::approx(x[ok], w_obs[ok], xout = x)$y]
+    if (anyNA(g$w)) {
+      fit <- stats::lm(w_obs ~ x + I(x^2), data = data.frame(w_obs = g$w_obs[ok], x = x[ok]))
+      miss <- is.na(g$w)
+      g[miss, w := stats::predict(fit, newdata = data.frame(x = x[miss]))]
+    }
+    g[feed[responder == id], on = "date", `:=`(dfi = i.dfi, state = i.state)]
+    g[, in_band := w >= lo & w <= hi]
+    if (!any(g$in_band)) return(list(error = "no daily weight inside the stage"))
+    # impute missing intake on the stage days
+    dd <- g[, .(date, seq_days = as.integer(date - min(date)) + 1L, bw = w,
+                in_stage = in_band, state = data.table::fifelse(state %in% c("org", "corr"), state, NA_character_),
+                dfi_check = data.table::fifelse(state %in% c("org", "corr"), dfi, NA_real_))]
+    dd <- impute_dfi_one_pig(dd, qc)
+    g[, dfi := dd$dfi]
+    st <- g[in_band == TRUE]
+    if (anyNA(st$dfi)) return(list(error = "daily feed intake missing on stage days"))
+    width <- qc$bin_width
+    st[, weight_from := pmin(lo + floor((w - lo) / width) * width, hi - width)]
+    bins <- st[, .(n_days = .N, w_first = w[1L], w_last = w[.N], feed_kg = sum(dfi) / 1000),
+               by = weight_from]
+    bins[, `:=`(weight_to = pmin(weight_from + width, hi), gain_kg = w_last - w_first)]
+    bins[, fcr := data.table::fifelse(gain_kg > 0, feed_kg / gain_kg, NA_real_)]
+    bins[, `:=`(fcr_min = NA_real_, fcr_max = NA_real_)]
+    if (!is.null(qc$bin_fcr_limits)) {
+      lim <- data.table::as.data.table(qc$bin_fcr_limits)
+      bins[lim, on = "weight_from", `:=`(fcr_min = i.fcr_min, fcr_max = i.fcr_max)]
+    }
+    bins[, removed := data.table::fcase(
+      gain_kg < qc$bin_min_gain_kg, sprintf("gain %.1f kg < %s kg", gain_kg, qc$bin_min_gain_kg),
+      !is.na(fcr_min) & (is.na(fcr) | fcr < fcr_min | fcr > fcr_max),
+      sprintf("class FCR %.2f outside %s-%s", fcr, fcr_min, fcr_max),
+      default = NA_character_)]
+    data.table::setorder(bins, weight_from)
+    kept_bins <- bins[is.na(removed), weight_from]
+    out_bins <- data.table::copy(bins)[, responder := id]
+    if (length(kept_bins) == 0L) {
+      return(list(error = "every weight class removed", bins = out_bins))
+    }
+    expected <- seq(min(kept_bins), max(kept_bins), by = width)
+    if (!all(expected %in% kept_bins)) {
+      gapb <- setdiff(expected, kept_bins)
+      return(list(error = sprintf("weight class %s kg removed or missing between kept classes",
+                                  paste0(gapb, "-", gapb + width, collapse = ", ")),
+                  bins = out_bins))
+    }
+    k <- st[weight_from %in% kept_bins]
+    data.table::setorder(k, date)
+    k[, cfi := cumsum(dfi) / 1000]
+    cf <- stats::lm(cfi ~ w, data = k)
+    r2 <- summary(cf)$r.squared
+    if (!is.finite(r2) || r2 <= qc$cfi_r2_min) {
+      return(list(error = sprintf("R2 of cumulative feed on weight %.3f <= %s", r2, qc$cfi_r2_min),
+                  bins = out_bins))
+    }
+    b <- unname(stats::coef(cf)[2L])
+    first <- k[1L]
+    last <- k[.N]
+    cfi_lo <- first$cfi - b * (first$w - lo)
+    cfi_hi <- last$cfi + b * (hi - last$w)
+    list(per_pig = data.table::data.table(
+      responder = id, fcr = (cfi_hi - cfi_lo) / (hi - lo),
+      cfi_start = cfi_lo, cfi_end = cfi_hi, cfi_r2 = r2, cfi_slope = b,
+      weight_first = first$w, weight_last = last$w,
+      extrap_kg_start = max(0, first$w - lo), extrap_kg_end = max(0, hi - last$w),
+      n_classes = length(kept_bins), n_classes_removed = sum(!is.na(bins$removed))),
+      bins = out_bins)
+  }
+  res <- lapply(pigs, one)
+  ok <- vapply(res, function(r) is.null(r$error), logical(1))
+  pp <- data.table::rbindlist(lapply(res[ok], `[[`, "per_pig"))
+  by_bin <- data.table::rbindlist(lapply(res, `[[`, "bins"), fill = TRUE)
+  if (nrow(by_bin) > 0L) {
+    data.table::setcolorder(by_bin, c("responder", "weight_from", "weight_to"))
+    by_bin[, c("w_first", "w_last") := NULL]
+  }
+  bad <- data.table::data.table(responder = pigs[!ok],
+                                reason = vapply(res[!ok], `[[`, "", "error"))
+
+  a <- adg$per_pig[, intersect(c("responder", "location", "breed", "stage", "adg", "adg_type",
+                                "stage_days", "start_weight", "end_weight"), names(adg$per_pig)),
+                   with = FALSE]
+  f <- adfi$per_pig[, .(responder, adfi, coverage)]
+  per_pig <- merge(merge(a, f, by = "responder", all.x = TRUE), pp, by = "responder", all.x = TRUE)
+  per_pig[, gf := 1 / fcr]
+  max_edge <- qc$bin_width
+  per_pig[, fcr_note := data.table::fcase(
+    is.na(fcr), "no FCR",
+    extrap_kg_start > max_edge | extrap_kg_end > max_edge,
+    sprintf("cumulative feed extrapolated over %.0f kg", extrap_kg_start + extrap_kg_end),
+    default = "")]
+  per_pig[, fcr_flag := data.table::fcase(is.na(fcr), NA_character_,
+                                          nzchar(fcr_note), "low_confidence", default = "ok")]
+  data.table::setcolorder(per_pig, intersect(c("responder", "location", "breed", "stage", "adg", "adfi",
+                                     "fcr", "gf", "adg_type", "coverage", "fcr_flag", "fcr_note"),
+                                   names(per_pig)))
+  data.table::setorder(per_pig, location, responder)
+  loc <- per_pig[, .(responder, location)]
+  removed <- rbind(adfi$removed,
+                   new_removed(bad$responder, loc$location[match(bad$responder, loc$responder)],
+                               "calc_fcr", bad$reason))
+  summary <- rbind(trait_summary(per_pig, "all"), trait_summary(per_pig[fcr_flag %in% "ok"], "ok"))
+  if ("breed" %in% names(per_pig)) {
+    for (bb in sort(unique(stats::na.omit(per_pig$breed)))) {
+      summary <- rbind(summary, trait_summary(per_pig[breed %in% bb], paste("breed", bb)))
+    }
+  }
+  ppt_msg("FCR for {sum(!is.na(per_pig$fcr))} pig{?s}; {nrow(bad)} removed by the class and cumulative-feed checks",
+          if (nrow(bad) > 0L) "warning" else "success")
+  s <- summary[group == "all" & trait == "fcr"]
+  if (nrow(s) == 1L && s$n > 0) {
+    ppt_msg("Mean FCR {sprintf('%.2f', s$mean)} (SD {sprintf('%.2f', s$sd)})", "success")
+  }
+  new_ppt_result(per_pig = per_pig, daily = adfi$daily, removed = removed,
+                 settings = qc, class = "ppt_fcr") |>
+    add_element(summary = summary, by_bin = by_bin)
+}
+
 fcr_by_bin <- function(adg, adfi, qc) {
   lo <- qc$stage_range[1L]
   hi <- qc$stage_range[2L]
@@ -4536,6 +4945,64 @@ test_that("a stage outside the data gives no R warnings", {
   q <- qc_config(stage_range = c(150, 160), weight_range = c(10, 200))
   expect_no_warning(r <- run_pipeline(nedap, qc = q, verbose = 0))
   expect_true(all(r$fcr$by_bin$weight_coverage_kg == 0))
+})
+
+test_that("the national method computes FCR from cumulative feed intake", {
+  r <- run_pipeline(nedap, qc = qc_config("national"), verbose = 0)
+  q <- r$fcr$settings
+  expect_equal(q$method, "national")
+  p <- r$fcr$per_pig
+  expect_true(all(c("fcr", "cfi_start", "cfi_end", "cfi_r2", "n_classes") %in% names(p)))
+  ok <- p[!is.na(fcr)]
+  expect_gt(nrow(ok), 5L)
+  expect_true(all(ok$fcr > 1.5 & ok$fcr < 4))
+  expect_true(all(ok$cfi_r2 > q$cfi_r2_min))
+  expect_equal(ok$fcr, (ok$cfi_end - ok$cfi_start) / 90)
+  # removed classes and pigs are logged with a reason
+  expect_true("removed" %in% names(r$fcr$by_bin))
+  rm <- r$fcr$removed[step == "calc_fcr"]
+  expect_setequal(rm$responder, p[is.na(fcr) & !is.na(adg), responder])
+  expect_true(all(nzchar(rm$reason)))
+  # another stage: classes start at its lower limit
+  r2 <- run_pipeline(fire, qc = qc_config("national", stage_range = c(60, 120)), verbose = 0)
+  expect_true(all(r2$fcr$by_bin$weight_from %in% seq(60, 110, 10)))
+  ok2 <- r2$fcr$per_pig[!is.na(fcr)]
+  expect_equal(ok2$fcr, (ok2$cfi_end - ok2$cfi_start) / 60)
+})
+
+test_that("national imputation: LOESS for short gaps, regression on weight for long ones", {
+  set.seed(5)
+  n <- 60
+  d <- data.table::data.table(seq_days = 1:n, bw = 30 + 1:n, in_stage = TRUE,
+                              dfi_check = 1500 + 20 * (1:n) + stats::rnorm(n, 0, 50))
+  d[c(10, 11), dfi_check := NA]        # short gap
+  d[30:40, dfi_check := NA]            # long gap
+  d[, state := data.table::fifelse(is.na(dfi_check), NA_character_, "org")]
+  q <- qc_config(impute_method = "national", long_gap_days = 3)
+  out <- impute_dfi_one_pig(d, q)
+  expect_false(anyNA(out$dfi))
+  truth <- 1500 + 20 * (1:n)
+  expect_lt(max(abs(out$dfi[c(10, 11, 30:40)] - truth[c(10, 11, 30:40)])), 150)
+})
+
+test_that("feed of the adaptation days counts only inside the stage", {
+  v <- prep_visits(nedap, verbose = 0)
+  a <- calc_adg(clean_weight(v, verbose = 0), verbose = 0)
+  f <- calc_adfi(v, a, verbose = 0)
+  first <- v[identified == TRUE, .(first = min(date)), by = responder]
+  dd <- f$daily[first, on = "responder"][date >= first & date < first + 7]
+  # NEDAP pigs enter below 30 kg: their adaptation days are not stage days
+  expect_true(all(!dd$in_stage | dd$bw >= 29))
+  # a 30-120 kg stage for pigs that enter at ~45 kg starts before entry, so
+  # the recorded intake of the adaptation days is part of the stage
+  vf <- prep_visits(fire, verbose = 0)
+  af <- calc_adg(clean_weight(vf, verbose = 0), verbose = 0)
+  ff <- calc_adfi(vf, af, verbose = 0)
+  firstf <- vf[identified == TRUE, .(first = min(date)), by = responder]
+  ddf <- ff$daily[firstf, on = "responder"][date >= first & date < first + 7 & in_stage == TRUE]
+  expect_gt(nrow(ddf), 0L)
+  # every recorded adaptation day inside the stage is used as recorded
+  expect_true(all(ddf[!is.na(dfi_raw), state] %in% c("org", "corr")))
 })
 
 test_that("min_coverage changes the flags", {
@@ -5284,6 +5751,8 @@ outlier_qc <- function(qc, m) {
 validate_outlier_job <- function(job, qc, methods, adg_true, cores = 1L) {
   d <- job$d
   q <- if (job$method == "none") qc else outlier_qc(qc, methods[[job$method]])
+  # the clean records already start after the adaptation period
+  q <- qc_set(q, list(adapt_days = 0))
   w <- clean_weight(d, q, verbose = 0, cores = cores)
   if (job$method == "none") {
     w$records[qc_flag != "weight_range", `:=`(outlier = FALSE, qc_flag = "")]
@@ -5332,7 +5801,7 @@ validate_outlier_job <- function(job, qc, methods, adg_true, cores = 1L) {
 #' @return A list of class `ppt_validation` with
 #' - `summary`: one row per model: `cv_rmse` and `cv_mae` (kg, weight of the
 #'   left-out records), and for each truncation (`late10`, `early10`, ...)
-#'   the ADG `bias`, `rmse` (g/d) and Spearman rank correlation `spearman`
+#'   the growth-curve ADG (`adg_curve`) `bias`, `rmse` (g/d) and Spearman rank correlation `spearman`
 #'   with the full-data ADG, and how many pigs still get an ADG (`n`);
 #' - `cv`: cross-validation error of every pig and model;
 #' - `truncation`: ADG of every pig, model and truncation;
@@ -5417,7 +5886,8 @@ validate_adg_one_pig <- function(d, qc, models, trim_days, day0) {
     q <- qc_set(qc, list(curve_model = m))
     adg_of <- function(dd) {
       if (data.table::uniqueN(dd$date) < 10L) return(NA_real_)
-      tryCatch(suppressWarnings(adg_one_pig(dd, q, day0)$adg), error = function(e) NA_real_)
+      # the growth curve ADG: this compares curve models
+      tryCatch(suppressWarnings(adg_one_pig(dd, q, day0)$adg_curve), error = function(e) NA_real_)
     }
     full <- adg_of(d)
     last_day <- max(d$date)

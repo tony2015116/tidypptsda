@@ -57,7 +57,8 @@ test_that("every outlier method finds the spikes", {
   spike_w <- pig$weight[pig$is_spike]
   for (m in c("rlm", "loess", "sd", "stl")) {
     # tracking off: it would already remove the spikes before the methods
-    w <- clean_weight(pig, qc = qc_config(weight_outlier = m, weight_track = FALSE), verbose = 0)
+    w <- clean_weight(pig, qc = qc_config(weight_outlier = m, weight_track = FALSE, adapt_days = 0),
+                      verbose = 0)
     flagged <- w$records[outlier == TRUE, weight]
     expect_true(all(spike_w %in% flagged), info = m)
     expect_lt(length(flagged), 30, label = m)
@@ -104,7 +105,7 @@ test_that("tracking from the end removes readings of several pigs on the scale",
   set.seed(3)
   multi <- t < 35 & stats::runif(nrow(pig)) < 0.5
   pig[multi, weight := weight * stats::runif(.N, 1.25, 2.2)]
-  w <- clean_weight(pig, verbose = 0)
+  w <- clean_weight(pig, qc_config(adapt_days = 0), verbose = 0)
   r <- w$records
   expect_gt(mean(r$outlier[multi]), 0.95)
   expect_lt(mean(r$outlier[!multi]), 0.05)        # also the slow early growth
@@ -139,6 +140,39 @@ test_that("clean and short pigs are not changed by the tracking", {
   expect_error(qc_config(weight_track = "yes"), "TRUE or FALSE")
 })
 
+test_that("weights of the adaptation days are not used", {
+  pig <- make_pig(per_day = 12)
+  w <- clean_weight(pig, verbose = 0)
+  r <- w$records
+  first <- min(r$date)
+  expect_true(all(r[date < first + 7, qc_flag] == "adaptation"))
+  expect_true(all(r[date < first + 7, outlier]))
+  expect_false(any(r[date >= first + 7, qc_flag] == "adaptation"))
+  w0 <- clean_weight(pig, qc_config(adapt_days = 0), verbose = 0)
+  expect_false(any(w0$records$qc_flag == "adaptation"))
+})
+
+test_that("national weight rules: whole days off the curve, weighted daily means", {
+  pig <- make_pig(per_day = 12)
+  d5 <- sort(unique(pig$date))[30]
+  pig[date == d5, weight := weight + 1.7]        # a whole day 1.7 kg too heavy
+  q <- qc_config(adapt_days = 0, weight_track = FALSE, rlm_cutoff = 0.01,
+                 day_weight_min = 0.9, daily_weight = "weighted_mean")
+  w <- clean_weight(pig, q, verbose = 0)
+  expect_true(all(w$records[date == d5, outlier]))
+  expect_true(all(w$records[date == d5, qc_flag] %in% c("day_weight", "rlm")))
+  expect_true(any(w$records[date == d5, qc_flag] == "day_weight"))
+  expect_equal(daily_weight_value(c(10, 20), c(1, 3), "weighted_mean"), 17.5)
+  expect_equal(daily_weight_value(c(10, 20, 90), c(1, 1, 1), "median"), 20)
+  expect_equal(daily_r2(1:10, 30 + 1:10), 1)
+  expect_true(w$per_pig$r2_daily > 0.99)
+  # feed missing and daily R2 remove pigs in the national method
+  short_feed <- clean_weight(pig, qc_set(q, list(max_feed_missing = 0, daily_r2_min = 0.99999)),
+                             verbose = 0)
+  expect_equal(short_feed$per_pig$status, "removed")
+  expect_match(short_feed$per_pig$reason, "R2 of the daily weights")
+})
+
 test_that("length rules remove pigs, entry/exit rules only flag them", {
   heavy <- make_pig("heavy", start = 80)          # entry weight too high
   light <- make_pig("light", start = 20, adg = 0.5, seed = 2)  # exit too low
@@ -171,7 +205,7 @@ test_that("curve R2 only lowers confidence", {
 test_that("a pig whose fit fails is removed, others continue", {
   pig <- make_pig()
   tiny <- make_pig("tiny")[1:3]
-  w <- clean_weight(rbind(pig, tiny), qc = qc_config(min_records = 3), verbose = 0)
+  w <- clean_weight(rbind(pig, tiny), qc = qc_config(min_records = 3, adapt_days = 0), verbose = 0)
   expect_equal(w$per_pig[responder == "tiny", status], "removed")
   expect_match(w$per_pig[responder == "tiny", reason], "fit failed")
   expect_equal(w$per_pig[responder == "p1", status], "keep")
