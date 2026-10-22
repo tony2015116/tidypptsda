@@ -50,6 +50,26 @@ test_that("filters work and unknown IDs warn", {
   expect_error(plot_adg(r$adfi), "calc_adg")
 })
 
+test_that("plots do not carry the data of other stations", {
+  r <- plot_inputs()
+  g <- plot_adg(r$adg, weight = r$w, verbose = 0)
+  env <- g$plot[[1]]$plot_env
+  # the plot's environment holds only this station's records
+  expect_false(exists("weight", envir = env, inherits = FALSE))
+  expect_setequal(unique(as.character(env$rec$responder)),
+                  as.character(r$adg$per_pig[location == g$location[1], responder]))
+})
+
+test_that("save_plots in parallel gives the same files", {
+  skip_on_os("windows")   # PSOCK needs the installed package
+  r <- plot_inputs()
+  g <- plot_adfi(r$adfi, verbose = 0)
+  dir <- withr::local_tempdir()
+  out <- save_plots(g, dir, device = "pdf", verbose = 0, cores = 2)
+  expect_true(all(out$saved))
+  expect_true(all(file.exists(out$file)))
+})
+
 test_that("save_plots writes one file per station", {
   r <- plot_inputs()
   g <- plot_adfi(r$adfi, verbose = 0)

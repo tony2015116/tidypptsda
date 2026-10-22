@@ -4212,43 +4212,15 @@ plot_adg <- function(adg, weight = NULL, responders = NULL, locations = NULL,
                           stage_rng[1L], stage_rng[2L],
                           ifelse(is.na(stage_days), "NA", sprintf("%.1f", stage_days)))]
 
+  # Each plot is built by a top-level helper that only receives its own
+  # station's data. A ggplot keeps the environment it was created in, so
+  # building it inside this function would drag every pig's records along
+  # (hundreds of MB per plot), which makes saving and parallel export slow.
   plots <- lapply(split(daily, by = "location", sorted = TRUE), function(d) {
-    loc <- d$location[1L]
     lv <- natural_order(unique(d$responder))
-    d[, responder := factor(responder, levels = lv)]
-    lab <- info[location == loc | responder %in% lv][, responder := factor(responder, levels = lv)]
-    lab <- lab[!is.na(responder)]
-    y_rng <- range(c(d$lower, d$upper, d$weight, stage_rng,
-                     if (!is.null(rec)) rec[responder %in% lv, weight]), na.rm = TRUE)
-    p <- ggplot2::ggplot(d, ggplot2::aes(x = date)) +
-      ggplot2::geom_hline(yintercept = stage_rng, linetype = "dashed",
-                          colour = cols[["stage"]], alpha = 0.4) +
-      ggplot2::geom_ribbon(ggplot2::aes(ymin = lower, ymax = upper),
-                           fill = cols[["curve"]], alpha = 0.15)
-    if (!is.null(rec)) {
-      r <- rec[responder %in% lv][, responder := factor(responder, levels = lv)]
-      r[, kind := data.table::fifelse(outlier, "outlier", "record")]
-      p <- p + ggplot2::geom_point(data = r, ggplot2::aes(y = weight, colour = kind),
-                                   size = 0.4, alpha = 0.6)
-    }
-    brk <- c("observed", "curve", if (!is.null(rec)) c("record", "outlier"))
-    p <- p +
-      ggplot2::geom_point(data = d[!is.na(weight)],
-                          ggplot2::aes(y = weight, colour = "observed"), size = 0.9) +
-      ggplot2::geom_line(ggplot2::aes(y = predicted, colour = "curve"), linewidth = 0.6) +
-      ggplot2::geom_text(data = lab, ggplot2::aes(label = label),
-                         x = -Inf, y = Inf, hjust = -0.05, vjust = 1.2,
-                         size = 2.8, inherit.aes = FALSE) +
-      ggplot2::facet_wrap(~responder, ncol = min(ncol, length(lv))) +
-      ggplot2::scale_y_continuous(limits = y_rng + c(-2, 12)) +
-      ggplot2::scale_colour_manual(
-        name = NULL, values = cols, breaks = brk,
-        labels = c(observed = "daily median weight", curve = "growth curve",
-                   record = "weight record", outlier = "outlier")[brk]
-      ) +
-      ggplot2::labs(title = paste("Station", loc), x = NULL, y = "Body weight (kg)") +
-      ppt_theme()
-    p
+    lab <- info[location == d$location[1L] | responder %in% lv]
+    r <- if (!is.null(rec)) rec[responder %in% lv] else NULL
+    adg_station_plot(d, r, lab, lv, stage_rng, cols, ncol)
   })
   out <- data.table::data.table(location = names(plots),
                                 n_pigs = vapply(plots, function(p) data.table::uniqueN(p$data$responder), integer(1)),
@@ -4285,32 +4257,8 @@ plot_adfi <- function(adfi, responders = NULL, locations = NULL, ncol = 3,
               iii = "interpolated", elrp = "extrapolated", missing = "missing")
 
   plots <- lapply(split(daily, by = "location", sorted = TRUE), function(d) {
-    loc <- d$location[1L]
     lv <- natural_order(unique(d$responder))
-    d[, responder := factor(responder, levels = lv)]
-    lab <- info[responder %in% lv][, responder := factor(responder, levels = lv)]
-    y_max <- max(c(d$dfi, d$dfi_raw), na.rm = TRUE)
-    brk <- intersect(names(cols), c("raw", unique(d$state)))
-    p <- ggplot2::ggplot(d, ggplot2::aes(x = date)) +
-      ggplot2::geom_hline(data = lab, ggplot2::aes(yintercept = adfi),
-                          linetype = "dashed", colour = "#666666", alpha = 0.6) +
-      ggplot2::geom_point(data = d[!is.na(dfi_raw)],
-                          ggplot2::aes(y = dfi_raw, colour = "raw"), size = 0.7) +
-      ggplot2::geom_line(data = d[!is.na(dfi)], ggplot2::aes(y = dfi),
-                         colour = "#666666", linewidth = 0.3, alpha = 0.5) +
-      ggplot2::geom_point(data = d[!is.na(dfi)],
-                          ggplot2::aes(y = dfi, colour = state), size = 0.9) +
-      ggplot2::geom_text(data = lab, ggplot2::aes(label = label),
-                         x = -Inf, y = Inf, hjust = -0.05, vjust = 1.2,
-                         size = 2.8, inherit.aes = FALSE) +
-      ggplot2::facet_wrap(~responder, ncol = min(ncol, length(lv))) +
-      ggplot2::scale_y_continuous(limits = c(min(0, d$dfi_raw, d$dfi, na.rm = TRUE), y_max * 1.25)) +
-      ggplot2::scale_colour_manual(name = NULL, values = cols, breaks = brk,
-                                   labels = labels[brk]) +
-      ggplot2::labs(title = paste("Station", loc), x = NULL,
-                    y = "Daily feed intake (g)") +
-      ppt_theme()
-    p
+    adfi_station_plot(d, info[responder %in% lv], lv, cols, labels, ncol)
   })
   out <- data.table::data.table(location = names(plots),
                                 n_pigs = vapply(plots, function(p) data.table::uniqueN(p$data$responder), integer(1)),
@@ -4328,39 +4276,141 @@ plot_adfi <- function(adfi, responders = NULL, locations = NULL, ncol = 3,
 #' @param dpi Resolution for bitmap devices. Default 300.
 #' @param width,height Size in cm. By default computed from the number of
 #'   panels.
+#' @param cores Number of CPU cores: stations are saved in parallel when
+#'   > 1. Default 1. Saving is mostly ggplot2 drawing time (about 1 s per
+#'   station of 15 pigs), so with many stations this is the main speed-up.
 #' @param verbose 0 (silent), 1 (summary, default).
 #'
 #' @return Invisibly, a `data.table` with `location`, `file` and `saved`.
 #' @export
 save_plots <- function(plots, path, prefix = "station", suffix = "plot",
                        device = c("png", "pdf", "jpeg", "tiff"), dpi = 300,
-                       width = NULL, height = NULL, verbose = 1) {
+                       width = NULL, height = NULL, verbose = 1, cores = 1) {
   local_verbose(verbose)
   device <- match.arg(device)
+  cores <- check_cores(cores)
   if (!data.table::is.data.table(plots) || !all(c("location", "plot") %in% names(plots))) {
     cli::cli_abort("{.arg plots} must be the result of {.fn plot_adg} or {.fn plot_adfi}.")
   }
   dir.create(path, recursive = TRUE, showWarnings = FALSE)
-  res <- data.table::rbindlist(lapply(seq_len(nrow(plots)), function(i) {
+  n <- nrow(plots)
+  jobs <- lapply(seq_len(n), function(i) {
     p <- plots$plot[[i]]
-    n <- plots$n_pigs[i]
     nc <- p$facet$params$ncol %||% 3L
-    w <- width %||% max(16, 9 * nc)
-    h <- height %||% (6 * ceiling(n / nc) + 4)
-    file <- file.path(path, paste0(prefix, "_", plots$location[i], "_", suffix, ".", device))
-    ok <- tryCatch({
-      ggplot2::ggsave(file, p, width = w, height = h, units = "cm", dpi = dpi,
-                      device = device, limitsize = FALSE)
-      TRUE
-    }, error = function(e) {
-      ppt_warn("Could not save {.file {file}}: {conditionMessage(e)}")
-      FALSE
-    })
-    data.table::data.table(location = plots$location[i], file = file, saved = ok)
-  }))
+    list(plot = p,
+         file = file.path(path, paste0(prefix, "_", plots$location[i], "_", suffix, ".", device)),
+         width = width %||% max(16, 9 * nc),
+         height = height %||% (6 * ceiling(plots$n_pigs[i] / nc) + 4))
+  })
+
+  errs <- if (cores > 1L && n > 1L) {
+    if (.Platform$OS.type == "windows") {
+      cl <- parallel::makeCluster(min(cores, n))
+      on.exit(parallel::stopCluster(cl), add = TRUE)
+      parallel::parLapply(cl, jobs, save_one_plot, device = device, dpi = dpi)
+    } else {
+      parallel::mclapply(jobs, save_one_plot, device = device, dpi = dpi,
+                         mc.cores = min(cores, n), mc.preschedule = FALSE)
+    }
+  } else if (ppt_verbose() >= 1L && n > 1L) {
+    out <- vector("list", n)
+    cli::cli_progress_bar("Saving plots", total = n, clear = TRUE,
+                          .envir = environment())
+    for (i in seq_len(n)) {
+      out[[i]] <- save_one_plot(jobs[[i]], device = device, dpi = dpi)
+      cli::cli_progress_update(.envir = environment())
+    }
+    cli::cli_progress_done(.envir = environment())
+    out
+  } else {
+    lapply(jobs, save_one_plot, device = device, dpi = dpi)
+  }
+
+  files <- vapply(jobs, `[[`, "", "file")
+  ok <- vapply(errs, function(e) is.character(e) && length(e) == 1L && is.na(e), logical(1))
+  for (i in which(!ok)) {
+    msg <- if (is.character(errs[[i]])) errs[[i]] else "worker failed"
+    file <- files[i]
+    ppt_warn("Could not save {.file {file}}: {msg}")
+  }
+  res <- data.table::data.table(location = plots$location, file = files, saved = ok)
   ppt_msg("Saved {sum(res$saved)} of {nrow(res)} plot{?s} to {.path {path}}",
           if (all(res$saved)) "success" else "warning")
   invisible(res)
+}
+
+# Save one plot; returns NA on success or the error message.
+save_one_plot <- function(job, device, dpi) {
+  tryCatch({
+    ggplot2::ggsave(job$file, job$plot, width = job$width, height = job$height,
+                    units = "cm", dpi = dpi, device = device, limitsize = FALSE)
+    NA_character_
+  }, error = function(e) conditionMessage(e))
+}
+
+adg_station_plot <- function(d, rec, lab, lv, stage_rng, cols, ncol) {
+  loc <- d$location[1L]
+  d <- data.table::copy(d)[, responder := factor(responder, levels = lv)]
+  lab <- data.table::copy(lab)[, responder := factor(responder, levels = lv)]
+  lab <- lab[!is.na(responder)]
+  y_rng <- range(c(d$lower, d$upper, d$weight, stage_rng, rec$weight), na.rm = TRUE)
+  p <- ggplot2::ggplot(d, ggplot2::aes(x = date)) +
+    ggplot2::geom_hline(yintercept = stage_rng, linetype = "dashed",
+                        colour = cols[["stage"]], alpha = 0.4) +
+    ggplot2::geom_ribbon(ggplot2::aes(ymin = lower, ymax = upper),
+                         fill = cols[["curve"]], alpha = 0.15)
+  if (!is.null(rec)) {
+    r <- data.table::copy(rec)[, responder := factor(responder, levels = lv)]
+    r[, kind := data.table::fifelse(outlier, "outlier", "record")]
+    r <- r[, .(date, responder, weight, kind)]
+    p <- p + ggplot2::geom_point(data = r, ggplot2::aes(y = weight, colour = kind),
+                                 size = 0.4, alpha = 0.6)
+  }
+  brk <- c("observed", "curve", if (!is.null(rec)) c("record", "outlier"))
+  p +
+    ggplot2::geom_point(data = d[!is.na(weight)],
+                        ggplot2::aes(y = weight, colour = "observed"), size = 0.9) +
+    ggplot2::geom_line(ggplot2::aes(y = predicted, colour = "curve"), linewidth = 0.6) +
+    ggplot2::geom_text(data = lab, ggplot2::aes(label = label),
+                       x = -Inf, y = Inf, hjust = -0.05, vjust = 1.2,
+                       size = 2.8, inherit.aes = FALSE) +
+    ggplot2::facet_wrap(~responder, ncol = min(ncol, length(lv))) +
+    ggplot2::scale_y_continuous(limits = y_rng + c(-2, 12)) +
+    ggplot2::scale_colour_manual(
+      name = NULL, values = cols, breaks = brk,
+      labels = c(observed = "daily median weight", curve = "growth curve",
+                 record = "weight record", outlier = "outlier")[brk]
+    ) +
+    ggplot2::labs(title = paste("Station", loc), x = NULL, y = "Body weight (kg)") +
+    ppt_theme()
+}
+
+adfi_station_plot <- function(d, lab, lv, cols, labels, ncol) {
+  loc <- d$location[1L]
+  d <- data.table::copy(d)[, responder := factor(responder, levels = lv)]
+  d <- d[, .(date, responder, dfi, dfi_raw, state)]
+  lab <- data.table::copy(lab)[, responder := factor(responder, levels = lv)]
+  y_max <- max(c(d$dfi, d$dfi_raw), na.rm = TRUE)
+  brk <- intersect(names(cols), c("raw", unique(d$state)))
+  ggplot2::ggplot(d, ggplot2::aes(x = date)) +
+    ggplot2::geom_hline(data = lab, ggplot2::aes(yintercept = adfi),
+                        linetype = "dashed", colour = "#666666", alpha = 0.6) +
+    ggplot2::geom_point(data = d[!is.na(dfi_raw)],
+                        ggplot2::aes(y = dfi_raw, colour = "raw"), size = 0.7) +
+    ggplot2::geom_line(data = d[!is.na(dfi)], ggplot2::aes(y = dfi),
+                       colour = "#666666", linewidth = 0.3, alpha = 0.5) +
+    ggplot2::geom_point(data = d[!is.na(dfi)],
+                        ggplot2::aes(y = dfi, colour = state), size = 0.9) +
+    ggplot2::geom_text(data = lab, ggplot2::aes(label = label),
+                       x = -Inf, y = Inf, hjust = -0.05, vjust = 1.2,
+                       size = 2.8, inherit.aes = FALSE) +
+    ggplot2::facet_wrap(~responder, ncol = min(ncol, length(lv))) +
+    ggplot2::scale_y_continuous(limits = c(min(0, d$dfi_raw, d$dfi, na.rm = TRUE), y_max * 1.25)) +
+    ggplot2::scale_colour_manual(name = NULL, values = cols, breaks = brk,
+                                 labels = labels[brk]) +
+    ggplot2::labs(title = paste("Station", loc), x = NULL,
+                  y = "Daily feed intake (g)") +
+    ppt_theme()
 }
 
 filter_pigs <- function(daily, responders, locations) {
@@ -4464,6 +4514,26 @@ test_that("filters work and unknown IDs warn", {
   expect_message(plot_adg(r$adg, responders = c("35853", "nope"), verbose = 1), "nope")
   expect_error(plot_adg(r$adg, locations = "999", verbose = 0), "No data")
   expect_error(plot_adg(r$adfi), "calc_adg")
+})
+
+test_that("plots do not carry the data of other stations", {
+  r <- plot_inputs()
+  g <- plot_adg(r$adg, weight = r$w, verbose = 0)
+  env <- g$plot[[1]]$plot_env
+  # the plot's environment holds only this station's records
+  expect_false(exists("weight", envir = env, inherits = FALSE))
+  expect_setequal(unique(as.character(env$rec$responder)),
+                  as.character(r$adg$per_pig[location == g$location[1], responder]))
+})
+
+test_that("save_plots in parallel gives the same files", {
+  skip_on_os("windows")   # PSOCK needs the installed package
+  r <- plot_inputs()
+  g <- plot_adfi(r$adfi, verbose = 0)
+  dir <- withr::local_tempdir()
+  out <- save_plots(g, dir, device = "pdf", verbose = 0, cores = 2)
+  expect_true(all(out$saved))
+  expect_true(all(file.exists(out$file)))
 })
 
 test_that("save_plots writes one file per station", {

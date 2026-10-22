@@ -237,6 +237,12 @@ h$plot[[1]]
 save_plots(g, path = "结果/生长曲线", prefix = "站", suffix = "growth", device = "png")
 ```
 
+保存图片的时间几乎都花在 ggplot2 绘图上：每个测定站（15 头猪左右）约 1–1.5 秒，与图片格式关系不大。测定站多时可以：
+
+- 用 `cores` 并行保存，例如 `save_plots(g, path = "结果", cores = 4)`，耗时大致按核心数缩短；
+- 只在屏幕上查看时，用 `dpi = 150`，约快 20%，文件大小约为原来的 1/4；
+- 用 `locations` 或 `responders` 只画需要核查的测定站或猪。
+
 ## 6. 导出结果与并行计算
 
 ### 导出为 csv
