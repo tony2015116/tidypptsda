@@ -185,28 +185,100 @@ correct_dfi <- function(cov, qc) {
 
   if (multi_loc) md[, location := factor(location)]
   if (multi_breed) md[, breed := factor(breed)]
-  fit <- tryCatch(
-    nlme::lme(stats::reformulate(c(base, terms), "y"), random = ~ 1 | responder,
-              data = md, method = "REML",
-              control = nlme::lmeControl(opt = "optim", returnObject = TRUE)),
-    error = function(e) e
-  )
+  fit <- tryCatch({
+    X <- stats::model.matrix(stats::reformulate(c(base, terms)), data = md)
+    lmm_ri_reml(md$y, X, md$responder)
+  }, error = function(e) e)
   if (inherits(fit, "error")) {
     ppt_warn("The correction model failed ({conditionMessage(fit)}); error-free intake is not corrected.")
     cov[all_error == FALSE, dfi_corrected := y]
     return(list(data = cov, coefficients = empty_coef, status = "failed", n_terms = 0L))
   }
 
-  tt <- summary(fit)$tTable
-  coefs <- data.table::data.table(term = rownames(tt), estimate = tt[, "Value"],
-                                  std_error = tt[, "Std.Error"],
-                                  p_value = tt[, "p-value"])
-  b <- nlme::fixef(fit)[terms]
+  coefs <- fit$coefficients
+  b <- stats::setNames(coefs$estimate, coefs$term)[terms]
   x <- as.matrix(cov[, terms, with = FALSE])
   cov[, dfi_corrected := y - as.numeric(x %*% b)]
   cov[all_error == TRUE, dfi_corrected := NA_real_]
   list(data = cov, coefficients = coefs, status = "fitted",
        n_terms = length(terms), n_obs = nrow(md))
+}
+
+# Linear mixed model with a random intercept per pig, fitted by REML:
+#   y = X b + u_pig + e,  u ~ N(0, s2_u),  e ~ N(0, s2_e).
+# Same model as nlme::lme(y ~ X, random = ~ 1 | pig, method = "REML"), but
+# much faster on large data: with lambda = s2_u / s2_e, each pig's rows are
+# quasi-demeaned (y - theta * mean(y)), which turns the model into ordinary
+# least squares; the REML likelihood is then profiled over lambda alone and
+# maximised with optimize().
+# Degrees of freedom for the t tests follow nlme: terms that are constant
+# within every pig are tested on the between-pig df, the others on the
+# within-pig df.
+lmm_ri_reml <- function(y, X, group) {
+  g <- as.integer(factor(group))
+  n_g <- tabulate(g)
+  N <- length(y)
+  p <- ncol(X)
+  # Everything needed is in cross-products, so each likelihood evaluation
+  # costs O(pigs * p^2) instead of a QR of the full N x p matrix:
+  #   Xs'Xs = X'X - sum_i c_i n_i xbar_i xbar_i',  c_i = 2 theta_i - theta_i^2
+  # Columns are scaled first to keep the cross-products well conditioned.
+  sc <- sqrt(colSums(X^2) / N)
+  sc[sc == 0] <- 1
+  Xn <- sweep(X, 2L, sc, "/")
+  XtX <- crossprod(Xn)
+  Xty <- crossprod(Xn, y)[, 1L]
+  yty <- sum(y^2)
+  Xbar <- rowsum(Xn, g, reorder = TRUE) / n_g
+  ybar <- rowsum(y, g, reorder = TRUE)[, 1L] / n_g
+
+  fit_at <- function(log_lambda) {
+    theta <- 1 - 1 / sqrt(1 + exp(log_lambda) * n_g)
+    cw <- (2 * theta - theta^2) * n_g
+    A <- XtX - crossprod(Xbar * sqrt(cw))
+    bvec <- Xty - colSums(Xbar * (cw * ybar))
+    yy <- yty - sum(cw * ybar^2)
+    R <- tryCatch(chol(A), error = function(e) NULL)
+    if (is.null(R)) stop("the fixed-effect design is rank deficient")
+    z <- backsolve(R, bvec, transpose = TRUE)
+    rss <- yy - sum(z^2)
+    logdet <- 2 * sum(log(diag(R))) + 2 * sum(log(sc))
+    ll <- -0.5 * (sum(log(1 + exp(log_lambda) * n_g)) + logdet +
+                    (N - p) * log(rss))
+    list(ll = ll, R = R, z = z, rss = rss)
+  }
+  opt <- stats::optimize(function(l) fit_at(l)$ll, c(-12, 8), maximum = TRUE)
+  log_lambda <- opt$maximum
+  f <- fit_at(log_lambda)
+  # variance on the boundary (lambda -> 0): plain least squares
+  f0 <- fit_at(-30)
+  if (f0$ll > f$ll) {
+    f <- f0
+    log_lambda <- -Inf
+  }
+
+  beta <- backsolve(f$R, f$z) / sc
+  s2_e <- f$rss / (N - p)
+  R_inv <- backsolve(f$R, diag(p))
+  se <- sqrt(s2_e * rowSums(R_inv^2)) / sc
+
+  # nlme-style denominator df
+  # a term is between-pig when it is constant within every pig
+  within_ss <- colSums(Xn^2) - colSums(Xbar^2 * n_g)
+  between <- within_ss < 1e-8 * N
+  n_groups <- length(n_g)
+  df <- ifelse(between, n_groups - sum(between),
+               N - n_groups - sum(!between))
+  # like nlme, the intercept is tested on the within-pig df
+  df[colnames(X) == "(Intercept)"] <- N - n_groups - sum(!between)
+  df[df < 1] <- 1
+  tval <- beta / se
+  coefs <- data.table::data.table(
+    term = colnames(X), estimate = unname(beta), std_error = unname(se),
+    p_value = unname(2 * stats::pt(-abs(tval), df))
+  )
+  list(coefficients = coefs, sigma2_e = s2_e,
+       sigma2_u = s2_e * exp(log_lambda), n_obs = N, n_groups = n_groups)
 }
 
 # Impute the stage days of one pig.

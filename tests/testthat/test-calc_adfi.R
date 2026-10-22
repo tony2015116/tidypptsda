@@ -47,6 +47,26 @@ test_that("visits do not need to be flagged beforehand", {
   expect_equal(f2$per_pig$adfi, r$adfi$per_pig$adfi)
 })
 
+test_that("the fast REML fit matches nlme::lme", {
+  skip_if_not_installed("nlme")
+  set.seed(1)
+  d <- data.frame(pig = rep(sprintf("p%02d", 1:40), times = sample(15:40, 40, TRUE)))
+  n <- nrow(d)
+  pig_x <- stats::rnorm(40)
+  d$b <- pig_x[as.integer(factor(d$pig))]           # constant within pig
+  d$x1 <- stats::rnorm(n)
+  d$x2 <- stats::rbinom(n, 1, 0.3)
+  d$y <- 2 + 0.5 * d$b + 1.5 * d$x1 - d$x2 +
+    stats::rnorm(40, sd = 0.8)[as.integer(factor(d$pig))] + stats::rnorm(n)
+  ours <- lmm_ri_reml(d$y, stats::model.matrix(~ b + x1 + x2, d), d$pig)
+  ref <- nlme::lme(y ~ b + x1 + x2, random = ~ 1 | pig, data = d, method = "REML")
+  tt <- summary(ref)$tTable
+  expect_equal(ours$coefficients$estimate, unname(tt[, "Value"]), tolerance = 1e-4)
+  expect_equal(ours$coefficients$std_error, unname(tt[, "Std.Error"]), tolerance = 1e-3)
+  expect_equal(ours$coefficients$p_value, unname(tt[, "p-value"]), tolerance = 1e-3)
+  expect_equal(ours$sigma2_e, ref$sigma^2, tolerance = 1e-3)
+})
+
 test_that("no correction uses the recorded intake", {
   r <- run_adfi(fire)
   f <- calc_adfi(r$visits, r$adg, qc = qc_config(dfi_correct = "none"), verbose = 0)

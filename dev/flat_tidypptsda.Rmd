@@ -47,7 +47,7 @@ fusen::fill_description(
   ),
   overwrite = TRUE
 )
-desc::desc_set_version("0.4.0")
+desc::desc_set_version("0.5.0")
 usethis::use_mit_license("Meng Guo")
 # Use markdown in roxygen comments
 desc::desc_set("Roxygen", "list(markdown = TRUE)")
@@ -163,7 +163,9 @@ check_verbose <- function(verbose) {
 # Set the verbosity level until the calling function exits.
 local_verbose <- function(verbose, envir = parent.frame()) {
   verbose <- check_verbose(verbose)
-  old <- options(tidypptsda.verbose = verbose)
+  # data.table's own "Processed ... groups" progress is not cli-styled and
+  # cannot be silenced by verbose, so switch it off as well.
+  old <- options(tidypptsda.verbose = verbose, datatable.showProgress = FALSE)
   do.call(on.exit, list(bquote(options(.(old))), add = TRUE), envir = envir)
   invisible(verbose)
 }
@@ -190,11 +192,13 @@ ppt_msg <- function(msg,
   invisible(NULL)
 }
 
-# Raise a real warning unless verbose = 0. Whatever triggers it is also
-# recorded in the result (removed / flags), so nothing is lost when silent.
+# Show a warning alert at the point where it happens (cli style), instead of
+# an R warning that is only printed after the whole call has finished.
+# Whatever triggers it is also recorded in the result (removed / flags), so
+# nothing is lost when silent.
 ppt_warn <- function(msg, .envir = parent.frame()) {
   if (ppt_verbose() >= 1L) {
-    cli::cli_warn(msg, .envir = .envir)
+    cli::cli_alert_warning(msg, .envir = .envir)
   }
   invisible(NULL)
 }
@@ -272,6 +276,17 @@ fit_by_pig <- function(data, fun, step, by = "responder", ...) {
     } else {
       parallel::mclapply(groups, one_pig, mc.cores = min(cores, n))
     }
+  } else if (ppt_verbose() >= 1L && n > 1L) {
+    # a cli progress bar; cli only draws it when the step takes > 2 s
+    res <- vector("list", n)
+    cli::cli_progress_bar(paste0(step, ": fitting pigs"), total = n,
+                          clear = TRUE, .envir = environment())
+    for (i in seq_len(n)) {
+      res[[i]] <- one_pig(groups[[i]])
+      cli::cli_progress_update(.envir = environment())
+    }
+    cli::cli_progress_done(.envir = environment())
+    res
   } else {
     lapply(groups, one_pig)
   }
@@ -372,6 +387,7 @@ utils::globalVariables(c(
   "fiv_lo", "fiv_hi", "fiv_0", "otv_lo", "otv_hi", "frv_hi_fiv_lo",
   "frv_hi_strict", "frv_hi", "frv_0", "frv_lo", "lwd_lo", "lwd_hi",
   "fwd_lo", "fwd_hi", "ltd_lo", "ftd_lo",
+  "error_visit", "y_part",
   # ADFI
   "all_error", "bw", "y", "dfi", "dfi_raw", "dfi_check", "dfi_corrected",
   "dfi_error_free", "check_flag", "pig_location", "adfi", "coverage",
@@ -455,6 +471,12 @@ test_that("ppt_msg and ppt_warn respect verbose", {
     "done"
   }
   expect_silent(silent())
+  warn_now <- function() {
+    local_verbose(1)
+    ppt_warn("shown at once")
+  }
+  expect_message(warn_now(), "shown at once")
+  expect_no_warning(suppressMessages(warn_now()))
   loud <- function() {
     local_verbose(1)
     ppt_msg("shown")
@@ -1716,7 +1738,7 @@ test_that("a weight jump at a transfer gives a warning", {
   m <- mid_time(d)
   d[visit_time > m, `:=`(location = 102L, weight = weight + 25000L)]
   d[visit_time > m & weight == 25000L, weight := 0L]
-  expect_warning(v <- prep_visits(d, verbose = 1), "transfer")
+  expect_message(v <- prep_visits(d, verbose = 1), "transfer")
   expect_gt(attr(v, "stations")$weight_jump_kg, 10)
   expect_silent(prep_visits(d, verbose = 0))
 })
@@ -1822,7 +1844,7 @@ test_that("add_breed merges by transponder and keeps attributes", {
 test_that("missing pigs warn and conflicting breeds stop", {
   v <- prep_visits(fire, verbose = 0)
   pigs <- unique(v[identified == TRUE, responder])
-  expect_warning(add_breed(v, data.frame(responder = pigs[1:3], breed = "YY"), verbose = 1), "not found")
+  expect_message(add_breed(v, data.frame(responder = pigs[1:3], breed = "YY"), verbose = 1), "not found")
   expect_error(add_breed(v, data.frame(responder = c(pigs[1], pigs[1]), breed = c("YY", "LL"))), "more than one")
   expect_error(add_breed(v, data.frame(id = pigs)), "breed")
 })
@@ -2095,7 +2117,8 @@ detect_weight_outliers <- function(d, qc) {
 
   mat <- do.call(cbind, flags)
   outlier <- if (qc$outlier_combine == "any") rowSums(mat) > 0 else rowSums(mat) > ncol(mat) / 2
-  by <- apply(mat, 1L, function(z) paste(colnames(mat)[z], collapse = ";"))
+  by <- character(nrow(mat))
+  for (m in colnames(mat)) by <- add_reason(by, mat[, m] %in% TRUE, m)
   ref <- fits[[1L]]
 
   if (!is.null(qc$rel_dev_max)) {
@@ -2611,7 +2634,10 @@ adg_one_pig <- function(d, qc, day0) {
 fit_growth_curve <- function(t, y, model, span = 0.75) {
   fit_poly <- function(k, name = paste0("poly", k)) {
     f <- stats::lm(y ~ poly(t, k, raw = TRUE))
-    list(pred = function(x) unname(stats::predict(f, newdata = data.frame(t = x))),
+    b <- stats::coef(f)
+    b[is.na(b)] <- 0                     # aliased terms, as predict() drops them
+    # evaluate the polynomial directly: much faster than predict.lm()
+    list(pred = function(x) as.numeric(outer(x, 0:k, `^`) %*% b),
          fitted = stats::fitted(f), name = name)
   }
   curve <- switch(model,
@@ -2674,7 +2700,7 @@ report_adg <- function(per_pig, fits) {
     ppt_msg("Gompertz did not converge for {fallback} pig{?s}: quadratic curve used", "warning")
   }
   if (types[["partial"]] > 0L) {
-    ppt_warn("{types[['partial']]} pig{?s} do not reach the whole stage: ADG is based on part of it (adg_type = \"partial\").")
+    ppt_warn("{types[['partial']]} pig{?s} {?does/do} not reach the whole stage: ADG is based on part of it (adg_type = \"partial\").")
   }
   if (any(!is.na(per_pig$adg))) {
     ppt_msg("Mean ADG: {round(mean(per_pig$adg, na.rm = TRUE))} g/d (SD {round(stats::sd(per_pig$adg, na.rm = TRUE))})", "success")
@@ -2737,7 +2763,7 @@ test_that("extrapolation and partial stages are flagged", {
   expect_equal(part$adg_type, "partial")
   expect_equal(part$adg, 1000, tolerance = 0.01)
   expect_true(is.na(part$end_date))
-  expect_warning(calc_adg(clean_weight(line_pig(days = 40), q, verbose = 0), verbose = 1), "partial")
+  expect_message(calc_adg(clean_weight(line_pig(days = 40), q, verbose = 0), verbose = 1), "partial")
   # a larger extrapolation window turns it into "extrapolated"
   q60 <- no_checks(max_extrap_days = 60)
   ext60 <- calc_adg(clean_weight(line_pig(days = 40), q60, verbose = 0), verbose = 0)$per_pig
@@ -3050,21 +3076,33 @@ daily_error_covariates <- function(flagged) {
   errs <- names(error_types())
   otd_errs <- errs[error_types() %in% c(1:2, 6:14)]
   fid_errs <- errs[error_types() %in% c(4:5, 15:16)]
-  idv <- flagged[identified == TRUE]
-  idv[, error_free := n_errors == 0L]
+  cols <- c("responder", "date", "location", "fiv", "otv", "n_errors", errs)
+  idv <- flagged[identified == TRUE, cols, with = FALSE]
 
-  out <- idv[, c(
-    list(
-      location = names(sort(table(location), decreasing = TRUE))[1L],
-      n_visits = .N,
-      n_error_visits = sum(!error_free),
-      dfi_raw = sum(fiv),
-      y = sum(fiv[error_free])
-    ),
-    stats::setNames(lapply(errs, function(e) mean(get(e))), paste0("pte_", errs)),
-    stats::setNames(lapply(otd_errs, function(e) sum(otv[get(e)])), paste0("otd_", otd_errs)),
-    stats::setNames(lapply(fid_errs, function(e) sum(fiv[get(e)])), paste0("fid_", fid_errs))
-  ), by = .(responder, date)]
+  # per-visit numeric columns, then one grouped sum/mean each (GForce, fast)
+  idv[, `:=`(error_free = as.numeric(n_errors == 0L), error_visit = as.numeric(n_errors > 0L))]
+  idv[, y_part := fiv * error_free]
+  pte <- paste0("pte_", errs)
+  otd <- paste0("otd_", otd_errs)
+  fid <- paste0("fid_", fid_errs)
+  idv[, (pte) := lapply(.SD, as.numeric), .SDcols = errs]
+  idv[, (otd) := lapply(.SD, function(e) otv * e), .SDcols = otd_errs]
+  idv[, (fid) := lapply(.SD, function(e) fiv * e), .SDcols = fid_errs]
+
+  keys <- c("responder", "date")
+  out <- idv[, .(n_visits = .N, n_error_visits = sum(error_visit),
+                 dfi_raw = sum(fiv), y = sum(y_part)), by = keys]
+  out[, n_error_visits := as.integer(n_error_visits)]
+  m <- idv[, lapply(.SD, mean), by = keys, .SDcols = pte]
+  sm <- idv[, lapply(.SD, sum), by = keys, .SDcols = c(otd, fid)]
+  # station of the day: the one with most visits
+  loc <- idv[, .N, by = c(keys, "location")]
+  data.table::setorderv(loc, c(keys, "N", "location"), c(1L, 1L, -1L, 1L))
+  loc <- loc[, .(location = location[1L]), by = keys]
+
+  out <- Reduce(function(x, z) x[z, on = keys], list(out, loc, m, sm))
+  data.table::setcolorder(out, c(keys, "location", "n_visits", "n_error_visits", "dfi_raw", "y"))
+  data.table::setorderv(out, keys)
   out[]
 }
 ```
@@ -3221,7 +3259,7 @@ test_that("FIV-hi limit can depend on body weight and breed", {
 test_that("a large unidentified feed disappearance gives a warning", {
   v <- prep_visits(fire, verbose = 0)
   q <- qc_config(max_unidentified_feed_kg = 1)
-  expect_warning(flag_feed_errors(v, q, verbose = 1), "unidentified")
+  expect_message(flag_feed_errors(v, q, verbose = 1), "unidentified")
 })
 
 test_that("daily covariates follow Jiao et al. (2014)", {
@@ -3458,28 +3496,100 @@ correct_dfi <- function(cov, qc) {
 
   if (multi_loc) md[, location := factor(location)]
   if (multi_breed) md[, breed := factor(breed)]
-  fit <- tryCatch(
-    nlme::lme(stats::reformulate(c(base, terms), "y"), random = ~ 1 | responder,
-              data = md, method = "REML",
-              control = nlme::lmeControl(opt = "optim", returnObject = TRUE)),
-    error = function(e) e
-  )
+  fit <- tryCatch({
+    X <- stats::model.matrix(stats::reformulate(c(base, terms)), data = md)
+    lmm_ri_reml(md$y, X, md$responder)
+  }, error = function(e) e)
   if (inherits(fit, "error")) {
     ppt_warn("The correction model failed ({conditionMessage(fit)}); error-free intake is not corrected.")
     cov[all_error == FALSE, dfi_corrected := y]
     return(list(data = cov, coefficients = empty_coef, status = "failed", n_terms = 0L))
   }
 
-  tt <- summary(fit)$tTable
-  coefs <- data.table::data.table(term = rownames(tt), estimate = tt[, "Value"],
-                                  std_error = tt[, "Std.Error"],
-                                  p_value = tt[, "p-value"])
-  b <- nlme::fixef(fit)[terms]
+  coefs <- fit$coefficients
+  b <- stats::setNames(coefs$estimate, coefs$term)[terms]
   x <- as.matrix(cov[, terms, with = FALSE])
   cov[, dfi_corrected := y - as.numeric(x %*% b)]
   cov[all_error == TRUE, dfi_corrected := NA_real_]
   list(data = cov, coefficients = coefs, status = "fitted",
        n_terms = length(terms), n_obs = nrow(md))
+}
+
+# Linear mixed model with a random intercept per pig, fitted by REML:
+#   y = X b + u_pig + e,  u ~ N(0, s2_u),  e ~ N(0, s2_e).
+# Same model as nlme::lme(y ~ X, random = ~ 1 | pig, method = "REML"), but
+# much faster on large data: with lambda = s2_u / s2_e, each pig's rows are
+# quasi-demeaned (y - theta * mean(y)), which turns the model into ordinary
+# least squares; the REML likelihood is then profiled over lambda alone and
+# maximised with optimize().
+# Degrees of freedom for the t tests follow nlme: terms that are constant
+# within every pig are tested on the between-pig df, the others on the
+# within-pig df.
+lmm_ri_reml <- function(y, X, group) {
+  g <- as.integer(factor(group))
+  n_g <- tabulate(g)
+  N <- length(y)
+  p <- ncol(X)
+  # Everything needed is in cross-products, so each likelihood evaluation
+  # costs O(pigs * p^2) instead of a QR of the full N x p matrix:
+  #   Xs'Xs = X'X - sum_i c_i n_i xbar_i xbar_i',  c_i = 2 theta_i - theta_i^2
+  # Columns are scaled first to keep the cross-products well conditioned.
+  sc <- sqrt(colSums(X^2) / N)
+  sc[sc == 0] <- 1
+  Xn <- sweep(X, 2L, sc, "/")
+  XtX <- crossprod(Xn)
+  Xty <- crossprod(Xn, y)[, 1L]
+  yty <- sum(y^2)
+  Xbar <- rowsum(Xn, g, reorder = TRUE) / n_g
+  ybar <- rowsum(y, g, reorder = TRUE)[, 1L] / n_g
+
+  fit_at <- function(log_lambda) {
+    theta <- 1 - 1 / sqrt(1 + exp(log_lambda) * n_g)
+    cw <- (2 * theta - theta^2) * n_g
+    A <- XtX - crossprod(Xbar * sqrt(cw))
+    bvec <- Xty - colSums(Xbar * (cw * ybar))
+    yy <- yty - sum(cw * ybar^2)
+    R <- tryCatch(chol(A), error = function(e) NULL)
+    if (is.null(R)) stop("the fixed-effect design is rank deficient")
+    z <- backsolve(R, bvec, transpose = TRUE)
+    rss <- yy - sum(z^2)
+    logdet <- 2 * sum(log(diag(R))) + 2 * sum(log(sc))
+    ll <- -0.5 * (sum(log(1 + exp(log_lambda) * n_g)) + logdet +
+                    (N - p) * log(rss))
+    list(ll = ll, R = R, z = z, rss = rss)
+  }
+  opt <- stats::optimize(function(l) fit_at(l)$ll, c(-12, 8), maximum = TRUE)
+  log_lambda <- opt$maximum
+  f <- fit_at(log_lambda)
+  # variance on the boundary (lambda -> 0): plain least squares
+  f0 <- fit_at(-30)
+  if (f0$ll > f$ll) {
+    f <- f0
+    log_lambda <- -Inf
+  }
+
+  beta <- backsolve(f$R, f$z) / sc
+  s2_e <- f$rss / (N - p)
+  R_inv <- backsolve(f$R, diag(p))
+  se <- sqrt(s2_e * rowSums(R_inv^2)) / sc
+
+  # nlme-style denominator df
+  # a term is between-pig when it is constant within every pig
+  within_ss <- colSums(Xn^2) - colSums(Xbar^2 * n_g)
+  between <- within_ss < 1e-8 * N
+  n_groups <- length(n_g)
+  df <- ifelse(between, n_groups - sum(between),
+               N - n_groups - sum(!between))
+  # like nlme, the intercept is tested on the within-pig df
+  df[colnames(X) == "(Intercept)"] <- N - n_groups - sum(!between)
+  df[df < 1] <- 1
+  tval <- beta / se
+  coefs <- data.table::data.table(
+    term = colnames(X), estimate = unname(beta), std_error = unname(se),
+    p_value = unname(2 * stats::pt(-abs(tval), df))
+  )
+  list(coefficients = coefs, sigma2_e = s2_e,
+       sigma2_u = s2_e * exp(log_lambda), n_obs = N, n_groups = n_groups)
 }
 
 # Impute the stage days of one pig.
@@ -3645,6 +3755,26 @@ test_that("visits do not need to be flagged beforehand", {
   flagged <- flag_feed_errors(r$visits, verbose = 0)
   f2 <- calc_adfi(flagged, r$adg, verbose = 0)
   expect_equal(f2$per_pig$adfi, r$adfi$per_pig$adfi)
+})
+
+test_that("the fast REML fit matches nlme::lme", {
+  skip_if_not_installed("nlme")
+  set.seed(1)
+  d <- data.frame(pig = rep(sprintf("p%02d", 1:40), times = sample(15:40, 40, TRUE)))
+  n <- nrow(d)
+  pig_x <- stats::rnorm(40)
+  d$b <- pig_x[as.integer(factor(d$pig))]           # constant within pig
+  d$x1 <- stats::rnorm(n)
+  d$x2 <- stats::rbinom(n, 1, 0.3)
+  d$y <- 2 + 0.5 * d$b + 1.5 * d$x1 - d$x2 +
+    stats::rnorm(40, sd = 0.8)[as.integer(factor(d$pig))] + stats::rnorm(n)
+  ours <- lmm_ri_reml(d$y, stats::model.matrix(~ b + x1 + x2, d), d$pig)
+  ref <- nlme::lme(y ~ b + x1 + x2, random = ~ 1 | pig, data = d, method = "REML")
+  tt <- summary(ref)$tTable
+  expect_equal(ours$coefficients$estimate, unname(tt[, "Value"]), tolerance = 1e-4)
+  expect_equal(ours$coefficients$std_error, unname(tt[, "Std.Error"]), tolerance = 1e-3)
+  expect_equal(ours$coefficients$p_value, unname(tt[, "p-value"]), tolerance = 1e-3)
+  expect_equal(ours$sigma2_e, ref$sigma^2, tolerance = 1e-3)
 })
 
 test_that("no correction uses the recorded intake", {
@@ -4082,43 +4212,15 @@ plot_adg <- function(adg, weight = NULL, responders = NULL, locations = NULL,
                           stage_rng[1L], stage_rng[2L],
                           ifelse(is.na(stage_days), "NA", sprintf("%.1f", stage_days)))]
 
+  # Each plot is built by a top-level helper that only receives its own
+  # station's data. A ggplot keeps the environment it was created in, so
+  # building it inside this function would drag every pig's records along
+  # (hundreds of MB per plot), which makes saving and parallel export slow.
   plots <- lapply(split(daily, by = "location", sorted = TRUE), function(d) {
-    loc <- d$location[1L]
     lv <- natural_order(unique(d$responder))
-    d[, responder := factor(responder, levels = lv)]
-    lab <- info[location == loc | responder %in% lv][, responder := factor(responder, levels = lv)]
-    lab <- lab[!is.na(responder)]
-    y_rng <- range(c(d$lower, d$upper, d$weight, stage_rng,
-                     if (!is.null(rec)) rec[responder %in% lv, weight]), na.rm = TRUE)
-    p <- ggplot2::ggplot(d, ggplot2::aes(x = date)) +
-      ggplot2::geom_hline(yintercept = stage_rng, linetype = "dashed",
-                          colour = cols[["stage"]], alpha = 0.4) +
-      ggplot2::geom_ribbon(ggplot2::aes(ymin = lower, ymax = upper),
-                           fill = cols[["curve"]], alpha = 0.15)
-    if (!is.null(rec)) {
-      r <- rec[responder %in% lv][, responder := factor(responder, levels = lv)]
-      r[, kind := data.table::fifelse(outlier, "outlier", "record")]
-      p <- p + ggplot2::geom_point(data = r, ggplot2::aes(y = weight, colour = kind),
-                                   size = 0.4, alpha = 0.6)
-    }
-    brk <- c("observed", "curve", if (!is.null(rec)) c("record", "outlier"))
-    p <- p +
-      ggplot2::geom_point(data = d[!is.na(weight)],
-                          ggplot2::aes(y = weight, colour = "observed"), size = 0.9) +
-      ggplot2::geom_line(ggplot2::aes(y = predicted, colour = "curve"), linewidth = 0.6) +
-      ggplot2::geom_text(data = lab, ggplot2::aes(label = label),
-                         x = -Inf, y = Inf, hjust = -0.05, vjust = 1.2,
-                         size = 2.8, inherit.aes = FALSE) +
-      ggplot2::facet_wrap(~responder, ncol = min(ncol, length(lv))) +
-      ggplot2::scale_y_continuous(limits = y_rng + c(-2, 12)) +
-      ggplot2::scale_colour_manual(
-        name = NULL, values = cols, breaks = brk,
-        labels = c(observed = "daily median weight", curve = "growth curve",
-                   record = "weight record", outlier = "outlier")[brk]
-      ) +
-      ggplot2::labs(title = paste("Station", loc), x = NULL, y = "Body weight (kg)") +
-      ppt_theme()
-    p
+    lab <- info[location == d$location[1L] | responder %in% lv]
+    r <- if (!is.null(rec)) rec[responder %in% lv] else NULL
+    adg_station_plot(d, r, lab, lv, stage_rng, cols, ncol)
   })
   out <- data.table::data.table(location = names(plots),
                                 n_pigs = vapply(plots, function(p) data.table::uniqueN(p$data$responder), integer(1)),
@@ -4155,32 +4257,8 @@ plot_adfi <- function(adfi, responders = NULL, locations = NULL, ncol = 3,
               iii = "interpolated", elrp = "extrapolated", missing = "missing")
 
   plots <- lapply(split(daily, by = "location", sorted = TRUE), function(d) {
-    loc <- d$location[1L]
     lv <- natural_order(unique(d$responder))
-    d[, responder := factor(responder, levels = lv)]
-    lab <- info[responder %in% lv][, responder := factor(responder, levels = lv)]
-    y_max <- max(c(d$dfi, d$dfi_raw), na.rm = TRUE)
-    brk <- intersect(names(cols), c("raw", unique(d$state)))
-    p <- ggplot2::ggplot(d, ggplot2::aes(x = date)) +
-      ggplot2::geom_hline(data = lab, ggplot2::aes(yintercept = adfi),
-                          linetype = "dashed", colour = "#666666", alpha = 0.6) +
-      ggplot2::geom_point(data = d[!is.na(dfi_raw)],
-                          ggplot2::aes(y = dfi_raw, colour = "raw"), size = 0.7) +
-      ggplot2::geom_line(data = d[!is.na(dfi)], ggplot2::aes(y = dfi),
-                         colour = "#666666", linewidth = 0.3, alpha = 0.5) +
-      ggplot2::geom_point(data = d[!is.na(dfi)],
-                          ggplot2::aes(y = dfi, colour = state), size = 0.9) +
-      ggplot2::geom_text(data = lab, ggplot2::aes(label = label),
-                         x = -Inf, y = Inf, hjust = -0.05, vjust = 1.2,
-                         size = 2.8, inherit.aes = FALSE) +
-      ggplot2::facet_wrap(~responder, ncol = min(ncol, length(lv))) +
-      ggplot2::scale_y_continuous(limits = c(min(0, d$dfi_raw, d$dfi, na.rm = TRUE), y_max * 1.25)) +
-      ggplot2::scale_colour_manual(name = NULL, values = cols, breaks = brk,
-                                   labels = labels[brk]) +
-      ggplot2::labs(title = paste("Station", loc), x = NULL,
-                    y = "Daily feed intake (g)") +
-      ppt_theme()
-    p
+    adfi_station_plot(d, info[responder %in% lv], lv, cols, labels, ncol)
   })
   out <- data.table::data.table(location = names(plots),
                                 n_pigs = vapply(plots, function(p) data.table::uniqueN(p$data$responder), integer(1)),
@@ -4198,39 +4276,141 @@ plot_adfi <- function(adfi, responders = NULL, locations = NULL, ncol = 3,
 #' @param dpi Resolution for bitmap devices. Default 300.
 #' @param width,height Size in cm. By default computed from the number of
 #'   panels.
+#' @param cores Number of CPU cores: stations are saved in parallel when
+#'   > 1. Default 1. Saving is mostly ggplot2 drawing time (about 1 s per
+#'   station of 15 pigs), so with many stations this is the main speed-up.
 #' @param verbose 0 (silent), 1 (summary, default).
 #'
 #' @return Invisibly, a `data.table` with `location`, `file` and `saved`.
 #' @export
 save_plots <- function(plots, path, prefix = "station", suffix = "plot",
                        device = c("png", "pdf", "jpeg", "tiff"), dpi = 300,
-                       width = NULL, height = NULL, verbose = 1) {
+                       width = NULL, height = NULL, verbose = 1, cores = 1) {
   local_verbose(verbose)
   device <- match.arg(device)
+  cores <- check_cores(cores)
   if (!data.table::is.data.table(plots) || !all(c("location", "plot") %in% names(plots))) {
     cli::cli_abort("{.arg plots} must be the result of {.fn plot_adg} or {.fn plot_adfi}.")
   }
   dir.create(path, recursive = TRUE, showWarnings = FALSE)
-  res <- data.table::rbindlist(lapply(seq_len(nrow(plots)), function(i) {
+  n <- nrow(plots)
+  jobs <- lapply(seq_len(n), function(i) {
     p <- plots$plot[[i]]
-    n <- plots$n_pigs[i]
     nc <- p$facet$params$ncol %||% 3L
-    w <- width %||% max(16, 9 * nc)
-    h <- height %||% (6 * ceiling(n / nc) + 4)
-    file <- file.path(path, paste0(prefix, "_", plots$location[i], "_", suffix, ".", device))
-    ok <- tryCatch({
-      ggplot2::ggsave(file, p, width = w, height = h, units = "cm", dpi = dpi,
-                      device = device, limitsize = FALSE)
-      TRUE
-    }, error = function(e) {
-      ppt_warn("Could not save {.file {file}}: {conditionMessage(e)}")
-      FALSE
-    })
-    data.table::data.table(location = plots$location[i], file = file, saved = ok)
-  }))
+    list(plot = p,
+         file = file.path(path, paste0(prefix, "_", plots$location[i], "_", suffix, ".", device)),
+         width = width %||% max(16, 9 * nc),
+         height = height %||% (6 * ceiling(plots$n_pigs[i] / nc) + 4))
+  })
+
+  errs <- if (cores > 1L && n > 1L) {
+    if (.Platform$OS.type == "windows") {
+      cl <- parallel::makeCluster(min(cores, n))
+      on.exit(parallel::stopCluster(cl), add = TRUE)
+      parallel::parLapply(cl, jobs, save_one_plot, device = device, dpi = dpi)
+    } else {
+      parallel::mclapply(jobs, save_one_plot, device = device, dpi = dpi,
+                         mc.cores = min(cores, n), mc.preschedule = FALSE)
+    }
+  } else if (ppt_verbose() >= 1L && n > 1L) {
+    out <- vector("list", n)
+    cli::cli_progress_bar("Saving plots", total = n, clear = TRUE,
+                          .envir = environment())
+    for (i in seq_len(n)) {
+      out[[i]] <- save_one_plot(jobs[[i]], device = device, dpi = dpi)
+      cli::cli_progress_update(.envir = environment())
+    }
+    cli::cli_progress_done(.envir = environment())
+    out
+  } else {
+    lapply(jobs, save_one_plot, device = device, dpi = dpi)
+  }
+
+  files <- vapply(jobs, `[[`, "", "file")
+  ok <- vapply(errs, function(e) is.character(e) && length(e) == 1L && is.na(e), logical(1))
+  for (i in which(!ok)) {
+    msg <- if (is.character(errs[[i]])) errs[[i]] else "worker failed"
+    file <- files[i]
+    ppt_warn("Could not save {.file {file}}: {msg}")
+  }
+  res <- data.table::data.table(location = plots$location, file = files, saved = ok)
   ppt_msg("Saved {sum(res$saved)} of {nrow(res)} plot{?s} to {.path {path}}",
           if (all(res$saved)) "success" else "warning")
   invisible(res)
+}
+
+# Save one plot; returns NA on success or the error message.
+save_one_plot <- function(job, device, dpi) {
+  tryCatch({
+    ggplot2::ggsave(job$file, job$plot, width = job$width, height = job$height,
+                    units = "cm", dpi = dpi, device = device, limitsize = FALSE)
+    NA_character_
+  }, error = function(e) conditionMessage(e))
+}
+
+adg_station_plot <- function(d, rec, lab, lv, stage_rng, cols, ncol) {
+  loc <- d$location[1L]
+  d <- data.table::copy(d)[, responder := factor(responder, levels = lv)]
+  lab <- data.table::copy(lab)[, responder := factor(responder, levels = lv)]
+  lab <- lab[!is.na(responder)]
+  y_rng <- range(c(d$lower, d$upper, d$weight, stage_rng, rec$weight), na.rm = TRUE)
+  p <- ggplot2::ggplot(d, ggplot2::aes(x = date)) +
+    ggplot2::geom_hline(yintercept = stage_rng, linetype = "dashed",
+                        colour = cols[["stage"]], alpha = 0.4) +
+    ggplot2::geom_ribbon(ggplot2::aes(ymin = lower, ymax = upper),
+                         fill = cols[["curve"]], alpha = 0.15)
+  if (!is.null(rec)) {
+    r <- data.table::copy(rec)[, responder := factor(responder, levels = lv)]
+    r[, kind := data.table::fifelse(outlier, "outlier", "record")]
+    r <- r[, .(date, responder, weight, kind)]
+    p <- p + ggplot2::geom_point(data = r, ggplot2::aes(y = weight, colour = kind),
+                                 size = 0.4, alpha = 0.6)
+  }
+  brk <- c("observed", "curve", if (!is.null(rec)) c("record", "outlier"))
+  p +
+    ggplot2::geom_point(data = d[!is.na(weight)],
+                        ggplot2::aes(y = weight, colour = "observed"), size = 0.9) +
+    ggplot2::geom_line(ggplot2::aes(y = predicted, colour = "curve"), linewidth = 0.6) +
+    ggplot2::geom_text(data = lab, ggplot2::aes(label = label),
+                       x = -Inf, y = Inf, hjust = -0.05, vjust = 1.2,
+                       size = 2.8, inherit.aes = FALSE) +
+    ggplot2::facet_wrap(~responder, ncol = min(ncol, length(lv))) +
+    ggplot2::scale_y_continuous(limits = y_rng + c(-2, 12)) +
+    ggplot2::scale_colour_manual(
+      name = NULL, values = cols, breaks = brk,
+      labels = c(observed = "daily median weight", curve = "growth curve",
+                 record = "weight record", outlier = "outlier")[brk]
+    ) +
+    ggplot2::labs(title = paste("Station", loc), x = NULL, y = "Body weight (kg)") +
+    ppt_theme()
+}
+
+adfi_station_plot <- function(d, lab, lv, cols, labels, ncol) {
+  loc <- d$location[1L]
+  d <- data.table::copy(d)[, responder := factor(responder, levels = lv)]
+  d <- d[, .(date, responder, dfi, dfi_raw, state)]
+  lab <- data.table::copy(lab)[, responder := factor(responder, levels = lv)]
+  y_max <- max(c(d$dfi, d$dfi_raw), na.rm = TRUE)
+  brk <- intersect(names(cols), c("raw", unique(d$state)))
+  ggplot2::ggplot(d, ggplot2::aes(x = date)) +
+    ggplot2::geom_hline(data = lab, ggplot2::aes(yintercept = adfi),
+                        linetype = "dashed", colour = "#666666", alpha = 0.6) +
+    ggplot2::geom_point(data = d[!is.na(dfi_raw)],
+                        ggplot2::aes(y = dfi_raw, colour = "raw"), size = 0.7) +
+    ggplot2::geom_line(data = d[!is.na(dfi)], ggplot2::aes(y = dfi),
+                       colour = "#666666", linewidth = 0.3, alpha = 0.5) +
+    ggplot2::geom_point(data = d[!is.na(dfi)],
+                        ggplot2::aes(y = dfi, colour = state), size = 0.9) +
+    ggplot2::geom_text(data = lab, ggplot2::aes(label = label),
+                       x = -Inf, y = Inf, hjust = -0.05, vjust = 1.2,
+                       size = 2.8, inherit.aes = FALSE) +
+    ggplot2::facet_wrap(~responder, ncol = min(ncol, length(lv))) +
+    ggplot2::scale_y_continuous(limits = c(min(0, d$dfi_raw, d$dfi, na.rm = TRUE), y_max * 1.25)) +
+    ggplot2::scale_colour_manual(name = NULL, values = cols, breaks = brk,
+                                 labels = labels[brk]) +
+    ggplot2::labs(title = paste("Station", loc), x = NULL,
+                  y = "Daily feed intake (g)") +
+    ppt_theme()
 }
 
 filter_pigs <- function(daily, responders, locations) {
@@ -4331,9 +4511,29 @@ test_that("filters work and unknown IDs warn", {
   r <- plot_inputs()
   g <- plot_adg(r$adg, responders = c("35853", "35855"), verbose = 0)
   expect_equal(sum(g$n_pigs), 2L)
-  expect_warning(plot_adg(r$adg, responders = c("35853", "nope"), verbose = 1), "nope")
+  expect_message(plot_adg(r$adg, responders = c("35853", "nope"), verbose = 1), "nope")
   expect_error(plot_adg(r$adg, locations = "999", verbose = 0), "No data")
   expect_error(plot_adg(r$adfi), "calc_adg")
+})
+
+test_that("plots do not carry the data of other stations", {
+  r <- plot_inputs()
+  g <- plot_adg(r$adg, weight = r$w, verbose = 0)
+  env <- g$plot[[1]]$plot_env
+  # the plot's environment holds only this station's records
+  expect_false(exists("weight", envir = env, inherits = FALSE))
+  expect_setequal(unique(as.character(env$rec$responder)),
+                  as.character(r$adg$per_pig[location == g$location[1], responder]))
+})
+
+test_that("save_plots in parallel gives the same files", {
+  skip_on_os("windows")   # PSOCK needs the installed package
+  r <- plot_inputs()
+  g <- plot_adfi(r$adfi, verbose = 0)
+  dir <- withr::local_tempdir()
+  out <- save_plots(g, dir, device = "pdf", verbose = 0, cores = 2)
+  expect_true(all(out$saved))
+  expect_true(all(file.exists(out$file)))
 })
 
 test_that("save_plots writes one file per station", {

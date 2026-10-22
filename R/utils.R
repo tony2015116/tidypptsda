@@ -25,7 +25,9 @@ check_verbose <- function(verbose) {
 # Set the verbosity level until the calling function exits.
 local_verbose <- function(verbose, envir = parent.frame()) {
   verbose <- check_verbose(verbose)
-  old <- options(tidypptsda.verbose = verbose)
+  # data.table's own "Processed ... groups" progress is not cli-styled and
+  # cannot be silenced by verbose, so switch it off as well.
+  old <- options(tidypptsda.verbose = verbose, datatable.showProgress = FALSE)
   do.call(on.exit, list(bquote(options(.(old))), add = TRUE), envir = envir)
   invisible(verbose)
 }
@@ -52,11 +54,13 @@ ppt_msg <- function(msg,
   invisible(NULL)
 }
 
-# Raise a real warning unless verbose = 0. Whatever triggers it is also
-# recorded in the result (removed / flags), so nothing is lost when silent.
+# Show a warning alert at the point where it happens (cli style), instead of
+# an R warning that is only printed after the whole call has finished.
+# Whatever triggers it is also recorded in the result (removed / flags), so
+# nothing is lost when silent.
 ppt_warn <- function(msg, .envir = parent.frame()) {
   if (ppt_verbose() >= 1L) {
-    cli::cli_warn(msg, .envir = .envir)
+    cli::cli_alert_warning(msg, .envir = .envir)
   }
   invisible(NULL)
 }
@@ -134,6 +138,17 @@ fit_by_pig <- function(data, fun, step, by = "responder", ...) {
     } else {
       parallel::mclapply(groups, one_pig, mc.cores = min(cores, n))
     }
+  } else if (ppt_verbose() >= 1L && n > 1L) {
+    # a cli progress bar; cli only draws it when the step takes > 2 s
+    res <- vector("list", n)
+    cli::cli_progress_bar(paste0(step, ": fitting pigs"), total = n,
+                          clear = TRUE, .envir = environment())
+    for (i in seq_len(n)) {
+      res[[i]] <- one_pig(groups[[i]])
+      cli::cli_progress_update(.envir = environment())
+    }
+    cli::cli_progress_done(.envir = environment())
+    res
   } else {
     lapply(groups, one_pig)
   }
@@ -234,6 +249,7 @@ utils::globalVariables(c(
   "fiv_lo", "fiv_hi", "fiv_0", "otv_lo", "otv_hi", "frv_hi_fiv_lo",
   "frv_hi_strict", "frv_hi", "frv_0", "frv_lo", "lwd_lo", "lwd_hi",
   "fwd_lo", "fwd_hi", "ltd_lo", "ftd_lo",
+  "error_visit", "y_part",
   # ADFI
   "all_error", "bw", "y", "dfi", "dfi_raw", "dfi_check", "dfi_corrected",
   "dfi_error_free", "check_flag", "pig_location", "adfi", "coverage",

@@ -175,7 +175,7 @@ FIRE 示例数据中的猪在 45–60 kg 才进站，若仍按 30–120 kg 计�
 visits_f <- prep_visits(fire, verbose = 0)
 rbindlist(lapply(list(c(30, 120), c(60, 120)), function(st) {
   q <- qc_config(stage_range = st)
-  a <- suppressWarnings(calc_adg(clean_weight(visits_f, q, verbose = 0), verbose = 0))
+  a <- calc_adg(clean_weight(visits_f, q, verbose = 0), verbose = 0)
   f <- calc_fcr(a, calc_adfi(visits_f, a, verbose = 0), verbose = 0)
   data.table(stage = paste(st, collapse = "-"),
              observed = a$per_pig[adg_type == "observed", .N],
@@ -288,7 +288,7 @@ rbindlist(lapply(c(1800, 3600), function(d) {
 ```{r edge}
 rbindlist(lapply(c(10, 15, 30), function(k) {
   q <- qc_config(max_edge_extrap_days = k)
-  a <- suppressWarnings(calc_adg(clean_weight(visits_f, q, verbose = 0), verbose = 0))
+  a <- calc_adg(clean_weight(visits_f, q, verbose = 0), verbose = 0)
   f <- calc_fcr(a, calc_adfi(visits_f, a, verbose = 0), verbose = 0)
   data.table(max_edge_extrap_days = k, fcr_ok = f$per_pig[fcr_flag %in% "ok", .N])
 }))

@@ -1,6 +1,6 @@
 Package: tidypptsda
 Title: Process and Analyse Pig Performance Testing Station Data
-Version: 0.4.0
+Version: 0.5.0
 Authors@R: 
     person("Meng", "Guo", , "tony2015116@163.com", role = c("aut", "cre", "cph"))
 Description: Tools to clean and analyse visit records from automatic pig
@@ -22,12 +22,12 @@ Imports:
     ggplot2,
     grDevices,
     MASS,
-    nlme,
     parallel,
     stats,
     utils
 Suggests: 
     knitr,
+    nlme,
     rmarkdown,
     testthat,
     withr

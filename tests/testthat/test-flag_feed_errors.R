@@ -145,7 +145,7 @@ test_that("FIV-hi limit can depend on body weight and breed", {
 test_that("a large unidentified feed disappearance gives a warning", {
   v <- prep_visits(fire, verbose = 0)
   q <- qc_config(max_unidentified_feed_kg = 1)
-  expect_warning(flag_feed_errors(v, q, verbose = 1), "unidentified")
+  expect_message(flag_feed_errors(v, q, verbose = 1), "unidentified")
 })
 
 test_that("daily covariates follow Jiao et al. (2014)", {

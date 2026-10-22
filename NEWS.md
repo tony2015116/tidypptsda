@@ -1,3 +1,36 @@
+# tidypptsda 0.5.0
+
+## Faster on large data
+
+* The feed-intake correction model is fitted by a built-in REML routine for
+  the random-intercept model (profiled likelihood over the variance ratio,
+  computed from cross-products). Estimates, standard errors and p values are
+  the same as `nlme::lme()` (difference < 0.001 g), but on 1.75 million visits
+  `calc_adfi()` takes 9 s instead of 66 s. `nlme` is no longer a dependency.
+* `daily_error_covariates()` (used by `calc_adfi()`) is vectorised: 39 s to
+  1.6 s on the same data. Polynomial growth curves are evaluated directly
+  instead of through `predict()`, and outlier reasons are built column-wise:
+  `clean_weight()` 27 s to 18 s, `calc_adg()` 18 s to 12 s.
+  Results are unchanged.
+
+* Plots are built from their own station's data only. Before, every plot
+  kept a reference to all pigs' records (about 177 MB per plot when serialised
+  on 1.75 million visits, now about 6 MB), which made parallel export and
+  `saveRDS()` of plots slow.
+* `save_plots()` gains `cores` to save stations in parallel (fork on
+  Linux/macOS, a PSOCK cluster on Windows) and shows a progress bar.
+  Drawing takes about 1–1.5 s per station of 15 pigs.
+
+## Messages
+
+* Situations that need attention (pigs not reaching the stage end, weight
+  jumps at a transfer, pigs missing from the breed table, too much
+  unidentified feed, a failed correction model, unknown pigs in plots) are now
+  shown at once as cli alerts instead of R warnings printed only after the call
+  has finished. Use `verbose = 0` to hide them, or `suppressMessages()`.
+* data.table's own "Processed ... groups" progress output is switched off
+  inside the package; long per-pig steps show a cli progress bar instead.
+
 # tidypptsda 0.4.0
 
 ## New features

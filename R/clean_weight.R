@@ -242,7 +242,8 @@ detect_weight_outliers <- function(d, qc) {
 
   mat <- do.call(cbind, flags)
   outlier <- if (qc$outlier_combine == "any") rowSums(mat) > 0 else rowSums(mat) > ncol(mat) / 2
-  by <- apply(mat, 1L, function(z) paste(colnames(mat)[z], collapse = ";"))
+  by <- character(nrow(mat))
+  for (m in colnames(mat)) by <- add_reason(by, mat[, m] %in% TRUE, m)
   ref <- fits[[1L]]
 
   if (!is.null(qc$rel_dev_max)) {
