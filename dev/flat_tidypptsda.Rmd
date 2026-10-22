@@ -47,7 +47,7 @@ fusen::fill_description(
   ),
   overwrite = TRUE
 )
-desc::desc_set_version("0.6.0")
+desc::desc_set_version("0.6.1")
 usethis::use_mit_license("Meng Guo")
 # Use markdown in roxygen comments
 desc::desc_set("Roxygen", "list(markdown = TRUE)")
@@ -382,6 +382,11 @@ run_forked <- function(x, fun, cores, set_bar, ...) {
   pids <- vapply(jobs, function(j) j$pid, integer(1))
   got <- vector("list", length(jobs))
   left <- seq_along(jobs)
+  # on an interrupt (Esc / Ctrl+C) or an error, stop the workers still running
+  on.exit(if (length(left) > 0L) {
+    tools::pskill(pids[left], tools::SIGKILL)
+    parallel::mccollect(jobs[left], wait = TRUE)   # reap them (no zombies)
+  }, add = TRUE)
   while (length(left) > 0L) {
     r <- parallel::mccollect(jobs[left], wait = FALSE, timeout = 0.25)
     if (!is.null(r)) {
@@ -1505,6 +1510,8 @@ prep_visits <- function(data, station = NULL, qc = qc_config(), verbose = 1) {
 standardise_nedap <- function(dt) {
   if (!inherits(dt$visit_time, "POSIXct")) {
     dt[, visit_time := as.POSIXct(as.character(visit_time), tz = "UTC")]
+  } else {
+    dt[, visit_time := clock_as_utc(visit_time)]
   }
   # NEDAP exports body weight in g; accept kg if the values are clearly kg.
   w <- dt$weight[!is.na(dt$weight) & dt$weight > 0]
@@ -1525,6 +1532,25 @@ standardise_nedap <- function(dt) {
   out[, exit_time := entry_time + duration]
   finish_ids(out)
   data.table::setattr(out, "n_midnight", 0L)
+  out
+}
+
+# The package works on clock times stored as UTC, so that a day runs from
+# 00:00 to 24:00 local clock time. A POSIXct in another time zone (e.g. read
+# from a database as Asia/Shanghai) keeps its clock time: 08:30 Beijing time
+# becomes 08:30 UTC. Without this, the date of every visit between 00:00 and
+# 08:00 would move to the previous day.
+clock_as_utc <- function(x) {
+  tz <- attr(x, "tzone")
+  if (!is.null(tz) && length(tz) > 0L && tz[1L] %in% c("UTC", "GMT", "Etc/UTC")) return(x)
+  lt <- as.POSIXlt(x)
+  off <- lt$gmtoff
+  out <- if (!is.null(off) && !anyNA(off[!is.na(x)])) {
+    as.POSIXct(as.numeric(x) + off, origin = "1970-01-01", tz = "UTC")
+  } else {
+    as.POSIXct(format(x, "%Y-%m-%d %H:%M:%OS6"), tz = "UTC")
+  }
+  ppt_msg("Visit times converted from time zone {.val {if (is.null(tz) || !nzchar(tz[1])) 'local' else tz[1]}} to UTC with the same clock time", "info", level = 2L)
   out
 }
 
@@ -1707,6 +1733,18 @@ summary(nedap_visits$weight)
 ```
 
 ```{r tests-prep_visits}
+test_that("visit times in another time zone keep their clock time", {
+  d <- data.table::as.data.table(nedap)
+  local <- data.table::copy(d)
+  local[, visit_time := as.POSIXct(format(visit_time, tz = "UTC"), tz = "Asia/Shanghai")]
+  a <- prep_visits(d, verbose = 0)
+  b <- prep_visits(local, verbose = 0)
+  expect_equal(b$date, a$date)
+  expect_equal(format(b$entry_time, tz = "UTC"), format(a$entry_time, tz = "UTC"))
+  expect_equal(clock_as_utc(as.POSIXct("2024-03-01 07:30:00", tz = "Asia/Shanghai")),
+               as.POSIXct("2024-03-01 07:30:00", tz = "UTC"))
+})
+
 test_that("NEDAP data are standardised", {
   input <- data.table::as.data.table(nedap)
   before <- data.table::copy(input)
@@ -2585,6 +2623,12 @@ calc_adg <- function(weight, qc = weight$settings, verbose = 1, cores = 1) {
   kcols <- intersect(c("responder", "location", "breed", "status", "reason"), names(weight$per_pig))
   kept <- weight$per_pig[status != "removed", kcols, with = FALSE]
   data.table::setnames(kept, c("status", "reason"), c("weight_status", "weight_reason"))
+  if (nrow(kept) == 0L) {
+    top <- utils::head(sort(table(weight$removed$reason), decreasing = TRUE), 3L)
+    cli::cli_abort(c("No pig is left after {.fn clean_weight}: all {nrow(weight$per_pig)} were removed.",
+                     "i" = "Most common reasons: {paste0(names(top), ' (', top, ')', collapse = '; ')}.",
+                     "i" = "See {.field $removed}, or relax {.field min_test_days} / {.field max_missing_rate} in {.fn qc_config}."))
+  }
   rec <- weight$records[outlier == FALSE & responder %in% kept$responder]
   day0 <- weight$daily[, min(date - seq_days + 1L)]   # date with seq_days = 1
 
@@ -2872,6 +2916,13 @@ test_that("calc_adg works on both datasets and every curve", {
       expect_true(all(a$per_pig$adg_type %in% c("observed", "extrapolated", "partial", "none")))
     }
   }
+})
+
+test_that("calc_adg explains when no pig is left", {
+  n <- data.table::as.data.table(nedap)
+  short <- n[visit_time < min(visit_time) + 10 * 86400]
+  w <- clean_weight(prep_visits(short, verbose = 0), verbose = 0)
+  expect_error(calc_adg(w, verbose = 0), "No pig is left")
 })
 
 test_that("Gompertz falls back to a quadratic curve when nls fails", {
@@ -4086,11 +4137,20 @@ fcr_by_bin <- function(adg, adfi, qc) {
   # how much of each class is covered by recorded body weights
   ob <- adg$daily[source == "observed" & !is.na(weight)]
   ob[, weight_from := cls(weight)]
-  cov <- ob[weight_from >= lo & weight_from < hi,
-            .(weight_coverage_kg = max(weight) - min(weight)), by = .(responder, weight_from)]
+  ob <- ob[weight_from >= lo & weight_from < hi]
+  cov <- if (nrow(ob) > 0L) {
+    ob[, .(weight_coverage_kg = max(weight) - min(weight)), by = .(responder, weight_from)]
+  } else {
+    data.table::data.table(responder = character(), weight_from = numeric(),
+                           weight_coverage_kg = numeric())
+  }
   bins <- merge(bins, cov, by = c("responder", "weight_from"), all.x = TRUE)
   bins[is.na(weight_coverage_kg), weight_coverage_kg := 0]
-  rng <- cov[, .(first_bin = min(weight_from), last_bin = max(weight_from)), by = responder]
+  rng <- if (nrow(cov) > 0L) {
+    cov[, .(first_bin = min(weight_from), last_bin = max(weight_from)), by = responder]
+  } else {
+    data.table::data.table(responder = character(), first_bin = numeric(), last_bin = numeric())
+  }
   bins <- merge(bins, rng, by = "responder", all.x = TRUE)
   bins[, inner := (weight_from > first_bin & weight_from < last_bin) %in% TRUE]
   bins[, low_coverage := inner & weight_coverage_kg < qc$min_bin_coverage_kg]
@@ -4224,6 +4284,12 @@ test_that("max_edge_extrap_days changes the flags", {
   a <- suppressWarnings(calc_adg(clean_weight(v, q, verbose = 0), verbose = 0))
   p <- calc_fcr(a, calc_adfi(v, a, verbose = 0), verbose = 0)$per_pig
   expect_false(any(grepl("extrapolated", p$fcr_note)))
+})
+
+test_that("a stage outside the data gives no R warnings", {
+  q <- qc_config(stage_range = c(150, 160), weight_range = c(10, 200))
+  expect_no_warning(r <- run_pipeline(nedap, qc = q, verbose = 0))
+  expect_true(all(r$fcr$by_bin$weight_coverage_kg == 0))
 })
 
 test_that("min_coverage changes the flags", {

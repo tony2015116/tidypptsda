@@ -86,6 +86,12 @@ test_that("max_edge_extrap_days changes the flags", {
   expect_false(any(grepl("extrapolated", p$fcr_note)))
 })
 
+test_that("a stage outside the data gives no R warnings", {
+  q <- qc_config(stage_range = c(150, 160), weight_range = c(10, 200))
+  expect_no_warning(r <- run_pipeline(nedap, qc = q, verbose = 0))
+  expect_true(all(r$fcr$by_bin$weight_coverage_kg == 0))
+})
+
 test_that("min_coverage changes the flags", {
   r <- fcr_pipeline(fire)
   strict <- calc_fcr(r$adg, r$adfi, min_coverage = 1, verbose = 0)$per_pig

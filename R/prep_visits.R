@@ -147,6 +147,8 @@ prep_visits <- function(data, station = NULL, qc = qc_config(), verbose = 1) {
 standardise_nedap <- function(dt) {
   if (!inherits(dt$visit_time, "POSIXct")) {
     dt[, visit_time := as.POSIXct(as.character(visit_time), tz = "UTC")]
+  } else {
+    dt[, visit_time := clock_as_utc(visit_time)]
   }
   # NEDAP exports body weight in g; accept kg if the values are clearly kg.
   w <- dt$weight[!is.na(dt$weight) & dt$weight > 0]
@@ -167,6 +169,25 @@ standardise_nedap <- function(dt) {
   out[, exit_time := entry_time + duration]
   finish_ids(out)
   data.table::setattr(out, "n_midnight", 0L)
+  out
+}
+
+# The package works on clock times stored as UTC, so that a day runs from
+# 00:00 to 24:00 local clock time. A POSIXct in another time zone (e.g. read
+# from a database as Asia/Shanghai) keeps its clock time: 08:30 Beijing time
+# becomes 08:30 UTC. Without this, the date of every visit between 00:00 and
+# 08:00 would move to the previous day.
+clock_as_utc <- function(x) {
+  tz <- attr(x, "tzone")
+  if (!is.null(tz) && length(tz) > 0L && tz[1L] %in% c("UTC", "GMT", "Etc/UTC")) return(x)
+  lt <- as.POSIXlt(x)
+  off <- lt$gmtoff
+  out <- if (!is.null(off) && !anyNA(off[!is.na(x)])) {
+    as.POSIXct(as.numeric(x) + off, origin = "1970-01-01", tz = "UTC")
+  } else {
+    as.POSIXct(format(x, "%Y-%m-%d %H:%M:%OS6"), tz = "UTC")
+  }
+  ppt_msg("Visit times converted from time zone {.val {if (is.null(tz) || !nzchar(tz[1])) 'local' else tz[1]}} to UTC with the same clock time", "info", level = 2L)
   out
 }
 

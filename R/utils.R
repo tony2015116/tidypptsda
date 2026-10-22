@@ -244,6 +244,11 @@ run_forked <- function(x, fun, cores, set_bar, ...) {
   pids <- vapply(jobs, function(j) j$pid, integer(1))
   got <- vector("list", length(jobs))
   left <- seq_along(jobs)
+  # on an interrupt (Esc / Ctrl+C) or an error, stop the workers still running
+  on.exit(if (length(left) > 0L) {
+    tools::pskill(pids[left], tools::SIGKILL)
+    parallel::mccollect(jobs[left], wait = TRUE)   # reap them (no zombies)
+  }, add = TRUE)
   while (length(left) > 0L) {
     r <- parallel::mccollect(jobs[left], wait = FALSE, timeout = 0.25)
     if (!is.null(r)) {

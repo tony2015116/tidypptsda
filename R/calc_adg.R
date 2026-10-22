@@ -55,6 +55,12 @@ calc_adg <- function(weight, qc = weight$settings, verbose = 1, cores = 1) {
   kcols <- intersect(c("responder", "location", "breed", "status", "reason"), names(weight$per_pig))
   kept <- weight$per_pig[status != "removed", kcols, with = FALSE]
   data.table::setnames(kept, c("status", "reason"), c("weight_status", "weight_reason"))
+  if (nrow(kept) == 0L) {
+    top <- utils::head(sort(table(weight$removed$reason), decreasing = TRUE), 3L)
+    cli::cli_abort(c("No pig is left after {.fn clean_weight}: all {nrow(weight$per_pig)} were removed.",
+                     "i" = "Most common reasons: {paste0(names(top), ' (', top, ')', collapse = '; ')}.",
+                     "i" = "See {.field $removed}, or relax {.field min_test_days} / {.field max_missing_rate} in {.fn qc_config}."))
+  }
   rec <- weight$records[outlier == FALSE & responder %in% kept$responder]
   day0 <- weight$daily[, min(date - seq_days + 1L)]   # date with seq_days = 1
 
