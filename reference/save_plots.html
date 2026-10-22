@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.4.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.5.0</span>
       </span>
     </div>
 
@@ -80,7 +80,8 @@
 <span>  dpi <span class="op">=</span> <span class="fl">300</span>,</span>
 <span>  width <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  height <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  verbose <span class="op">=</span> <span class="fl">1</span></span>
+<span>  verbose <span class="op">=</span> <span class="fl">1</span>,</span>
+<span>  cores <span class="op">=</span> <span class="fl">1</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -115,6 +116,10 @@ panels.</p></dd>
 
 <dt id="arg-verbose">verbose<a class="anchor" aria-label="anchor" href="#arg-verbose"></a></dt>
 <dd><p>0 (silent), 1 (summary, default).</p></dd>
+
+
+<dt id="arg-cores">cores<a class="anchor" aria-label="anchor" href="#arg-cores"></a></dt>
+<dd><p>Number of CPU cores: stations are saved in parallel whenDefault 1. Saving is mostly ggplot2 drawing time (about 1 s perstation of 15 pigs), so with many stations this is the main speed-up.</p></dd>
 
 </dl></div>
     <div id="value">

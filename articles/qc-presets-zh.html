@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.4.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.5.0</span>
       </span>
     </div>
 
@@ -343,7 +343,7 @@ kg（原始资料中的”测试体重范围”），有效体重范围为 25–
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">run_one</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">data</span>, <span class="va">profile</span>, <span class="va">...</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">q</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="va">profile</span>, <span class="va">...</span><span class="op">)</span></span>
-<span>  <span class="va">r</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/warning.html" class="external-link">suppressWarnings</a></span><span class="op">(</span><span class="fu"><a href="../reference/run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">data</span>, qc <span class="op">=</span> <span class="va">q</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="va">r</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">data</span>, qc <span class="op">=</span> <span class="va">q</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span>  <span class="va">p</span> <span class="op">&lt;-</span> <span class="va">r</span><span class="op">$</span><span class="va">fcr</span><span class="op">$</span><span class="va">per_pig</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/data.table.html" class="external-link">data.table</a></span><span class="op">(</span></span>
 <span>    预设 <span class="op">=</span> <span class="va">profile</span>,</span>
@@ -384,7 +384,7 @@ ADG、ADFI
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fcr_of</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">profile</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">q</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="va">profile</span>, stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>, <span class="fl">120</span><span class="op">)</span><span class="op">)</span></span>
-<span>  <span class="va">r</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/warning.html" class="external-link">suppressWarnings</a></span><span class="op">(</span><span class="fu"><a href="../reference/run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">nedap</span>, qc <span class="op">=</span> <span class="va">q</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="va">r</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">nedap</span>, qc <span class="op">=</span> <span class="va">q</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span>  <span class="va">r</span><span class="op">$</span><span class="va">fcr</span><span class="op">$</span><span class="va">per_pig</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">fcr</span><span class="op">)</span><span class="op">]</span></span>
 <span><span class="op">}</span></span>
 <span><span class="va">m</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/funprog.html" class="external-link">Reduce</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">a</span>, <span class="va">b</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span><span class="va">a</span>, <span class="va">b</span>, by <span class="op">=</span> <span class="st">"responder"</span><span class="op">)</span>,</span>

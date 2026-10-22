@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.4.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.5.0</span>
       </span>
     </div>
 
@@ -65,6 +65,21 @@
       <small>Source: <a href="https://github.com/tony2015116/tidypptsda/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="page-header" data-toc-text="0.5.0" id="tidypptsda-050">tidypptsda 0.5.0<a class="anchor" aria-label="anchor" href="#tidypptsda-050"></a></h2>
+<div class="section level3">
+<h3 id="faster-on-large-data-0-5-0">Faster on large data<a class="anchor" aria-label="anchor" href="#faster-on-large-data-0-5-0"></a></h3>
+<ul><li><p>The feed-intake correction model is fitted by a built-in REML routine for the random-intercept model (profiled likelihood over the variance ratio, computed from cross-products). Estimates, standard errors and p values are the same as <code><a href="https://rdrr.io/pkg/nlme/man/lme.html" class="external-link">nlme::lme()</a></code> (difference &lt; 0.001 g), but on 1.75 million visits <code><a href="../reference/calc_adfi.html">calc_adfi()</a></code> takes 9 s instead of 66 s. <code>nlme</code> is no longer a dependency.</p></li>
+<li><p><code>daily_error_covariates()</code> (used by <code><a href="../reference/calc_adfi.html">calc_adfi()</a></code>) is vectorised: 39 s to 1.6 s on the same data. Polynomial growth curves are evaluated directly instead of through <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code>, and outlier reasons are built column-wise: <code><a href="../reference/clean_weight.html">clean_weight()</a></code> 27 s to 18 s, <code><a href="../reference/calc_adg.html">calc_adg()</a></code> 18 s to 12 s. Results are unchanged.</p></li>
+<li><p>Plots are built from their own station’s data only. Before, every plot kept a reference to all pigs’ records (about 177 MB per plot when serialised on 1.75 million visits, now about 6 MB), which made parallel export and <code><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS()</a></code> of plots slow.</p></li>
+<li><p><code><a href="../reference/save_plots.html">save_plots()</a></code> gains <code>cores</code> to save stations in parallel (fork on Linux/macOS, a PSOCK cluster on Windows) and shows a progress bar. Drawing takes about 1–1.5 s per station of 15 pigs.</p></li>
+</ul></div>
+<div class="section level3">
+<h3 id="messages-0-5-0">Messages<a class="anchor" aria-label="anchor" href="#messages-0-5-0"></a></h3>
+<ul><li>Situations that need attention (pigs not reaching the stage end, weight jumps at a transfer, pigs missing from the breed table, too much unidentified feed, a failed correction model, unknown pigs in plots) are now shown at once as cli alerts instead of R warnings printed only after the call has finished. Use <code>verbose = 0</code> to hide them, or <code><a href="https://rdrr.io/r/base/message.html" class="external-link">suppressMessages()</a></code>.</li>
+<li>data.table’s own “Processed … groups” progress output is switched off inside the package; long per-pig steps show a cli progress bar instead.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="page-header" data-toc-text="0.4.0" id="tidypptsda-040">tidypptsda 0.4.0<a class="anchor" aria-label="anchor" href="#tidypptsda-040"></a></h2>
 <div class="section level3">

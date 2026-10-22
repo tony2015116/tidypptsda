@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.4.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.5.0</span>
       </span>
     </div>
 
@@ -490,8 +490,7 @@ is <code>NA</code>.</li>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Extrapolated: <span style="font-weight: bold;">4</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Partial (stage not fully reached): <span style="font-weight: bold;">1</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> No ADG: <span style="font-weight: bold;">0</span></span></span>
-<span><span class="co">#&gt; Warning: 1 pig do not reach the whole stage: ADG is based on part of it (adg_type =</span></span>
-<span><span class="co">#&gt; "partial").</span></span>
+<span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> 1 pig does not reach the whole stage: ADG is based on part of it (adg_type = "partial").</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Mean ADG: 1160 g/d (SD 124)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">adg</span><span class="op">$</span><span class="va">per_pig</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">adg_type</span>, <span class="va">start_date</span>, <span class="va">end_date</span>, <span class="va">stage_days</span>, <span class="va">adg</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    responder     adg_type start_date   end_date stage_days       adg</span></span>
@@ -754,12 +753,12 @@ which is why such pigs are flagged by [calc_fcr()].</p>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">adfi</span><span class="op">$</span><span class="va">model</span><span class="op">)</span></span>
 <span><span class="co">#&gt;           term      estimate    std_error      p_value</span></span>
 <span><span class="co">#&gt;         &lt;char&gt;         &lt;num&gt;        &lt;num&gt;        &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1: (Intercept)   -883.565535  294.8491609 2.754031e-03</span></span>
-<span><span class="co">#&gt; 2: location102    -75.207468   60.1144632 2.220494e-01</span></span>
+<span><span class="co">#&gt; 1: (Intercept)   -883.565519  294.8496966 2.754081e-03</span></span>
+<span><span class="co">#&gt; 2: location102    -75.207470   60.1145736 2.220502e-01</span></span>
 <span><span class="co">#&gt; 3:          bw     24.930643    0.3435384 0.000000e+00</span></span>
-<span><span class="co">#&gt; 4:         adg      1.557668    0.2481584 1.209946e-06</span></span>
-<span><span class="co">#&gt; 5:  pte_fiv_hi -12786.859956 6072.7882287 3.533023e-02</span></span>
-<span><span class="co">#&gt; 6:  pte_otv_hi  -2668.620256 3480.0227004 4.432430e-01</span></span></code></pre></div>
+<span><span class="co">#&gt; 4:         adg      1.557668    0.2481588 1.209982e-06</span></span>
+<span><span class="co">#&gt; 5:  pte_fiv_hi -12786.859500 6072.7881333 3.533023e-02</span></span>
+<span><span class="co">#&gt; 6:  pte_otv_hi  -2668.620000 3480.0226472 4.432430e-01</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="calc_fcr">calc_fcr<a class="anchor" aria-label="anchor" href="#calc_fcr"></a>
@@ -808,7 +807,7 @@ part of the stage only, less than <code>min_coverage</code> (default
 <span><span class="co">#&gt;     group        trait     n          min          max       median</span></span>
 <span><span class="co">#&gt;    &lt;char&gt;       &lt;char&gt; &lt;int&gt;        &lt;num&gt;        &lt;num&gt;        &lt;num&gt;</span></span>
 <span><span class="co">#&gt; 1:    all          adg    29  788.2016246 1329.9939338 1195.4404810</span></span>
-<span><span class="co">#&gt; 2:    all         adfi    29 1918.5410620 3517.5385488 2808.5847425</span></span>
+<span><span class="co">#&gt; 2:    all         adfi    29 1918.5410616 3517.5385491 2808.5847423</span></span>
 <span><span class="co">#&gt; 3:    all          fcr    29    2.2266875    2.8288859    2.4117169</span></span>
 <span><span class="co">#&gt; 4:    all           gf    29    0.3534961    0.4490976    0.4146424</span></span>
 <span><span class="co">#&gt; 5:    all   stage_days    29   67.6694817   97.8579101   74.8865629</span></span>
@@ -817,7 +816,7 @@ part of the stage only, less than <code>min_coverage</code> (default
 <span><span class="co">#&gt;            mean           sd           cv</span></span>
 <span><span class="co">#&gt;           &lt;num&gt;        &lt;num&gt;        &lt;num&gt;</span></span>
 <span><span class="co">#&gt; 1: 1159.9380965 1.240203e+02 1.069198e-01</span></span>
-<span><span class="co">#&gt; 2: 2800.9155080 3.523560e+02 1.258003e-01</span></span>
+<span><span class="co">#&gt; 2: 2800.9155074 3.523560e+02 1.258003e-01</span></span>
 <span><span class="co">#&gt; 3:    2.4144006 1.469139e-01 6.084903e-02</span></span>
 <span><span class="co">#&gt; 4:    0.4156041 2.428400e-02 5.843061e-02</span></span>
 <span><span class="co">#&gt; 5:   77.0849839 7.744381e+00 1.004655e-01</span></span>
@@ -849,7 +848,7 @@ colour-blind safe palette (Okabe-Ito) without extra packages.</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span></span>
 <span><span class="va">out</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/save_plots.html">save_plots</a></span><span class="op">(</span><span class="va">g</span>, path <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, prefix <span class="op">=</span> <span class="st">"loc"</span>, suffix <span class="op">=</span> <span class="st">"growth"</span>, device <span class="op">=</span> <span class="st">"pdf"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Saved 1 of 1 plot to <span style="color: #0000BB;">/tmp/RtmpdqRqOy</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Saved 1 of 1 plot to <span style="color: #0000BB;">/tmp/RtmpQzXSOO</span></span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.exists</a></span><span class="op">(</span><span class="va">out</span><span class="op">$</span><span class="va">file</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] TRUE</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">out</span><span class="op">$</span><span class="va">file</span><span class="op">)</span></span></code></pre></div>
@@ -875,7 +874,7 @@ settings and keeps all intermediate results.</p>
 <span><span class="co">#&gt;     group        trait     n         min          max       median        mean</span></span>
 <span><span class="co">#&gt;    &lt;char&gt;       &lt;char&gt; &lt;int&gt;       &lt;num&gt;        &lt;num&gt;        &lt;num&gt;       &lt;num&gt;</span></span>
 <span><span class="co">#&gt; 1:    all          adg    25  937.148002 1554.7635738 1238.2756911 1226.292755</span></span>
-<span><span class="co">#&gt; 2:    all         adfi    25 2572.527511 3874.4621650 3243.1673513 3266.068769</span></span>
+<span><span class="co">#&gt; 2:    all         adfi    25 2572.527511 3874.4621639 3243.1673512 3266.068768</span></span>
 <span><span class="co">#&gt; 3:    all          fcr    25    2.261206    3.0879735    2.6424840    2.674295</span></span>
 <span><span class="co">#&gt; 4:    all           gf    25    0.323837    0.4422418    0.3784318    0.375591</span></span>
 <span><span class="co">#&gt; 5:    all   stage_days    25   38.591072   64.0240415   48.4544758   49.422974</span></span>
@@ -901,19 +900,19 @@ mark so that Excel shows Chinese text correctly.</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="va">out</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/write_results.html">write_results</a></span><span class="op">(</span><span class="va">res</span>, dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"results"</span><span class="op">)</span>, farm <span class="op">=</span> <span class="st">"demo"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Wrote 9 files to <span style="color: #0000BB;">/tmp/RtmpdqRqOy/results</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Wrote 9 files to <span style="color: #0000BB;">/tmp/RtmpQzXSOO/results</span></span></span>
 <span><span class="va">out</span></span>
 <span><span class="co">#&gt;           table                                                   file  rows</span></span>
 <span><span class="co">#&gt;          &lt;char&gt;                                                 &lt;char&gt; &lt;int&gt;</span></span>
-<span><span class="co">#&gt; 1:          fcr          /tmp/RtmpdqRqOy/results/demo_fcr_20261022.csv    29</span></span>
-<span><span class="co">#&gt; 2:       by_bin       /tmp/RtmpdqRqOy/results/demo_by_bin_20261022.csv   258</span></span>
-<span><span class="co">#&gt; 3:   daily_feed   /tmp/RtmpdqRqOy/results/demo_daily_feed_20261022.csv  2816</span></span>
-<span><span class="co">#&gt; 4: daily_weight /tmp/RtmpdqRqOy/results/demo_daily_weight_20261022.csv  2802</span></span>
-<span><span class="co">#&gt; 5:  weight_pigs  /tmp/RtmpdqRqOy/results/demo_weight_pigs_20261022.csv    30</span></span>
-<span><span class="co">#&gt; 6:   feed_model   /tmp/RtmpdqRqOy/results/demo_feed_model_20261022.csv    15</span></span>
-<span><span class="co">#&gt; 7:      summary      /tmp/RtmpdqRqOy/results/demo_summary_20261022.csv    14</span></span>
-<span><span class="co">#&gt; 8:      removed      /tmp/RtmpdqRqOy/results/demo_removed_20261022.csv     1</span></span>
-<span><span class="co">#&gt; 9:     settings     /tmp/RtmpdqRqOy/results/demo_settings_20261022.csv    42</span></span>
+<span><span class="co">#&gt; 1:          fcr          /tmp/RtmpQzXSOO/results/demo_fcr_20261022.csv    29</span></span>
+<span><span class="co">#&gt; 2:       by_bin       /tmp/RtmpQzXSOO/results/demo_by_bin_20261022.csv   258</span></span>
+<span><span class="co">#&gt; 3:   daily_feed   /tmp/RtmpQzXSOO/results/demo_daily_feed_20261022.csv  2816</span></span>
+<span><span class="co">#&gt; 4: daily_weight /tmp/RtmpQzXSOO/results/demo_daily_weight_20261022.csv  2802</span></span>
+<span><span class="co">#&gt; 5:  weight_pigs  /tmp/RtmpQzXSOO/results/demo_weight_pigs_20261022.csv    30</span></span>
+<span><span class="co">#&gt; 6:   feed_model   /tmp/RtmpQzXSOO/results/demo_feed_model_20261022.csv    15</span></span>
+<span><span class="co">#&gt; 7:      summary      /tmp/RtmpQzXSOO/results/demo_summary_20261022.csv    14</span></span>
+<span><span class="co">#&gt; 8:      removed      /tmp/RtmpQzXSOO/results/demo_removed_20261022.csv     1</span></span>
+<span><span class="co">#&gt; 9:     settings     /tmp/RtmpQzXSOO/results/demo_settings_20261022.csv    42</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"results"</span><span class="op">)</span>, recursive <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
 <!--
 # Inflate your package

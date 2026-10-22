@@ -18,7 +18,7 @@ average daily gain (ADG) over a body weight stage."><meta property="og:image" co
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.4.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.5.0</span>
       </span>
     </div>
 
@@ -133,8 +133,7 @@ predicted days), <code>predicted</code> weight with <code>lower</code> / <code>u
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Extrapolated: <span style="font-weight: bold;">4</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Partial (stage not fully reached): <span style="font-weight: bold;">1</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> No ADG: <span style="font-weight: bold;">0</span></span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>1 pig do not reach the whole stage: ADG is based on part of it (adg_type =</span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> "partial").</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #BBBB00;">!</span> 1 pig does not reach the whole stage: ADG is based on part of it (adg_type = "partial").</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Mean ADG: 1160 g/d (SD 124)</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">adg</span><span class="op">$</span><span class="va">per_pig</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">adg_type</span>, <span class="va">start_date</span>, <span class="va">end_date</span>, <span class="va">stage_days</span>, <span class="va">adg</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    responder     adg_type start_date   end_date stage_days       adg</span>
