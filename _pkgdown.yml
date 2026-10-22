@@ -9,10 +9,13 @@ template:
 navbar:
   bg: light
   structure:
-    left:  [reference, articles]
+    left:  [getstarted, reference, articles, news]
     right: [github, lightswitch]
 
   components:
+    getstarted:
+      text: Get started
+      href: articles/get-started.html
     github:
       icon: fab fa-github fa-lg
       href: https://github.com/tony2015116/tidypptsda
@@ -79,3 +82,6 @@ articles:
   - qc-parameters-zh
   - qc-presets-zh
   - validation-zh
+
+news:
+  one_page: true

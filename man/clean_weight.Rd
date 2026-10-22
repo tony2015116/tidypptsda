@@ -25,17 +25,14 @@ An object of class \code{ppt_weight} (a list):
 \item \code{per_pig}: one row per pig with \code{n_records}, \code{n_valid},
 \code{n_outliers}, \code{first_date}, \code{last_date}, \code{test_days},
 \code{missing_rate}, \code{entry_weight}, \code{exit_weight} (kg, from the fitted
-curve), \code{r2}, \code{n_weeks} (weeks with at least 20 records),
-\code{double_layer_weeks} (of these, weeks with two weight layers),
-\code{entry_noise_days} (length of the unstable period after entry, 0 if
-none) and \code{entry_noise_kept} (share of its records kept),
-\code{status} (\code{"keep"}, \code{"low_confidence"} or \code{"removed"}) and \code{reason};
+curve), \code{r2}, \code{track_removed} (share of the records removed by the
+tracking, \code{NA} when not tracked), \code{status} (\code{"keep"},
+\code{"low_confidence"} or \code{"removed"}) and \code{reason};
 \item \code{daily}: one row per pig and day for pigs not removed: median of the
 valid weights (\code{weight}, kg), \code{n_records}, \code{n_outliers};
 \item \code{records}: every weight record with \code{fitted}, \code{outlier} and
-\code{qc_flag} (why it was flagged; \code{"double_layer"} for records removed
-by the double-layer check, \code{"entry_noise"} for unstable records after
-entry);
+\code{qc_flag} (why it was flagged; \code{"track"} for records removed by the
+tracking);
 \item \code{removed}: pigs removed here, plus misreads logged by
 \code{\link[=prep_visits]{prep_visits()}};
 \item \code{settings}: the QC settings used.
@@ -54,10 +51,8 @@ weight) remove the pig;
 \item \code{entry_weight > entry_weight_max}, \code{exit_weight < exit_weight_min},
 \code{r2 < curve_r2_min}, \code{max_daily_jump > max_daily_jump_kg} (the
 largest change of the daily median weight between consecutive recorded
-days, kg/d), or double-layer weights in at least
-\code{double_layer_flag_weeks} weeks, or an unstable period after entry
-longer than \code{entry_noise_flag_days} (or with less than 30\% of its
-records kept) mark the pig \code{"low_confidence"}
+days, kg/d), or a tracking that removes more than \code{track_flag_share}
+of the records mark the pig \code{"low_confidence"}
 but keep it: its
 growth can still be estimated by extrapolation in \code{\link[=calc_adg]{calc_adg()}}, with a
 flag.

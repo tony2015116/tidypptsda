@@ -12,7 +12,8 @@
 #' @param qc QC settings from [qc_config()]. They define the clean records
 #'   (records kept by `qc`) and every setting except `weight_outlier`.
 #' @param methods Named list of outlier method sets to compare; each element
-#'   is a value for `weight_outlier`.
+#'   is a value for `weight_outlier` (run without tracking), or `"track"`
+#'   for the tracking from the end of the test (`weight_track = TRUE`).
 #' @param rate Share of clean records that receive an artificial error.
 #'   Default 0.05.
 #' @param size Range of the error size in kg. Default `c(3, 15)`.
@@ -64,7 +65,7 @@
 #' vf <- validate_adfi(adfi, scenarios = c("random30", "late20"), reps = 2)
 #' vf$summary
 validate_outliers <- function(visits, qc = qc_config(),
-                              methods = list(rlm = "rlm", loess = "loess",
+                              methods = list(track = "track", rlm = "rlm", loess = "loess",
                                              stl = "stl", sd = "sd",
                                              "stl+rlm+sd" = c("stl", "rlm", "sd")),
                               rate = 0.05, size = c(3, 15),
@@ -128,9 +129,14 @@ validate_outliers <- function(visits, qc = qc_config(),
             class = c("ppt_validation", "ppt_result"))
 }
 
-# qc with another outlier method set ("majority" needs two methods).
+# qc with another outlier method set ("majority" needs two methods);
+# "track" is the tracking from the end of the test (with rlm for untracked
+# pigs), every other set runs without tracking.
 outlier_qc <- function(qc, m) {
-  q <- qc_set(qc, list(weight_outlier = m))
+  if (identical(m, "track")) {
+    return(qc_set(qc, list(weight_track = TRUE, weight_outlier = "rlm", outlier_combine = "any")))
+  }
+  q <- qc_set(qc, list(weight_outlier = m, weight_track = FALSE))
   if (q$outlier_combine == "majority" && length(m) < 2L) {
     q <- qc_set(q, list(outlier_combine = "any"))
   }

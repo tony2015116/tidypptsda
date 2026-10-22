@@ -7,8 +7,8 @@
 validate_outliers(
   visits,
   qc = qc_config(),
-  methods = list(rlm = "rlm", loess = "loess", stl = "stl", sd = "sd", `stl+rlm+sd` =
-    c("stl", "rlm", "sd")),
+  methods = list(track = "track", rlm = "rlm", loess = "loess", stl = "stl", sd = "sd",
+    `stl+rlm+sd` = c("stl", "rlm", "sd")),
   rate = 0.05,
   size = c(3, 15),
   direction = c("both", "down", "up"),
@@ -26,7 +26,8 @@ validate_outliers(
 (records kept by \code{qc}) and every setting except \code{weight_outlier}.}
 
 \item{methods}{Named list of outlier method sets to compare; each element
-is a value for \code{weight_outlier}.}
+is a value for \code{weight_outlier} (run without tracking), or \code{"track"}
+for the tracking from the end of the test (\code{weight_track = TRUE}).}
 
 \item{rate}{Share of clean records that receive an artificial error.
 Default 0.05.}

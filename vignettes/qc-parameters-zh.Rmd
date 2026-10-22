@@ -16,7 +16,7 @@ library(tidypptsda)
 library(data.table)
 ```
 
-tidypptsda 把整个分析流程中的全部阈值都集中在 `qc_config()` 返回的一个对象里。各分析函数通过 `qc` 参数接收这个对象，结果中的 `$settings` 也会原样保存这份设置，方便复现。本文逐一说明 48 个参数；三套预设的区别见《质控预设说明》。
+tidypptsda 把整个分析流程中的全部阈值都集中在 `qc_config()` 返回的一个对象里。各分析函数通过 `qc` 参数接收这个对象，结果中的 `$settings` 也会原样保存这份设置，方便复现。本文逐一说明 44 个参数；三套预设的区别见《质控预设说明》。
 
 ## 1. 基本用法
 
@@ -58,8 +58,8 @@ qc_config(entry_weight_max = 90)         # 进站体重上限不小于出栏体�
 | 分组 | 参数 | 默认值（casey） | 作用于 |
 |---|---|---|---|
 | 跨站 | `max_gap_days`、`max_overlap_days`、`max_jump_kg` | 3、1、10 | `prep_visits()` |
-| 体重记录 | `weight_range`、`weight_outlier`、`outlier_combine`、`rlm_cutoff`、`sd_max`、`loess_span`、`rel_dev_max`、`daily_drop_min`、`double_layer_gap`、`double_layer_min_share`、`entry_noise_days`、`entry_noise_iqr_kg`、`entry_noise_tol` | 15–150、rlm、any、0.5、3、0.75、NULL、NULL、0.08、0.15、21、3、0.08 | `clean_weight()` |
-| 个体判定 | `min_test_days`、`min_records`、`max_missing_rate`、`entry_weight_max`、`exit_weight_min`、`curve_r2_min`、`max_daily_jump_kg`、`double_layer_flag_weeks`、`entry_noise_flag_days` | 35、20、0.30、65、85、NULL、NULL、3、14 | `clean_weight()` |
+| 体重记录 | `weight_range`、`weight_outlier`、`outlier_combine`、`rlm_cutoff`、`sd_max`、`loess_span`、`rel_dev_max`、`daily_drop_min`、`weight_track`、`track_tol` | 15–150、rlm、any、0.5、3、0.75、NULL、NULL、TRUE、0.08 | `clean_weight()` |
+| 个体判定 | `min_test_days`、`min_records`、`max_missing_rate`、`entry_weight_max`、`exit_weight_min`、`curve_r2_min`、`max_daily_jump_kg`、`track_flag_share` | 35、20、0.30、65、85、NULL、NULL、0.4 | `clean_weight()` |
 | 生长曲线 | `stage_range`、`curve_model`、`max_extrap_days` | 30–120、poly2、30 | `calc_adg()` |
 | 采食错误 | `fiv_range`、`fiv0_abs_max`、`duration_max`、`speed_fiv_lo_max`、`speed_strict_max`、`speed_range`、`idle_duration_max`、`trough_diff_range`、`max_unidentified_feed_kg`、`fiv_max_by_weight` | −20–2000、20、3600、500、110、2–170、500、−20–1800、90、NULL | `flag_feed_errors()` |
 | 日采食 | `dfi_range`、`dfi_quantile`、`dfi_correct`、`impute_method`、`long_gap_days` | 0–6、NULL、lmm、linear、7 | `calc_adfi()` |
@@ -96,25 +96,23 @@ qc_config(entry_weight_max = 90)         # 进站体重上限不小于出栏体�
 | `loess_span` | LOESS 的平滑窗口占数据的比例，越大越平滑 | — | 0.75 | 0.1–1 |
 | `rel_dev_max` | 可选规则：实测体重与拟合曲线的相对偏差超过此值即判为异常，例如 0.25 表示偏离 25% | — | NULL（关闭） | 0–1 |
 | `daily_drop_min` | 可选规则：当天体重中位数与前一天之比低于此值时，当天全部记录判为异常，例如 0.90 | — | NULL（关闭） | 0–1 |
-| `double_layer_gap` | 双层体重检测：同一周内两层体重的均值之差，至少达到上层均值的这一比例才算双层。设为 NULL 关闭检测 | — | 0.08 | 0–1 或 NULL |
-| `double_layer_min_share` | 双层体重检测：较少的一层至少占该周记录的比例；比例更低的零星低值由 rlm 等方法处理 | — | 0.15 | 0–0.5 |
-| `entry_noise_days` | 进站乱读数检测：只在首条记录后这么多天内寻找乱读数期。设为 NULL 关闭 | 天 | 21 | ≥ 1 或 NULL |
-| `entry_noise_iqr_kg` | 进站乱读数检测：当天读数的四分位距超过此值、且超过这头猪平时日四分位距的 4 倍，视为乱读数日 | kg | 3 | ≥ 0 |
-| `entry_noise_tol` | 进站乱读数检测：逐日回溯时，读数与后一天体重之差的容许比例（至少 2 kg；某天没有读数可接受时，每天再放宽 0.5 kg） | — | 0.08 | 0–1 |
+| `weight_track` | 从测定末期逐日往回追踪体重，剔除与之不衔接的读数，见下文"逐日回溯追踪" | — | TRUE | TRUE / FALSE |
+| `track_tol` | 追踪时读数与当天预测体重之差的容许比例（至少 2 kg；某天没有读数可保留时，每天再放宽 0.5 kg） | — | 0.08 | 0–1 |
 
-### 双层体重
+### 逐日回溯追踪
 
-一头猪在一台测定站上，有时会出现上下两层平行的体重记录。常见原因有三种：猪只有一部分站在秤上（下层偏轻）；两头猪同时上秤（上层约为两倍）；两头猪共用一个耳标（两层长期平行）。两层记录数接近时，rlm 等方法的拟合曲线会落在两层之间，两层都不剔除，日中位体重在两层之间来回跳。
+测定站只有猪四条腿都站上秤才称重，所以读数**偏轻的情况很少**。偏重的读数则很常见：进站初期猪小，测定站的挡板空隙即使调到最小，也能挤进去好几头小猪，读数是几头猪的体重之和或其中一部分。进站初期，这类读数往往占到一半左右，使日中位体重和拟合曲线整体偏高，看起来像"进站后长期不长"，算出的日增重偏低。到测定后期，猪大了，秤上只容得下一头，读数才准确。
 
-所以 `clean_weight()` 在异常值检测**之前**先做双层检测：
+所以 `clean_weight()` 在异常值检测之前，先从**最可靠的测定末期**往回追踪每头猪的体重：
 
-1. 对每头猪拟合二次稳健回归，取残差；
-2. 按周分组（每周至少 20 条记录），把残差分成上下两组（一维两均值聚类）；
-3. 同时满足以下条件才判为双层：两组都是紧密的"层"（均值之差至少是每组标准差的 3 倍，零散的离群点不算）；均值之差至少为上层均值的 `double_layer_gap`；较少的一组至少占 `double_layer_min_share`；
-4. 保留哪一层：用没有双层的那些周拟合生长曲线并延伸到这一周，保留与之衔接的一层，剔除另一层（`qc_flag = "double_layer"`）。没有双层的周不足 2 周时，按物理规律判断：一般剔除下层；下层不到上层的 55%（上层约为两倍）时剔除上层；
-5. 双层出现在 `double_layer_flag_weeks` 周以上的猪，降级为 `low_confidence`，原因注明"可能两头猪共用一个耳标"。
+1. **起点**：最后 3 个有记录日子的体重中位数；日增重取最后 14 天的稳健回归斜率；
+2. **逐日往前推**：按当前日增重预测前一天的体重，只保留与预测值相差不超过 `track_tol`（至少 2 kg）的读数，其余剔除（`qc_flag = "track"`）；
+3. **日增重随时更新**：用其后 10 天内已保留的日体重重新估计，所以进站初期长得慢、甚至停滞，也能跟得上；
+4. **某天没有读数可保留时**，按预测值继续往前推，容差每天放宽 0.5 kg，不会跳到另一群读数上；
+5. 被保留的读数**不再由 rlm 等方法复核**：平滑的曲线贴不住进站后几周的缓慢生长，复核反而会把真实的体重删掉。`weight_outlier` 中的方法只用于没有追踪的猪（有记录的日子少于 7 天、或测定期短于 14 天），以及设置 `weight_track = FALSE` 时；
+6. **个体判定**：追踪剔除的记录超过 `track_flag_share`（默认 40%）的猪，降级为 `low_confidence`，原因注明"可能是称重异常，如体重传感器故障"。例如一头猪在 50–100 kg 时仍长期出现两条相差约 20 kg 的平行体重带，这时秤上只容得下一头猪，只能是称重本身出了问题。
 
-每头猪检测到双层的周数记录在 `per_pig$double_layer_weeks` 中。在示例数据上，NEDAP 有 16 头猪的个别周（多为进站后头一两周）检测到双层，1 头猪因双层持续 3 周被降级；FIRE 有 6 头猪进站头两天出现约两倍体重的读数（上层），被剔除。
+每头猪被追踪剔除的记录比例记录在 `per_pig$track_removed` 中。在示例数据上，NEDAP 剔除了 10.5% 的记录（每头猪中位数 7%），FIRE 剔除了 1.8%。
 
 ### 四种检测方法
 
@@ -144,25 +142,9 @@ rbindlist(lapply(c(0.3, 0.5, 0.7), function(k) {
 - 测定站的称量下限较高，或者小猪数据不可靠时，把 `weight_range` 的下限调高，例如 `c(20, 150)`。
 - `rel_dev_max` 和 `daily_drop_min` 的含义直观，但目前没有文献依据，建议先在一个批次上试用，看看被剔除的记录（`w$records[grepl("rel_dev|daily_drop", qc_flag)]`）是否合理，再决定是否长期使用。
 
-### 进站乱读数（逐日回溯追踪）
-
-新进站的猪常常有一段时间体重读数乱成一片：不成清晰的两层，而是在一个很宽的范围内连续分布。读数偏高的部分只可能来自别的猪（同栏较大的猪的体重记到了它头上），而这头猪自己采食很少，体重可能还在下降。乱读数占到一半左右时，rlm 等方法的曲线会被整体拉高，把假的高值当成正常体重。
-
-所以 `clean_weight()` 在双层检测之后、异常值方法之前，再做一步逐日回溯追踪：
-
-1. **找乱读数日**：在首条记录后 `entry_noise_days` 天内，当天读数的四分位距超过 `entry_noise_iqr_kg`、且超过这头猪平时日四分位距的 4 倍；
-2. **确定乱读数期**：从进站开始，到最后一个乱读数日为止，并且这段时间内至少一半的日子是乱读数日。零星的个别乱读数日不算，交给 rlm 等方法处理；
-3. **从稳定期往回追**：以乱读数期之后头 3 个有记录日子的体重中位数为起点，从乱读数期的最后一天开始，一天一天往前推。只接受与"后一天体重"相差不超过 `entry_noise_tol`（至少 2 kg）的读数，当天被接受读数的中位数作为前一天的参照；其余读数剔除（`qc_flag = "entry_noise"`）。某天没有读数可接受时参照不变，容差每天放宽 0.5 kg；
-4. **被接受的读数不再由曲线方法复核**：它们逐日衔接这头猪自己的体重，而二次曲线无法贴合进站后真实的掉重；
-5. **个体判定**：乱读数期超过 `entry_noise_flag_days` 天，或期内被接受的读数不到 30% 的猪，降级为 `low_confidence`。
-
-只追踪每天和后一天是否衔接，不假设生长形状，所以进站初期长得慢甚至掉重都能保留。每头猪的乱读数期天数和被接受读数的比例记录在 `per_pig$entry_noise_days`、`per_pig$entry_noise_kept` 中。
-
-在示例数据上，NEDAP 30 头猪中有 20 头检测到乱读数期（2–19 天），剔除 1517 条读数，4 头猪因乱读数期较长被降级；FIRE 有 9 头猪，乱读数期只有 1–3 天。
-
 ## 5. 个体判定参数
 
-体重异常值剔除之后，`clean_weight()` 逐头猪判断能否用于生长分析。下表中前三个参数不满足时**剔除**该猪，后六个不满足时只**降级**为 `low_confidence`，该猪仍参与后续计算。
+体重异常值剔除之后，`clean_weight()` 逐头猪判断能否用于生长分析。下表中前三个参数不满足时**剔除**该猪，后五个不满足时只**降级**为 `low_confidence`，该猪仍参与后续计算。
 
 | 参数 | 含义 | 单位 | 默认值 | 不满足时 |
 |---|---|---|---|---|
@@ -173,8 +155,7 @@ rbindlist(lapply(c(0.3, 0.5, 0.7), function(k) {
 | `exit_weight_min` | 出栏体重下限，取清洗后曲线在末条记录处的拟合值 | kg | 85 | 降级 |
 | `curve_r2_min` | 可选规则：清洗后生长曲线的最小 R²（用 loess 方法时为 LOESS 曲线，否则为二次曲线） | — | NULL（关闭） | 降级 |
 | `max_daily_jump_kg` | 可选规则：相邻两个有记录的日子之间，日体重中位数的变化超过此值（按天折算），例如 4 | kg/天 | NULL（关闭） | 降级 |
-| `double_layer_flag_weeks` | 检测到双层体重的周数达到此值时降级（可能两头猪共用一个耳标），见上文"双层体重" | 周 | 3 | 降级 |
-| `entry_noise_flag_days` | 进站乱读数期超过此天数（或期内被接受的读数不到 30%）时降级，见上文"进站乱读数" | 天 | 14 | 降级 |
+| `track_flag_share` | 逐日回溯追踪剔除的记录比例超过此值时降级（可能是称重异常，如体重传感器故障），见上文"逐日回溯追踪" | — | 0.4 | 降级 |
 
 进站和出栏体重不达标的猪只降级、不剔除，因为它们的 ADG 还可以在 `calc_adg()` 中外推得到，并会带上相应的标记。
 

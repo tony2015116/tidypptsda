@@ -38,25 +38,22 @@
 #'   a record is an outlier (e.g. 0.25). `NULL` = off.
 #' - `daily_drop_min`: optional, a day whose weight is below this ratio of
 #'   the previous day is an outlier (e.g. 0.90). `NULL` = off.
-#' - `double_layer_gap`: double-layer detection. Within each week of a pig,
-#'   the records are split into two groups; when the groups are clearly
-#'   separated, their mean weights differ by at least this share of the
-#'   upper mean (default 0.08), both groups are tight bands (difference of
-#'   means at least 3 times the SD of each group) and the smaller group holds
-#'   at least `double_layer_min_share` of the records (default 0.15), the
-#'   layer that does not continue the pig's growth in the other weeks is
-#'   removed. `NULL` = off.
-#' - `entry_noise_days`: unstable weights after entry. Within this many days
-#'   after the first record (default 21), a day is unstable when the
-#'   interquartile range of its records exceeds `entry_noise_iqr_kg`
-#'   (default 3 kg) and 4 times the pig's usual daily range. The unstable
-#'   period runs from entry to the last unstable day such that at least half
-#'   of the days up to it are unstable. From the stable days after it, the
-#'   weight is tracked back day by
-#'   day: a record is kept when it lies within `entry_noise_tol` (default
-#'   8%, at least 2 kg, widened by 0.5 kg per day without accepted records)
-#'   of the next day's accepted weight; other records are removed
-#'   (`qc_flag = "entry_noise"`). `NULL` = off.
+#' - `weight_track`: track the weight of each pig back from the end of the
+#'   test (default `TRUE`). The scale only counts a pig standing on it with
+#'   all four feet, so a reading is too light only rarely, while several
+#'   small pigs on the scale at once give readings that are too heavy. At
+#'   the end of the test the pigs are large and only one fits on the scale,
+#'   so the last days are the most reliable. Starting from the median of the
+#'   last 3 recorded days and the daily gain of the last 14 days, the weight
+#'   is tracked back day by day: a record is kept when it lies within
+#'   `track_tol` (default 8%, at least 2 kg, widened by 0.5 kg per day
+#'   without kept records) of the weight expected for that day; the daily
+#'   gain is updated from the kept daily weights of the next 10 days. Other
+#'   records are removed (`qc_flag = "track"`). The outlier methods
+#'   (`weight_outlier`) do not remove kept records, since a smooth curve
+#'   cannot follow e.g. slow growth for weeks after entry; they are used
+#'   for pigs that are not tracked (less than 7 recorded days or a test
+#'   shorter than 14 days) and when `weight_track = FALSE`.
 #'
 #' **Pig-level checks**
 #' - `min_test_days`, `min_records`: minimum test length (days) and number
@@ -69,12 +66,10 @@
 #' - `max_daily_jump_kg`: optional, pigs whose daily median weight changes
 #'   by more than this many kg per day between consecutive days are flagged
 #'   as low confidence (not removed). `NULL` = off.
-#' - `double_layer_flag_weeks`: pigs with double-layer weights in at least
-#'   this many weeks are flagged as low confidence: two pigs may share one
-#'   transponder. Default 3.
-#' - `entry_noise_flag_days`: pigs whose unstable period after entry is
-#'   longer than this many days, or in which less than 30% of the records
-#'   are kept, are flagged as low confidence. Default 14.
+#' - `track_flag_share`: pigs whose tracking removes more than this share
+#'   of their records are flagged as low confidence: the scale probably did
+#'   not weigh them correctly for a long time (e.g. a faulty load cell).
+#'   Default 0.4.
 #'
 #' **Growth and ADG**
 #' - `stage_range`: body weight interval for ADG and FCR, kg.
@@ -272,13 +267,9 @@ qc_defaults <- function() {
     loess_span = 0.75,
     rel_dev_max = NULL,
     daily_drop_min = NULL,
-    double_layer_gap = 0.08,
-    double_layer_min_share = 0.15,
-    double_layer_flag_weeks = 3,
-    entry_noise_days = 21,
-    entry_noise_iqr_kg = 3,
-    entry_noise_tol = 0.08,
-    entry_noise_flag_days = 14,
+    weight_track = TRUE,
+    track_tol = 0.08,
+    track_flag_share = 0.4,
     # pig-level checks
     min_test_days = 35,
     min_records = 20,
@@ -346,10 +337,8 @@ qc_groups <- function() {
     outlier_combine = "Body weight records", rlm_cutoff = "Body weight records",
     sd_max = "Body weight records", loess_span = "Body weight records",
     rel_dev_max = "Body weight records", daily_drop_min = "Body weight records",
-    double_layer_gap = "Body weight records", double_layer_min_share = "Body weight records",
-    double_layer_flag_weeks = "Pig-level checks",
-    entry_noise_days = "Body weight records", entry_noise_iqr_kg = "Body weight records",
-    entry_noise_tol = "Body weight records", entry_noise_flag_days = "Pig-level checks",
+    weight_track = "Body weight records", track_tol = "Body weight records",
+    track_flag_share = "Pig-level checks",
     min_test_days = "Pig-level checks", min_records = "Pig-level checks",
     max_missing_rate = "Pig-level checks", entry_weight_max = "Pig-level checks",
     exit_weight_min = "Pig-level checks", curve_r2_min = "Pig-level checks",
@@ -377,16 +366,14 @@ qc_spec <- function() {
   rng <- function(min = -Inf, max = Inf, null = FALSE) list(type = "range", min = min, max = max, null = null)
   chc <- function(choices, multiple = FALSE) list(type = "choice", choices = choices, multiple = multiple, null = FALSE)
   tbl <- function(cols, optional = character()) list(type = "table", cols = cols, optional = optional, null = TRUE)
+  lgl <- function() list(type = "logical", null = FALSE)
   list(
     max_gap_days = num(0), max_overlap_days = num(0), max_jump_kg = num(0),
     weight_range = rng(0), weight_outlier = chc(c("rlm", "loess", "stl", "sd"), multiple = TRUE),
     outlier_combine = chc(c("any", "majority")),
     rlm_cutoff = num(0, 1), sd_max = num(0), loess_span = num(0.1, 1),
     rel_dev_max = num(0, 1, null = TRUE), daily_drop_min = num(0, 1, null = TRUE),
-    double_layer_gap = num(0, 1, null = TRUE), double_layer_min_share = num(0, 0.5),
-    double_layer_flag_weeks = num(1),
-    entry_noise_days = num(1, null = TRUE), entry_noise_iqr_kg = num(0),
-    entry_noise_tol = num(0, 1), entry_noise_flag_days = num(1),
+    weight_track = lgl(), track_tol = num(0, 1), track_flag_share = num(0, 1),
     min_test_days = num(1), min_records = num(3), max_missing_rate = num(0, 1),
     entry_weight_max = num(0), exit_weight_min = num(0),
     curve_r2_min = num(0, 1, null = TRUE), max_daily_jump_kg = num(0, null = TRUE),
@@ -427,6 +414,10 @@ qc_validate <- function(cfg) {
       }
     } else if (s$type == "table") {
       check_qc_table(v, nm, s$cols, s$optional)
+    } else if (s$type == "logical") {
+      if (!is.logical(v) || length(v) != 1L || is.na(v)) {
+        cli::cli_abort("QC parameter {.field {nm}} must be TRUE or FALSE, not {.val {v}}.")
+      }
     } else if (s$type == "choice") {
       ok <- is.character(v) && length(v) >= 1L && all(v %in% s$choices) &&
         (s$multiple || length(v) == 1L) && !anyDuplicated(v)

@@ -1,3 +1,37 @@
+# tidypptsda 0.8.0
+
+## Body weight: tracking from the end of the test
+
+* `clean_weight()` now tracks the weight of each pig back from the end of the
+  test (`weight_track = TRUE`, default in all three presets). The scale only
+  counts a pig standing on it with all four feet, so readings are rarely too
+  light; early in the test, when pigs are small, several of them fit into the
+  station and readings are too heavy. At the end only one pig fits, so the
+  last days are the most reliable. Starting from the median of the last 3
+  recorded days and the gain of the last 14 days, the weight is tracked back
+  day by day; records more than `track_tol` (default 8%, at least 2 kg) from
+  the expected weight are removed (`qc_flag = "track"`). The gain is
+  updated from the kept weights of the next 10 days, so slow growth after
+  entry is followed. Kept records are not overruled by the outlier methods,
+  which are still used for pigs that are not tracked (less than 7 recorded
+  days or a test shorter than 14 days) and with `weight_track = FALSE`.
+* Pigs whose tracking removes more than `track_flag_share` (default 40%) of
+  the records are flagged as low confidence: a possible weighing fault such
+  as a faulty load cell. New `per_pig` column `track_removed`.
+* The tracking replaces the double-layer check and the tracking after
+  entry of 0.7.0, which chose the wrong layer when the early readings of
+  several pigs formed the majority. Removed QC parameters:
+  `double_layer_gap`, `double_layer_min_share`, `double_layer_flag_weeks`,
+  `entry_noise_days`, `entry_noise_iqr_kg`, `entry_noise_tol`,
+  `entry_noise_flag_days`; removed `per_pig` columns `n_weeks`,
+  `double_layer_weeks`, `entry_noise_days`, `entry_noise_kept`.
+* `validate_outliers()` compares `"track"` with the other methods (which run
+  without tracking).
+
+## Website
+
+* "Get started" and "News" are now in the navigation bar.
+
 # tidypptsda 0.7.0
 
 ## Body weight

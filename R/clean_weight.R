@@ -19,17 +19,14 @@
 #'   - `per_pig`: one row per pig with `n_records`, `n_valid`,
 #'     `n_outliers`, `first_date`, `last_date`, `test_days`,
 #'     `missing_rate`, `entry_weight`, `exit_weight` (kg, from the fitted
-#'     curve), `r2`, `n_weeks` (weeks with at least 20 records),
-#'     `double_layer_weeks` (of these, weeks with two weight layers),
-#'     `entry_noise_days` (length of the unstable period after entry, 0 if
-#'     none) and `entry_noise_kept` (share of its records kept),
-#'     `status` (`"keep"`, `"low_confidence"` or `"removed"`) and `reason`;
+#'     curve), `r2`, `track_removed` (share of the records removed by the
+#'     tracking, `NA` when not tracked), `status` (`"keep"`,
+#'     `"low_confidence"` or `"removed"`) and `reason`;
 #'   - `daily`: one row per pig and day for pigs not removed: median of the
 #'     valid weights (`weight`, kg), `n_records`, `n_outliers`;
 #'   - `records`: every weight record with `fitted`, `outlier` and
-#'     `qc_flag` (why it was flagged; `"double_layer"` for records removed
-#'     by the double-layer check, `"entry_noise"` for unstable records after
-#'     entry);
+#'     `qc_flag` (why it was flagged; `"track"` for records removed by the
+#'     tracking);
 #'   - `removed`: pigs removed here, plus misreads logged by
 #'     [prep_visits()];
 #'   - `settings`: the QC settings used.
@@ -42,10 +39,8 @@
 #' - `entry_weight > entry_weight_max`, `exit_weight < exit_weight_min`,
 #'   `r2 < curve_r2_min`, `max_daily_jump > max_daily_jump_kg` (the
 #'   largest change of the daily median weight between consecutive recorded
-#'   days, kg/d), or double-layer weights in at least
-#'   `double_layer_flag_weeks` weeks, or an unstable period after entry
-#'   longer than `entry_noise_flag_days` (or with less than 30% of its
-#'   records kept) mark the pig `"low_confidence"`
+#'   days, kg/d), or a tracking that removes more than `track_flag_share`
+#'   of the records mark the pig `"low_confidence"`
 #'   but keep it: its
 #'   growth can still be estimated by extrapolation in [calc_adg()], with a
 #'   flag.
@@ -102,8 +97,7 @@ clean_weight <- function(visits, qc = qc_config(), verbose = 1, cores = 1) {
 
   # 3. pig checks
   pig_fit <- unique(fits$result[, .(responder, r2, entry_weight, exit_weight,
-                                    n_weeks, double_layer_weeks,
-                                    entry_noise_days, entry_noise_kept)])
+                                    track_removed)])
   per_pig <- rec[, .(
     n_records = .N,
     n_valid = sum(!outlier),
@@ -227,13 +221,13 @@ detect_weight_outliers <- function(d, qc) {
   }
   t_all <- as.numeric(difftime(d$entry_time, min(d$entry_time), units = "days"))
   y_all <- d$weight
-  # double layers first: they would pull every curve between the two layers
-  dl <- detect_double_layer(t_all, y_all, qc)
-  # then unstable weights after entry, tracked back from the stable days
-  en <- detect_entry_noise(d$date, y_all, dl$flag, qc)
-  keep <- !dl$flag & !en$flag
+  # track the weight back from the reliable end of the test first: readings
+  # of several pigs on the scale would pull every curve upwards
+  tr <- if (isTRUE(qc$weight_track)) track_weight(t_all, y_all, qc$track_tol) else
+    list(keep = rep(TRUE, length(y_all)), removed = NA_real_)
+  keep <- tr$keep
   if (sum(keep) < 5L) {
-    stop(sprintf("only %d weight records left after double-layer removal", sum(keep)), call. = FALSE)
+    stop(sprintf("only %d weight records left after tracking", sum(keep)), call. = FALSE)
   }
   t <- t_all[keep]
   y <- y_all[keep]
@@ -242,8 +236,7 @@ detect_weight_outliers <- function(d, qc) {
 
   for (m in qc$weight_outlier) {
     if (m == "rlm") {
-      fit <- if (all(keep) && !is.null(dl$fit)) dl$fit else
-        MASS::rlm(cbind(1, t, t^2), y, psi = MASS::psi.bisquare, maxit = 100)
+      fit <- MASS::rlm(cbind(1, t, t^2), y, psi = MASS::psi.bisquare, maxit = 100)
       fits$rlm <- stats::fitted(fit)
       flags$rlm <- fit$w < qc$rlm_cutoff
     } else if (m == "loess") {
@@ -278,6 +271,12 @@ detect_weight_outliers <- function(d, qc) {
     by <- add_reason(by, drop, "daily_drop")
     outlier <- outlier | drop
   }
+  # records kept by the tracking follow the pig's own weight day by day; a
+  # smooth curve cannot follow e.g. slow growth for weeks after entry, so the
+  # curve methods do not overrule them (they still give the fitted curve)
+  if (!is.na(tr$removed)) {
+    outlier[] <- FALSE
+  }
   by[!outlier] <- ""
 
   # Curve on the valid records: R2 and entry/exit weight.
@@ -294,181 +293,60 @@ detect_weight_outliers <- function(d, qc) {
     r2 <- entry_weight <- exit_weight <- NA_real_
   }
 
-  # records accepted by the entry tracking follow the pig's own weight
-  # day by day; a smooth curve cannot follow a real weight loss after entry,
-  # so the curve methods do not overrule them
-  outlier[en$accepted[keep]] <- FALSE
-  by[en$accepted[keep]] <- ""
   # back to all records
-  out_all <- dl$flag | en$flag
+  out_all <- !keep
   out_all[keep] <- outlier
-  by_all <- ifelse(dl$flag, "double_layer", ifelse(en$flag, "entry_noise", ""))
+  by_all <- ifelse(keep, "", "track")
   by_all[keep] <- by
   fit_all <- if (all(keep)) ref else stats::approx(t, ref, xout = t_all, rule = 2, ties = mean)$y
 
   data.table::data.table(row_id = d$row_id, fitted = fit_all, outlier = out_all,
                          outlier_by = by_all, r2 = r2,
                          entry_weight = entry_weight, exit_weight = exit_weight,
-                         n_weeks = dl$weeks, double_layer_weeks = dl$dl_weeks,
-                         entry_noise_days = en$days, entry_noise_kept = en$kept)
+                         track_removed = tr$removed)
 }
 
-# Interquartile range (as stats::IQR) of y for every day, vectorised.
-daily_iqr <- function(day, y) {
-  o <- order(day, y)
-  day <- day[o]
-  y <- y[o]
-  r <- rle(day)
-  n <- r$lengths
-  start <- cumsum(c(1L, utils::head(n, -1L)))
-  q <- function(p) {
-    h <- (n - 1) * p + 1
-    lo <- floor(h)
-    hi <- pmin(lo + 1, n)
-    y[start + lo - 1L] + (h - lo) * (y[start + hi - 1L] - y[start + lo - 1L])
-  }
-  data.frame(day = r$values, n = n, iqr = q(0.75) - q(0.25))
-}
-
-# Unstable weights after entry (often pen mates on the scale while a new pig
-# hardly eats): see `entry_noise_days` in qc_config(). `skip` marks records
-# already removed (double layers). Returns the records to remove, the length
-# of the unstable period (days) and the share of its records kept.
-detect_entry_noise <- function(date, y, skip, qc) {
+# Track the weight of one pig back from the end of the test (see
+# `weight_track` in qc_config()). Returns the records to keep and the share
+# removed (NA when the pig is not tracked).
+track_weight <- function(t, y, tol) {
   n <- length(y)
-  out <- list(flag = rep(FALSE, n), accepted = rep(FALSE, n), days = 0L, kept = NA_real_)
-  if (is.null(qc$entry_noise_days) || n < 20L) return(out)
-  day <- as.integer(date - min(date))
-  ok <- !skip
-  dd <- daily_iqr(day[ok], y[ok])
-  dd <- dd[dd$n >= 5L, ]
-  if (nrow(dd) < 5L) return(out)
-  usual <- stats::median(dd$iqr)
-  unstable <- dd$day[dd$day < qc$entry_noise_days & dd$iqr > max(qc$entry_noise_iqr_kg, 4 * usual)]
-  if (length(unstable) == 0L) return(out)
-  # the unstable period starts at entry and ends at the last unstable day
-  # such that at least half of the recorded days up to it are unstable; a
-  # few scattered noisy days later on are left to the outlier methods
-  rec_days <- sort(dd$day)
-  dense <- vapply(unstable, function(e) mean(rec_days[rec_days <= e] %in% unstable) >= 0.5,
-                  logical(1))
-  if (!any(dense)) return(out)
-  last <- max(unstable[dense])
-  # anchor: median of the first 3 recorded days after the unstable period
-  after <- sort(unique(day[ok & day > last]))
-  if (length(after) == 0L) return(out)
-  ref <- stats::median(y[ok & day %in% utils::head(after, 3L)])
-  gap <- 0
-  for (k in last:0) {
-    j <- which(ok & day == k)
-    if (length(j) == 0L) {
-      gap <- gap + 1
-      next
-    }
-    tol <- max(2, qc$entry_noise_tol * ref) + 0.5 * gap
-    good <- abs(y[j] - ref) <= tol
-    out$flag[j[!good]] <- TRUE
-    out$accepted[j[good]] <- TRUE
-    if (any(good)) {
-      ref <- stats::median(y[j][good])
-      gap <- 0
-    } else {
-      gap <- gap + 1
+  out <- list(keep = rep(TRUE, n), removed = NA_real_)
+  day <- floor(t)
+  days <- sort(unique(day), decreasing = TRUE)
+  if (length(days) < 7L || diff(range(t)) < 14) return(out)
+  # start: median of the last 3 recorded days, daily gain of the last 14 days
+  last3 <- days[1:3]
+  ref <- stats::median(y[day %in% last3])
+  ref_day <- stats::median(last3)
+  end <- day >= days[1L] - 14
+  g <- tryCatch(stats::coef(MASS::rlm(cbind(1, t[end]), y[end], psi = MASS::psi.bisquare,
+                                      maxit = 50))[2L],
+                error = function(e) stats::coef(stats::lm(y[end] ~ t[end]))[2L])
+  g <- min(1.5, max(0, unname(g)))
+  keep <- rep(FALSE, n)
+  kd <- numeric()
+  kw <- numeric()
+  for (k in days) {
+    j <- which(day == k)
+    gap <- ref_day - k
+    pred <- ref - g * gap
+    tl <- max(2, tol * pred) + 0.5 * max(0, gap - 1)
+    good <- abs(y[j] - pred) <= tl
+    if (!any(good)) next
+    keep[j[good]] <- TRUE
+    ref <- stats::median(y[j][good])
+    ref_day <- k
+    kd <- c(kd, k)
+    kw <- c(kw, ref)
+    # daily gain from the kept daily weights of the next 10 days
+    win <- kd <= k + 10
+    if (sum(win) >= 5L) {
+      x <- kd[win] - mean(kd[win])
+      g <- min(1.5, max(0, sum(x * (kw[win] - mean(kw[win]))) / sum(x^2)))
     }
   }
-  in_period <- ok & day <= last
-  out$days <- last + 1L
-  out$kept <- sum(in_period & !out$flag) / sum(in_period)
-  out
-}
-
-# Double-layer weights: within each week (>= 20 records), split the
-# residuals from a robust quadratic trend into two groups (best two-means
-# split). A week has two layers when
-# - both groups are tight bands: the difference of their means is at least
-#   3 times the SD of each group (a scattered cloud of outliers is not a
-#   layer; rlm handles those),
-# - the means differ by at least `double_layer_gap` of the upper mean weight,
-# - the smaller group holds at least `double_layer_min_share` of the records.
-# The layer kept is the one that continues the pig's growth: a robust
-# quadratic fitted to the weeks without two layers is extended into the week,
-# and the layer farther from it is removed. When fewer than 2 weeks are free
-# of layers, physical reasoning decides: the lower layer is removed (pig
-# partly on the scale), or the upper one when the lower is below 55% of it
-# (two pigs on the scale).
-detect_double_layer <- function(t, y, qc) {
-  n <- length(y)
-  out <- list(flag = rep(FALSE, n), weeks = 0L, dl_weeks = 0L, fit = NULL)
-  if (is.null(qc$double_layer_gap) || n < 20L) return(out)
-  rlm2 <- function(tt, yy) {
-    # matrix interface: same fit as the formula, without model-frame overhead
-    tryCatch(MASS::rlm(cbind(1, tt, tt^2), yy, psi = MASS::psi.bisquare, maxit = 100),
-             error = function(e) NULL)
-  }
-  base <- rlm2(t, y)
-  if (is.null(base)) return(out)
-  out$fit <- base   # reused by the rlm outlier method when nothing is removed
-  r <- y - stats::fitted(base)
-  week <- floor(t / 7)
-  layers <- list()
-  for (w in unique(week)) {
-    j <- which(week == w)
-    if (length(j) < 20L) next
-    out$weeks <- out$weeks + 1L
-    s <- split_two(r[j])
-    if (is.null(s) || s$share < qc$double_layer_min_share || s$gap < 3 * s$sd_max) next
-    lo <- j[s$lo]
-    hi <- j[!s$lo]
-    m_lo <- mean(y[lo])
-    m_hi <- mean(y[hi])
-    if ((m_hi - m_lo) / m_hi < qc$double_layer_gap) next
-    layers[[length(layers) + 1L]] <- list(week = w, lo = lo, hi = hi, ratio = m_lo / m_hi)
-  }
-  out$dl_weeks <- length(layers)
-  if (out$dl_weeks == 0L) return(out)
-
-  layer_weeks <- vapply(layers, `[[`, numeric(1), "week")
-  clean <- !week %in% layer_weeks
-  n_clean_weeks <- out$weeks - out$dl_weeks
-  ref <- if (n_clean_weeks >= 2L && sum(clean) >= 20L) rlm2(t[clean], y[clean]) else NULL
-  for (L in layers) {
-    drop <- if (!is.null(ref)) {
-      cf <- stats::coef(ref)
-      pred <- function(k) cf[1L] + cf[2L] * t[k] + cf[3L] * t[k]^2
-      d_lo <- abs(stats::median(y[L$lo] - pred(L$lo)))
-      d_hi <- abs(stats::median(y[L$hi] - pred(L$hi)))
-      if (d_lo <= d_hi) L$hi else L$lo
-    } else if (L$ratio < 0.55) {
-      L$hi
-    } else {
-      L$lo
-    }
-    out$flag[drop] <- TRUE
-  }
-  out
-}
-
-# Best split of x into a lower and an upper group (one-dimensional two-means),
-# computed from cumulative sums.
-split_two <- function(x) {
-  n <- length(x)
-  if (n < 4L) return(NULL)
-  o <- sort(x)
-  cs <- cumsum(o)
-  cs2 <- cumsum(o^2)
-  k <- seq_len(n - 1L)
-  m1 <- cs[k] / k
-  m2 <- (cs[n] - cs[k]) / (n - k)
-  i <- which.max(k * (n - k) * (m2 - m1)^2)
-  if (i < 2L || i > n - 2L) return(NULL)
-  ss_lo <- max(0, cs2[i] - i * m1[i]^2)
-  ss_hi <- max(0, (cs2[n] - cs2[i]) - (n - i) * m2[i]^2)
-  s <- sqrt((ss_lo + ss_hi) / (n - 2L))
-  if (!is.finite(s) || s == 0) return(NULL)
-  list(lo = x <= (o[i] + o[i + 1L]) / 2, gap = m2[i] - m1[i],
-       sep = (m2[i] - m1[i]) / s,
-       sd_max = max(sqrt(ss_lo / (i - 1L)), sqrt(ss_hi / (n - i - 1L))),
-       share = min(i, n - i) / n)
+  list(keep = keep, removed = mean(!keep))
 }
 
 loess_fit <- function(t, y, span) {
@@ -520,13 +398,9 @@ pig_reasons <- function(p, qc, failed, type = c("remove", "flag")) {
     if (!is.null(qc$curve_r2_min)) {
       add(p$r2 < qc$curve_r2_min, sprintf("curve R2 %.3f < %s", p$r2, qc$curve_r2_min))
     }
-    add(p$entry_noise_days > qc$entry_noise_flag_days |
-          (p$entry_noise_days > 0 & p$entry_noise_kept < 0.3),
-        sprintf("unstable weights for %d days after entry (%.0f%% of them kept)",
-                as.integer(p$entry_noise_days), 100 * p$entry_noise_kept))
-    add(p$double_layer_weeks >= qc$double_layer_flag_weeks,
-        sprintf("double-layer weights in %d of %d weeks (possibly two pigs on one transponder)",
-                as.integer(p$double_layer_weeks), as.integer(p$n_weeks)))
+    add(p$track_removed > qc$track_flag_share,
+        sprintf("tracking removed %.0f%% of the weight records (possible weighing fault, e.g. a faulty load cell)",
+                100 * p$track_removed))
     if (!is.null(qc$max_daily_jump_kg)) {
       add(p$max_daily_jump > qc$max_daily_jump_kg,
           sprintf("day-to-day weight change %.1f kg/d > %s kg/d", p$max_daily_jump, qc$max_daily_jump_kg))
@@ -554,8 +428,7 @@ report_clean_weight <- function(rec, per_pig, n_range, fits, qc) {
     "Weight records" = n_rec,
     "Outside weight range" = n_range,
     "Outliers" = n_out,
-    "  of which double-layer records" = rec[qc_flag == "double_layer", .N],
-    "  of which unstable after entry" = rec[qc_flag == "entry_noise", .N]
+    "  of which removed by tracking" = rec[qc_flag == "track", .N]
   ))
   if (length(qc$weight_outlier) > 1L) {
     ppt_bullets_counts(stats::setNames(method_counts, paste0("  flagged by ", names(method_counts))), level = 2L)
