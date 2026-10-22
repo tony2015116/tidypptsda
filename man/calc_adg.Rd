@@ -26,8 +26,9 @@ included) with \code{stage}, \code{curve_used}, \code{curve_r2}, \code{adg_type}
 curve reaches the stage limits, kg), \code{stage_days},
 \code{extrap_days_start} / \code{extrap_days_end} (days the curve is
 extrapolated before the first / after the last weight), \code{adg} (g/d),
-\code{lm_slope} (g/d, linear regression on the records inside the stage,
-for comparison), \code{r_squared} (of that regression), \code{weight_status}
+\code{lm_slope} (g/d, linear regression on all valid records between the
+stage start and end times, for comparison), \code{r_squared} (of that
+regression), \code{weight_status}
 and \code{weight_reason} (from \code{\link[=clean_weight]{clean_weight()}});
 \item \code{daily}: one row per pig and day from \code{start_date} to \code{end_date} and
 over the recorded days: observed \code{weight} (daily median, kg, \code{NA} on

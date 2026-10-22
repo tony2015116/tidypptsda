@@ -54,6 +54,14 @@ outliers. Default 0.5.
 a record is an outlier (e.g. 0.25). \code{NULL} = off.
 \item \code{daily_drop_min}: optional, a day whose weight is below this ratio of
 the previous day is an outlier (e.g. 0.90). \code{NULL} = off.
+\item \code{double_layer_gap}: double-layer detection. Within each week of a pig,
+the records are split into two groups; when the groups are clearly
+separated, their mean weights differ by at least this share of the
+upper mean (default 0.08), both groups are tight bands (difference of
+means at least 3 times the SD of each group) and the smaller group holds
+at least \code{double_layer_min_share} of the records (default 0.15), the
+layer that does not continue the pig's growth in the other weeks is
+removed. \code{NULL} = off.
 }
 
 \strong{Pig-level checks}
@@ -68,6 +76,9 @@ flagged as low confidence (not removed). \code{NULL} = off.
 \item \code{max_daily_jump_kg}: optional, pigs whose daily median weight changes
 by more than this many kg per day between consecutive days are flagged
 as low confidence (not removed). \code{NULL} = off.
+\item \code{double_layer_flag_weeks}: pigs with double-layer weights in at least
+this many weeks are flagged as low confidence: two pigs may share one
+transponder. Default 3.
 }
 
 \strong{Growth and ADG}

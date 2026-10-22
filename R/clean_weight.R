@@ -19,12 +19,14 @@
 #'   - `per_pig`: one row per pig with `n_records`, `n_valid`,
 #'     `n_outliers`, `first_date`, `last_date`, `test_days`,
 #'     `missing_rate`, `entry_weight`, `exit_weight` (kg, from the fitted
-#'     curve), `r2`, `status` (`"keep"`, `"low_confidence"` or
-#'     `"removed"`) and `reason`;
+#'     curve), `r2`, `n_weeks` (weeks with at least 20 records),
+#'     `double_layer_weeks` (of these, weeks with two weight layers),
+#'     `status` (`"keep"`, `"low_confidence"` or `"removed"`) and `reason`;
 #'   - `daily`: one row per pig and day for pigs not removed: median of the
 #'     valid weights (`weight`, kg), `n_records`, `n_outliers`;
 #'   - `records`: every weight record with `fitted`, `outlier` and
-#'     `qc_flag` (why it was flagged);
+#'     `qc_flag` (why it was flagged; `"double_layer"` for records removed
+#'     by the double-layer check);
 #'   - `removed`: pigs removed here, plus misreads logged by
 #'     [prep_visits()];
 #'   - `settings`: the QC settings used.
@@ -35,9 +37,11 @@
 #'   `missing_rate > max_missing_rate` (share of test days without a valid
 #'   weight) remove the pig;
 #' - `entry_weight > entry_weight_max`, `exit_weight < exit_weight_min`,
-#'   `r2 < curve_r2_min` or `max_daily_jump > max_daily_jump_kg` (the
+#'   `r2 < curve_r2_min`, `max_daily_jump > max_daily_jump_kg` (the
 #'   largest change of the daily median weight between consecutive recorded
-#'   days, kg/d) mark the pig `"low_confidence"` but keep it: its
+#'   days, kg/d), or double-layer weights in at least
+#'   `double_layer_flag_weeks` weeks mark the pig `"low_confidence"`
+#'   but keep it: its
 #'   growth can still be estimated by extrapolation in [calc_adg()], with a
 #'   flag.
 #'
@@ -92,7 +96,8 @@ clean_weight <- function(visits, qc = qc_config(), verbose = 1, cores = 1) {
   rec[is.na(outlier), outlier := FALSE]
 
   # 3. pig checks
-  pig_fit <- unique(fits$result[, .(responder, r2, entry_weight, exit_weight)])
+  pig_fit <- unique(fits$result[, .(responder, r2, entry_weight, exit_weight,
+                                    n_weeks, double_layer_weeks)])
   per_pig <- rec[, .(
     n_records = .N,
     n_valid = sum(!outlier),
@@ -214,14 +219,23 @@ detect_weight_outliers <- function(d, qc) {
   if (nrow(d) < 5L) {
     stop(sprintf("only %d weight records in range", nrow(d)), call. = FALSE)
   }
-  t <- as.numeric(difftime(d$entry_time, min(d$entry_time), units = "days"))
-  y <- d$weight
+  t_all <- as.numeric(difftime(d$entry_time, min(d$entry_time), units = "days"))
+  y_all <- d$weight
+  # double layers first: they would pull every curve between the two layers
+  dl <- detect_double_layer(t_all, y_all, qc)
+  keep <- !dl$flag
+  if (sum(keep) < 5L) {
+    stop(sprintf("only %d weight records left after double-layer removal", sum(keep)), call. = FALSE)
+  }
+  t <- t_all[keep]
+  y <- y_all[keep]
   flags <- list()
   fits <- list()
 
   for (m in qc$weight_outlier) {
     if (m == "rlm") {
-      fit <- MASS::rlm(y ~ t + I(t^2), psi = MASS::psi.bisquare, maxit = 100)
+      fit <- if (all(keep) && !is.null(dl$fit)) dl$fit else
+        MASS::rlm(cbind(1, t, t^2), y, psi = MASS::psi.bisquare, maxit = 100)
       fits$rlm <- stats::fitted(fit)
       flags$rlm <- fit$w < qc$rlm_cutoff
     } else if (m == "loess") {
@@ -252,7 +266,7 @@ detect_weight_outliers <- function(d, qc) {
     outlier <- outlier | rel
   }
   if (!is.null(qc$daily_drop_min)) {
-    drop <- daily_drop(d$date, y, outlier, qc$daily_drop_min)
+    drop <- daily_drop(d$date[keep], y, outlier, qc$daily_drop_min)
     by <- add_reason(by, drop, "daily_drop")
     outlier <- outlier | drop
   }
@@ -272,9 +286,106 @@ detect_weight_outliers <- function(d, qc) {
     r2 <- entry_weight <- exit_weight <- NA_real_
   }
 
-  data.table::data.table(row_id = d$row_id, fitted = ref, outlier = outlier,
-                         outlier_by = by, r2 = r2,
-                         entry_weight = entry_weight, exit_weight = exit_weight)
+  # back to all records
+  out_all <- dl$flag
+  out_all[keep] <- outlier
+  by_all <- ifelse(dl$flag, "double_layer", "")
+  by_all[keep] <- by
+  fit_all <- if (all(keep)) ref else stats::approx(t, ref, xout = t_all, rule = 2, ties = mean)$y
+
+  data.table::data.table(row_id = d$row_id, fitted = fit_all, outlier = out_all,
+                         outlier_by = by_all, r2 = r2,
+                         entry_weight = entry_weight, exit_weight = exit_weight,
+                         n_weeks = dl$weeks, double_layer_weeks = dl$dl_weeks)
+}
+
+# Double-layer weights: within each week (>= 20 records), split the
+# residuals from a robust quadratic trend into two groups (best two-means
+# split). A week has two layers when
+# - both groups are tight bands: the difference of their means is at least
+#   3 times the SD of each group (a scattered cloud of outliers is not a
+#   layer; rlm handles those),
+# - the means differ by at least `double_layer_gap` of the upper mean weight,
+# - the smaller group holds at least `double_layer_min_share` of the records.
+# The layer kept is the one that continues the pig's growth: a robust
+# quadratic fitted to the weeks without two layers is extended into the week,
+# and the layer farther from it is removed. When fewer than 2 weeks are free
+# of layers, physical reasoning decides: the lower layer is removed (pig
+# partly on the scale), or the upper one when the lower is below 55% of it
+# (two pigs on the scale).
+detect_double_layer <- function(t, y, qc) {
+  n <- length(y)
+  out <- list(flag = rep(FALSE, n), weeks = 0L, dl_weeks = 0L, fit = NULL)
+  if (is.null(qc$double_layer_gap) || n < 20L) return(out)
+  rlm2 <- function(tt, yy) {
+    # matrix interface: same fit as the formula, without model-frame overhead
+    tryCatch(MASS::rlm(cbind(1, tt, tt^2), yy, psi = MASS::psi.bisquare, maxit = 100),
+             error = function(e) NULL)
+  }
+  base <- rlm2(t, y)
+  if (is.null(base)) return(out)
+  out$fit <- base   # reused by the rlm outlier method when nothing is removed
+  r <- y - stats::fitted(base)
+  week <- floor(t / 7)
+  layers <- list()
+  for (w in unique(week)) {
+    j <- which(week == w)
+    if (length(j) < 20L) next
+    out$weeks <- out$weeks + 1L
+    s <- split_two(r[j])
+    if (is.null(s) || s$share < qc$double_layer_min_share || s$gap < 3 * s$sd_max) next
+    lo <- j[s$lo]
+    hi <- j[!s$lo]
+    m_lo <- mean(y[lo])
+    m_hi <- mean(y[hi])
+    if ((m_hi - m_lo) / m_hi < qc$double_layer_gap) next
+    layers[[length(layers) + 1L]] <- list(week = w, lo = lo, hi = hi, ratio = m_lo / m_hi)
+  }
+  out$dl_weeks <- length(layers)
+  if (out$dl_weeks == 0L) return(out)
+
+  layer_weeks <- vapply(layers, `[[`, numeric(1), "week")
+  clean <- !week %in% layer_weeks
+  n_clean_weeks <- out$weeks - out$dl_weeks
+  ref <- if (n_clean_weeks >= 2L && sum(clean) >= 20L) rlm2(t[clean], y[clean]) else NULL
+  for (L in layers) {
+    drop <- if (!is.null(ref)) {
+      cf <- stats::coef(ref)
+      pred <- function(k) cf[1L] + cf[2L] * t[k] + cf[3L] * t[k]^2
+      d_lo <- abs(stats::median(y[L$lo] - pred(L$lo)))
+      d_hi <- abs(stats::median(y[L$hi] - pred(L$hi)))
+      if (d_lo <= d_hi) L$hi else L$lo
+    } else if (L$ratio < 0.55) {
+      L$hi
+    } else {
+      L$lo
+    }
+    out$flag[drop] <- TRUE
+  }
+  out
+}
+
+# Best split of x into a lower and an upper group (one-dimensional two-means),
+# computed from cumulative sums.
+split_two <- function(x) {
+  n <- length(x)
+  if (n < 4L) return(NULL)
+  o <- sort(x)
+  cs <- cumsum(o)
+  cs2 <- cumsum(o^2)
+  k <- seq_len(n - 1L)
+  m1 <- cs[k] / k
+  m2 <- (cs[n] - cs[k]) / (n - k)
+  i <- which.max(k * (n - k) * (m2 - m1)^2)
+  if (i < 2L || i > n - 2L) return(NULL)
+  ss_lo <- max(0, cs2[i] - i * m1[i]^2)
+  ss_hi <- max(0, (cs2[n] - cs2[i]) - (n - i) * m2[i]^2)
+  s <- sqrt((ss_lo + ss_hi) / (n - 2L))
+  if (!is.finite(s) || s == 0) return(NULL)
+  list(lo = x <= (o[i] + o[i + 1L]) / 2, gap = m2[i] - m1[i],
+       sep = (m2[i] - m1[i]) / s,
+       sd_max = max(sqrt(ss_lo / (i - 1L)), sqrt(ss_hi / (n - i - 1L))),
+       share = min(i, n - i) / n)
 }
 
 loess_fit <- function(t, y, span) {
@@ -326,6 +437,9 @@ pig_reasons <- function(p, qc, failed, type = c("remove", "flag")) {
     if (!is.null(qc$curve_r2_min)) {
       add(p$r2 < qc$curve_r2_min, sprintf("curve R2 %.3f < %s", p$r2, qc$curve_r2_min))
     }
+    add(p$double_layer_weeks >= qc$double_layer_flag_weeks,
+        sprintf("double-layer weights in %d of %d weeks (possibly two pigs on one transponder)",
+                as.integer(p$double_layer_weeks), as.integer(p$n_weeks)))
     if (!is.null(qc$max_daily_jump_kg)) {
       add(p$max_daily_jump > qc$max_daily_jump_kg,
           sprintf("day-to-day weight change %.1f kg/d > %s kg/d", p$max_daily_jump, qc$max_daily_jump_kg))
@@ -352,7 +466,8 @@ report_clean_weight <- function(rec, per_pig, n_range, fits, qc) {
   ppt_bullets_counts(c(
     "Weight records" = n_rec,
     "Outside weight range" = n_range,
-    "Outliers" = n_out
+    "Outliers" = n_out,
+    "  of which double-layer records" = rec[qc_flag == "double_layer", .N]
   ))
   if (length(qc$weight_outlier) > 1L) {
     ppt_bullets_counts(stats::setNames(method_counts, paste0("  flagged by ", names(method_counts))), level = 2L)

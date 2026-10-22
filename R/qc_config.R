@@ -38,6 +38,14 @@
 #'   a record is an outlier (e.g. 0.25). `NULL` = off.
 #' - `daily_drop_min`: optional, a day whose weight is below this ratio of
 #'   the previous day is an outlier (e.g. 0.90). `NULL` = off.
+#' - `double_layer_gap`: double-layer detection. Within each week of a pig,
+#'   the records are split into two groups; when the groups are clearly
+#'   separated, their mean weights differ by at least this share of the
+#'   upper mean (default 0.08), both groups are tight bands (difference of
+#'   means at least 3 times the SD of each group) and the smaller group holds
+#'   at least `double_layer_min_share` of the records (default 0.15), the
+#'   layer that does not continue the pig's growth in the other weeks is
+#'   removed. `NULL` = off.
 #'
 #' **Pig-level checks**
 #' - `min_test_days`, `min_records`: minimum test length (days) and number
@@ -50,6 +58,9 @@
 #' - `max_daily_jump_kg`: optional, pigs whose daily median weight changes
 #'   by more than this many kg per day between consecutive days are flagged
 #'   as low confidence (not removed). `NULL` = off.
+#' - `double_layer_flag_weeks`: pigs with double-layer weights in at least
+#'   this many weeks are flagged as low confidence: two pigs may share one
+#'   transponder. Default 3.
 #'
 #' **Growth and ADG**
 #' - `stage_range`: body weight interval for ADG and FCR, kg.
@@ -247,6 +258,9 @@ qc_defaults <- function() {
     loess_span = 0.75,
     rel_dev_max = NULL,
     daily_drop_min = NULL,
+    double_layer_gap = 0.08,
+    double_layer_min_share = 0.15,
+    double_layer_flag_weeks = 3,
     # pig-level checks
     min_test_days = 35,
     min_records = 20,
@@ -314,6 +328,8 @@ qc_groups <- function() {
     outlier_combine = "Body weight records", rlm_cutoff = "Body weight records",
     sd_max = "Body weight records", loess_span = "Body weight records",
     rel_dev_max = "Body weight records", daily_drop_min = "Body weight records",
+    double_layer_gap = "Body weight records", double_layer_min_share = "Body weight records",
+    double_layer_flag_weeks = "Pig-level checks",
     min_test_days = "Pig-level checks", min_records = "Pig-level checks",
     max_missing_rate = "Pig-level checks", entry_weight_max = "Pig-level checks",
     exit_weight_min = "Pig-level checks", curve_r2_min = "Pig-level checks",
@@ -347,6 +363,8 @@ qc_spec <- function() {
     outlier_combine = chc(c("any", "majority")),
     rlm_cutoff = num(0, 1), sd_max = num(0), loess_span = num(0.1, 1),
     rel_dev_max = num(0, 1, null = TRUE), daily_drop_min = num(0, 1, null = TRUE),
+    double_layer_gap = num(0, 1, null = TRUE), double_layer_min_share = num(0, 0.5),
+    double_layer_flag_weeks = num(1),
     min_test_days = num(1), min_records = num(3), max_missing_rate = num(0, 1),
     entry_weight_max = num(0), exit_weight_min = num(0),
     curve_r2_min = num(0, 1, null = TRUE), max_daily_jump_kg = num(0, null = TRUE),
