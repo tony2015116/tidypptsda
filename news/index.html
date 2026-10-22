@@ -17,12 +17,15 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.7.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.8.0</span>
       </span>
     </div>
 
     <div id="navbar" class="navbar-collapse collapse">
       <ul class="nav navbar-nav"><li>
+  <a href="../articles/get-started.html">Get started</a>
+</li>
+<li>
   <a href="../reference/index.html">Reference</a>
 </li>
 <li class="dropdown">
@@ -49,6 +52,9 @@
       <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线与采食插补</a>
     </li>
   </ul></li>
+<li>
+  <a href="../news/index.html">Changelog</a>
+</li>
       </ul><ul class="nav navbar-nav navbar-right"><li>
   <a href="https://github.com/tony2015116/tidypptsda" class="external-link">
     <span class="fab fa-github fa-lg"></span>
@@ -68,6 +74,26 @@
       <small>Source: <a href="https://github.com/tony2015116/tidypptsda/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="page-header" data-toc-text="0.8.0" id="tidypptsda-080">tidypptsda 0.8.0<a class="anchor" aria-label="anchor" href="#tidypptsda-080"></a></h2>
+<div class="section level3">
+<h3 id="body-weight-tracking-from-the-end-of-the-test-0-8-0">Body weight: tracking from the end of the test<a class="anchor" aria-label="anchor" href="#body-weight-tracking-from-the-end-of-the-test-0-8-0"></a></h3>
+<ul><li>
+<code><a href="../reference/clean_weight.html">clean_weight()</a></code> now tracks the weight of each pig back from the end of the test (<code>weight_track = TRUE</code>, default in all three presets). The scale only counts a pig standing on it with all four feet, so readings are rarely too light; early in the test, when pigs are small, several of them fit into the station and readings are too heavy. At the end only one pig fits, so the last days are the most reliable. Starting from the median of the last 3 recorded days and the gain of the last 14 days, the weight is tracked back day by day; records more than <code>track_tol</code> (default 8%, at least 2 kg) from the expected weight are removed (<code>qc_flag = "track"</code>). The gain is updated from the kept weights of the next 10 days, so slow growth after entry is followed. Kept records are not overruled by the outlier methods, which are still used for pigs that are not tracked (less than 7 recorded days or a test shorter than 14 days) and with <code>weight_track = FALSE</code>.</li>
+<li>Pigs whose tracking removes more than <code>track_flag_share</code> (default 40%) of the records are flagged as low confidence: a possible weighing fault such as a faulty load cell. New <code>per_pig</code> column <code>track_removed</code>.</li>
+<li>The tracking replaces the double-layer check and the tracking after entry of 0.7.0, which chose the wrong layer when the early readings of several pigs formed the majority. Removed QC parameters: <code>double_layer_gap</code>, <code>double_layer_min_share</code>, <code>double_layer_flag_weeks</code>, <code>entry_noise_days</code>, <code>entry_noise_iqr_kg</code>, <code>entry_noise_tol</code>, <code>entry_noise_flag_days</code>; removed <code>per_pig</code> columns <code>n_weeks</code>, <code>double_layer_weeks</code>, <code>entry_noise_days</code>, <code>entry_noise_kept</code>.</li>
+<li>
+<code><a href="../reference/validate_outliers.html">validate_outliers()</a></code> compares <code>"track"</code> with the other methods (which run without tracking).</li>
+</ul></div>
+<div class="section level3">
+<h3 id="adg-0-8-0">ADG<a class="anchor" aria-label="anchor" href="#adg-0-8-0"></a></h3>
+<ul><li>New QC parameter <code>curve_margin_kg</code> (default <code>NULL</code> = all records): fit the growth curve only to the records from the last day below <code>stage_range[1] - curve_margin_kg</code> to the first day above <code>stage_range[2] + curve_margin_kg</code> (cut by time). Slow growth for weeks after entry then no longer bends the curve and pulls the stage start earlier. With 5 kg, the mean difference between ADG and <code>lm_slope</code> drops from 29 to 19 g/d on the NEDAP example. New <code>per_pig</code> columns <code>curve_start</code> and <code>curve_end</code>.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="website-0-8-0">Website<a class="anchor" aria-label="anchor" href="#website-0-8-0"></a></h3>
+<ul><li>“Get started” and “News” are now in the navigation bar.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="page-header" data-toc-text="0.7.0" id="tidypptsda-070">tidypptsda 0.7.0<a class="anchor" aria-label="anchor" href="#tidypptsda-070"></a></h2>
 <div class="section level3">

@@ -20,12 +20,15 @@ far ADG moves from the ADG of the clean records."><meta property="og:image" cont
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.7.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.8.0</span>
       </span>
     </div>
 
     <div id="navbar" class="navbar-collapse collapse">
       <ul class="nav navbar-nav"><li>
+  <a href="../articles/get-started.html">Get started</a>
+</li>
+<li>
   <a href="../reference/index.html">Reference</a>
 </li>
 <li class="dropdown">
@@ -52,6 +55,9 @@ far ADG moves from the ADG of the clean records."><meta property="og:image" cont
       <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线与采食插补</a>
     </li>
   </ul></li>
+<li>
+  <a href="../news/index.html">Changelog</a>
+</li>
       </ul><ul class="nav navbar-nav navbar-right"><li>
   <a href="https://github.com/tony2015116/tidypptsda" class="external-link">
     <span class="fab fa-github fa-lg"></span>
@@ -83,8 +89,8 @@ far ADG moves from the ADG of the clean records.</p>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">validate_outliers</span><span class="op">(</span></span>
 <span>  <span class="va">visits</span>,</span>
 <span>  qc <span class="op">=</span> <span class="fu"><a href="qc_config.html">qc_config</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  methods <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>rlm <span class="op">=</span> <span class="st">"rlm"</span>, loess <span class="op">=</span> <span class="st">"loess"</span>, stl <span class="op">=</span> <span class="st">"stl"</span>, sd <span class="op">=</span> <span class="st">"sd"</span>, `stl+rlm+sd` <span class="op">=</span></span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"stl"</span>, <span class="st">"rlm"</span>, <span class="st">"sd"</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  methods <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>track <span class="op">=</span> <span class="st">"track"</span>, rlm <span class="op">=</span> <span class="st">"rlm"</span>, loess <span class="op">=</span> <span class="st">"loess"</span>, stl <span class="op">=</span> <span class="st">"stl"</span>, sd <span class="op">=</span> <span class="st">"sd"</span>,</span>
+<span>    `stl+rlm+sd` <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"stl"</span>, <span class="st">"rlm"</span>, <span class="st">"sd"</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>  rate <span class="op">=</span> <span class="fl">0.05</span>,</span>
 <span>  size <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">3</span>, <span class="fl">15</span><span class="op">)</span>,</span>
 <span>  direction <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"both"</span>, <span class="st">"down"</span>, <span class="st">"up"</span><span class="op">)</span>,</span>
@@ -111,7 +117,8 @@ far ADG moves from the ADG of the clean records.</p>
 
 <dt id="arg-methods">methods<a class="anchor" aria-label="anchor" href="#arg-methods"></a></dt>
 <dd><p>Named list of outlier method sets to compare; each element
-is a value for <code>weight_outlier</code>.</p></dd>
+is a value for <code>weight_outlier</code> (run without tracking), or <code>"track"</code>
+for the tracking from the end of the test (<code>weight_track = TRUE</code>).</p></dd>
 
 
 <dt id="arg-rate">rate<a class="anchor" aria-label="anchor" href="#arg-rate"></a></dt>
@@ -181,57 +188,60 @@ removes.</p>
 <span class="r-in"><span><span class="va">vo</span> <span class="op">&lt;-</span> <span class="fu">validate_outliers</span><span class="op">(</span><span class="va">visits</span>, reps <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Validating weight outlier methods (1 repetition, 5% artificial errors)</span> <span style="color: #00BBBB;">──────</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Validating outlier methods <span style="color: #00BB00;">■■■■■■■■■■■                     </span>  33% | ETA:  3s</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Validating outlier methods <span style="color: #00BB00;">■■■■■■■■■■■■■■■■■■■■■■■■■■      </span>  83% | ETA:  1s</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Validating outlier methods <span style="color: #00BB00;">■■■■■■■■■■                      </span>  29% | ETA:  4s</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Validating outlier methods <span style="color: #00BB00;">■■■■■■■■■■■■■■■■■■■■■■■■■■■     </span>  86% | ETA:  1s</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Validating outlier methods <span style="color: #00BB00;">■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■ </span> 100% | ETA:  0s</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> rlm: 83% of errors found, 1.2% of good records removed, ADG error 10.1 g/d</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> loess: 89% of errors found, 0.9% of good records removed, ADG error 2.8 g/d</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stl: 94% of errors found, 1.8% of good records removed, ADG error 4.0 g/d</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> sd: 53% of errors found, 0.2% of good records removed, ADG error 2.3 g/d</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stl+rlm+sd: 94% of errors found, 2.7% of good records removed, ADG error 10.2</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> track: 68% of errors found, 0.1% of good records removed, ADG error 1.3 g/d</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> rlm: 83% of errors found, 1.7% of good records removed, ADG error 5.7 g/d</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> loess: 89% of errors found, 1.3% of good records removed, ADG error 4.0 g/d</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stl: 94% of errors found, 2.1% of good records removed, ADG error 2.5 g/d</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> sd: 52% of errors found, 0.1% of good records removed, ADG error 1.6 g/d</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stl+rlm+sd: 95% of errors found, 3.0% of good records removed, ADG error 6.1</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> g/d</span>
 <span class="r-in"><span><span class="va">vo</span><span class="op">$</span><span class="va">summary</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>        method sensitivity false_positive_rate precision   adg_bias  adg_rmse</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>        &lt;char&gt;       &lt;num&gt;               &lt;num&gt;     &lt;num&gt;      &lt;num&gt;     &lt;num&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:       none   0.0158046         0.000000000 1.0000000 -0.4894037  2.735915</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:        rlm   0.8304598         0.011828970 0.7863946  3.4606598 10.079039</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:      loess   0.8872126         0.008890563 0.8395649 -0.1712047  2.780608</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:        stl   0.9396552         0.018346205 0.7286908 -0.1877863  3.960998</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:         sd   0.5323276         0.001845922 0.9379747 -0.1304154  2.285840</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6: stl+rlm+sd   0.9446839         0.026558674 0.6509901  3.5640007 10.186566</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>        method sensitivity false_positive_rate precision    adg_bias adg_rmse</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>        &lt;char&gt;       &lt;num&gt;               &lt;num&gt;     &lt;num&gt;       &lt;num&gt;    &lt;num&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:       none  0.01570307        0.0000000000 1.0000000  0.51898468 3.158579</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:      track  0.67808708        0.0010105547 0.9723644 -0.28147973 1.325973</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:        rlm  0.82583869        0.0168425780 0.7199751  3.01370668 5.744232</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4:      loess  0.88936474        0.0128377873 0.7841410  1.23448526 4.030737</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5:        stl  0.94147038        0.0209222247 0.7023429  1.35965623 2.474395</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6:         sd  0.51605996        0.0005239913 0.9810041 -0.02780591 1.639765</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7: stl+rlm+sd  0.94575303        0.0298300771 0.6244109  3.68956848 6.075641</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    adg_spearman n_pigs</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           &lt;num&gt;  &lt;num&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:    0.9980296     29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:    0.9980296     29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:    0.9995074     29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:    1.0000000     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:    0.9975369     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:    1.0000000     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:    0.9980296     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4:    0.9990148     29</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 5:    0.9995074     29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:    0.9985222     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6:    0.9990148     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7:    0.9995074     29</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># 2. growth curve models</span></span></span>
 <span class="r-in"><span><span class="va">va</span> <span class="op">&lt;-</span> <span class="fu"><a href="validate_adg.html">validate_adg</a></span><span class="op">(</span><span class="va">w</span>, models <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"poly1"</span>, <span class="st">"poly2"</span>, <span class="st">"loess"</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Validating growth curves: 5-fold cross-validation and truncation</span> <span style="color: #00BBBB;">────────────</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> validate_adg: fitting pigs <span style="color: #00BB00;">■■■■■■■■■■                      </span>  31% | ETA:  4s</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> validate_adg: fitting pigs <span style="color: #00BB00;">■■■■■■■■■■■■■■■■■■■■■■■■■■      </span>  83% | ETA:  1s</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> validate_adg: fitting pigs <span style="color: #00BB00;">■■■■■■■■■■■                     </span>  34% | ETA:  4s</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> validate_adg: fitting pigs <span style="color: #00BB00;">■■■■■■■■■■■■■■■■■■■■■■■■■■■■    </span>  90% | ETA:  1s</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> validate_adg: fitting pigs <span style="color: #00BB00;">■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■ </span> 100% | ETA:  0s</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Lowest cross-validation error: <span style="color: #0000BB;">"loess"</span> (1.49 kg)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Lowest cross-validation error: <span style="color: #0000BB;">"loess"</span> (1.53 kg)</span>
 <span class="r-in"><span><span class="va">va</span><span class="op">$</span><span class="va">summary</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     model  cv_rmse   cv_mae bias_late10 rmse_late10 spearman_late10 n_late10</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    &lt;char&gt;    &lt;num&gt;    &lt;num&gt;       &lt;num&gt;       &lt;num&gt;           &lt;num&gt;    &lt;int&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:  poly1 2.296248 1.813063    29.32444    38.10791       0.9650246       29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:  poly2 1.914773 1.533710    28.69547    33.34324       0.9896552       29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:  loess 1.486132 1.148429    22.77291    31.33349       0.9807882       29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:  poly1 2.185412 1.727146    24.16706    27.46496       0.9758621       29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:  poly2 1.925455 1.517579    28.37188    32.95773       0.9886700       29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:  loess 1.527806 1.161539    23.98305    32.00730       0.9773399       29</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    bias_early10 rmse_early10 spearman_early10 n_early10 bias_late20 rmse_late20</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           &lt;num&gt;        &lt;num&gt;            &lt;num&gt;     &lt;int&gt;       &lt;num&gt;       &lt;num&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:    -1.417274     17.38777        0.9763547        29    43.04324    61.58196</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:    14.380875     21.80573        0.9945813        29    60.78069    72.58957</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:     8.302127     20.43711        0.9906404        29    72.86608    88.11454</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:     1.466386     15.76301        0.9842365        29    33.73806    42.67029</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:    15.426969     21.34528        0.9871921        29    56.43722    63.83718</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:     7.392091     20.57009        0.9916256        29    66.91088    77.17890</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    spearman_late20 n_late20 bias_early20 rmse_early20 spearman_early20</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>              &lt;num&gt;    &lt;int&gt;        &lt;num&gt;        &lt;num&gt;            &lt;num&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:       0.9167488       29  -12.0184132     40.82636        0.9310345</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:       0.9679803       29   37.7102160     78.60557        0.9467980</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:       0.9428571       29   -0.5055332     55.79609        0.9492611</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:       0.9344828       29    -7.411622     35.97178        0.9630542</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:       0.9733990       29    38.662738     77.08385        0.9394089</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:       0.9394089       29     2.088635     59.46199        0.9399015</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    n_early20</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>        &lt;int&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1:        29</span>
@@ -245,18 +255,18 @@ removes.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Validating feed intake imputation (2 scenarios x 2 repetitions)</span> <span style="color: #00BBBB;">─────────────</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> 29 pigs with coverage &gt;= 0.8 used</span>
 <span class="r-in"><span><span class="va">vf</span><span class="op">$</span><span class="va">summary</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    scenario method mean_abs_error_pct p95_abs_error_pct   bias_pct  spearman</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>      &lt;char&gt; &lt;char&gt;              &lt;num&gt;             &lt;num&gt;      &lt;num&gt;     &lt;num&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1: random30 linear          0.9862136          3.037380 -0.1467223 0.9894089</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2: random30  loess          1.1075243          2.759248 -0.2229573 0.9901478</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:   late20 linear          4.4425725          7.406748  4.2950549 0.9527094</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:   late20  loess          2.5966842          5.905810  0.1539734 0.9497537</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    scenario method mean_abs_error_pct p95_abs_error_pct  bias_pct  spearman</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>      &lt;char&gt; &lt;char&gt;              &lt;num&gt;             &lt;num&gt;     &lt;num&gt;     &lt;num&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1: random30 linear          1.1576073          2.793481 0.2559840 0.9911330</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2: random30  loess          0.9863053          2.609018 0.1846718 0.9918719</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:   late20 linear          4.4810732          7.397420 4.3554438 0.9556650</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4:   late20  loess          2.7323081          5.416435 0.3504257 0.9576355</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    daily_rmse n_pigs</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>         &lt;num&gt;  &lt;int&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:   509.6333     29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:   460.6054     29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:   675.0915     29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:   472.2266     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:   503.4444     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:   449.3936     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:   673.5975     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4:   475.1744     29</span>
 </code></pre></div>
     </div>
   </div>

@@ -36,12 +36,15 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.7.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.8.0</span>
       </span>
     </div>
 
     <div id="navbar" class="navbar-collapse collapse">
       <ul class="nav navbar-nav">
+<li>
+  <a href="../articles/get-started.html">Get started</a>
+</li>
 <li>
   <a href="../reference/index.html">Reference</a>
 </li>
@@ -70,6 +73,9 @@
       <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线与采食插补</a>
     </li>
   </ul>
+</li>
+<li>
+  <a href="../news/index.html">Changelog</a>
 </li>
       </ul>
 <ul class="nav navbar-nav navbar-right">
@@ -107,7 +113,7 @@
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://r-datatable.com" class="external-link">data.table</a></span><span class="op">)</span></span></code></pre></div>
 <p><code><a href="../reference/qc_config.html">qc_config()</a></code>
 提供三套预设：<code>casey</code>（默认）、<code>national</code> 和
-<code>legacy</code>。每套预设是 48
+<code>legacy</code>。每套预设是 45
 个质控参数的一组完整取值，只在部分参数上互不相同。本文说明三套预设各自的设计思路、它们的区别，以及如何选择。每个参数的具体含义见《质控参数详解》。</p>
 <div class="section level2">
 <h2 id="一句话区别">1. 一句话区别<a class="anchor" aria-label="anchor" href="#%E4%B8%80%E5%8F%A5%E8%AF%9D%E5%8C%BA%E5%88%AB"></a>
@@ -365,17 +371,17 @@ kg（原始资料中的”测试体重范围”），有效体重范围为 25–
 <span><span class="fu"><a href="https://rdrr.io/pkg/data.table/man/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"casey"</span>, <span class="st">"national"</span>, <span class="st">"legacy"</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">p</span><span class="op">)</span> <span class="fu">run_one</span><span class="op">(</span><span class="va">nedap</span>, <span class="va">p</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;        预设 异常记录_pct  保留  降级  剔除   ADG  ADFI   FCR FCR可信</span></span>
 <span><span class="co">#&gt;      &lt;char&gt;        &lt;num&gt; &lt;int&gt; &lt;int&gt; &lt;int&gt; &lt;num&gt; &lt;num&gt; &lt;num&gt;   &lt;int&gt;</span></span>
-<span><span class="co">#&gt; 1:    casey         11.1    24     5     1  1162  2809  2.42      20</span></span>
-<span><span class="co">#&gt; 2: national         14.1    23     6     1  1128  2778  2.48      19</span></span>
-<span><span class="co">#&gt; 3:   legacy         15.4    23     6     1  1193  2979  2.51      21</span></span>
+<span><span class="co">#&gt; 1:    casey         10.5    28     1     1  1170  2823  2.41      23</span></span>
+<span><span class="co">#&gt; 2: national         13.3    27     1     2  1160  2821  2.44      22</span></span>
+<span><span class="co">#&gt; 3:   legacy         13.3    28     1     1  1203  2988  2.49      27</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"FIRE（统一使用 60-120 kg）\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; FIRE（统一使用 60-120 kg）</span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/data.table/man/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"casey"</span>, <span class="st">"national"</span>, <span class="st">"legacy"</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">p</span><span class="op">)</span> <span class="fu">run_one</span><span class="op">(</span><span class="va">fire</span>, <span class="va">p</span>, stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">60</span>, <span class="fl">120</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;        预设 异常记录_pct  保留  降级  剔除   ADG  ADFI   FCR FCR可信</span></span>
 <span><span class="co">#&gt;      &lt;char&gt;        &lt;num&gt; &lt;int&gt; &lt;int&gt; &lt;int&gt; &lt;num&gt; &lt;num&gt; &lt;num&gt;   &lt;int&gt;</span></span>
-<span><span class="co">#&gt; 1:    casey          4.2    25     0     1  1227  3264  2.67      23</span></span>
-<span><span class="co">#&gt; 2: national          4.6    24     0     2  1215  3249  2.68      21</span></span>
-<span><span class="co">#&gt; 3:   legacy          6.3    25     0     1  1223  3259  2.68      21</span></span></code></pre></div>
+<span><span class="co">#&gt; 1:    casey          2.0    25     0     1  1223  3265  2.68      22</span></span>
+<span><span class="co">#&gt; 2: national          2.7    24     0     2  1215  3249  2.68      21</span></span>
+<span><span class="co">#&gt; 3:   legacy          2.7    25     0     1  1219  3264  2.69      21</span></span></code></pre></div>
 <p>注意：legacy 在 NEDAP 上使用的是它默认的 45–110 kg 区间，所以它的
 ADG、ADFI
 与另外两套不是在同一体重段上算的，只能看趋势，不能直接比较数值。</p>
@@ -394,14 +400,14 @@ ADG、ADFI
 <span>            <span class="fu"><a href="https://rdrr.io/r/base/funprog.html" class="external-link">Map</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">p</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/setattr.html" class="external-link">setnames</a></span><span class="op">(</span><span class="fu">fcr_of</span><span class="op">(</span><span class="va">p</span><span class="op">)</span>, <span class="st">"fcr"</span>, <span class="va">p</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"casey"</span>, <span class="st">"national"</span>, <span class="st">"legacy"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/cor.html" class="external-link">cor</a></span><span class="op">(</span><span class="va">m</span><span class="op">[</span>, <span class="op">-</span><span class="fl">1</span><span class="op">]</span>, method <span class="op">=</span> <span class="st">"spearman"</span>, use <span class="op">=</span> <span class="st">"complete.obs"</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span></span>
 <span><span class="co">#&gt;          casey national legacy</span></span>
-<span><span class="co">#&gt; casey    1.000    0.923  0.918</span></span>
-<span><span class="co">#&gt; national 0.923    1.000  0.967</span></span>
-<span><span class="co">#&gt; legacy   0.918    0.967  1.000</span></span></code></pre></div>
+<span><span class="co">#&gt; casey    1.000     0.90  0.914</span></span>
+<span><span class="co">#&gt; national 0.900     1.00  0.960</span></span>
+<span><span class="co">#&gt; legacy   0.914     0.96  1.000</span></span></code></pre></div>
 <p>相关系数越接近
 1，说明换用不同的预设对个体排名的影响越小。在示例数据上，national 与
-legacy 的排名很接近（0.97 左右），casey 与另外两套稍有差异（约
-0.92）。差异主要来自生长曲线的形式：casey 用二次曲线，另外两套用 LOESS
-和
+legacy 的排名很接近（0.96 左右），casey 与另外两套稍有差异（约
+0.90–0.91）。差异主要来自生长曲线的形式：casey 用二次曲线，另外两套用
+LOESS 和
 Gompertz。这也说明，同一个育种群体应固定使用同一套预设，否则换方法本身就可能改变个体排序。</p>
 </div>
 </div>

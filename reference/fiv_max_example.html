@@ -27,12 +27,15 @@ before use."><meta property="og:image" content="https://tony2015116.github.io/ti
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.7.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.8.0</span>
       </span>
     </div>
 
     <div id="navbar" class="navbar-collapse collapse">
       <ul class="nav navbar-nav"><li>
+  <a href="../articles/get-started.html">Get started</a>
+</li>
+<li>
   <a href="../reference/index.html">Reference</a>
 </li>
 <li class="dropdown">
@@ -59,6 +62,9 @@ before use."><meta property="og:image" content="https://tony2015116.github.io/ti
       <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线与采食插补</a>
     </li>
   </ul></li>
+<li>
+  <a href="../news/index.html">Changelog</a>
+</li>
       </ul><ul class="nav navbar-nav navbar-right"><li>
   <a href="https://github.com/tony2015116/tidypptsda" class="external-link">
     <span class="fab fa-github fa-lg"></span>
@@ -172,14 +178,10 @@ before use.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">loess_span</span>: 0.75</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">rel_dev_max</span>: NULL (off)</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">daily_drop_min</span>: NULL (off)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">double_layer_gap</span>: 0.08</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">double_layer_min_share</span>: 0.15</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">entry_noise_days</span>: 21</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">entry_noise_iqr_kg</span>: 3</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">entry_noise_tol</span>: 0.08</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">weight_track</span>: TRUE</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">track_tol</span>: 0.08</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">Pig-level checks</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">double_layer_flag_weeks</span>: 3</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">entry_noise_flag_days</span>: 14</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">track_flag_share</span>: 0.4</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">min_test_days</span>: 50</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">min_records</span>: 20</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">max_missing_rate</span>: 0.15</span>
@@ -190,6 +192,7 @@ before use.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">Growth and ADG</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">stage_range</span>: 30, 120</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">curve_model</span>: loess</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">curve_margin_kg</span>: NULL (off)</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">max_extrap_days</span>: 30</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">Feeder errors</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">fiv_range</span>: -20, 2000</span>

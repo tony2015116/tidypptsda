@@ -18,12 +18,15 @@ average daily gain (ADG) over a body weight stage."><meta property="og:image" co
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.7.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.8.0</span>
       </span>
     </div>
 
     <div id="navbar" class="navbar-collapse collapse">
       <ul class="nav navbar-nav"><li>
+  <a href="../articles/get-started.html">Get started</a>
+</li>
+<li>
   <a href="../reference/index.html">Reference</a>
 </li>
 <li class="dropdown">
@@ -50,6 +53,9 @@ average daily gain (ADG) over a body weight stage."><meta property="og:image" co
       <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线与采食插补</a>
     </li>
   </ul></li>
+<li>
+  <a href="../news/index.html">Changelog</a>
+</li>
       </ul><ul class="nav navbar-nav navbar-right"><li>
   <a href="https://github.com/tony2015116/tidypptsda" class="external-link">
     <span class="fab fa-github fa-lg"></span>
@@ -89,8 +95,8 @@ average daily gain (ADG) over a body weight stage.</p>
 
 <dt id="arg-qc">qc<a class="anchor" aria-label="anchor" href="#arg-qc"></a></dt>
 <dd><p>QC settings; by default the ones used by <code><a href="clean_weight.html">clean_weight()</a></code>.
-Used here: <code>stage_range</code>, <code>curve_model</code>, <code>loess_span</code>,
-<code>max_extrap_days</code>.</p></dd>
+Used here: <code>stage_range</code>, <code>curve_model</code>, <code>curve_margin_kg</code>,
+<code>loess_span</code>, <code>max_extrap_days</code>.</p></dd>
 
 
 <dt id="arg-verbose">verbose<a class="anchor" aria-label="anchor" href="#arg-verbose"></a></dt>
@@ -104,7 +110,9 @@ Used here: <code>stage_range</code>, <code>curve_model</code>, <code>loess_span<
     <div id="value">
     <h2>Value</h2>
     <p>An object of class <code>ppt_adg</code> (a list):</p><ul><li><p><code>per_pig</code>: one row per pig (pigs removed by <code><a href="clean_weight.html">clean_weight()</a></code> are not
-included) with <code>stage</code>, <code>curve_used</code>, <code>curve_r2</code>, <code>adg_type</code>,
+included) with <code>stage</code>, <code>curve_used</code>, <code>curve_r2</code>, <code>curve_start</code> /
+<code>curve_end</code> (first and last day of the records the curve was fitted
+to, see <code>curve_margin_kg</code>), <code>adg_type</code>,
 <code>start_date</code> / <code>end_date</code> and <code>start_weight</code> / <code>end_weight</code> (when the
 curve reaches the stage limits, kg), <code>stage_days</code>,
 <code>extrap_days_start</code> / <code>extrap_days_end</code> (days the curve is
@@ -138,16 +146,16 @@ predicted days), <code>predicted</code> weight with <code>lower</code> / <code>u
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Partial (stage not fully reached): <span style="font-weight: bold;">1</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> No ADG: <span style="font-weight: bold;">0</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #BBBB00;">!</span> 1 pig does not reach the whole stage: ADG is based on part of it (adg_type = "partial").</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Mean ADG: 1162 g/d (SD 129)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Mean ADG: 1170 g/d (SD 122)</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">adg</span><span class="op">$</span><span class="va">per_pig</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">adg_type</span>, <span class="va">start_date</span>, <span class="va">end_date</span>, <span class="va">stage_days</span>, <span class="va">adg</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    responder     adg_type start_date   end_date stage_days       adg</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>       &lt;char&gt;       &lt;char&gt;     &lt;Date&gt;     &lt;Date&gt;      &lt;num&gt;     &lt;num&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:     13913     observed 2024-02-29 2024-05-16   76.87808 1170.6849</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:     13918     observed 2024-03-06 2024-05-24   78.97753 1139.5646</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:     13954 extrapolated 2024-02-15 2024-05-26  101.51660  886.5545</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:     13996     observed 2024-02-27 2024-05-08   71.02349 1267.1864</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:     14962     observed 2024-02-25 2024-05-07   72.02116 1249.6328</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:     15006     observed 2024-02-26 2024-05-07   70.80745 1271.0526</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    responder     adg_type start_date   end_date stage_days      adg</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       &lt;char&gt;       &lt;char&gt;     &lt;Date&gt;     &lt;Date&gt;      &lt;num&gt;    &lt;num&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:     13913     observed 2024-03-01 2024-05-16   76.73557 1172.859</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:     13918     observed 2024-03-06 2024-05-24   79.04064 1138.655</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:     13954 extrapolated 2024-03-05 2024-05-27   82.92620 1085.302</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4:     13996     observed 2024-02-27 2024-05-08   70.96490 1268.233</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5:     14962     observed 2024-02-25 2024-05-07   72.19671 1246.594</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6:     15006     observed 2024-02-26 2024-05-07   70.86011 1270.108</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Gompertz curve, with quadratic fallback</span></span></span>
 <span class="r-in"><span><span class="va">adg_g</span> <span class="op">&lt;-</span> <span class="fu">calc_adg</span><span class="op">(</span><span class="va">w</span>, qc <span class="op">=</span> <span class="fu"><a href="qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"casey"</span>, curve_model <span class="op">=</span> <span class="st">"gompertz"</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></span>

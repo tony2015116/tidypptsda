@@ -36,12 +36,15 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.7.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.8.0</span>
       </span>
     </div>
 
     <div id="navbar" class="navbar-collapse collapse">
       <ul class="nav navbar-nav">
+<li>
+  <a href="../articles/get-started.html">Get started</a>
+</li>
 <li>
   <a href="../reference/index.html">Reference</a>
 </li>
@@ -70,6 +73,9 @@
       <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线与采食插补</a>
     </li>
   </ul>
+</li>
+<li>
+  <a href="../news/index.html">Changelog</a>
 </li>
       </ul>
 <ul class="nav navbar-nav navbar-right">
@@ -177,14 +183,10 @@ parameter can be overridden.</p>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">loess_span</span>: 0.75</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">rel_dev_max</span>: NULL (off)</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">daily_drop_min</span>: NULL (off)</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">double_layer_gap</span>: 0.08</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">double_layer_min_share</span>: 0.15</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">entry_noise_days</span>: 21</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">entry_noise_iqr_kg</span>: 3</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">entry_noise_tol</span>: 0.08</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">weight_track</span>: TRUE</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">track_tol</span>: 0.08</span></span>
 <span><span class="co">#&gt; <span style="font-weight: bold;">Pig-level checks</span></span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">double_layer_flag_weeks</span>: 3</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">entry_noise_flag_days</span>: 14</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">track_flag_share</span>: 0.4</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">min_test_days</span>: 50</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">min_records</span>: 20</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">max_missing_rate</span>: 0.15</span></span>
@@ -195,6 +197,7 @@ parameter can be overridden.</p>
 <span><span class="co">#&gt; <span style="font-weight: bold;">Growth and ADG</span></span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">stage_range</span>: 30, 120</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">curve_model</span>: loess</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">curve_margin_kg</span>: NULL (off)</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">max_extrap_days</span>: 30</span></span>
 <span><span class="co">#&gt; <span style="font-weight: bold;">Feeder errors</span></span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">fiv_range</span>: -20, 2000</span></span>
@@ -414,16 +417,15 @@ missing rate, entry and exit weight, and optionally the curve R².</li>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Cleaning body weight (</span><span style="color: #00BB00; font-weight: bold;">rlm</span><span style="font-weight: bold;">)</span> <span style="color: #00BBBB;">──────────────────────────────────────────────────</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Weight records: <span style="font-weight: bold;">31,472</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Outside weight range: <span style="font-weight: bold;">0</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Outliers: <span style="font-weight: bold;">3,496</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span>  of which double-layer records: <span style="font-weight: bold;">398</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span>  of which unstable after entry: <span style="font-weight: bold;">1,517</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> Pigs kept: 24, low confidence: 5, removed: 1</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Outliers: <span style="font-weight: bold;">3,314</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span>  of which removed by tracking: <span style="font-weight: bold;">3,313</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> Pigs kept: 28, low confidence: 1, removed: 1</span></span>
 <span><span class="va">w</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; ── <span style="color: #0000BB; font-weight: bold;">&lt;ppt_weight&gt;</span> ──</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Pigs: 30 (keep 24, low confidence 5, removed 1)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">$per_pig</span>: 30 rows x 19 columns</span></span>
+<span><span class="co">#&gt; Pigs: 30 (keep 28, low confidence 1, removed 1)</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">$per_pig</span>: 30 rows x 16 columns</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">$daily</span>: 2789 rows x 7 columns</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">$removed</span>: 1 row x 4 columns</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">$records</span>: 31472 rows x 9 columns</span></span>
@@ -439,27 +441,27 @@ missing rate, entry and exit weight, and optionally the curve R².</li>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">w</span><span class="op">$</span><span class="va">records</span><span class="op">[</span><span class="va">outlier</span> <span class="op">==</span> <span class="cn">TRUE</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    responder location       date seq_days          entry_time weight   fitted</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;   &lt;char&gt;     &lt;Date&gt;    &lt;int&gt;              &lt;POSc&gt;  &lt;num&gt;    &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:     13913      101 2024-02-20        2 2024-02-20 01:05:04   31.0 21.30040</span></span>
-<span><span class="co">#&gt; 2:     13913      101 2024-02-20        2 2024-02-20 06:52:21   28.5 21.50829</span></span>
-<span><span class="co">#&gt; 3:     13913      101 2024-02-20        2 2024-02-20 06:53:50   29.5 21.50918</span></span>
-<span><span class="co">#&gt; 4:     13913      101 2024-02-20        2 2024-02-20 08:46:55   30.0 21.57697</span></span>
-<span><span class="co">#&gt; 5:     13913      101 2024-02-20        2 2024-02-20 11:28:05   29.5 21.67363</span></span>
-<span><span class="co">#&gt; 6:     13913      101 2024-02-20        2 2024-02-20 11:32:56   27.5 21.67654</span></span>
-<span><span class="co">#&gt;    outlier     qc_flag</span></span>
-<span><span class="co">#&gt;     &lt;lgcl&gt;      &lt;char&gt;</span></span>
-<span><span class="co">#&gt; 1:    TRUE entry_noise</span></span>
-<span><span class="co">#&gt; 2:    TRUE entry_noise</span></span>
-<span><span class="co">#&gt; 3:    TRUE entry_noise</span></span>
-<span><span class="co">#&gt; 4:    TRUE entry_noise</span></span>
-<span><span class="co">#&gt; 5:    TRUE entry_noise</span></span>
-<span><span class="co">#&gt; 6:    TRUE entry_noise</span></span>
+<span><span class="co">#&gt; 1:     13913      101 2024-02-20        2 2024-02-20 01:05:04   31.0 21.16833</span></span>
+<span><span class="co">#&gt; 2:     13913      101 2024-02-20        2 2024-02-20 06:52:21   28.5 21.37602</span></span>
+<span><span class="co">#&gt; 3:     13913      101 2024-02-20        2 2024-02-20 06:53:50   29.5 21.37691</span></span>
+<span><span class="co">#&gt; 4:     13913      101 2024-02-20        2 2024-02-20 08:46:55   30.0 21.44464</span></span>
+<span><span class="co">#&gt; 5:     13913      101 2024-02-20        2 2024-02-20 11:28:05   29.5 21.54121</span></span>
+<span><span class="co">#&gt; 6:     13913      101 2024-02-20        2 2024-02-20 11:32:56   27.5 21.54412</span></span>
+<span><span class="co">#&gt;    outlier qc_flag</span></span>
+<span><span class="co">#&gt;     &lt;lgcl&gt;  &lt;char&gt;</span></span>
+<span><span class="co">#&gt; 1:    TRUE   track</span></span>
+<span><span class="co">#&gt; 2:    TRUE   track</span></span>
+<span><span class="co">#&gt; 3:    TRUE   track</span></span>
+<span><span class="co">#&gt; 4:    TRUE   track</span></span>
+<span><span class="co">#&gt; 5:    TRUE   track</span></span>
+<span><span class="co">#&gt; 6:    TRUE   track</span></span>
 <span></span>
 <span><span class="co"># Another QC preset</span></span>
 <span><span class="va">w_national</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/clean_weight.html">clean_weight</a></span><span class="op">(</span><span class="va">visits</span>, qc <span class="op">=</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"national"</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">w_national</span><span class="op">$</span><span class="va">per_pig</span><span class="op">$</span><span class="va">status</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt;           keep low_confidence        removed </span></span>
-<span><span class="co">#&gt;             23              6              1</span></span></code></pre></div>
+<span><span class="co">#&gt;             27              1              2</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="calc_adg">calc_adg<a class="anchor" aria-label="anchor" href="#calc_adg"></a>
@@ -507,16 +509,16 @@ is <code>NA</code>.</li>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Partial (stage not fully reached): <span style="font-weight: bold;">1</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> No ADG: <span style="font-weight: bold;">0</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> 1 pig does not reach the whole stage: ADG is based on part of it (adg_type = "partial").</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Mean ADG: 1162 g/d (SD 129)</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Mean ADG: 1170 g/d (SD 122)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">adg</span><span class="op">$</span><span class="va">per_pig</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">adg_type</span>, <span class="va">start_date</span>, <span class="va">end_date</span>, <span class="va">stage_days</span>, <span class="va">adg</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
-<span><span class="co">#&gt;    responder     adg_type start_date   end_date stage_days       adg</span></span>
-<span><span class="co">#&gt;       &lt;char&gt;       &lt;char&gt;     &lt;Date&gt;     &lt;Date&gt;      &lt;num&gt;     &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:     13913     observed 2024-02-29 2024-05-16   76.87808 1170.6849</span></span>
-<span><span class="co">#&gt; 2:     13918     observed 2024-03-06 2024-05-24   78.97753 1139.5646</span></span>
-<span><span class="co">#&gt; 3:     13954 extrapolated 2024-02-15 2024-05-26  101.51660  886.5545</span></span>
-<span><span class="co">#&gt; 4:     13996     observed 2024-02-27 2024-05-08   71.02349 1267.1864</span></span>
-<span><span class="co">#&gt; 5:     14962     observed 2024-02-25 2024-05-07   72.02116 1249.6328</span></span>
-<span><span class="co">#&gt; 6:     15006     observed 2024-02-26 2024-05-07   70.80745 1271.0526</span></span>
+<span><span class="co">#&gt;    responder     adg_type start_date   end_date stage_days      adg</span></span>
+<span><span class="co">#&gt;       &lt;char&gt;       &lt;char&gt;     &lt;Date&gt;     &lt;Date&gt;      &lt;num&gt;    &lt;num&gt;</span></span>
+<span><span class="co">#&gt; 1:     13913     observed 2024-03-01 2024-05-16   76.73557 1172.859</span></span>
+<span><span class="co">#&gt; 2:     13918     observed 2024-03-06 2024-05-24   79.04064 1138.655</span></span>
+<span><span class="co">#&gt; 3:     13954 extrapolated 2024-03-05 2024-05-27   82.92620 1085.302</span></span>
+<span><span class="co">#&gt; 4:     13996     observed 2024-02-27 2024-05-08   70.96490 1268.233</span></span>
+<span><span class="co">#&gt; 5:     14962     observed 2024-02-25 2024-05-07   72.19671 1246.594</span></span>
+<span><span class="co">#&gt; 6:     15006     observed 2024-02-26 2024-05-07   70.86011 1270.108</span></span>
 <span></span>
 <span><span class="co"># Gompertz curve, with quadratic fallback</span></span>
 <span><span class="va">adg_g</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calc_adg.html">calc_adg</a></span><span class="op">(</span><span class="va">w</span>, qc <span class="op">=</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"casey"</span>, curve_model <span class="op">=</span> <span class="st">"gompertz"</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
@@ -729,28 +731,28 @@ which is why such pigs are flagged by [calc_fcr()].</p>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Visits with at least one error: <span style="font-weight: bold;">1.58%</span> of 31652 identified visits</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">ADFI over 30-120 kg</span> <span style="color: #00BBBB;">─────────────────────────────────────────────────────────</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Correction model: 2778 pig-days, 11 error covariates</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Stage days recorded without error (org): <span style="font-weight: bold;">1,949</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Corrected (corr): <span style="font-weight: bold;">280</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Correction model: 2762 pig-days, 11 error covariates</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Stage days recorded without error (org): <span style="font-weight: bold;">1,940</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Corrected (corr): <span style="font-weight: bold;">275</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Interpolated (iii): <span style="font-weight: bold;">1</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Extrapolated (elrp): <span style="font-weight: bold;">32</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Extrapolated (elrp): <span style="font-weight: bold;">28</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Missing: <span style="font-weight: bold;">0</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Pig-days outside dfi_range: <span style="font-weight: bold;">0</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Mean ADFI over the stage: 2809 g/d</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Pig-days outside dfi_range: <span style="font-weight: bold;">1</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Mean ADFI over the stage: 2823 g/d</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">adfi</span><span class="op">$</span><span class="va">per_pig</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    responder location  stage     adfi     adg_type adfi_raw adfi_error_free</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;   &lt;char&gt; &lt;char&gt;    &lt;num&gt;       &lt;char&gt;    &lt;num&gt;           &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:     13913      101 30-120 2616.853     observed 2596.513        2595.679</span></span>
-<span><span class="co">#&gt; 2:     13918      101 30-120 2570.277     observed 2540.500        2539.662</span></span>
-<span><span class="co">#&gt; 3:     13954      101 30-120 2310.346 extrapolated 2317.260        2312.906</span></span>
-<span><span class="co">#&gt; 4:     13996      101 30-120 2879.404     observed 2856.625        2853.403</span></span>
-<span><span class="co">#&gt; 5:     14962      101 30-120 2818.766     observed 2800.425        2800.137</span></span>
-<span><span class="co">#&gt; 6:     15006      101 30-120 3084.753     observed 3071.028        3070.833</span></span>
+<span><span class="co">#&gt; 1:     13913      101 30-120 2630.862     observed 2611.364        2610.519</span></span>
+<span><span class="co">#&gt; 2:     13918      101 30-120 2568.833     observed 2540.500        2539.662</span></span>
+<span><span class="co">#&gt; 3:     13954      101 30-120 2592.348 extrapolated 2544.378        2543.695</span></span>
+<span><span class="co">#&gt; 4:     13996      101 30-120 2878.577     observed 2856.625        2853.403</span></span>
+<span><span class="co">#&gt; 5:     14962      101 30-120 2818.677     observed 2800.425        2800.137</span></span>
+<span><span class="co">#&gt; 6:     15006      101 30-120 3084.703     observed 3071.028        3070.833</span></span>
 <span><span class="co">#&gt;    n_stage_days n_observed n_corrected n_interpolated n_extrapolated n_missing</span></span>
 <span><span class="co">#&gt;           &lt;int&gt;      &lt;int&gt;       &lt;int&gt;          &lt;int&gt;          &lt;int&gt;     &lt;int&gt;</span></span>
-<span><span class="co">#&gt; 1:           78         78          12              0              0         0</span></span>
+<span><span class="co">#&gt; 1:           77         77          12              0              0         0</span></span>
 <span><span class="co">#&gt; 2:           80         80          15              0              0         0</span></span>
-<span><span class="co">#&gt; 3:          102         96          15              0              6         0</span></span>
+<span><span class="co">#&gt; 3:           84         82          11              0              2         0</span></span>
 <span><span class="co">#&gt; 4:           72         72           8              0              0         0</span></span>
 <span><span class="co">#&gt; 5:           73         73           9              0              0         0</span></span>
 <span><span class="co">#&gt; 6:           72         72           7              0              0         0</span></span>
@@ -758,23 +760,23 @@ which is why such pigs are flagged by [calc_fcr()].</p>
 <span><span class="co">#&gt;             &lt;int&gt;        &lt;int&gt;     &lt;num&gt;</span></span>
 <span><span class="co">#&gt; 1:              0            0 1.0000000</span></span>
 <span><span class="co">#&gt; 2:              0            0 1.0000000</span></span>
-<span><span class="co">#&gt; 3:              5            1 0.9411765</span></span>
+<span><span class="co">#&gt; 3:              0            2 0.9761905</span></span>
 <span><span class="co">#&gt; 4:              0            0 1.0000000</span></span>
 <span><span class="co">#&gt; 5:              0            0 1.0000000</span></span>
 <span><span class="co">#&gt; 6:              0            0 1.0000000</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">adfi</span><span class="op">$</span><span class="va">daily</span><span class="op">[</span><span class="va">in_stage</span> <span class="op">==</span> <span class="cn">TRUE</span>, <span class="va">state</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; corr elrp  iii  org </span></span>
-<span><span class="co">#&gt;  280   32    1 1949</span></span>
+<span><span class="co">#&gt;  275   28    1 1940</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">adfi</span><span class="op">$</span><span class="va">model</span><span class="op">)</span></span>
 <span><span class="co">#&gt;           term      estimate    std_error      p_value</span></span>
 <span><span class="co">#&gt;         &lt;char&gt;         &lt;num&gt;        &lt;num&gt;        &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1: (Intercept)   -903.769543  271.6472281 8.894731e-04</span></span>
-<span><span class="co">#&gt; 2: location102    -67.899813   57.2541792 2.463727e-01</span></span>
-<span><span class="co">#&gt; 3:          bw     25.090992    0.3410229 0.000000e+00</span></span>
-<span><span class="co">#&gt; 4:         adg      1.557735    0.2274260 2.856764e-07</span></span>
-<span><span class="co">#&gt; 5:  pte_fiv_hi -13021.069596 6062.0801193 3.180494e-02</span></span>
-<span><span class="co">#&gt; 6:  pte_otv_hi  -2714.681970 3473.9024180 4.346053e-01</span></span></code></pre></div>
+<span><span class="co">#&gt; 1: (Intercept)  -1109.495069  295.6514476 1.785867e-04</span></span>
+<span><span class="co">#&gt; 2: location102    -43.993479   58.0731593 4.555303e-01</span></span>
+<span><span class="co">#&gt; 3:          bw     24.901038    0.3383241 0.000000e+00</span></span>
+<span><span class="co">#&gt; 4:         adg      1.731557    0.2445546 1.612494e-07</span></span>
+<span><span class="co">#&gt; 5:  pte_fiv_hi -12812.029231 6003.5004677 3.292432e-02</span></span>
+<span><span class="co">#&gt; 6:  pte_otv_hi  -2532.404123 3439.2248531 4.615934e-01</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="calc_fcr">calc_fcr<a class="anchor" aria-label="anchor" href="#calc_fcr"></a>
@@ -800,44 +802,44 @@ part of the stage only, less than <code>min_coverage</code> (default
 <span><span class="va">fcr</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calc_fcr.html">calc_fcr</a></span><span class="op">(</span><span class="va">adg</span>, <span class="va">adfi</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">FCR over 30-120 kg</span> <span style="color: #00BBBB;">──────────────────────────────────────────────────────────</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> FCR for 29 pigs: 20 ok, 9 low confidence</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Mean FCR 2.42 (SD 0.14), ADG 1162 g/d, ADFI 2809 g/d</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> FCR for 29 pigs: 23 ok, 6 low confidence</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Mean FCR 2.41 (SD 0.14), ADG 1170 g/d, ADFI 2823 g/d</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">fcr</span><span class="op">$</span><span class="va">per_pig</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">adg</span>, <span class="va">adfi</span>, <span class="va">fcr</span>, <span class="va">fcr_flag</span>, <span class="va">fcr_note</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
-<span><span class="co">#&gt;    responder       adg     adfi      fcr       fcr_flag</span></span>
-<span><span class="co">#&gt;       &lt;char&gt;     &lt;num&gt;    &lt;num&gt;    &lt;num&gt;         &lt;char&gt;</span></span>
-<span><span class="co">#&gt; 1:     13913 1170.6849 2616.853 2.235318             ok</span></span>
-<span><span class="co">#&gt; 2:     13918 1139.5646 2570.277 2.255490 low_confidence</span></span>
-<span><span class="co">#&gt; 3:     13954  886.5545 2310.346 2.605983 low_confidence</span></span>
-<span><span class="co">#&gt; 4:     13996 1267.1864 2879.404 2.272281             ok</span></span>
-<span><span class="co">#&gt; 5:     14962 1249.6328 2818.766 2.255675             ok</span></span>
-<span><span class="co">#&gt; 6:     15006 1271.0526 3084.753 2.426928             ok</span></span>
-<span><span class="co">#&gt;                                                        fcr_note</span></span>
-<span><span class="co">#&gt;                                                          &lt;char&gt;</span></span>
-<span><span class="co">#&gt; 1:                                                             </span></span>
-<span><span class="co">#&gt; 2:                                          weight data flagged</span></span>
-<span><span class="co">#&gt; 3: weight data flagged; weight records cover 5.0 kg of 80-90 kg</span></span>
-<span><span class="co">#&gt; 4:                                                             </span></span>
-<span><span class="co">#&gt; 5:                                                             </span></span>
+<span><span class="co">#&gt;    responder      adg     adfi      fcr       fcr_flag</span></span>
+<span><span class="co">#&gt;       &lt;char&gt;    &lt;num&gt;    &lt;num&gt;    &lt;num&gt;         &lt;char&gt;</span></span>
+<span><span class="co">#&gt; 1:     13913 1172.859 2630.862 2.243119             ok</span></span>
+<span><span class="co">#&gt; 2:     13918 1138.655 2568.833 2.256024             ok</span></span>
+<span><span class="co">#&gt; 3:     13954 1085.302 2592.348 2.388595 low_confidence</span></span>
+<span><span class="co">#&gt; 4:     13996 1268.233 2878.577 2.269755             ok</span></span>
+<span><span class="co">#&gt; 5:     14962 1246.594 2818.677 2.261102             ok</span></span>
+<span><span class="co">#&gt; 6:     15006 1270.108 3084.703 2.428693             ok</span></span>
+<span><span class="co">#&gt;                                   fcr_note</span></span>
+<span><span class="co">#&gt;                                     &lt;char&gt;</span></span>
+<span><span class="co">#&gt; 1:                                        </span></span>
+<span><span class="co">#&gt; 2:                                        </span></span>
+<span><span class="co">#&gt; 3: weight records cover 5.0 kg of 80-90 kg</span></span>
+<span><span class="co">#&gt; 4:                                        </span></span>
+<span><span class="co">#&gt; 5:                                        </span></span>
 <span><span class="co">#&gt; 6:</span></span>
 <span><span class="va">fcr</span><span class="op">$</span><span class="va">summary</span><span class="op">[</span><span class="va">group</span> <span class="op">==</span> <span class="st">"all"</span><span class="op">]</span></span>
 <span><span class="co">#&gt;     group        trait     n          min          max       median</span></span>
 <span><span class="co">#&gt;    &lt;char&gt;       &lt;char&gt; &lt;int&gt;        &lt;num&gt;        &lt;num&gt;        &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:    all          adg    29  793.3916048 1323.4965323 1195.3710603</span></span>
-<span><span class="co">#&gt; 2:    all         adfi    29 1934.0640577 3518.2230948 2809.0770981</span></span>
-<span><span class="co">#&gt; 3:    all          fcr    29    2.2273233    2.8296559    2.4191907</span></span>
-<span><span class="co">#&gt; 4:    all           gf    29    0.3533999    0.4489694    0.4133614</span></span>
-<span><span class="co">#&gt; 5:    all   stage_days    29   67.2591023  101.5165978   74.9907553</span></span>
-<span><span class="co">#&gt; 6:    all start_weight    29   29.9999848   30.0000077   29.9999978</span></span>
-<span><span class="co">#&gt; 7:    all   end_weight    29   83.3628148  120.0000027  119.9999979</span></span>
+<span><span class="co">#&gt; 1:    all          adg    29  794.4579840 1364.5338979 1194.5189222</span></span>
+<span><span class="co">#&gt; 2:    all         adfi    29 1934.6424858 3528.4497387 2809.4091053</span></span>
+<span><span class="co">#&gt; 3:    all          fcr    29    2.2431187    2.8370385    2.4157886</span></span>
+<span><span class="co">#&gt; 4:    all           gf    29    0.3524802    0.4458079    0.4139435</span></span>
+<span><span class="co">#&gt; 5:    all   stage_days    29   65.9565932   96.4046677   74.9040445</span></span>
+<span><span class="co">#&gt; 6:    all start_weight    29   29.9999906   30.0000041   29.9999985</span></span>
+<span><span class="co">#&gt; 7:    all   end_weight    29   83.3110096  120.0000026  119.9999983</span></span>
 <span><span class="co">#&gt;            mean           sd           cv</span></span>
 <span><span class="co">#&gt;           &lt;num&gt;        &lt;num&gt;        &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1: 1161.8388765 1.288442e+02 1.108968e-01</span></span>
-<span><span class="co">#&gt; 2: 2808.8231142 3.605002e+02 1.283456e-01</span></span>
-<span><span class="co">#&gt; 3:    2.4175766 1.441554e-01 5.962804e-02</span></span>
-<span><span class="co">#&gt; 4:    0.4150077 2.386968e-02 5.751624e-02</span></span>
-<span><span class="co">#&gt; 5:   76.9896102 8.357676e+00 1.085559e-01</span></span>
-<span><span class="co">#&gt; 6:   29.9999976 4.166519e-06 1.388840e-07</span></span>
-<span><span class="co">#&gt; 7:  118.7366466 6.803354e+00 5.729785e-02</span></span></code></pre></div>
+<span><span class="co">#&gt; 1: 1169.5442638 1.216623e+02 1.040254e-01</span></span>
+<span><span class="co">#&gt; 2: 2823.1270779 3.583797e+02 1.269442e-01</span></span>
+<span><span class="co">#&gt; 3:    2.4120556 1.386377e-01 5.747699e-02</span></span>
+<span><span class="co">#&gt; 4:    0.4158459 2.280657e-02 5.484380e-02</span></span>
+<span><span class="co">#&gt; 5:   76.3310035 7.262166e+00 9.514045e-02</span></span>
+<span><span class="co">#&gt; 6:   29.9999982 2.920678e-06 9.735593e-08</span></span>
+<span><span class="co">#&gt; 7:  118.7348608 6.812974e+00 5.737973e-02</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="plot_adg-plot_adfi-and-save_plots">plot_adg, plot_adfi and save_plots<a class="anchor" aria-label="anchor" href="#plot_adg-plot_adfi-and-save_plots"></a>
@@ -864,7 +866,7 @@ colour-blind safe palette (Okabe-Ito) without extra packages.</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span></span>
 <span><span class="va">out</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/save_plots.html">save_plots</a></span><span class="op">(</span><span class="va">g</span>, path <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, prefix <span class="op">=</span> <span class="st">"loc"</span>, suffix <span class="op">=</span> <span class="st">"growth"</span>, device <span class="op">=</span> <span class="st">"pdf"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Saved 1 of 1 plot to <span style="color: #0000BB;">/tmp/RtmpG43LPA</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Saved 1 of 1 plot to <span style="color: #0000BB;">/tmp/RtmpiAFMG1</span></span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.exists</a></span><span class="op">(</span><span class="va">out</span><span class="op">$</span><span class="va">file</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] TRUE</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">out</span><span class="op">$</span><span class="va">file</span><span class="op">)</span></span></code></pre></div>
@@ -883,28 +885,28 @@ settings and keeps all intermediate results.</p>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Pigs in the data: 26</span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Pigs with weight data kept: 25</span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Pigs with ADG: 25</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Pigs with FCR: 25 (23 ok, 2 low confidence)</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Pigs with FCR: 25 (22 ok, 3 low confidence)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Removed pigs: 1 (see <span style="color: #00BB00;">$removed</span>)</span></span>
-<span><span class="co">#&gt; Mean ADG 1227 g/d, ADFI 3264 g/d, FCR 2.67</span></span>
+<span><span class="co">#&gt; Mean ADG 1223 g/d, ADFI 3265 g/d, FCR 2.68</span></span>
 <span><span class="va">res</span><span class="op">$</span><span class="va">fcr</span><span class="op">$</span><span class="va">summary</span><span class="op">[</span><span class="va">group</span> <span class="op">==</span> <span class="st">"all"</span><span class="op">]</span></span>
-<span><span class="co">#&gt;     group        trait     n          min          max       median</span></span>
-<span><span class="co">#&gt;    &lt;char&gt;       &lt;char&gt; &lt;int&gt;        &lt;num&gt;        &lt;num&gt;        &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:    all          adg    25  937.1479986 1558.4568559 1235.0573464</span></span>
-<span><span class="co">#&gt; 2:    all         adfi    25 2572.7298039 3874.7587765 3243.1712862</span></span>
-<span><span class="co">#&gt; 3:    all          fcr    25    2.2558475    3.0880691    2.6377744</span></span>
-<span><span class="co">#&gt; 4:    all           gf    25    0.3238269    0.4432924    0.3791075</span></span>
-<span><span class="co">#&gt; 5:    all   stage_days    25   38.4996222   64.0240405   48.5807355</span></span>
-<span><span class="co">#&gt; 6:    all start_weight    25   59.9999853   60.0000056   59.9999982</span></span>
-<span><span class="co">#&gt; 7:    all   end_weight    25  119.9999897  120.0000112  119.9999969</span></span>
-<span><span class="co">#&gt;            mean           sd           cv</span></span>
-<span><span class="co">#&gt;           &lt;num&gt;        &lt;num&gt;        &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1: 1226.7174391 1.248092e+02 1.017424e-01</span></span>
-<span><span class="co">#&gt; 2: 3264.2179870 2.593681e+02 7.945796e-02</span></span>
-<span><span class="co">#&gt; 3:    2.6719987 1.831749e-01 6.855352e-02</span></span>
-<span><span class="co">#&gt; 4:    0.3759441 2.584666e-02 6.875134e-02</span></span>
-<span><span class="co">#&gt; 5:   49.4066427 5.150501e+00 1.042471e-01</span></span>
-<span><span class="co">#&gt; 6:   59.9999973 3.971357e-06 6.618929e-08</span></span>
-<span><span class="co">#&gt; 7:  119.9999968 4.525663e-06 3.771386e-08</span></span></code></pre></div>
+<span><span class="co">#&gt;     group        trait     n          min          max      median         mean</span></span>
+<span><span class="co">#&gt;    &lt;char&gt;       &lt;char&gt; &lt;int&gt;        &lt;num&gt;        &lt;num&gt;       &lt;num&gt;        &lt;num&gt;</span></span>
+<span><span class="co">#&gt; 1:    all          adg    25  932.9237689 1515.1490452 1213.955139 1223.0452261</span></span>
+<span><span class="co">#&gt; 2:    all         adfi    25 2572.7470000 3874.3427447 3243.745884 3264.7272936</span></span>
+<span><span class="co">#&gt; 3:    all          fcr    25    2.2740418    3.1065828    2.647156    2.6798708</span></span>
+<span><span class="co">#&gt; 4:    all           gf    25    0.3218971    0.4397457    0.377764    0.3748119</span></span>
+<span><span class="co">#&gt; 5:    all   stage_days    25   39.6000645   64.3139315   49.425221   49.5345597</span></span>
+<span><span class="co">#&gt; 6:    all start_weight    25   59.9999874   60.0000031   59.999998   59.9999970</span></span>
+<span><span class="co">#&gt; 7:    all   end_weight    25  119.9999880  120.0000095  119.999996  119.9999964</span></span>
+<span><span class="co">#&gt;              sd           cv</span></span>
+<span><span class="co">#&gt;           &lt;num&gt;        &lt;num&gt;</span></span>
+<span><span class="co">#&gt; 1: 1.207191e+02 9.870369e-02</span></span>
+<span><span class="co">#&gt; 2: 2.568892e+02 7.868627e-02</span></span>
+<span><span class="co">#&gt; 3: 1.825049e-01 6.810214e-02</span></span>
+<span><span class="co">#&gt; 4: 2.551180e-02 6.806560e-02</span></span>
+<span><span class="co">#&gt; 5: 5.096677e+00 1.028913e-01</span></span>
+<span><span class="co">#&gt; 6: 3.669556e-06 6.115927e-08</span></span>
+<span><span class="co">#&gt; 7: 4.212084e-06 3.510070e-08</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="write_results">write_results<a class="anchor" aria-label="anchor" href="#write_results"></a>
@@ -916,19 +918,19 @@ mark so that Excel shows Chinese text correctly.</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="va">out</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/write_results.html">write_results</a></span><span class="op">(</span><span class="va">res</span>, dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"results"</span><span class="op">)</span>, farm <span class="op">=</span> <span class="st">"demo"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Wrote 9 files to <span style="color: #0000BB;">/tmp/RtmpG43LPA/results</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Wrote 9 files to <span style="color: #0000BB;">/tmp/RtmpiAFMG1/results</span></span></span>
 <span><span class="va">out</span></span>
 <span><span class="co">#&gt;           table                                                   file  rows</span></span>
 <span><span class="co">#&gt;          &lt;char&gt;                                                 &lt;char&gt; &lt;int&gt;</span></span>
-<span><span class="co">#&gt; 1:          fcr          /tmp/RtmpG43LPA/results/demo_fcr_20261022.csv    29</span></span>
-<span><span class="co">#&gt; 2:       by_bin       /tmp/RtmpG43LPA/results/demo_by_bin_20261022.csv   258</span></span>
-<span><span class="co">#&gt; 3:   daily_feed   /tmp/RtmpG43LPA/results/demo_daily_feed_20261022.csv  2821</span></span>
-<span><span class="co">#&gt; 4: daily_weight /tmp/RtmpG43LPA/results/demo_daily_weight_20261022.csv  2814</span></span>
-<span><span class="co">#&gt; 5:  weight_pigs  /tmp/RtmpG43LPA/results/demo_weight_pigs_20261022.csv    30</span></span>
-<span><span class="co">#&gt; 6:   feed_model   /tmp/RtmpG43LPA/results/demo_feed_model_20261022.csv    15</span></span>
-<span><span class="co">#&gt; 7:      summary      /tmp/RtmpG43LPA/results/demo_summary_20261022.csv    14</span></span>
-<span><span class="co">#&gt; 8:      removed      /tmp/RtmpG43LPA/results/demo_removed_20261022.csv     1</span></span>
-<span><span class="co">#&gt; 9:     settings     /tmp/RtmpG43LPA/results/demo_settings_20261022.csv    49</span></span>
+<span><span class="co">#&gt; 1:          fcr          /tmp/RtmpiAFMG1/results/demo_fcr_20261022.csv    29</span></span>
+<span><span class="co">#&gt; 2:       by_bin       /tmp/RtmpiAFMG1/results/demo_by_bin_20261022.csv   258</span></span>
+<span><span class="co">#&gt; 3:   daily_feed   /tmp/RtmpiAFMG1/results/demo_daily_feed_20261022.csv  2817</span></span>
+<span><span class="co">#&gt; 4: daily_weight /tmp/RtmpiAFMG1/results/demo_daily_weight_20261022.csv  2793</span></span>
+<span><span class="co">#&gt; 5:  weight_pigs  /tmp/RtmpiAFMG1/results/demo_weight_pigs_20261022.csv    30</span></span>
+<span><span class="co">#&gt; 6:   feed_model   /tmp/RtmpiAFMG1/results/demo_feed_model_20261022.csv    15</span></span>
+<span><span class="co">#&gt; 7:      summary      /tmp/RtmpiAFMG1/results/demo_summary_20261022.csv    14</span></span>
+<span><span class="co">#&gt; 8:      removed      /tmp/RtmpiAFMG1/results/demo_removed_20261022.csv     1</span></span>
+<span><span class="co">#&gt; 9:     settings     /tmp/RtmpiAFMG1/results/demo_settings_20261022.csv    46</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"results"</span><span class="op">)</span>, recursive <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
@@ -959,57 +961,59 @@ compares ADFI with the recorded value.</li>
 <span><span class="va">vo</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_outliers.html">validate_outliers</a></span><span class="op">(</span><span class="va">visits</span>, reps <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Validating weight outlier methods (1 repetition, 5% artificial errors)</span> <span style="color: #00BBBB;">──────</span></span></span>
-<span><span class="co">#&gt; Validating outlier methods <span style="color: #00BB00;">■■■■■■■■■■■                     </span>  33% | ETA:  3s</span></span>
-<span><span class="co">#&gt; Validating outlier methods <span style="color: #00BB00;">■■■■■■■■■■■■■■■■■■■■■           </span>  67% | ETA:  2s</span></span>
+<span><span class="co">#&gt; Validating outlier methods <span style="color: #00BB00;">■■■■■■■■■■                      </span>  29% | ETA:  4s</span></span>
+<span><span class="co">#&gt; Validating outlier methods <span style="color: #00BB00;">■■■■■■■■■■■■■■                  </span>  43% | ETA:  3s</span></span>
 <span><span class="co">#&gt; Validating outlier methods <span style="color: #00BB00;">■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■ </span> 100% | ETA:  0s</span></span>
-<span><span class="co">#&gt; rlm: 83% of errors found, 1.2% of good records removed, ADG error 10.1 g/d</span></span>
-<span><span class="co">#&gt; loess: 89% of errors found, 0.9% of good records removed, ADG error 2.8 g/d</span></span>
-<span><span class="co">#&gt; stl: 94% of errors found, 1.8% of good records removed, ADG error 4.0 g/d</span></span>
-<span><span class="co">#&gt; sd: 53% of errors found, 0.2% of good records removed, ADG error 2.3 g/d</span></span>
-<span><span class="co">#&gt; stl+rlm+sd: 94% of errors found, 2.7% of good records removed, ADG error 10.2</span></span>
+<span><span class="co">#&gt; track: 68% of errors found, 0.1% of good records removed, ADG error 1.3 g/d</span></span>
+<span><span class="co">#&gt; rlm: 83% of errors found, 1.7% of good records removed, ADG error 5.7 g/d</span></span>
+<span><span class="co">#&gt; loess: 89% of errors found, 1.3% of good records removed, ADG error 4.0 g/d</span></span>
+<span><span class="co">#&gt; stl: 94% of errors found, 2.1% of good records removed, ADG error 2.5 g/d</span></span>
+<span><span class="co">#&gt; sd: 52% of errors found, 0.1% of good records removed, ADG error 1.6 g/d</span></span>
+<span><span class="co">#&gt; stl+rlm+sd: 95% of errors found, 3.0% of good records removed, ADG error 6.1</span></span>
 <span><span class="co">#&gt; g/d</span></span>
 <span><span class="va">vo</span><span class="op">$</span><span class="va">summary</span></span>
-<span><span class="co">#&gt;        method sensitivity false_positive_rate precision   adg_bias  adg_rmse</span></span>
-<span><span class="co">#&gt;        &lt;char&gt;       &lt;num&gt;               &lt;num&gt;     &lt;num&gt;      &lt;num&gt;     &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:       none   0.0158046         0.000000000 1.0000000 -0.4894037  2.735915</span></span>
-<span><span class="co">#&gt; 2:        rlm   0.8304598         0.011828970 0.7863946  3.4606598 10.079039</span></span>
-<span><span class="co">#&gt; 3:      loess   0.8872126         0.008890563 0.8395649 -0.1712047  2.780608</span></span>
-<span><span class="co">#&gt; 4:        stl   0.9396552         0.018346205 0.7286908 -0.1877863  3.960998</span></span>
-<span><span class="co">#&gt; 5:         sd   0.5323276         0.001845922 0.9379747 -0.1304154  2.285840</span></span>
-<span><span class="co">#&gt; 6: stl+rlm+sd   0.9446839         0.026558674 0.6509901  3.5640007 10.186566</span></span>
+<span><span class="co">#&gt;        method sensitivity false_positive_rate precision    adg_bias adg_rmse</span></span>
+<span><span class="co">#&gt;        &lt;char&gt;       &lt;num&gt;               &lt;num&gt;     &lt;num&gt;       &lt;num&gt;    &lt;num&gt;</span></span>
+<span><span class="co">#&gt; 1:       none  0.01570307        0.0000000000 1.0000000  0.51898468 3.158579</span></span>
+<span><span class="co">#&gt; 2:      track  0.67808708        0.0010105547 0.9723644 -0.28147973 1.325973</span></span>
+<span><span class="co">#&gt; 3:        rlm  0.82583869        0.0168425780 0.7199751  3.01370668 5.744232</span></span>
+<span><span class="co">#&gt; 4:      loess  0.88936474        0.0128377873 0.7841410  1.23448526 4.030737</span></span>
+<span><span class="co">#&gt; 5:        stl  0.94147038        0.0209222247 0.7023429  1.35965623 2.474395</span></span>
+<span><span class="co">#&gt; 6:         sd  0.51605996        0.0005239913 0.9810041 -0.02780591 1.639765</span></span>
+<span><span class="co">#&gt; 7: stl+rlm+sd  0.94575303        0.0298300771 0.6244109  3.68956848 6.075641</span></span>
 <span><span class="co">#&gt;    adg_spearman n_pigs</span></span>
 <span><span class="co">#&gt;           &lt;num&gt;  &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:    0.9980296     29</span></span>
-<span><span class="co">#&gt; 2:    0.9980296     29</span></span>
-<span><span class="co">#&gt; 3:    0.9995074     29</span></span>
-<span><span class="co">#&gt; 4:    1.0000000     29</span></span>
+<span><span class="co">#&gt; 1:    0.9975369     29</span></span>
+<span><span class="co">#&gt; 2:    1.0000000     29</span></span>
+<span><span class="co">#&gt; 3:    0.9980296     29</span></span>
+<span><span class="co">#&gt; 4:    0.9990148     29</span></span>
 <span><span class="co">#&gt; 5:    0.9995074     29</span></span>
-<span><span class="co">#&gt; 6:    0.9985222     29</span></span>
+<span><span class="co">#&gt; 6:    0.9990148     29</span></span>
+<span><span class="co">#&gt; 7:    0.9995074     29</span></span>
 <span></span>
 <span><span class="co"># 2. growth curve models</span></span>
 <span><span class="va">va</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_adg.html">validate_adg</a></span><span class="op">(</span><span class="va">w</span>, models <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"poly1"</span>, <span class="st">"poly2"</span>, <span class="st">"loess"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Validating growth curves: 5-fold cross-validation and truncation</span> <span style="color: #00BBBB;">────────────</span></span></span>
-<span><span class="co">#&gt; validate_adg: fitting pigs <span style="color: #00BB00;">■■■■■■■■                        </span>  24% | ETA:  4s</span></span>
-<span><span class="co">#&gt; validate_adg: fitting pigs <span style="color: #00BB00;">■■■■■■■■■■■■■■■■■■■■■■■■■       </span>  79% | ETA:  1s</span></span>
+<span><span class="co">#&gt; validate_adg: fitting pigs <span style="color: #00BB00;">■■■■■■■■■■■■■■■■■■              </span>  55% | ETA:  2s</span></span>
 <span><span class="co">#&gt; validate_adg: fitting pigs <span style="color: #00BB00;">■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■ </span> 100% | ETA:  0s</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Lowest cross-validation error: <span style="color: #0000BB;">"loess"</span> (1.49 kg)</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Lowest cross-validation error: <span style="color: #0000BB;">"loess"</span> (1.53 kg)</span></span>
 <span><span class="va">va</span><span class="op">$</span><span class="va">summary</span></span>
 <span><span class="co">#&gt;     model  cv_rmse   cv_mae bias_late10 rmse_late10 spearman_late10 n_late10</span></span>
 <span><span class="co">#&gt;    &lt;char&gt;    &lt;num&gt;    &lt;num&gt;       &lt;num&gt;       &lt;num&gt;           &lt;num&gt;    &lt;int&gt;</span></span>
-<span><span class="co">#&gt; 1:  poly1 2.296248 1.813063    29.32444    38.10791       0.9650246       29</span></span>
-<span><span class="co">#&gt; 2:  poly2 1.914773 1.533710    28.69547    33.34324       0.9896552       29</span></span>
-<span><span class="co">#&gt; 3:  loess 1.486132 1.148429    22.77291    31.33349       0.9807882       29</span></span>
+<span><span class="co">#&gt; 1:  poly1 2.185412 1.727146    24.16706    27.46496       0.9758621       29</span></span>
+<span><span class="co">#&gt; 2:  poly2 1.925455 1.517579    28.37188    32.95773       0.9886700       29</span></span>
+<span><span class="co">#&gt; 3:  loess 1.527806 1.161539    23.98305    32.00730       0.9773399       29</span></span>
 <span><span class="co">#&gt;    bias_early10 rmse_early10 spearman_early10 n_early10 bias_late20 rmse_late20</span></span>
 <span><span class="co">#&gt;           &lt;num&gt;        &lt;num&gt;            &lt;num&gt;     &lt;int&gt;       &lt;num&gt;       &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:    -1.417274     17.38777        0.9763547        29    43.04324    61.58196</span></span>
-<span><span class="co">#&gt; 2:    14.380875     21.80573        0.9945813        29    60.78069    72.58957</span></span>
-<span><span class="co">#&gt; 3:     8.302127     20.43711        0.9906404        29    72.86608    88.11454</span></span>
+<span><span class="co">#&gt; 1:     1.466386     15.76301        0.9842365        29    33.73806    42.67029</span></span>
+<span><span class="co">#&gt; 2:    15.426969     21.34528        0.9871921        29    56.43722    63.83718</span></span>
+<span><span class="co">#&gt; 3:     7.392091     20.57009        0.9916256        29    66.91088    77.17890</span></span>
 <span><span class="co">#&gt;    spearman_late20 n_late20 bias_early20 rmse_early20 spearman_early20</span></span>
 <span><span class="co">#&gt;              &lt;num&gt;    &lt;int&gt;        &lt;num&gt;        &lt;num&gt;            &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:       0.9167488       29  -12.0184132     40.82636        0.9310345</span></span>
-<span><span class="co">#&gt; 2:       0.9679803       29   37.7102160     78.60557        0.9467980</span></span>
-<span><span class="co">#&gt; 3:       0.9428571       29   -0.5055332     55.79609        0.9492611</span></span>
+<span><span class="co">#&gt; 1:       0.9344828       29    -7.411622     35.97178        0.9630542</span></span>
+<span><span class="co">#&gt; 2:       0.9733990       29    38.662738     77.08385        0.9394089</span></span>
+<span><span class="co">#&gt; 3:       0.9394089       29     2.088635     59.46199        0.9399015</span></span>
 <span><span class="co">#&gt;    n_early20</span></span>
 <span><span class="co">#&gt;        &lt;int&gt;</span></span>
 <span><span class="co">#&gt; 1:        29</span></span>
@@ -1023,18 +1027,18 @@ compares ADFI with the recorded value.</li>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Validating feed intake imputation (2 scenarios x 2 repetitions)</span> <span style="color: #00BBBB;">─────────────</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> 29 pigs with coverage &gt;= 0.8 used</span></span>
 <span><span class="va">vf</span><span class="op">$</span><span class="va">summary</span></span>
-<span><span class="co">#&gt;    scenario method mean_abs_error_pct p95_abs_error_pct   bias_pct  spearman</span></span>
-<span><span class="co">#&gt;      &lt;char&gt; &lt;char&gt;              &lt;num&gt;             &lt;num&gt;      &lt;num&gt;     &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1: random30 linear          0.9862136          3.037380 -0.1467223 0.9894089</span></span>
-<span><span class="co">#&gt; 2: random30  loess          1.1075243          2.759248 -0.2229573 0.9901478</span></span>
-<span><span class="co">#&gt; 3:   late20 linear          4.4425725          7.406748  4.2950549 0.9527094</span></span>
-<span><span class="co">#&gt; 4:   late20  loess          2.5966842          5.905810  0.1539734 0.9497537</span></span>
+<span><span class="co">#&gt;    scenario method mean_abs_error_pct p95_abs_error_pct  bias_pct  spearman</span></span>
+<span><span class="co">#&gt;      &lt;char&gt; &lt;char&gt;              &lt;num&gt;             &lt;num&gt;     &lt;num&gt;     &lt;num&gt;</span></span>
+<span><span class="co">#&gt; 1: random30 linear          1.1576073          2.793481 0.2559840 0.9911330</span></span>
+<span><span class="co">#&gt; 2: random30  loess          0.9863053          2.609018 0.1846718 0.9918719</span></span>
+<span><span class="co">#&gt; 3:   late20 linear          4.4810732          7.397420 4.3554438 0.9556650</span></span>
+<span><span class="co">#&gt; 4:   late20  loess          2.7323081          5.416435 0.3504257 0.9576355</span></span>
 <span><span class="co">#&gt;    daily_rmse n_pigs</span></span>
 <span><span class="co">#&gt;         &lt;num&gt;  &lt;int&gt;</span></span>
-<span><span class="co">#&gt; 1:   509.6333     29</span></span>
-<span><span class="co">#&gt; 2:   460.6054     29</span></span>
-<span><span class="co">#&gt; 3:   675.0915     29</span></span>
-<span><span class="co">#&gt; 4:   472.2266     29</span></span></code></pre></div>
+<span><span class="co">#&gt; 1:   503.4444     29</span></span>
+<span><span class="co">#&gt; 2:   449.3936     29</span></span>
+<span><span class="co">#&gt; 3:   673.5975     29</span></span>
+<span><span class="co">#&gt; 4:   475.1744     29</span></span></code></pre></div>
 <!--
 # Inflate your package
 -->
