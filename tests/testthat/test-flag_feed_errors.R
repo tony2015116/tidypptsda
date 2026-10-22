@@ -115,6 +115,33 @@ test_that("NEDAP: weight differences are NA, time rules still apply", {
   expect_true(any(!is.na(f$ltd)))
 })
 
+test_that("FIV-hi limit can depend on body weight and breed", {
+  v <- prep_visits(nedap, verbose = 0)
+  fixed <- flag_feed_errors(v, verbose = 0)
+  expect_true(all(fixed$fiv_max == 2000))
+  # one limit for all weights: same as a fixed limit
+  flat <- flag_feed_errors(v, qc_config(fiv_max_by_weight = data.frame(weight_from = 0, fiv_max = 500)), verbose = 0)
+  idv <- flat[identified == TRUE & !is.na(weight)]
+  expect_true(all(flat[identified == FALSE, fiv_max] == 2000))
+  expect_equal(sum(flat$fiv_hi), flat[, sum(feed_intake > fiv_max)])
+  expect_gt(sum(flat$fiv_hi), sum(fixed$fiv_hi))
+  # limit rising with weight: light pigs get the lower limit
+  tab <- data.frame(weight_from = c(0, 60), fiv_max = c(300, 5000))
+  byw <- flag_feed_errors(v, qc_config(fiv_max_by_weight = tab), verbose = 0)
+  expect_setequal(unique(byw[identified == TRUE, fiv_max]), c(300, 5000))
+  # breed-specific table: breeds absent from the table keep 2000 g
+  pigs <- unique(v[identified == TRUE, responder])
+  vb <- add_breed(v, data.frame(responder = pigs, breed = rep(c("DD", "ZZ"), length.out = length(pigs))), verbose = 0)
+  fb <- flag_feed_errors(vb, qc_config(fiv_max_by_weight = fiv_max_example()), verbose = 0)
+  expect_true(all(fb[breed == "ZZ", fiv_max] == 2000))
+  expect_true(all(fb[breed == "DD", fiv_max] %in% fiv_max_example()[breed == "DD", fiv_max]))
+  # fitted body weights can be supplied
+  bwt <- data.table::data.table(responder = pigs, date = min(v$date), bw = 25)
+  f25 <- flag_feed_errors(v, qc_config(fiv_max_by_weight = tab), bw = bwt, verbose = 0)
+  expect_true(all(f25[identified == TRUE, fiv_max] == 300))
+  expect_error(flag_feed_errors(v, qc_config(fiv_max_by_weight = tab), bw = data.frame(x = 1), verbose = 0), "bw")
+})
+
 test_that("a large unidentified feed disappearance gives a warning", {
   v <- prep_visits(fire, verbose = 0)
   q <- qc_config(max_unidentified_feed_kg = 1)

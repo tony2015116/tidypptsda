@@ -1,3 +1,34 @@
+# tidypptsda 0.4.0
+
+## New features
+
+* `add_breed()` merges a breed (line) table from your own records into the
+  visit table. `prep_visits()` keeps a `breed` column of the raw data and
+  otherwise reminds you to add one. With breed, `calc_adfi()` adds it as a
+  fixed effect to the correction model and `calc_fcr()` summarises traits by
+  breed. `run_pipeline()` gains `breeds`.
+* QC parameter `fiv_max_by_weight`: the FIV-hi limit can depend on body
+  weight (and breed) instead of the fixed 2000 g. The limit used for each
+  visit is kept in column `fiv_max`. Example table: `fiv_max_example()`.
+* QC parameter `max_daily_jump_kg` (off by default): flags pigs whose daily
+  median weight changes too fast; `clean_weight()` always reports
+  `max_daily_jump`.
+* `calc_fcr()` returns `$by_bin`: feed, gain and FCR per body weight class
+  (`bin_width`, default 10 kg). Inner classes covered by less than
+  `min_bin_coverage_kg` (default 6 kg) of recorded weights, and segment FCR
+  outside the optional `bin_fcr_limits` (example: `bin_fcr_example()`), flag
+  the pig as low confidence.
+* `write_results()` writes all result tables to CSV files named
+  `<farm>_<table>_<date>.csv` (UTF-8 with BOM for Excel).
+* `clean_weight()`, `calc_adg()`, `calc_adfi()` and `run_pipeline()` gain
+  `cores` for parallel per-pig computation (base package parallel).
+
+## Bug fixes
+
+* `calc_fcr()`: the numbers in `fcr_note` (coverage, extrapolated days) could
+  belong to another pig when several pigs were flagged. The flags themselves
+  were right.
+
 # tidypptsda 0.3.0
 
 ## Breaking changes

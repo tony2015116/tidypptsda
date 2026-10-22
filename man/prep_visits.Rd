@@ -26,6 +26,8 @@ A \code{data.table}, one row per visit, ordered by \code{location} and
 \itemize{
 \item \code{responder}: pig ID (character, \code{NA} for unidentified visits);
 \code{responder_raw}: transponder number as recorded;
+\item \code{breed}: kept when the input has a \code{breed} column; otherwise add it
+with \code{\link[=add_breed]{add_breed()}};
 \item \code{identified}: \code{FALSE} for visits without a transponder read;
 \item \code{location}: station (feeder) ID, character;
 \item \code{date}, \code{seq_days} (day number from the first day in the data, 1 =

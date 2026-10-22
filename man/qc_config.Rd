@@ -65,6 +65,9 @@ of valid weight records.
 body weight, kg.
 \item \code{curve_r2_min}: optional, pigs whose growth curve R² is below this are
 flagged as low confidence (not removed). \code{NULL} = off.
+\item \code{max_daily_jump_kg}: optional, pigs whose daily median weight changes
+by more than this many kg per day between consecutive days are flagged
+as low confidence (not removed). \code{NULL} = off.
 }
 
 \strong{Growth and ADG}
@@ -90,6 +93,11 @@ preceding or following visit has FIV < -20 g, g/min.
 subsequent visits, g.
 \item \code{max_unidentified_feed_kg}: feed disappearance in unidentified visits
 per feeder above which a warning is given.
+\item \code{fiv_max_by_weight}: optional table that replaces the upper limit of
+\code{fiv_range} (FIV-hi) by a limit that depends on body weight, and
+optionally on breed. Columns \code{weight_from} (kg, lower bound of the
+weight class), \code{fiv_max} (g) and optionally \code{breed}. See
+\code{\link[=fiv_max_example]{fiv_max_example()}}. \code{NULL} = off.
 }
 
 \strong{Daily feed intake}
@@ -113,21 +121,16 @@ curve or the feed intake is extrapolated over more than this many days
 at the start or the end of the stage. Default 15.
 \item \code{min_coverage}: minimum share of stage days with recorded feed intake.
 Default 0.7.
+\item \code{bin_width}: width of the body weight classes used for the segment
+checks of \code{\link[=calc_fcr]{calc_fcr()}}, kg. Default 10.
+\item \code{min_bin_coverage_kg}: an inner weight class whose recorded body
+weights span less than this many kg flags the pig. Default 6.
+\item \code{bin_fcr_limits}: optional table of plausible FCR per weight class,
+columns \code{weight_from} (kg), \code{fcr_min}, \code{fcr_max}. See
+\code{\link[=bin_fcr_example]{bin_fcr_example()}}. \code{NULL} = off.
 }
 }
 
-\examples{
-# Default preset
-qc <- qc_config()
-qc$duration_max
-
-# Another preset with one parameter overridden
-qc_national <- qc_config("national", min_test_days = 50)
-qc_national
-
-# Optional rules are off (NULL) unless switched on
-qc_config("casey", daily_drop_min = 0.90)$daily_drop_min
-}
 \references{
 Casey, D. S., Stern, H. S., & Dekkers, J. C. M. (2005). Identification of
 errors and factors associated with errors in data from electronic swine

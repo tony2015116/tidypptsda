@@ -2,6 +2,7 @@ flat_tidypptsda.Rmd:
   path: dev/flat_tidypptsda.Rmd
   state: active
   R:
+  - R/add_breed.R
   - R/calc_adfi.R
   - R/calc_adg.R
   - R/calc_fcr.R
@@ -13,6 +14,7 @@ flat_tidypptsda.Rmd:
   - R/qc_config.R
   - R/read_station.R
   - R/run_pipeline.R
+  - R/write_results.R
   - R/example-datasets.R
   tests:
   - tests/testthat/test-datasets.R
@@ -20,6 +22,7 @@ flat_tidypptsda.Rmd:
   - tests/testthat/test-qc_config.R
   - tests/testthat/test-read_station.R
   - tests/testthat/test-prep_visits.R
+  - tests/testthat/test-add_breed.R
   - tests/testthat/test-clean_weight.R
   - tests/testthat/test-calc_adg.R
   - tests/testthat/test-flag_feed_errors.R
@@ -27,6 +30,7 @@ flat_tidypptsda.Rmd:
   - tests/testthat/test-calc_fcr.R
   - tests/testthat/test-plot_adg.R
   - tests/testthat/test-run_pipeline.R
+  - tests/testthat/test-write_results.R
   vignettes: vignettes/get-started.Rmd
   inflate:
     flat_file: dev/flat_tidypptsda.Rmd

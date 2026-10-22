@@ -84,29 +84,69 @@ check_cols <- function(data, cols, arg = "data", hint = NULL) {
 
 # ---- per-pig fitting --------------------------------------------------------
 
+# ---- parallel computing -----------------------------------------------------
+
+check_cores <- function(cores) {
+  if (!is.numeric(cores) || length(cores) != 1L || is.na(cores) || cores < 1) {
+    cli::cli_abort("{.arg cores} must be a single number >= 1.")
+  }
+  max_cores <- parallel::detectCores()
+  if (is.na(max_cores)) max_cores <- 1L
+  as.integer(min(cores, max_cores))
+}
+
+# Set the number of cores used by fit_by_pig() until the calling function
+# exits.
+local_cores <- function(cores, envir = parent.frame()) {
+  cores <- check_cores(cores)
+  old <- options(tidypptsda.cores = cores)
+  do.call(on.exit, list(bquote(options(.(old))), add = TRUE), envir = envir)
+  invisible(cores)
+}
+
 # Apply `fun` to each pig. Errors are recorded in `failed` and the pig is
 # skipped; warnings are recorded in `warnings` and muffled.
 # `fun` must return a data.frame (or NULL to drop the pig silently).
+# Pigs are processed in parallel when option tidypptsda.cores > 1.
 fit_by_pig <- function(data, fun, step, by = "responder", ...) {
   groups <- split(data, by = by, keep.by = TRUE, sorted = TRUE)
   n <- length(groups)
-  out <- vector("list", n)
-  failed <- vector("list", n)
-  warns <- vector("list", n)
+  args <- list(...)
 
-  for (i in seq_len(n)) {
-    id <- as.character(groups[[i]][[by]][1L])
+  one_pig <- function(g) {
     w <- character()
     res <- withCallingHandlers(
-      tryCatch(fun(groups[[i]], ...), error = function(e) e),
+      tryCatch(do.call(fun, c(list(g), args)), error = function(e) e),
       warning = function(cnd) {
         w <<- c(w, conditionMessage(cnd))
         invokeRestart("muffleWarning")
       }
     )
+    list(res = res, warnings = unique(w))
+  }
+
+  cores <- getOption("tidypptsda.cores", 1L)
+  runs <- if (cores > 1L && n > 1L) {
+    if (.Platform$OS.type == "windows") {
+      cl <- parallel::makeCluster(min(cores, n))
+      on.exit(parallel::stopCluster(cl), add = TRUE)
+      parallel::parLapply(cl, groups, one_pig)
+    } else {
+      parallel::mclapply(groups, one_pig, mc.cores = min(cores, n))
+    }
+  } else {
+    lapply(groups, one_pig)
+  }
+
+  out <- vector("list", n)
+  failed <- vector("list", n)
+  warns <- vector("list", n)
+  for (i in seq_len(n)) {
+    id <- as.character(groups[[i]][[by]][1L])
+    res <- runs[[i]]$res
+    w <- runs[[i]]$warnings
     if (length(w) > 0L) {
-      warns[[i]] <- data.table::data.table(responder = id, step = step,
-                                           message = unique(w))
+      warns[[i]] <- data.table::data.table(responder = id, step = step, message = w)
     }
     if (inherits(res, "error")) {
       failed[[i]] <- data.table::data.table(responder = id, step = step,
@@ -202,6 +242,11 @@ utils::globalVariables(c(
   "fcr", "gf", "fcr_flag", "fcr_note", "weight_status", "stage_days",
   "start_weight", "end_weight", "group", "trait", "cv", "sd",
   "extrap_days_start", "extrap_days_end", "n_extrap_start", "n_extrap_end",
+  # breed, jumps, FIV limits, weight classes
+  "breed", "rate", "w", "max_daily_jump", "fiv_max", "day", "weight_from",
+  "weight_to", "feed_kg", "gain_kg", "bw_min", "bw_max", "n_days",
+  "n_observed_feed", "weight_coverage_kg", "first_bin", "last_bin", "inner",
+  "low_coverage", "fcr_min", "fcr_max", "fcr_out", "i.fcr_min", "i.fcr_max",
   # plots
   "label", "lower", "upper", "kind"
 ))

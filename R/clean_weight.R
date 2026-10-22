@@ -13,6 +13,7 @@
 #'   `min_test_days`, `max_missing_rate`, `entry_weight_max`,
 #'   `exit_weight_min`, `curve_r2_min`.
 #' @param verbose 0 (silent), 1 (summary, default) or 2 (details).
+#' @param cores Number of CPU cores for the per-pig computations. Default 1.
 #'
 #' @return An object of class `ppt_weight` (a list):
 #'   - `per_pig`: one row per pig with `n_records`, `n_valid`,
@@ -33,8 +34,10 @@
 #' - `n_valid < min_records`, `test_days < min_test_days` or
 #'   `missing_rate > max_missing_rate` (share of test days without a valid
 #'   weight) remove the pig;
-#' - `entry_weight > entry_weight_max`, `exit_weight < exit_weight_min` or
-#'   `r2 < curve_r2_min` mark the pig `"low_confidence"` but keep it: its
+#' - `entry_weight > entry_weight_max`, `exit_weight < exit_weight_min`,
+#'   `r2 < curve_r2_min` or `max_daily_jump > max_daily_jump_kg` (the
+#'   largest change of the daily median weight between consecutive recorded
+#'   days, kg/d) mark the pig `"low_confidence"` but keep it: its
 #'   growth can still be estimated by extrapolation in [calc_adg()], with a
 #'   flag.
 #'
@@ -55,8 +58,9 @@
 #' # Another QC preset
 #' w_national <- clean_weight(visits, qc = qc_config("national"), verbose = 0)
 #' table(w_national$per_pig$status)
-clean_weight <- function(visits, qc = qc_config(), verbose = 1) {
+clean_weight <- function(visits, qc = qc_config(), verbose = 1, cores = 1) {
   local_verbose(verbose)
+  local_cores(cores)
   check_qc(qc)
   dt <- as_dt(visits, "visits")
   check_cols(dt, c("responder", "identified", "location", "date", "seq_days",
@@ -107,7 +111,10 @@ clean_weight <- function(visits, qc = qc_config(), verbose = 1) {
   per_pig[, test_days := as.integer(last_date - first_date) + 1L]
   per_pig[, missing_rate := 1 - valid_days / test_days]
   per_pig <- merge(per_pig, pig_fit, by = "responder", all.x = TRUE)
+  per_pig <- merge(per_pig, daily_jumps(rec), by = "responder", all.x = TRUE)
   per_pig <- merge(main_loc, per_pig, by = "responder", all.y = TRUE)
+  pig_breed <- breed_of(dt)
+  if (!is.null(pig_breed)) per_pig <- merge(pig_breed, per_pig, by = "responder", all.y = TRUE)
 
   remove_why <- pig_reasons(per_pig, qc, fits$failed, type = "remove")
   flag_why <- pig_reasons(per_pig, qc, fits$failed, type = "flag")
@@ -115,7 +122,7 @@ clean_weight <- function(visits, qc = qc_config(), verbose = 1) {
                        data.table::fifelse(nzchar(flag_why), "low_confidence", "keep"))]
   per_pig[, reason := data.table::fifelse(status == "removed", remove_why, flag_why)]
   per_pig[, valid_days := NULL]
-  data.table::setcolorder(per_pig, c("responder", "location"))
+  data.table::setcolorder(per_pig, intersect(c("responder", "location", "breed"), names(per_pig)))
   data.table::setorder(per_pig, location, responder)
 
   kept <- per_pig[status != "removed", responder]
@@ -147,6 +154,25 @@ clean_weight <- function(visits, qc = qc_config(), verbose = 1) {
 # ---- helpers ----------------------------------------------------------------
 
 `%||%` <- function(x, y) if (is.null(x)) y else x
+
+# Breed of each identified pig (first non-missing value), or NULL.
+breed_of <- function(dt) {
+  if (!"breed" %in% names(dt)) return(NULL)
+  out <- dt[identified == TRUE, .(breed = stats::na.omit(breed)[1L]), by = responder]
+  out[, breed := as.character(breed)]
+  out[]
+}
+
+# Largest change of the daily median valid weight between consecutive
+# recorded days, in kg per day.
+daily_jumps <- function(rec) {
+  d <- rec[outlier == FALSE, .(w = stats::median(weight)), by = .(responder, date)]
+  data.table::setorder(d, responder, date)
+  d[, rate := abs(w - data.table::shift(w)) / as.numeric(date - data.table::shift(date)),
+    by = responder]
+  d[, .(max_daily_jump = if (all(is.na(rate))) NA_real_ else max(rate, na.rm = TRUE)),
+    by = responder]
+}
 
 check_qc <- function(qc) {
   if (!inherits(qc, "ppt_qc")) {
@@ -298,6 +324,10 @@ pig_reasons <- function(p, qc, failed, type = c("remove", "flag")) {
         sprintf("exit weight %.1f kg < %s kg", p$exit_weight, qc$exit_weight_min))
     if (!is.null(qc$curve_r2_min)) {
       add(p$r2 < qc$curve_r2_min, sprintf("curve R2 %.3f < %s", p$r2, qc$curve_r2_min))
+    }
+    if (!is.null(qc$max_daily_jump_kg)) {
+      add(p$max_daily_jump > qc$max_daily_jump_kg,
+          sprintf("day-to-day weight change %.1f kg/d > %s kg/d", p$max_daily_jump, qc$max_daily_jump_kg))
     }
     return(vapply(reasons, function(x) paste(unique(x), collapse = "; "), character(1)))
   }

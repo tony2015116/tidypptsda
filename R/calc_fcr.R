@@ -20,8 +20,14 @@
 #'     `fcr_note`;
 #'   - `daily`: the daily table of [calc_adfi()];
 #'   - `summary`: numeric summary (`n`, `min`, `max`, `median`, `mean`,
-#'     `sd`, `cv`) of the main traits, for all pigs and for pigs with
-#'     `fcr_flag = "ok"`;
+#'     `sd`, `cv`) of the main traits, for all pigs, for pigs with
+#'     `fcr_flag = "ok"` and, with a `breed` column, for each breed;
+#'   - `by_bin`: one row per pig and body weight class of `bin_width` kg:
+#'     feed (`feed_kg`), gain (`gain_kg`), segment `fcr`,
+#'     `weight_coverage_kg` (span of recorded body weights in the class),
+#'     `low_coverage` (inner class covered by less than
+#'     `min_bin_coverage_kg`) and `fcr_out` (segment FCR outside
+#'     `bin_fcr_limits`);
 #'   - `removed`, `settings`.
 #'
 #' @seealso [calc_adg()], [calc_adfi()].
@@ -47,9 +53,10 @@ calc_fcr <- function(adg, adfi, min_coverage = adg$settings$min_coverage,
   }
   ppt_msg("FCR over {adg$settings$stage_range[1]}-{adg$settings$stage_range[2]} kg", "h1")
 
-  a <- adg$per_pig[, .(responder, location, stage, adg, adg_type, stage_days,
-                       start_weight, end_weight, weight_status,
-                       extrap_days_start, extrap_days_end)]
+  a <- adg$per_pig[, intersect(c("responder", "location", "breed", "stage", "adg", "adg_type",
+                                "stage_days", "start_weight", "end_weight", "weight_status",
+                                "extrap_days_start", "extrap_days_end"), names(adg$per_pig)),
+                   with = FALSE]
   f <- adfi$per_pig[, .(responder, adfi, coverage, n_extrap_start, n_extrap_end)]
   max_edge <- adg$settings$max_edge_extrap_days
   per_pig <- merge(a, f, by = "responder", all.x = TRUE)
@@ -58,6 +65,8 @@ calc_fcr <- function(adg, adfi, min_coverage = adg$settings$min_coverage,
   notes <- character(nrow(per_pig))
   add_note <- function(cond, text) {
     cond <- cond %in% TRUE
+    if (!any(cond)) return(invisible(NULL))
+    text <- if (length(text) == 1L) rep(text, sum(cond)) else text[cond]
     notes[cond] <<- ifelse(nzchar(notes[cond]), paste(notes[cond], text, sep = "; "), text)
   }
   add_note(per_pig$adg_type == "partial", "ADG on part of the stage")
@@ -72,20 +81,34 @@ calc_fcr <- function(adg, adfi, min_coverage = adg$settings$min_coverage,
   add_note(per_pig$coverage < min_coverage,
            sprintf("feed intake recorded on %.0f%% of the stage", 100 * per_pig$coverage))
   add_note(per_pig$weight_status == "low_confidence", "weight data flagged")
+  by_bin <- fcr_by_bin(adg, adfi, adg$settings)
+  bin_notes <- by_bin[low_coverage == TRUE | fcr_out == TRUE, .(note = paste(
+    c(if (any(low_coverage)) sprintf("weight records cover %.1f kg of %s-%s kg",
+                                     weight_coverage_kg[low_coverage], weight_from[low_coverage], weight_to[low_coverage]),
+      if (any(fcr_out)) sprintf("segment FCR %.2f outside %s-%s in %s-%s kg", fcr[fcr_out],
+                                fcr_min[fcr_out], fcr_max[fcr_out], weight_from[fcr_out], weight_to[fcr_out])),
+    collapse = "; ")), by = responder]
+  m <- match(per_pig$responder, bin_notes$responder)
+  add_note(!is.na(m), bin_notes$note[m])
   add_note(is.na(per_pig$fcr), "no FCR")
   per_pig[, `:=`(fcr_note = notes,
                  fcr_flag = data.table::fifelse(nzchar(notes), "low_confidence", "ok"))]
   per_pig[is.na(fcr), fcr_flag := NA_character_]
   per_pig[, weight_status := NULL]
-  data.table::setcolorder(per_pig, c("responder", "location", "stage", "adg", "adfi",
+  data.table::setcolorder(per_pig, intersect(c("responder", "location", "breed", "stage", "adg", "adfi",
                                      "fcr", "gf", "adg_type", "coverage", "stage_days",
-                                     "start_weight", "end_weight", "fcr_flag", "fcr_note"))
+                                     "start_weight", "end_weight", "fcr_flag", "fcr_note"), names(per_pig)))
   data.table::setorder(per_pig, location, responder)
 
   summary <- rbind(
     trait_summary(per_pig, "all"),
     trait_summary(per_pig[fcr_flag %in% "ok"], "ok")
   )
+  if ("breed" %in% names(per_pig)) {
+    for (b in sort(unique(stats::na.omit(per_pig$breed)))) {
+      summary <- rbind(summary, trait_summary(per_pig[breed %in% b], paste("breed", b)))
+    }
+  }
 
   n_ok <- per_pig[fcr_flag %in% "ok", .N]
   n_low <- per_pig[fcr_flag %in% "low_confidence", .N]
@@ -102,7 +125,51 @@ calc_fcr <- function(adg, adfi, min_coverage = adg$settings$min_coverage,
 
   new_ppt_result(per_pig = per_pig, daily = adfi$daily, removed = adfi$removed,
                  settings = adg$settings, class = "ppt_fcr") |>
-    add_element(summary = summary)
+    add_element(summary = summary, by_bin = by_bin)
+}
+
+# Feed intake, gain and FCR per body weight class of each pig.
+fcr_by_bin <- function(adg, adfi, qc) {
+  lo <- qc$stage_range[1L]
+  hi <- qc$stage_range[2L]
+  width <- qc$bin_width
+  cls <- function(w) lo + floor((w - lo) / width) * width
+  st <- adfi$daily[in_stage == TRUE & !is.na(bw) & !is.na(dfi)]
+  st[, weight_from := cls(bw)]
+  st <- st[weight_from >= lo & weight_from < hi]
+  bins <- st[, .(n_days = .N, n_observed_feed = sum(state %in% c("org", "corr")),
+                 feed_kg = sum(dfi) / 1000, bw_min = min(bw), bw_max = max(bw)),
+             by = .(responder, weight_from)]
+  # gain over the days of the class (daily weights are mid-day values)
+  bins[, gain_kg := data.table::fifelse(n_days > 1L, (bw_max - bw_min) * n_days / (n_days - 1L), NA_real_)]
+  bins[, fcr := feed_kg / gain_kg]
+  bins[, weight_to := pmin(weight_from + width, hi)]
+
+  # how much of each class is covered by recorded body weights
+  ob <- adg$daily[source == "observed" & !is.na(weight)]
+  ob[, weight_from := cls(weight)]
+  cov <- ob[weight_from >= lo & weight_from < hi,
+            .(weight_coverage_kg = max(weight) - min(weight)), by = .(responder, weight_from)]
+  bins <- merge(bins, cov, by = c("responder", "weight_from"), all.x = TRUE)
+  bins[is.na(weight_coverage_kg), weight_coverage_kg := 0]
+  rng <- cov[, .(first_bin = min(weight_from), last_bin = max(weight_from)), by = responder]
+  bins <- merge(bins, rng, by = "responder", all.x = TRUE)
+  bins[, inner := (weight_from > first_bin & weight_from < last_bin) %in% TRUE]
+  bins[, low_coverage := inner & weight_coverage_kg < qc$min_bin_coverage_kg]
+
+  bins[, `:=`(fcr_min = NA_real_, fcr_max = NA_real_)]
+  if (!is.null(qc$bin_fcr_limits)) {
+    lim <- data.table::as.data.table(qc$bin_fcr_limits)
+    bins[lim, on = "weight_from", `:=`(fcr_min = i.fcr_min, fcr_max = i.fcr_max)]
+  }
+  bins[, fcr_out := !is.na(fcr) & !is.na(fcr_min) & (fcr < fcr_min | fcr > fcr_max)]
+  bins[, c("bw_min", "bw_max", "first_bin", "last_bin") := NULL]
+  data.table::setcolorder(bins, c("responder", "weight_from", "weight_to", "n_days",
+                                  "n_observed_feed", "feed_kg", "gain_kg", "fcr",
+                                  "weight_coverage_kg", "inner", "low_coverage",
+                                  "fcr_min", "fcr_max", "fcr_out"))
+  data.table::setorder(bins, responder, weight_from)
+  bins[]
 }
 
 trait_summary <- function(p, group) {

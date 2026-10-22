@@ -47,7 +47,7 @@ fusen::fill_description(
   ),
   overwrite = TRUE
 )
-desc::desc_set_version("0.3.0")
+desc::desc_set_version("0.4.0")
 usethis::use_mit_license("Meng Guo")
 # Use markdown in roxygen comments
 desc::desc_set("Roxygen", "list(markdown = TRUE)")
@@ -222,29 +222,69 @@ check_cols <- function(data, cols, arg = "data", hint = NULL) {
 
 # ---- per-pig fitting --------------------------------------------------------
 
+# ---- parallel computing -----------------------------------------------------
+
+check_cores <- function(cores) {
+  if (!is.numeric(cores) || length(cores) != 1L || is.na(cores) || cores < 1) {
+    cli::cli_abort("{.arg cores} must be a single number >= 1.")
+  }
+  max_cores <- parallel::detectCores()
+  if (is.na(max_cores)) max_cores <- 1L
+  as.integer(min(cores, max_cores))
+}
+
+# Set the number of cores used by fit_by_pig() until the calling function
+# exits.
+local_cores <- function(cores, envir = parent.frame()) {
+  cores <- check_cores(cores)
+  old <- options(tidypptsda.cores = cores)
+  do.call(on.exit, list(bquote(options(.(old))), add = TRUE), envir = envir)
+  invisible(cores)
+}
+
 # Apply `fun` to each pig. Errors are recorded in `failed` and the pig is
 # skipped; warnings are recorded in `warnings` and muffled.
 # `fun` must return a data.frame (or NULL to drop the pig silently).
+# Pigs are processed in parallel when option tidypptsda.cores > 1.
 fit_by_pig <- function(data, fun, step, by = "responder", ...) {
   groups <- split(data, by = by, keep.by = TRUE, sorted = TRUE)
   n <- length(groups)
-  out <- vector("list", n)
-  failed <- vector("list", n)
-  warns <- vector("list", n)
+  args <- list(...)
 
-  for (i in seq_len(n)) {
-    id <- as.character(groups[[i]][[by]][1L])
+  one_pig <- function(g) {
     w <- character()
     res <- withCallingHandlers(
-      tryCatch(fun(groups[[i]], ...), error = function(e) e),
+      tryCatch(do.call(fun, c(list(g), args)), error = function(e) e),
       warning = function(cnd) {
         w <<- c(w, conditionMessage(cnd))
         invokeRestart("muffleWarning")
       }
     )
+    list(res = res, warnings = unique(w))
+  }
+
+  cores <- getOption("tidypptsda.cores", 1L)
+  runs <- if (cores > 1L && n > 1L) {
+    if (.Platform$OS.type == "windows") {
+      cl <- parallel::makeCluster(min(cores, n))
+      on.exit(parallel::stopCluster(cl), add = TRUE)
+      parallel::parLapply(cl, groups, one_pig)
+    } else {
+      parallel::mclapply(groups, one_pig, mc.cores = min(cores, n))
+    }
+  } else {
+    lapply(groups, one_pig)
+  }
+
+  out <- vector("list", n)
+  failed <- vector("list", n)
+  warns <- vector("list", n)
+  for (i in seq_len(n)) {
+    id <- as.character(groups[[i]][[by]][1L])
+    res <- runs[[i]]$res
+    w <- runs[[i]]$warnings
     if (length(w) > 0L) {
-      warns[[i]] <- data.table::data.table(responder = id, step = step,
-                                           message = unique(w))
+      warns[[i]] <- data.table::data.table(responder = id, step = step, message = w)
     }
     if (inherits(res, "error")) {
       failed[[i]] <- data.table::data.table(responder = id, step = step,
@@ -340,6 +380,11 @@ utils::globalVariables(c(
   "fcr", "gf", "fcr_flag", "fcr_note", "weight_status", "stage_days",
   "start_weight", "end_weight", "group", "trait", "cv", "sd",
   "extrap_days_start", "extrap_days_end", "n_extrap_start", "n_extrap_end",
+  # breed, jumps, FIV limits, weight classes
+  "breed", "rate", "w", "max_daily_jump", "fiv_max", "day", "weight_from",
+  "weight_to", "feed_kg", "gain_kg", "bw_min", "bw_max", "n_days",
+  "n_observed_feed", "weight_coverage_kg", "first_bin", "last_bin", "inner",
+  "low_coverage", "fcr_min", "fcr_max", "fcr_out", "i.fcr_min", "i.fcr_max",
   # plots
   "label", "lower", "upper", "kind"
 ))
@@ -512,6 +557,9 @@ Three presets are available, and any single parameter can be overridden.
 #'   body weight, kg.
 #' - `curve_r2_min`: optional, pigs whose growth curve R² is below this are
 #'   flagged as low confidence (not removed). `NULL` = off.
+#' - `max_daily_jump_kg`: optional, pigs whose daily median weight changes
+#'   by more than this many kg per day between consecutive days are flagged
+#'   as low confidence (not removed). `NULL` = off.
 #'
 #' **Growth and ADG**
 #' - `stage_range`: body weight interval for ADG and FCR, kg.
@@ -533,6 +581,11 @@ Three presets are available, and any single parameter can be overridden.
 #'   subsequent visits, g.
 #' - `max_unidentified_feed_kg`: feed disappearance in unidentified visits
 #'   per feeder above which a warning is given.
+#' - `fiv_max_by_weight`: optional table that replaces the upper limit of
+#'   `fiv_range` (FIV-hi) by a limit that depends on body weight, and
+#'   optionally on breed. Columns `weight_from` (kg, lower bound of the
+#'   weight class), `fiv_max` (g) and optionally `breed`. See
+#'   [fiv_max_example()]. `NULL` = off.
 #'
 #' **Daily feed intake**
 #' - `dfi_range`: valid daily feed intake, kg.
@@ -552,6 +605,13 @@ Three presets are available, and any single parameter can be overridden.
 #'   at the start or the end of the stage. Default 15.
 #' - `min_coverage`: minimum share of stage days with recorded feed intake.
 #'   Default 0.7.
+#' - `bin_width`: width of the body weight classes used for the segment
+#'   checks of [calc_fcr()], kg. Default 10.
+#' - `min_bin_coverage_kg`: an inner weight class whose recorded body
+#'   weights span less than this many kg flags the pig. Default 6.
+#' - `bin_fcr_limits`: optional table of plausible FCR per weight class,
+#'   columns `weight_from` (kg), `fcr_min`, `fcr_max`. See
+#'   [bin_fcr_example()]. `NULL` = off.
 #'
 #' @return An object of class `ppt_qc`: a named list of parameters with the
 #'   preset name in attribute `"profile"`.
@@ -565,6 +625,7 @@ Three presets are available, and any single parameter can be overridden.
 #' average daily gain, feed efficiency, and real-time ultrasound traits in
 #' Duroc pigs: I. *Journal of Animal Science*, 92, 2377-2386.
 #'
+#' @filename qc_config
 #' @export
 qc_config <- function(profile = c("casey", "national", "legacy"), ...) {
   if (!is.character(profile)) {
@@ -607,6 +668,7 @@ print.ppt_qc <- function(x, ...) {
   groups <- qc_groups()
   fmt <- function(v) {
     if (is.null(v)) return("NULL (off)")
+    if (is.data.frame(v)) return(sprintf("table (%d rows)", nrow(v)))
     paste(format(v), collapse = ", ")
   }
   for (g in unique(groups)) {
@@ -616,6 +678,50 @@ print.ppt_qc <- function(x, ...) {
     cli::cli_bullets(stats::setNames(lines, rep(" ", length(lines))))
   }
   invisible(x)
+}
+
+#' Example threshold tables
+#'
+#' @description
+#' Example tables for the optional QC parameters `fiv_max_by_weight` and
+#' `bin_fcr_limits` of [qc_config()].
+#'
+#' - `fiv_max_example()`: maximum feed intake per visit (g) by breed
+#'   (`"YY"`, `"LL"`, `"DD"`) and 10 kg body weight class from 20 to 140 kg.
+#' - `bin_fcr_example()`: plausible feed conversion ratio per 10 kg body
+#'   weight class from 30 to 120 kg.
+#'
+#' The values come from in-house quality-control scripts of a pig testing
+#' station, not from the literature. Check them against your own data
+#' before use.
+#'
+#' @return A `data.table`. `fiv_max_example()`: `breed`, `weight_from`
+#'   (kg), `fiv_max` (g). `bin_fcr_example()`: `weight_from` (kg),
+#'   `fcr_min`, `fcr_max`.
+#' @export
+#' @examples
+#' fiv_max_example()
+#' qc <- qc_config(fiv_max_by_weight = fiv_max_example(),
+#'                 bin_fcr_limits = bin_fcr_example())
+fiv_max_example <- function() {
+  w <- seq(20, 130, by = 10)
+  data.table::data.table(
+    breed = rep(c("YY", "LL", "DD"), each = length(w)),
+    weight_from = rep(w, 3L),
+    fiv_max = c(747.0, 936.0, 1125.1, 1314.1, 1503.2, 1692.2, 1881.2, 2070.3, 2259.3, 2448.4, 2637.4, 2826.5,
+                821.6, 1044.8, 1268.0, 1491.2, 1714.4, 1937.7, 2160.9, 2384.1, 2607.3, 2830.5, 3053.7, 3277.0,
+                712.6, 916.9, 1121.2, 1325.4, 1529.7, 1734.0, 1938.2, 2142.5, 2346.8, 2551.0, 2755.3, 2959.6)
+  )
+}
+
+#' @rdname fiv_max_example
+#' @export
+bin_fcr_example <- function() {
+  data.table::data.table(
+    weight_from = seq(30, 110, by = 10),
+    fcr_min = c(0.76, 1.06, 1.14, 1.28, 1.35, 1.36, 1.34, 1.34, 1.31),
+    fcr_max = c(3.16, 3.08, 3.30, 3.41, 3.59, 3.86, 4.12, 4.27, 4.50)
+  )
 }
 
 # Assign values one by one so that NULL values are kept, not dropped.
@@ -648,6 +754,7 @@ qc_defaults <- function() {
     entry_weight_max = 65,
     exit_weight_min = 85,
     curve_r2_min = NULL,
+    max_daily_jump_kg = NULL,
     # growth and ADG
     stage_range = c(30, 120),
     curve_model = "poly2",
@@ -662,6 +769,7 @@ qc_defaults <- function() {
     idle_duration_max = 500,
     trough_diff_range = c(-20, 1800),
     max_unidentified_feed_kg = 90,
+    fiv_max_by_weight = NULL,
     # daily feed intake
     dfi_range = c(0, 6),
     dfi_quantile = NULL,
@@ -670,7 +778,10 @@ qc_defaults <- function() {
     long_gap_days = 7,
     # confidence flags
     max_edge_extrap_days = 15,
-    min_coverage = 0.7
+    min_coverage = 0.7,
+    bin_width = 10,
+    min_bin_coverage_kg = 6,
+    bin_fcr_limits = NULL
   )
 }
 
@@ -706,17 +817,20 @@ qc_groups <- function() {
     min_test_days = "Pig-level checks", min_records = "Pig-level checks",
     max_missing_rate = "Pig-level checks", entry_weight_max = "Pig-level checks",
     exit_weight_min = "Pig-level checks", curve_r2_min = "Pig-level checks",
+    max_daily_jump_kg = "Pig-level checks",
     stage_range = "Growth and ADG", curve_model = "Growth and ADG",
     max_extrap_days = "Growth and ADG",
     fiv_range = "Feeder errors", fiv0_abs_max = "Feeder errors",
     duration_max = "Feeder errors", speed_fiv_lo_max = "Feeder errors",
     speed_strict_max = "Feeder errors", speed_range = "Feeder errors",
     idle_duration_max = "Feeder errors", trough_diff_range = "Feeder errors",
-    max_unidentified_feed_kg = "Feeder errors",
+    max_unidentified_feed_kg = "Feeder errors", fiv_max_by_weight = "Feeder errors",
     dfi_range = "Daily feed intake", dfi_quantile = "Daily feed intake",
     dfi_correct = "Daily feed intake", impute_method = "Daily feed intake",
     long_gap_days = "Daily feed intake",
-    max_edge_extrap_days = "Confidence flags", min_coverage = "Confidence flags"
+    max_edge_extrap_days = "Confidence flags", min_coverage = "Confidence flags",
+    bin_width = "Confidence flags", min_bin_coverage_kg = "Confidence flags",
+    bin_fcr_limits = "Confidence flags"
   )
   g[names(qc_defaults())]
 }
@@ -726,6 +840,7 @@ qc_spec <- function() {
   num <- function(min = -Inf, max = Inf, null = FALSE) list(type = "num", min = min, max = max, null = null)
   rng <- function(min = -Inf, max = Inf, null = FALSE) list(type = "range", min = min, max = max, null = null)
   chc <- function(choices, multiple = FALSE) list(type = "choice", choices = choices, multiple = multiple, null = FALSE)
+  tbl <- function(cols, optional = character()) list(type = "table", cols = cols, optional = optional, null = TRUE)
   list(
     max_gap_days = num(0), max_overlap_days = num(0), max_jump_kg = num(0),
     weight_range = rng(0), weight_outlier = chc(c("rlm", "loess", "stl", "sd"), multiple = TRUE),
@@ -734,18 +849,21 @@ qc_spec <- function() {
     rel_dev_max = num(0, 1, null = TRUE), daily_drop_min = num(0, 1, null = TRUE),
     min_test_days = num(1), min_records = num(3), max_missing_rate = num(0, 1),
     entry_weight_max = num(0), exit_weight_min = num(0),
-    curve_r2_min = num(0, 1, null = TRUE),
+    curve_r2_min = num(0, 1, null = TRUE), max_daily_jump_kg = num(0, null = TRUE),
     stage_range = rng(0), curve_model = chc(c("poly1", "poly2", "poly3", "loess", "gompertz")),
     max_extrap_days = num(0),
     fiv_range = rng(), fiv0_abs_max = num(0), duration_max = num(0),
     speed_fiv_lo_max = num(0), speed_strict_max = num(0), speed_range = rng(0),
     idle_duration_max = num(0), trough_diff_range = rng(),
     max_unidentified_feed_kg = num(0),
+    fiv_max_by_weight = tbl(c("weight_from", "fiv_max"), optional = "breed"),
     dfi_range = rng(0), dfi_quantile = rng(0, 1, null = TRUE),
     dfi_correct = chc(c("lmm", "none")),
     impute_method = chc(c("linear", "loess")),
     long_gap_days = num(1),
-    max_edge_extrap_days = num(0), min_coverage = num(0, 1)
+    max_edge_extrap_days = num(0), min_coverage = num(0, 1),
+    bin_width = num(1), min_bin_coverage_kg = num(0),
+    bin_fcr_limits = tbl(c("weight_from", "fcr_min", "fcr_max"))
   )
 }
 
@@ -767,6 +885,8 @@ qc_validate <- function(cfg) {
           any(v < s$min) || any(v > s$max)) {
         cli::cli_abort("QC parameter {.field {nm}} must be two increasing numbers between {s$min} and {s$max}, not {.val {v}}.")
       }
+    } else if (s$type == "table") {
+      check_qc_table(v, nm, s$cols, s$optional)
     } else if (s$type == "choice") {
       ok <- is.character(v) && length(v) >= 1L && all(v %in% s$choices) &&
         (s$multiple || length(v) == 1L) && !anyDuplicated(v)
@@ -785,6 +905,39 @@ qc_validate <- function(cfg) {
   }
   if (cfg$outlier_combine == "majority" && length(cfg$weight_outlier) < 2L) {
     cli::cli_abort("{.field outlier_combine = \"majority\"} needs at least two methods in {.field weight_outlier}.")
+  }
+  if (cfg$min_bin_coverage_kg > cfg$bin_width) {
+    cli::cli_abort("{.field min_bin_coverage_kg} cannot be larger than {.field bin_width}.")
+  }
+  invisible(TRUE)
+}
+
+# Table parameters: required numeric columns, optional character columns,
+# one row per (optional key, weight_from).
+check_qc_table <- function(v, nm, cols, optional) {
+  if (!is.data.frame(v)) {
+    cli::cli_abort("QC parameter {.field {nm}} must be a data frame with columns {.val {cols}}.")
+  }
+  miss <- setdiff(cols, names(v))
+  if (length(miss) > 0L) {
+    cli::cli_abort("QC parameter {.field {nm}} is missing column{?s} {.val {miss}}.")
+  }
+  for (cl in cols) {
+    if (!is.numeric(v[[cl]]) || anyNA(v[[cl]])) {
+      cli::cli_abort("Column {.field {cl}} of {.field {nm}} must be numeric without NA.")
+    }
+  }
+  if (nrow(v) == 0L) cli::cli_abort("QC parameter {.field {nm}} has no rows.")
+  keys <- intersect(optional, names(v))
+  key <- do.call(paste, c(lapply(c(keys, "weight_from"), function(k) v[[k]]), sep = "|"))
+  if (anyDuplicated(key)) {
+    cli::cli_abort("QC parameter {.field {nm}} has duplicated {.field weight_from} rows{if (length(keys)) ' within a breed' else ''}.")
+  }
+  if (all(c("fcr_min", "fcr_max") %in% names(v)) && any(v$fcr_min >= v$fcr_max)) {
+    cli::cli_abort("In {.field {nm}}, {.field fcr_min} must be smaller than {.field fcr_max}.")
+  }
+  if ("fiv_max" %in% names(v) && any(v$fiv_max <= 0)) {
+    cli::cli_abort("In {.field {nm}}, {.field fiv_max} must be positive.")
   }
   invisible(TRUE)
 }
@@ -848,6 +1001,19 @@ test_that("invalid values are rejected", {
   expect_error(qc_config(curve_model = "spline"), "curve_model")
   expect_error(qc_config(weight_outlier = c("rlm", "rlm")), "weight_outlier")
   expect_error(qc_config(rlm_cutoff = NULL), "NULL")
+})
+
+test_that("table parameters are validated", {
+  expect_silent(qc_config(fiv_max_by_weight = fiv_max_example(),
+                          bin_fcr_limits = bin_fcr_example()))
+  expect_error(qc_config(fiv_max_by_weight = data.frame(weight_from = 20)), "fiv_max")
+  expect_error(qc_config(fiv_max_by_weight = data.frame(weight_from = c(20, 20), fiv_max = 1:2)), "duplicated")
+  expect_silent(qc_config(fiv_max_by_weight = data.frame(breed = c("A", "B"), weight_from = c(20, 20), fiv_max = 1:2)))
+  expect_error(qc_config(bin_fcr_limits = data.frame(weight_from = 30, fcr_min = 3, fcr_max = 2)), "fcr_min")
+  expect_error(qc_config(bin_fcr_limits = "x"), "data frame")
+  expect_error(qc_config(min_bin_coverage_kg = 12), "bin_width")
+  expect_message(print(qc_config(bin_fcr_limits = bin_fcr_example())), "table")
+  expect_equal(nrow(fiv_max_example()), 36L)
 })
 
 test_that("cross-parameter checks work", {
@@ -1125,6 +1291,8 @@ table that every later step uses:
 #'   `entry_time`:
 #'   - `responder`: pig ID (character, `NA` for unidentified visits);
 #'     `responder_raw`: transponder number as recorded;
+#'   - `breed`: kept when the input has a `breed` column; otherwise add it
+#'     with [add_breed()];
 #'   - `identified`: `FALSE` for visits without a transponder read;
 #'   - `location`: station (feeder) ID, character;
 #'   - `date`, `seq_days` (day number from the first day in the data, 1 =
@@ -1211,8 +1379,8 @@ prep_visits <- function(data, station = NULL, qc = qc_config(), verbose = 1) {
   dt[, seq_in_location := seq_len(.N), by = .(location, date)]
   dt[identified == TRUE, seq_in_day := seq_len(.N), by = .(responder, date)]
 
-  cols <- c("responder", "responder_raw", "identified", "location", "date",
-            "seq_days", "seq_in_day", "seq_in_location", "entry_time",
+  cols <- c("responder", "responder_raw", "identified", "breed", "location",
+            "date", "seq_days", "seq_in_day", "seq_in_location", "entry_time",
             "exit_time", "duration", "feed_intake", "weight", "trough_in",
             "trough_out", "topup", "source_file")
   cols <- intersect(cols, names(dt))
@@ -1228,6 +1396,9 @@ prep_visits <- function(data, station = NULL, qc = qc_config(), verbose = 1) {
   ))
 
   ppt_msg("{data.table::uniqueN(dt$responder, na.rm = TRUE)} pigs at {data.table::uniqueN(dt$location)} station{?s}, {nrow(dt)} visits over {max(dt$seq_days)} days", "success")
+  if (!"breed" %in% names(dt)) {
+    ppt_msg("No {.field breed} column. To use breed in the feed intake model and breed-specific limits, add it with {.fn add_breed}.", "info")
+  }
   dt
 }
 
@@ -1250,6 +1421,7 @@ standardise_nedap <- function(dt) {
     topup = NA_real_
   )]
   if ("source_file" %in% names(dt)) out[, source_file := dt$source_file]
+  if ("breed" %in% names(dt)) out[, breed := as.character(dt$breed)]
   out[, exit_time := entry_time + duration]
   finish_ids(out)
   data.table::setattr(out, "n_midnight", 0L)
@@ -1280,6 +1452,7 @@ standardise_fire <- function(dt, duration_max) {
     topup = if ("Topup Amount" %in% names(dt)) as.numeric(dt$`Topup Amount`) * 1000 else NA_real_
   )
   if ("source_file" %in% names(dt)) out[, source_file := dt$source_file]
+  if ("breed" %in% names(dt)) out[, breed := as.character(dt$breed)]
   finish_ids(out)
   data.table::setattr(out, "n_midnight", sum(crossing))
   out
@@ -1555,6 +1728,121 @@ test_that("bad inputs give clear errors", {
 })
 ```
 
+# add_breed
+
+Pig breed (or line) usually is not in the station export and cannot be
+read from the transponder number. `add_breed()` merges a breed table from
+your own records into the visit table. With a `breed` column:
+
+- `calc_adfi()` adds breed as a fixed effect to the correction model;
+- `fiv_max_by_weight` limits can differ by breed;
+- `calc_fcr()` summarises traits by breed.
+
+```{r function-add_breed}
+#' Add Breed Information to a Visit Table
+#'
+#' @description
+#' Merge a table of pig IDs and breeds into a visit table from
+#' [prep_visits()].
+#'
+#' @param visits Visit table from [prep_visits()].
+#' @param breeds A data frame with one row per pig: the pig ID and its
+#'   breed (or line).
+#' @param id Name of the ID column in `breeds`. It is matched to the
+#'   transponder number `responder_raw` (so pigs split by [prep_visits()]
+#'   keep their breed), then to `responder`. Default `"responder"`.
+#' @param breed Name of the breed column in `breeds`. Default `"breed"`.
+#' @param verbose 0 (silent), 1 (summary, default) or 2 (details).
+#'
+#' @return The visit table with a `breed` column (character, `NA` for
+#'   unidentified visits and for pigs not found in `breeds`). Attributes of
+#'   `visits` are kept.
+#' @export
+add_breed <- function(visits, breeds, id = "responder", breed = "breed",
+                      verbose = 1) {
+  local_verbose(verbose)
+  dt <- as_dt(visits, "visits")
+  check_cols(dt, c("responder", "responder_raw", "identified"), arg = "visits",
+             hint = "Use {.fn prep_visits} first.")
+  b <- as_dt(breeds, "breeds")
+  check_cols(b, c(id, breed), arg = "breeds")
+  map <- unique(data.table::data.table(id = trimws(as.character(b[[id]])),
+                                       breed = trimws(as.character(b[[breed]]))))
+  map <- map[!is.na(id) & nzchar(id)]
+  conflict <- map[, .N, by = id][N > 1L, id]
+  if (length(conflict) > 0L) {
+    cli::cli_abort(c("Pig{?s} with more than one breed in {.arg breeds}: {.val {conflict}}.",
+                     "i" = "Keep one row per pig."))
+  }
+  if ("breed" %in% names(dt)) {
+    ppt_msg("Replacing the existing {.field breed} column", "warning")
+    dt[, breed := NULL]
+  }
+  dt[, breed := map$breed[match(responder_raw, map$id)]]
+  dt[is.na(breed), breed := map$breed[match(responder, map$id)]]
+  dt[identified == FALSE, breed := NA_character_]
+  data.table::setcolorder(dt, intersect(c("responder", "responder_raw", "identified", "breed"), names(dt)))
+
+  pigs <- unique(dt[identified == TRUE, .(responder, breed)])
+  missing_pigs <- pigs[is.na(breed), responder]
+  counts <- pigs[!is.na(breed), .N, by = breed][order(breed)]
+  ppt_msg("Breed added for {sum(!is.na(pigs$breed))} of {nrow(pigs)} pigs: {paste0(counts$breed, ' (', counts$N, ')', collapse = ', ')}", "success")
+  if (length(missing_pigs) > 0L) {
+    ppt_warn("{length(missing_pigs)} pig{?s} not found in {.arg breeds}: {.val {utils::head(missing_pigs, 10)}}{if (length(missing_pigs) > 10) ' ...' else ''}")
+  }
+  for (a in setdiff(names(attributes(visits)), c("names", "row.names", "class", ".internal.selfref", "sorted", "index"))) {
+    data.table::setattr(dt, a, attr(visits, a, exact = TRUE))
+  }
+  dt
+}
+```
+
+```{r example-add_breed}
+visits <- prep_visits(nedap, verbose = 0)
+# a breed table from your own herd records, one row per pig
+pigs <- unique(visits[identified == TRUE, responder])
+breeds <- data.frame(responder = pigs, breed = rep(c("YY", "LL"), length.out = length(pigs)))
+visits <- add_breed(visits, breeds)
+table(unique(visits[identified == TRUE, .(responder, breed)])$breed)
+```
+
+```{r tests-add_breed}
+test_that("add_breed merges by transponder and keeps attributes", {
+  v <- prep_visits(nedap, verbose = 0)
+  pigs <- unique(v[identified == TRUE, responder])
+  b <- data.frame(tag = pigs, line = rep(c("A", "B"), length.out = length(pigs)))
+  out <- add_breed(v, b, id = "tag", breed = "line", verbose = 0)
+  expect_true("breed" %in% names(out))
+  expect_true(all(is.na(out[identified == FALSE, breed])))
+  expect_false(anyNA(out[identified == TRUE, breed]))
+  expect_equal(attr(out, "station"), "nedap")
+  expect_false("breed" %in% names(v))                # input not modified
+})
+
+test_that("missing pigs warn and conflicting breeds stop", {
+  v <- prep_visits(fire, verbose = 0)
+  pigs <- unique(v[identified == TRUE, responder])
+  expect_warning(add_breed(v, data.frame(responder = pigs[1:3], breed = "YY"), verbose = 1), "not found")
+  expect_error(add_breed(v, data.frame(responder = c(pigs[1], pigs[1]), breed = c("YY", "LL"))), "more than one")
+  expect_error(add_breed(v, data.frame(id = pigs)), "breed")
+})
+
+test_that("split pigs keep their breed and a breed column in raw data is kept", {
+  d <- data.table::as.data.table(nedap)[responder == 15497]
+  d[, location := 101L]
+  m <- d$visit_time[floor(nrow(d) / 2)]
+  d <- d[visit_time < m | visit_time > m + 10 * 86400]
+  d[visit_time > m, location := 102L]
+  v <- prep_visits(d, verbose = 0)
+  out <- add_breed(v, data.frame(responder = "15497", breed = "DD"), verbose = 0)
+  expect_equal(unique(out$breed), "DD")
+  expect_setequal(unique(out$responder), c("15497_101", "15497_102"))
+  d[, breed := "LL"]
+  expect_equal(unique(prep_visits(d, verbose = 0)[identified == TRUE, breed]), "LL")
+  expect_message(prep_visits(nedap), "add_breed")
+})
+```
+
 # clean_weight
 
 `clean_weight()` cleans the body weight records of identified visits in
@@ -1592,6 +1880,7 @@ removed pig is listed in `removed` with the reason.
 #'   `min_test_days`, `max_missing_rate`, `entry_weight_max`,
 #'   `exit_weight_min`, `curve_r2_min`.
 #' @param verbose 0 (silent), 1 (summary, default) or 2 (details).
+#' @param cores Number of CPU cores for the per-pig computations. Default 1.
 #'
 #' @return An object of class `ppt_weight` (a list):
 #'   - `per_pig`: one row per pig with `n_records`, `n_valid`,
@@ -1612,16 +1901,19 @@ removed pig is listed in `removed` with the reason.
 #' - `n_valid < min_records`, `test_days < min_test_days` or
 #'   `missing_rate > max_missing_rate` (share of test days without a valid
 #'   weight) remove the pig;
-#' - `entry_weight > entry_weight_max`, `exit_weight < exit_weight_min` or
-#'   `r2 < curve_r2_min` mark the pig `"low_confidence"` but keep it: its
+#' - `entry_weight > entry_weight_max`, `exit_weight < exit_weight_min`,
+#'   `r2 < curve_r2_min` or `max_daily_jump > max_daily_jump_kg` (the
+#'   largest change of the daily median weight between consecutive recorded
+#'   days, kg/d) mark the pig `"low_confidence"` but keep it: its
 #'   growth can still be estimated by extrapolation in [calc_adg()], with a
 #'   flag.
 #'
 #' @seealso [prep_visits()] for the previous step, [qc_config()] for the
 #'   settings.
 #' @export
-clean_weight <- function(visits, qc = qc_config(), verbose = 1) {
+clean_weight <- function(visits, qc = qc_config(), verbose = 1, cores = 1) {
   local_verbose(verbose)
+  local_cores(cores)
   check_qc(qc)
   dt <- as_dt(visits, "visits")
   check_cols(dt, c("responder", "identified", "location", "date", "seq_days",
@@ -1672,7 +1964,10 @@ clean_weight <- function(visits, qc = qc_config(), verbose = 1) {
   per_pig[, test_days := as.integer(last_date - first_date) + 1L]
   per_pig[, missing_rate := 1 - valid_days / test_days]
   per_pig <- merge(per_pig, pig_fit, by = "responder", all.x = TRUE)
+  per_pig <- merge(per_pig, daily_jumps(rec), by = "responder", all.x = TRUE)
   per_pig <- merge(main_loc, per_pig, by = "responder", all.y = TRUE)
+  pig_breed <- breed_of(dt)
+  if (!is.null(pig_breed)) per_pig <- merge(pig_breed, per_pig, by = "responder", all.y = TRUE)
 
   remove_why <- pig_reasons(per_pig, qc, fits$failed, type = "remove")
   flag_why <- pig_reasons(per_pig, qc, fits$failed, type = "flag")
@@ -1680,7 +1975,7 @@ clean_weight <- function(visits, qc = qc_config(), verbose = 1) {
                        data.table::fifelse(nzchar(flag_why), "low_confidence", "keep"))]
   per_pig[, reason := data.table::fifelse(status == "removed", remove_why, flag_why)]
   per_pig[, valid_days := NULL]
-  data.table::setcolorder(per_pig, c("responder", "location"))
+  data.table::setcolorder(per_pig, intersect(c("responder", "location", "breed"), names(per_pig)))
   data.table::setorder(per_pig, location, responder)
 
   kept <- per_pig[status != "removed", responder]
@@ -1712,6 +2007,25 @@ clean_weight <- function(visits, qc = qc_config(), verbose = 1) {
 # ---- helpers ----------------------------------------------------------------
 
 `%||%` <- function(x, y) if (is.null(x)) y else x
+
+# Breed of each identified pig (first non-missing value), or NULL.
+breed_of <- function(dt) {
+  if (!"breed" %in% names(dt)) return(NULL)
+  out <- dt[identified == TRUE, .(breed = stats::na.omit(breed)[1L]), by = responder]
+  out[, breed := as.character(breed)]
+  out[]
+}
+
+# Largest change of the daily median valid weight between consecutive
+# recorded days, in kg per day.
+daily_jumps <- function(rec) {
+  d <- rec[outlier == FALSE, .(w = stats::median(weight)), by = .(responder, date)]
+  data.table::setorder(d, responder, date)
+  d[, rate := abs(w - data.table::shift(w)) / as.numeric(date - data.table::shift(date)),
+    by = responder]
+  d[, .(max_daily_jump = if (all(is.na(rate))) NA_real_ else max(rate, na.rm = TRUE)),
+    by = responder]
+}
 
 check_qc <- function(qc) {
   if (!inherits(qc, "ppt_qc")) {
@@ -1863,6 +2177,10 @@ pig_reasons <- function(p, qc, failed, type = c("remove", "flag")) {
         sprintf("exit weight %.1f kg < %s kg", p$exit_weight, qc$exit_weight_min))
     if (!is.null(qc$curve_r2_min)) {
       add(p$r2 < qc$curve_r2_min, sprintf("curve R2 %.3f < %s", p$r2, qc$curve_r2_min))
+    }
+    if (!is.null(qc$max_daily_jump_kg)) {
+      add(p$max_daily_jump > qc$max_daily_jump_kg,
+          sprintf("day-to-day weight change %.1f kg/d > %s kg/d", p$max_daily_jump, qc$max_daily_jump_kg))
     }
     return(vapply(reasons, function(x) paste(unique(x), collapse = "; "), character(1)))
   }
@@ -2056,6 +2374,39 @@ test_that("a pig whose fit fails is removed, others continue", {
   expect_equal(w$per_pig[responder == "p1", status], "keep")
 })
 
+test_that("daily weight jumps are measured and only flag pigs when asked", {
+  v <- prep_visits(nedap, verbose = 0)
+  w <- clean_weight(v, verbose = 0)
+  expect_true("max_daily_jump" %in% names(w$per_pig))
+  expect_false(any(grepl("day-to-day", w$per_pig$reason)))
+  w4 <- clean_weight(v, qc = qc_config(max_daily_jump_kg = 4), verbose = 0)
+  flagged <- w4$per_pig[grepl("day-to-day", reason)]
+  expect_gt(nrow(flagged), 0)
+  expect_true(all(flagged$status %in% c("low_confidence", "removed")))
+  expect_equal(w4$per_pig[status == "removed", .N], w$per_pig[status == "removed", .N])
+})
+
+test_that("parallel computing gives the same result", {
+  skip_on_cran()
+  skip_on_os("windows")
+  v <- prep_visits(nedap, verbose = 0)
+  one <- clean_weight(v, verbose = 0, cores = 1)
+  two <- clean_weight(v, verbose = 0, cores = 2)
+  expect_equal(one$per_pig, two$per_pig)
+  expect_equal(one$records, two$records)
+  expect_error(clean_weight(v, verbose = 0, cores = 0), "cores")
+})
+
+test_that("breed is carried to the pig tables", {
+  v <- prep_visits(fire, verbose = 0)
+  pigs <- unique(v[identified == TRUE, responder])
+  v <- add_breed(v, data.frame(responder = pigs, breed = rep(c("YY", "LL"), length.out = length(pigs))), verbose = 0)
+  w <- clean_weight(v, verbose = 0)
+  expect_true("breed" %in% names(w$per_pig))
+  a <- suppressWarnings(calc_adg(w, verbose = 0))
+  expect_setequal(unique(a$per_pig$breed), c("YY", "LL"))
+})
+
 test_that("verbose = 0 is silent and bad inputs are rejected", {
   v <- prep_visits(fire, verbose = 0)
   expect_silent(clean_weight(v, verbose = 0))
@@ -2098,6 +2449,7 @@ Every pig gets an `adg_type`:
 #'   Used here: `stage_range`, `curve_model`, `loess_span`,
 #'   `max_extrap_days`.
 #' @param verbose 0 (silent), 1 (summary, default) or 2 (details).
+#' @param cores Number of CPU cores for the per-pig computations. Default 1.
 #'
 #' @return An object of class `ppt_adg` (a list):
 #'   - `per_pig`: one row per pig (pigs removed by [clean_weight()] are not
@@ -2119,8 +2471,9 @@ Every pig gets an `adg_type`:
 #'
 #' @seealso [clean_weight()] for the previous step.
 #' @export
-calc_adg <- function(weight, qc = weight$settings, verbose = 1) {
+calc_adg <- function(weight, qc = weight$settings, verbose = 1, cores = 1) {
   local_verbose(verbose)
+  local_cores(cores)
   if (!inherits(weight, "ppt_weight")) {
     cli::cli_abort("{.arg weight} must be the result of {.fn clean_weight}.")
   }
@@ -2128,9 +2481,9 @@ calc_adg <- function(weight, qc = weight$settings, verbose = 1) {
   stage <- qc$stage_range
   ppt_msg("ADG over {stage[1]}-{stage[2]} kg ({.field {qc$curve_model}} curve)", "h1")
 
-  kept <- weight$per_pig[status != "removed", .(responder, location,
-                                                 weight_status = status,
-                                                 weight_reason = reason)]
+  kcols <- intersect(c("responder", "location", "breed", "status", "reason"), names(weight$per_pig))
+  kept <- weight$per_pig[status != "removed", kcols, with = FALSE]
+  data.table::setnames(kept, c("status", "reason"), c("weight_status", "weight_reason"))
   rec <- weight$records[outlier == FALSE & responder %in% kept$responder]
   day0 <- weight$daily[, min(date - seq_days + 1L)]   # date with seq_days = 1
 
@@ -2153,7 +2506,7 @@ calc_adg <- function(weight, qc = weight$settings, verbose = 1) {
     data.table::setorder(daily, location, responder, date)
   }
 
-  cols <- c("responder", "location", "stage", "curve_used", "curve_r2",
+  cols <- c("responder", "location", "breed", "stage", "curve_used", "curve_r2",
             "adg_type", "start_date", "end_date", "start_weight", "end_weight",
             "stage_days", "extrap_days_start", "extrap_days_end", "adg", "lm_slope",
             "r_squared", "weight_status",
@@ -2492,7 +2845,13 @@ pens above 90 kg, here a warning is given above `max_unidentified_feed_kg`.
 #' @param qc QC settings from [qc_config()]. Used here: `fiv_range`,
 #'   `fiv0_abs_max`, `duration_max`, `speed_fiv_lo_max`,
 #'   `speed_strict_max`, `speed_range`, `idle_duration_max`,
-#'   `trough_diff_range`, `max_unidentified_feed_kg`.
+#'   `trough_diff_range`, `max_unidentified_feed_kg`, `fiv_max_by_weight`.
+#' @param bw Optional daily body weight of each pig, used to look up
+#'   `fiv_max_by_weight`: a data frame with `responder`, `date` and `bw`
+#'   (kg), such as the fitted weights of [calc_adg()]. [calc_adfi()] passes
+#'   them automatically. Without it, the daily median of the recorded
+#'   weights is used; early in the test these are often biased upwards by
+#'   outliers.
 #' @param verbose 0 (silent), 1 (summary, default) or 2 (rate of each
 #'   error type).
 #'
@@ -2503,6 +2862,8 @@ pens above 90 kg, here a warning is given above `max_unidentified_feed_kg`.
 #'     `otv_lo`, `otv_hi`, `frv_hi_fiv_lo`, `frv_hi_strict`, `frv_hi`,
 #'     `frv_0`, `frv_lo`, `lwd_lo`, `lwd_hi`, `fwd_lo`, `fwd_hi`, `ltd_lo`,
 #'     `ftd_lo`);
+#'   - `fiv_max`: the FIV-hi limit used for the visit (g), fixed or from
+#'     `fiv_max_by_weight`;
 #'   - `n_errors`: number of error types of the visit (0 = error-free).
 #'
 #'   Attributes `"feeders"` (per feeder: visits, unidentified visits, feed
@@ -2518,7 +2879,7 @@ pens above 90 kg, here a warning is given above `max_unidentified_feed_kg`.
 #' @seealso [prep_visits()] for the previous step, [calc_adfi()] which uses
 #'   the flags.
 #' @export
-flag_feed_errors <- function(visits, qc = qc_config(), verbose = 1) {
+flag_feed_errors <- function(visits, qc = qc_config(), bw = NULL, verbose = 1) {
   local_verbose(verbose)
   check_qc(qc)
   dt <- as_dt(visits, "visits")
@@ -2547,10 +2908,12 @@ flag_feed_errors <- function(visits, qc = qc_config(), verbose = 1) {
 
   fiv_lo <- qc$fiv_range[1L]
   is_true <- function(x) x %in% TRUE
+  # upper limit of FIV: fixed, or by body weight (and breed)
+  dt[, fiv_max := if (is.null(qc$fiv_max_by_weight)) qc$fiv_range[2L] else fiv_limit_by_weight(dt, qc, bw)]
   neighbour_neg <- dt[, is_true(prev_fiv < fiv_lo) | is_true(next_fiv < fiv_lo)]
   dt[, `:=`(
     fiv_lo = is_true(fiv < fiv_lo),
-    fiv_hi = is_true(fiv > qc$fiv_range[2L]),
+    fiv_hi = is_true(fiv > fiv_max),
     fiv_0 = is_true(otv == 0 & abs(fiv) > qc$fiv0_abs_max),
     otv_lo = is_true(otv < 0),
     otv_hi = is_true(otv > qc$duration_max),
@@ -2605,6 +2968,60 @@ flag_feed_errors <- function(visits, qc = qc_config(), verbose = 1) {
     ppt_warn("Feeder {.val {big$location[i]}}: {round(big$unidentified_feed_kg[i], 1)} kg of feed disappeared in unidentified visits (> {qc$max_unidentified_feed_kg} kg). Casey et al. (2005) discarded such pens.")
   }
   dt
+}
+
+# Body weight of the pig at each visit: from `bw` (daily fitted weights)
+# when given, otherwise the daily median of the valid recorded weights;
+# interpolated between days. NA for unidentified visits.
+visit_body_weight <- function(dt, qc, bw = NULL) {
+  day <- as.numeric(as.Date(dt$entry_time, tz = "UTC"))
+  if (!is.null(bw)) {
+    bw <- data.table::as.data.table(bw)
+    check_cols(bw, c("responder", "date", "bw"), arg = "bw")
+    daily <- bw[!is.na(bw), .(responder = as.character(responder),
+                              day = as.numeric(as.Date(date)), w = bw)]
+  } else {
+    ok <- dt$identified & !is.na(dt$weight) &
+      dt$weight >= qc$weight_range[1L] & dt$weight <= qc$weight_range[2L]
+    daily <- data.table::data.table(responder = dt$responder[ok], day = day[ok],
+                                    w = dt$weight[ok])
+  }
+  daily <- daily[, .(w = stats::median(w)), by = .(responder, day)]
+  out <- rep(NA_real_, nrow(dt))
+  for (pig in unique(daily$responder)) {
+    d <- daily[responder == pig][order(day)]
+    idx <- which(dt$identified & dt$responder %in% pig)
+    out[idx] <- if (nrow(d) == 1L) d$w else stats::approx(d$day, d$w, xout = day[idx], rule = 2)$y
+  }
+  out
+}
+
+# FIV-hi limit of each visit from the table qc$fiv_max_by_weight.
+# Visits without body weight, or of a breed absent from the table, keep the
+# fixed limit fiv_range[2].
+fiv_limit_by_weight <- function(dt, qc, bw_table = NULL) {
+  tab <- data.table::as.data.table(qc$fiv_max_by_weight)
+  bw <- visit_body_weight(dt, qc, bw_table)
+  lim <- rep(qc$fiv_range[2L], nrow(dt))
+  pick <- function(rows, t) {
+    t <- t[order(weight_from)]
+    k <- findInterval(bw[rows], t$weight_from)
+    k[k == 0L] <- 1L
+    ifelse(is.na(bw[rows]), qc$fiv_range[2L], t$fiv_max[k])
+  }
+  if ("breed" %in% names(tab)) {
+    visit_breed <- if ("breed" %in% names(dt)) as.character(dt$breed) else rep(NA_character_, nrow(dt))
+    for (b in unique(stats::na.omit(tab$breed))) {
+      rows <- which(visit_breed %in% b)
+      if (length(rows)) lim[rows] <- pick(rows, tab[breed %in% b])
+    }
+    default <- tab[is.na(breed)]
+    rows <- which(!visit_breed %in% tab$breed)
+    if (nrow(default) > 0L && length(rows)) lim[rows] <- pick(rows, default)
+  } else {
+    lim <- pick(seq_len(nrow(dt)), tab)
+  }
+  lim
 }
 
 # Error types in the order of Casey et al. (2005), Table 3.
@@ -2774,6 +3191,33 @@ test_that("NEDAP: weight differences are NA, time rules still apply", {
   expect_true(any(!is.na(f$ltd)))
 })
 
+test_that("FIV-hi limit can depend on body weight and breed", {
+  v <- prep_visits(nedap, verbose = 0)
+  fixed <- flag_feed_errors(v, verbose = 0)
+  expect_true(all(fixed$fiv_max == 2000))
+  # one limit for all weights: same as a fixed limit
+  flat <- flag_feed_errors(v, qc_config(fiv_max_by_weight = data.frame(weight_from = 0, fiv_max = 500)), verbose = 0)
+  idv <- flat[identified == TRUE & !is.na(weight)]
+  expect_true(all(flat[identified == FALSE, fiv_max] == 2000))
+  expect_equal(sum(flat$fiv_hi), flat[, sum(feed_intake > fiv_max)])
+  expect_gt(sum(flat$fiv_hi), sum(fixed$fiv_hi))
+  # limit rising with weight: light pigs get the lower limit
+  tab <- data.frame(weight_from = c(0, 60), fiv_max = c(300, 5000))
+  byw <- flag_feed_errors(v, qc_config(fiv_max_by_weight = tab), verbose = 0)
+  expect_setequal(unique(byw[identified == TRUE, fiv_max]), c(300, 5000))
+  # breed-specific table: breeds absent from the table keep 2000 g
+  pigs <- unique(v[identified == TRUE, responder])
+  vb <- add_breed(v, data.frame(responder = pigs, breed = rep(c("DD", "ZZ"), length.out = length(pigs))), verbose = 0)
+  fb <- flag_feed_errors(vb, qc_config(fiv_max_by_weight = fiv_max_example()), verbose = 0)
+  expect_true(all(fb[breed == "ZZ", fiv_max] == 2000))
+  expect_true(all(fb[breed == "DD", fiv_max] %in% fiv_max_example()[breed == "DD", fiv_max]))
+  # fitted body weights can be supplied
+  bwt <- data.table::data.table(responder = pigs, date = min(v$date), bw = 25)
+  f25 <- flag_feed_errors(v, qc_config(fiv_max_by_weight = tab), bw = bwt, verbose = 0)
+  expect_true(all(f25[identified == TRUE, fiv_max] == 300))
+  expect_error(flag_feed_errors(v, qc_config(fiv_max_by_weight = tab), bw = data.frame(x = 1), verbose = 0), "bw")
+})
+
 test_that("a large unidentified feed disappearance gives a warning", {
   v <- prep_visits(fire, verbose = 0)
   q <- qc_config(max_unidentified_feed_kg = 1)
@@ -2801,13 +3245,15 @@ weight stage as [calc_adg()], so that FCR compares like with like.
 day, the error-free intake `y` (sum of FIV over visits without error) is
 modelled with a linear mixed model fitted on **all** pig-days:
 
-`y ~ location + BW + ADG + 16 x PTE + 11 x OTD + 4 x FID + (1 | pig)`
+`y ~ location + breed + BW + ADG + 16 x PTE + 11 x OTD + 4 x FID + (1 | pig)`
 
 - PTE: share of the day's visits with error type p; OTD: occupation time
   of visits with error p (types 1, 2, 6-14); FID: feed intake of visits
   with error p (types 4, 5, 15, 16);
 - BW: predicted body weight of the day from [calc_adg()]; ADG of the pig;
-- `location` is a fixed effect when there is more than one station.
+- `location` is a fixed effect when there is more than one station, and
+  `breed` when the data have a `breed` column (see [add_breed()]) with
+  more than one breed.
 
 The corrected intake is `y - sum(b x error covariates)`: only the effects
 of the error covariates are removed, so a day without errors keeps its
@@ -2849,6 +3295,7 @@ Day states: `"org"` (no error, recorded value), `"corr"` (corrected),
 #'   the feeder error thresholds, `dfi_correct`, `dfi_range`,
 #'   `dfi_quantile`, `impute_method`, `long_gap_days`, `loess_span`.
 #' @param verbose 0 (silent), 1 (summary, default) or 2 (details).
+#' @param cores Number of CPU cores for the per-pig computations. Default 1.
 #'
 #' @return An object of class `ppt_adfi` (a list):
 #'   - `per_pig`: `adfi` (g/d over the stage), `adfi_raw` (mean recorded
@@ -2871,8 +3318,9 @@ Day states: `"org"` (no error, recorded value), `"corr"` (corrected),
 #'
 #' @seealso [flag_feed_errors()], [calc_adg()].
 #' @export
-calc_adfi <- function(visits, adg, qc = adg$settings, verbose = 1) {
+calc_adfi <- function(visits, adg, qc = adg$settings, verbose = 1, cores = 1) {
   local_verbose(verbose)
+  local_cores(cores)
   if (!inherits(adg, "ppt_adg")) {
     cli::cli_abort("{.arg adg} must be the result of {.fn calc_adg}.")
   }
@@ -2880,17 +3328,21 @@ calc_adfi <- function(visits, adg, qc = adg$settings, verbose = 1) {
   flagged <- if ("n_errors" %in% names(visits)) {
     as_dt(visits, "visits")
   } else {
-    flag_feed_errors(visits, qc, verbose = ppt_verbose())
+    flag_feed_errors(visits, qc, bw = adg$daily[, .(responder, date, bw = predicted)],
+                     verbose = ppt_verbose())
   }
 
   ppt_msg("ADFI over {qc$stage_range[1]}-{qc$stage_range[2]} kg", "h1")
 
-  pigs <- adg$per_pig[!is.na(adg), .(responder, pig_location = location,
-                                      adg, adg_type, stage)]
+  has_breed <- "breed" %in% names(adg$per_pig)
+  pigs <- adg$per_pig[!is.na(adg), intersect(c("responder", "location", "breed", "adg", "adg_type", "stage"),
+                                             names(adg$per_pig)), with = FALSE]
+  data.table::setnames(pigs, "location", "pig_location")
   cov <- daily_error_covariates(flagged)[responder %in% pigs$responder]
   bw <- adg$daily[, .(responder, date, seq_days, bw = predicted, in_stage)]
   cov <- merge(cov, bw, by = c("responder", "date"), all.x = TRUE)
-  cov <- merge(cov, pigs[, .(responder, adg)], by = "responder")
+  cov <- merge(cov, pigs[, intersect(c("responder", "adg", "breed"), names(pigs)), with = FALSE],
+               by = "responder")
   cov[, all_error := n_error_visits == n_visits]
 
   # 5c. correction
@@ -2954,9 +3406,11 @@ calc_adfi <- function(visits, adg, qc = adg$settings, verbose = 1) {
   ), by = responder]
   per_pig[, coverage := n_observed / n_stage_days]
   per_pig[is.nan(adfi), adfi := NA_real_]
-  per_pig <- merge(pigs[, .(responder, location = pig_location, stage, adg_type)],
+  per_pig <- merge(pigs[, intersect(c("responder", "pig_location", "breed", "stage", "adg_type"), names(pigs)),
+                        with = FALSE],
                    per_pig, by = "responder", all.x = TRUE)
-  data.table::setcolorder(per_pig, c("responder", "location", "stage", "adfi"))
+  data.table::setnames(per_pig, "pig_location", "location")
+  data.table::setcolorder(per_pig, intersect(c("responder", "location", "breed", "stage", "adfi"), names(per_pig)))
   data.table::setorder(per_pig, location, responder)
 
   no_adfi <- per_pig[is.na(adfi)]
@@ -2988,7 +3442,9 @@ correct_dfi <- function(cov, qc) {
   varies <- vapply(err_cols, function(cl) stats::var(md[[cl]]) > 0, logical(1))
   terms <- err_cols[varies %in% TRUE]
   multi_loc <- data.table::uniqueN(md$location) > 1L
-  base <- c(if (multi_loc) "location", "bw", "adg")
+  multi_breed <- "breed" %in% names(md) && data.table::uniqueN(stats::na.omit(md$breed)) > 1L
+  if (multi_breed) md[is.na(breed), breed := "unknown"]
+  base <- c(if (multi_loc) "location", if (multi_breed) "breed", "bw", "adg")
   if (length(terms) > 0L) {
     lfit <- stats::lm(stats::reformulate(c(base, terms), "y"), data = md)
     aliased <- names(stats::coef(lfit))[is.na(stats::coef(lfit))]
@@ -3001,6 +3457,7 @@ correct_dfi <- function(cov, qc) {
   }
 
   if (multi_loc) md[, location := factor(location)]
+  if (multi_breed) md[, breed := factor(breed)]
   fit <- tryCatch(
     nlme::lme(stats::reformulate(c(base, terms), "y"), random = ~ 1 | responder,
               data = md, method = "REML",
@@ -3272,6 +3729,9 @@ gain) and its inverse, feed efficiency G:F = ADG / ADFI.
 Each pig gets `fcr_flag = "ok"` or `"low_confidence"`, with the reasons in
 `fcr_note`: the growth curve or the feed intake extrapolated over more
 than `max_edge_extrap_days` (default 15) at the start or end of the stage,
+an inner 10 kg class with recorded weights spanning less than
+`min_bin_coverage_kg` (default 6 kg), a segment FCR outside the optional
+`bin_fcr_limits`,
 ADG on part of the stage only, less than `min_coverage` (default 0.7) of
 the stage with recorded feed intake, or weight data flagged by
 [clean_weight()].
@@ -3297,8 +3757,14 @@ the stage with recorded feed intake, or weight data flagged by
 #'     `fcr_note`;
 #'   - `daily`: the daily table of [calc_adfi()];
 #'   - `summary`: numeric summary (`n`, `min`, `max`, `median`, `mean`,
-#'     `sd`, `cv`) of the main traits, for all pigs and for pigs with
-#'     `fcr_flag = "ok"`;
+#'     `sd`, `cv`) of the main traits, for all pigs, for pigs with
+#'     `fcr_flag = "ok"` and, with a `breed` column, for each breed;
+#'   - `by_bin`: one row per pig and body weight class of `bin_width` kg:
+#'     feed (`feed_kg`), gain (`gain_kg`), segment `fcr`,
+#'     `weight_coverage_kg` (span of recorded body weights in the class),
+#'     `low_coverage` (inner class covered by less than
+#'     `min_bin_coverage_kg`) and `fcr_out` (segment FCR outside
+#'     `bin_fcr_limits`);
 #'   - `removed`, `settings`.
 #'
 #' @seealso [calc_adg()], [calc_adfi()].
@@ -3317,9 +3783,10 @@ calc_fcr <- function(adg, adfi, min_coverage = adg$settings$min_coverage,
   }
   ppt_msg("FCR over {adg$settings$stage_range[1]}-{adg$settings$stage_range[2]} kg", "h1")
 
-  a <- adg$per_pig[, .(responder, location, stage, adg, adg_type, stage_days,
-                       start_weight, end_weight, weight_status,
-                       extrap_days_start, extrap_days_end)]
+  a <- adg$per_pig[, intersect(c("responder", "location", "breed", "stage", "adg", "adg_type",
+                                "stage_days", "start_weight", "end_weight", "weight_status",
+                                "extrap_days_start", "extrap_days_end"), names(adg$per_pig)),
+                   with = FALSE]
   f <- adfi$per_pig[, .(responder, adfi, coverage, n_extrap_start, n_extrap_end)]
   max_edge <- adg$settings$max_edge_extrap_days
   per_pig <- merge(a, f, by = "responder", all.x = TRUE)
@@ -3328,6 +3795,8 @@ calc_fcr <- function(adg, adfi, min_coverage = adg$settings$min_coverage,
   notes <- character(nrow(per_pig))
   add_note <- function(cond, text) {
     cond <- cond %in% TRUE
+    if (!any(cond)) return(invisible(NULL))
+    text <- if (length(text) == 1L) rep(text, sum(cond)) else text[cond]
     notes[cond] <<- ifelse(nzchar(notes[cond]), paste(notes[cond], text, sep = "; "), text)
   }
   add_note(per_pig$adg_type == "partial", "ADG on part of the stage")
@@ -3342,20 +3811,34 @@ calc_fcr <- function(adg, adfi, min_coverage = adg$settings$min_coverage,
   add_note(per_pig$coverage < min_coverage,
            sprintf("feed intake recorded on %.0f%% of the stage", 100 * per_pig$coverage))
   add_note(per_pig$weight_status == "low_confidence", "weight data flagged")
+  by_bin <- fcr_by_bin(adg, adfi, adg$settings)
+  bin_notes <- by_bin[low_coverage == TRUE | fcr_out == TRUE, .(note = paste(
+    c(if (any(low_coverage)) sprintf("weight records cover %.1f kg of %s-%s kg",
+                                     weight_coverage_kg[low_coverage], weight_from[low_coverage], weight_to[low_coverage]),
+      if (any(fcr_out)) sprintf("segment FCR %.2f outside %s-%s in %s-%s kg", fcr[fcr_out],
+                                fcr_min[fcr_out], fcr_max[fcr_out], weight_from[fcr_out], weight_to[fcr_out])),
+    collapse = "; ")), by = responder]
+  m <- match(per_pig$responder, bin_notes$responder)
+  add_note(!is.na(m), bin_notes$note[m])
   add_note(is.na(per_pig$fcr), "no FCR")
   per_pig[, `:=`(fcr_note = notes,
                  fcr_flag = data.table::fifelse(nzchar(notes), "low_confidence", "ok"))]
   per_pig[is.na(fcr), fcr_flag := NA_character_]
   per_pig[, weight_status := NULL]
-  data.table::setcolorder(per_pig, c("responder", "location", "stage", "adg", "adfi",
+  data.table::setcolorder(per_pig, intersect(c("responder", "location", "breed", "stage", "adg", "adfi",
                                      "fcr", "gf", "adg_type", "coverage", "stage_days",
-                                     "start_weight", "end_weight", "fcr_flag", "fcr_note"))
+                                     "start_weight", "end_weight", "fcr_flag", "fcr_note"), names(per_pig)))
   data.table::setorder(per_pig, location, responder)
 
   summary <- rbind(
     trait_summary(per_pig, "all"),
     trait_summary(per_pig[fcr_flag %in% "ok"], "ok")
   )
+  if ("breed" %in% names(per_pig)) {
+    for (b in sort(unique(stats::na.omit(per_pig$breed)))) {
+      summary <- rbind(summary, trait_summary(per_pig[breed %in% b], paste("breed", b)))
+    }
+  }
 
   n_ok <- per_pig[fcr_flag %in% "ok", .N]
   n_low <- per_pig[fcr_flag %in% "low_confidence", .N]
@@ -3372,7 +3855,51 @@ calc_fcr <- function(adg, adfi, min_coverage = adg$settings$min_coverage,
 
   new_ppt_result(per_pig = per_pig, daily = adfi$daily, removed = adfi$removed,
                  settings = adg$settings, class = "ppt_fcr") |>
-    add_element(summary = summary)
+    add_element(summary = summary, by_bin = by_bin)
+}
+
+# Feed intake, gain and FCR per body weight class of each pig.
+fcr_by_bin <- function(adg, adfi, qc) {
+  lo <- qc$stage_range[1L]
+  hi <- qc$stage_range[2L]
+  width <- qc$bin_width
+  cls <- function(w) lo + floor((w - lo) / width) * width
+  st <- adfi$daily[in_stage == TRUE & !is.na(bw) & !is.na(dfi)]
+  st[, weight_from := cls(bw)]
+  st <- st[weight_from >= lo & weight_from < hi]
+  bins <- st[, .(n_days = .N, n_observed_feed = sum(state %in% c("org", "corr")),
+                 feed_kg = sum(dfi) / 1000, bw_min = min(bw), bw_max = max(bw)),
+             by = .(responder, weight_from)]
+  # gain over the days of the class (daily weights are mid-day values)
+  bins[, gain_kg := data.table::fifelse(n_days > 1L, (bw_max - bw_min) * n_days / (n_days - 1L), NA_real_)]
+  bins[, fcr := feed_kg / gain_kg]
+  bins[, weight_to := pmin(weight_from + width, hi)]
+
+  # how much of each class is covered by recorded body weights
+  ob <- adg$daily[source == "observed" & !is.na(weight)]
+  ob[, weight_from := cls(weight)]
+  cov <- ob[weight_from >= lo & weight_from < hi,
+            .(weight_coverage_kg = max(weight) - min(weight)), by = .(responder, weight_from)]
+  bins <- merge(bins, cov, by = c("responder", "weight_from"), all.x = TRUE)
+  bins[is.na(weight_coverage_kg), weight_coverage_kg := 0]
+  rng <- cov[, .(first_bin = min(weight_from), last_bin = max(weight_from)), by = responder]
+  bins <- merge(bins, rng, by = "responder", all.x = TRUE)
+  bins[, inner := (weight_from > first_bin & weight_from < last_bin) %in% TRUE]
+  bins[, low_coverage := inner & weight_coverage_kg < qc$min_bin_coverage_kg]
+
+  bins[, `:=`(fcr_min = NA_real_, fcr_max = NA_real_)]
+  if (!is.null(qc$bin_fcr_limits)) {
+    lim <- data.table::as.data.table(qc$bin_fcr_limits)
+    bins[lim, on = "weight_from", `:=`(fcr_min = i.fcr_min, fcr_max = i.fcr_max)]
+  }
+  bins[, fcr_out := !is.na(fcr) & !is.na(fcr_min) & (fcr < fcr_min | fcr > fcr_max)]
+  bins[, c("bw_min", "bw_max", "first_bin", "last_bin") := NULL]
+  data.table::setcolorder(bins, c("responder", "weight_from", "weight_to", "n_days",
+                                  "n_observed_feed", "feed_kg", "gain_kg", "fcr",
+                                  "weight_coverage_kg", "inner", "low_coverage",
+                                  "fcr_min", "fcr_max", "fcr_out"))
+  data.table::setorder(bins, responder, weight_from)
+  bins[]
 }
 
 trait_summary <- function(p, group) {
@@ -3431,6 +3958,17 @@ test_that("FCR is ADFI / ADG and flags explain themselves", {
   }
 })
 
+test_that("each note describes its own pig", {
+  r <- fcr_pipeline(fire)
+  p <- r$fcr$per_pig[grepl("feed intake recorded on", fcr_note)]
+  expect_gt(nrow(p), 0)
+  shown <- as.numeric(sub(".*feed intake recorded on ([0-9]+)%.*", "\\1", p$fcr_note))
+  expect_equal(shown, round(100 * p$coverage))
+  e <- r$fcr$per_pig[grepl("extrapolated .* d before", fcr_note)]
+  shown_d <- as.numeric(sub(".*extrapolated ([0-9]+) d before.*", "\\1", e$fcr_note))
+  expect_equal(shown_d, round(e$extrap_days_start))
+})
+
 test_that("summary is numeric and consistent", {
   r <- fcr_pipeline(nedap)
   s <- r$fcr$summary
@@ -3438,6 +3976,38 @@ test_that("summary is numeric and consistent", {
   expect_equal(s[group == "all" & trait == "fcr", mean], mean(r$fcr$per_pig$fcr, na.rm = TRUE))
   expect_equal(s[group == "ok" & trait == "fcr", n], r$fcr$per_pig[fcr_flag %in% "ok", .N])
   expect_equal(s$cv, s$sd / s$mean)
+})
+
+test_that("breed enters the correction model and the summary", {
+  v <- prep_visits(nedap, verbose = 0)
+  pigs <- unique(v[identified == TRUE, responder])
+  v <- add_breed(v, data.frame(responder = pigs, breed = rep(c("YY", "LL"), length.out = length(pigs))), verbose = 0)
+  a <- calc_adg(clean_weight(v, verbose = 0), verbose = 0)
+  f <- calc_adfi(v, a, verbose = 0)
+  expect_true(any(grepl("^breed", f$model$term)))
+  expect_true("breed" %in% names(f$per_pig))
+  r <- calc_fcr(a, f, verbose = 0)
+  expect_true(all(c("breed LL", "breed YY") %in% r$summary$group))
+  expect_true("breed" %in% names(r$per_pig))
+})
+
+test_that("weight classes: coverage and optional FCR limits", {
+  r <- fcr_pipeline(nedap)
+  b <- r$fcr$by_bin
+  expect_true(all(c("weight_from", "weight_to", "feed_kg", "gain_kg", "fcr",
+                    "weight_coverage_kg", "low_coverage", "fcr_out") %in% names(b)))
+  expect_true(all(b$weight_from >= 30 & b$weight_to <= 120))
+  expect_false(any(b$fcr_out))                         # no limits by default
+  low <- b[low_coverage == TRUE, unique(responder)]
+  expect_true(all(r$fcr$per_pig[responder %in% low, fcr_flag] == "low_confidence"))
+  expect_true(all(grepl("weight records cover", r$fcr$per_pig[responder %in% low, fcr_note])))
+  # very narrow limits flag every pig
+  q <- qc_config(bin_fcr_limits = data.frame(weight_from = seq(30, 110, 10), fcr_min = 2.40, fcr_max = 2.41))
+  v <- prep_visits(nedap, verbose = 0)
+  a <- calc_adg(clean_weight(v, q, verbose = 0), verbose = 0)
+  f2 <- calc_fcr(a, calc_adfi(v, a, verbose = 0), verbose = 0)
+  expect_true(any(f2$by_bin$fcr_out))
+  expect_true(all(grepl("segment FCR", f2$per_pig[responder %in% f2$by_bin[fcr_out == TRUE, responder], fcr_note])))
 })
 
 test_that("max_edge_extrap_days changes the flags", {
@@ -3798,19 +4368,24 @@ intermediate results.
 #' @param data Raw station data (see [prep_visits()]).
 #' @param station `"nedap"`, `"fire"` or `NULL` to detect it.
 #' @param qc QC settings from [qc_config()].
+#' @param breeds Optional breed table passed to [add_breed()] (columns
+#'   `responder` and `breed`).
 #' @param verbose 0 (silent), 1 (summary, default) or 2 (details).
+#' @param cores Number of CPU cores for the per-pig computations. Default 1.
 #'
 #' @return An object of class `ppt_pipeline`: a list with `visits`,
 #'   `weight`, `adg`, `adfi` and `fcr`, plus `removed` (every pig removed,
 #'   with the step and the reason).
 #' @export
-run_pipeline <- function(data, station = NULL, qc = qc_config(), verbose = 1) {
+run_pipeline <- function(data, station = NULL, qc = qc_config(), breeds = NULL,
+                         verbose = 1, cores = 1) {
   local_verbose(verbose)
   check_qc(qc)
   visits <- prep_visits(data, station = station, qc = qc, verbose = verbose)
-  weight <- clean_weight(visits, qc = qc, verbose = verbose)
-  adg <- calc_adg(weight, qc = qc, verbose = verbose)
-  adfi <- calc_adfi(visits, adg, qc = qc, verbose = verbose)
+  if (!is.null(breeds)) visits <- add_breed(visits, breeds, verbose = verbose)
+  weight <- clean_weight(visits, qc = qc, verbose = verbose, cores = cores)
+  adg <- calc_adg(weight, qc = qc, verbose = verbose, cores = cores)
+  adfi <- calc_adfi(visits, adg, qc = qc, verbose = verbose, cores = cores)
   fcr <- calc_fcr(adg, adfi, verbose = verbose)
   structure(
     list(visits = visits, weight = weight, adg = adg, adfi = adfi, fcr = fcr,
@@ -3874,6 +4449,120 @@ test_that("pipeline equals running the steps one by one", {
 test_that("print method runs and verbose = 0 is silent", {
   expect_silent(res <- run_pipeline(fire, verbose = 0))
   expect_message(print(res), "FCR")
+})
+```
+
+# write_results
+
+`write_results()` writes the tables of an analysis to CSV files named
+`<farm>_<table>_<date>.csv`, ready to send to the testing station. Files
+are UTF-8 with a byte order mark so that Excel shows Chinese text correctly.
+
+```{r function-write_results}
+#' Write Analysis Results to CSV Files
+#'
+#' @description
+#' Write the result tables of [run_pipeline()] (or of a single step such as
+#' [calc_fcr()]) to CSV files.
+#'
+#' @param x Result of [run_pipeline()], or of [clean_weight()],
+#'   [calc_adg()], [calc_adfi()] or [calc_fcr()].
+#' @param dir Folder to write to (created if needed). Default: working
+#'   directory.
+#' @param farm Farm or station code used as file name prefix.
+#' @param date Date in the file names. Default: today.
+#' @param bom Write a UTF-8 byte order mark (for Excel). Default `TRUE`.
+#' @param verbose 0 (silent), 1 (summary, default).
+#'
+#' @details
+#' For a [run_pipeline()] result the files are:
+#' - `fcr`: one row per pig with ADG, ADFI, FCR and confidence flags;
+#' - `by_bin`: feed, gain and FCR per body weight class;
+#' - `daily_feed`: daily feed intake (recorded, corrected, imputed);
+#' - `daily_weight`: daily body weight (recorded and fitted);
+#' - `weight_pigs`: weight checks of every pig;
+#' - `feed_model`: coefficients of the feed intake correction model;
+#' - `removed`: removed pigs with step and reason;
+#' - `settings`: the QC settings used.
+#'
+#' For a single step, its `per_pig`, `daily` and `removed` tables (and
+#' `by_bin`, `model` or `summary` when present) are written.
+#'
+#' @return Invisibly, a `data.table` with `table`, `file` and `rows`.
+#' @export
+write_results <- function(x, dir = ".", farm = "farm", date = Sys.Date(),
+                          bom = TRUE, verbose = 1) {
+  local_verbose(verbose)
+  if (!is.character(farm) || length(farm) != 1L || !nzchar(farm)) {
+    cli::cli_abort("{.arg farm} must be a single non-empty string.")
+  }
+  tables <- if (inherits(x, "ppt_pipeline")) {
+    list(fcr = x$fcr$per_pig, by_bin = x$fcr$by_bin, daily_feed = x$adfi$daily,
+         daily_weight = x$adg$daily, weight_pigs = x$weight$per_pig,
+         feed_model = x$adfi$model, summary = x$fcr$summary,
+         removed = x$removed, settings = settings_table(x$fcr$settings))
+  } else if (inherits(x, "ppt_result")) {
+    keep <- intersect(c("per_pig", "daily", "by_bin", "summary", "model", "removed"), names(x))
+    c(x[keep], list(settings = settings_table(x$settings)))
+  } else {
+    cli::cli_abort("{.arg x} must be the result of {.fn run_pipeline} or of a {.code calc_*} function.")
+  }
+  tables <- tables[!vapply(tables, is.null, logical(1))]
+  dir.create(dir, recursive = TRUE, showWarnings = FALSE)
+  stamp <- format(as.Date(date), "%Y%m%d")
+  out <- data.table::rbindlist(lapply(names(tables), function(nm) {
+    file <- file.path(dir, sprintf("%s_%s_%s.csv", farm, nm, stamp))
+    data.table::fwrite(tables[[nm]], file, bom = bom)
+    data.table::data.table(table = nm, file = file, rows = nrow(tables[[nm]]))
+  }))
+  ppt_msg("Wrote {nrow(out)} file{?s} to {.path {dir}}", "success")
+  invisible(out)
+}
+
+# QC settings as a two-column table.
+settings_table <- function(qc) {
+  if (is.null(qc)) return(NULL)
+  val <- vapply(names(qc), function(nm) {
+    v <- qc[[nm]]
+    if (is.null(v)) "NULL" else if (is.data.frame(v)) sprintf("table (%d rows)", nrow(v)) else paste(v, collapse = ", ")
+  }, character(1))
+  data.table::data.table(parameter = c("profile", names(qc)),
+                         value = c(attr(qc, "profile") %||% "", unname(val)))
+}
+```
+
+```{r example-write_results}
+res <- run_pipeline(nedap, verbose = 0)
+out <- write_results(res, dir = file.path(tempdir(), "results"), farm = "demo")
+out
+unlink(file.path(tempdir(), "results"), recursive = TRUE)
+```
+
+```{r tests-write_results}
+test_that("write_results writes every table of a pipeline", {
+  res <- run_pipeline(fire, qc = qc_config(stage_range = c(60, 120)), verbose = 0)
+  dir <- withr::local_tempdir()
+  out <- write_results(res, dir, farm = "A01", date = as.Date("2026-10-21"), verbose = 0)
+  expect_true(all(file.exists(out$file)))
+  expect_true("A01_fcr_20261021.csv" %in% basename(out$file))
+  expect_setequal(out$table, c("fcr", "by_bin", "daily_feed", "daily_weight", "weight_pigs",
+                               "feed_model", "summary", "removed", "settings"))
+  fcr <- data.table::fread(out[table == "fcr", file])
+  expect_equal(nrow(fcr), nrow(res$fcr$per_pig))
+  st <- data.table::fread(out[table == "settings", file])
+  expect_equal(st[parameter == "stage_range", value], "60, 120")
+  # BOM for Excel
+  expect_equal(readBin(out$file[1], "raw", 3), as.raw(c(0xef, 0xbb, 0xbf)))
+})
+
+test_that("write_results works for a single step and rejects other input", {
+  v <- prep_visits(nedap, verbose = 0)
+  w <- clean_weight(v, verbose = 0)
+  dir <- withr::local_tempdir()
+  out <- write_results(w, dir, farm = "x", verbose = 0)
+  expect_setequal(out$table, c("per_pig", "daily", "removed", "settings"))
+  expect_error(write_results(list(), dir), "run_pipeline")
+  expect_error(write_results(w, dir, farm = ""), "farm")
 })
 ```
 

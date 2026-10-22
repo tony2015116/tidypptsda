@@ -25,12 +25,14 @@ library(tidypptsda)
 | 0 | `qc_config()` | 设定全部质控参数（三套预设） |
 | 1 | `read_station()` | 读取测定站导出的 csv（多个文件或整个文件夹） |
 | 2 | `prep_visits()` | 整理为标准访问表 |
+| 2+ | `add_breed()` | 可选：合并你自己的品种（品系）表 |
 | 3 | `clean_weight()` | 体重质控：剔除异常值，判定每头猪是否可用 |
 | 4 | `calc_adg()` | 拟合生长曲线，计算体重区间内的日增重 |
 | 5 | `flag_feed_errors()` | 按 Casey 等（2005）的 16 条规则标记采食错误 |
 | 6 | `calc_adfi()` | 校正日采食量、插补缺失日，计算 ADFI |
 | 7 | `calc_fcr()` | 计算料肉比，并给出可信度标记 |
 | 8 | `plot_adg()` / `plot_adfi()` / `save_plots()` | 按测定站出图并保存 |
+| 9 | `write_results()` | 把全部结果表导出为 csv |
 
 不需要中间结果时，用 `run_pipeline()` 一次跑完：
 
@@ -60,6 +62,30 @@ raw <- read_station(c("101.csv", "102.csv"), station = "fire")
 
 - 耳标号一律按文本读入，前导零不会丢失。
 - 多个文件的列名不一致时会报错，并指出每个文件缺哪些列；如需用 NA 补齐缺失列，设`fill = TRUE`。
+
+### 添加品种信息
+
+测定站导出的数据一般不含品种，耳标号前缀也不一定能对应品种，所以需要你**手动准备一张品种表**（每头猪一行：耳标号、品种），再合并进访问表：
+
+```{r breed}
+visits_b <- prep_visits(nedap, verbose = 0)
+pigs <- unique(visits_b[identified == TRUE, responder])
+# 实际使用时从种猪档案读取，例如 breeds <- read.csv("品种表.csv")
+breeds <- data.frame(responder = pigs, breed = rep(c("YY", "LL"), length.out = length(pigs)))
+visits_b <- add_breed(visits_b, breeds)
+```
+
+- 品种表的列名不同时，用 `id = "耳标列名", breed = "品种列名"` 指定。
+- 耳标号先按测定站记录的原始号匹配，所以被拆成 `id_站号` 的个体也能拿到品种。
+- 品种表里找不到的猪会给出警告，这些猪的品种记为 NA。
+
+有了品种列以后：
+
+- 日采食校正模型会把品种作为固定效应；
+- `fiv_max_by_weight` 可以按品种设定单次采食上限；
+- 料肉比汇总表 `fcr$summary` 会按品种分组。
+
+`run_pipeline()` 也可以直接传入品种表：`run_pipeline(nedap, breeds = breeds)`。
 
 ## 3. 质控参数：`qc_config()`
 
@@ -182,7 +208,16 @@ fcr$summary[group == "all", lapply(.SD, function(x) if (is.numeric(x)) round(x, 
 
 - 生长曲线或采食量在区间开头或结尾外推超过 15 天，通常是进站太晚或出栏太早；
 - ADG 只覆盖了区间的一部分；
-- 区间内实测采食的天数不足 70%。
+- 区间内实测采食的天数不足 70%；
+- 中间某个 10 kg 体重段的体重记录覆盖不足 6 kg（记录断档）；
+- 设置了 `bin_fcr_limits` 时，某一段的料肉比超出了合理范围。
+
+每头猪每个 10 kg 体重段的采食量、增重和分段料肉比保存在 `fcr$by_bin` 中，可以用来定位问题出在哪一段：
+
+```{r bybin}
+head(fcr$by_bin[, .(responder, weight_from, weight_to, feed_kg = round(feed_kg, 1),
+                    gain_kg = round(gain_kg, 1), fcr = round(fcr, 2), weight_coverage_kg = round(weight_coverage_kg, 1))])
+```
 
 ## 5. 作图与保存
 
@@ -202,13 +237,49 @@ h$plot[[1]]
 save_plots(g, path = "结果/生长曲线", prefix = "站", suffix = "growth", device = "png")
 ```
 
-## 6. 结果怎么用
+## 6. 导出结果与并行计算
+
+### 导出为 csv
+
+```{r export, eval = FALSE}
+res <- run_pipeline(fire, qc = qc_config(stage_range = c(60, 120)))
+write_results(res, dir = "结果", farm = "A01")
+```
+
+文件按"场名_内容_日期.csv"命名，例如 `A01_fcr_20261022.csv`。全部文件如下：
+
+| 文件 | 内容 |
+|---|---|
+| `fcr` | 每头猪的 ADG、ADFI、FCR 和可信度标记 |
+| `by_bin` | 每个体重段的采食、增重和分段料肉比 |
+| `daily_feed` | 每天的采食量（原始、校正、插补） |
+| `daily_weight` | 每天的体重（实测和拟合） |
+| `weight_pigs` | 每头猪的体重质控结果 |
+| `feed_model` | 采食校正模型的系数 |
+| `summary` | 性状汇总统计 |
+| `removed` | 被剔除的猪及原因 |
+| `settings` | 本次使用的质控参数 |
+
+文件带有 UTF-8 BOM，用 Excel 直接打开时中文不会乱码。
+
+### 并行计算
+
+猪的头数很多时，逐头猪拟合曲线是最耗时的步骤。`clean_weight()`、`calc_adg()`、`calc_adfi()` 和 `run_pipeline()` 都有 `cores` 参数：
+
+```{r cores, eval = FALSE}
+res <- run_pipeline(nedap, cores = 4)          # 用 4 个 CPU 核心
+parallel::detectCores()                         # 查看电脑有几个核心
+```
+
+并行使用 R 自带的 parallel 包，不增加依赖，结果与 `cores = 1` 完全相同。几十头猪时并行没有必要；上千头猪时才有明显的加速效果。在 Windows 上，并行要求本包是正式安装的（而不是用 `devtools::load_all()` 临时加载）。
+
+## 7. 结果怎么用
 
 - **最终结果**：`fcr$per_pig`，包含每头猪的 ADG、ADFI、FCR 及可信度标记。
 - **被剔除的猪及原因**：`fcr$removed`，或 `run_pipeline()` 结果中的 `$removed`。
 - 在育种评估中，建议**优先使用 `fcr_flag = "ok"` 的个体**。低可信度的个体可以单独核查，或在模型中加以区分。
 
-## 7. 提高数据质量的建议
+## 8. 提高数据质量的建议
 
 以下是根据示例数据和缺失模拟得到的经验：
 
@@ -218,7 +289,7 @@ save_plots(g, path = "结果/生长曲线", prefix = "站", suffix = "growth", d
 4. **避免连续多天缺数据**。区间中间的随机缺失影响很小，而连续一周以上的缺失会明显降低结果的排名准确性。每 1–2 天检查一次没有访问记录的猪和测定站。
 5. **定期校准设备，核对耳标**。每周校准料槽和体重秤，转栏时记录日期和站号。
 
-## 8. 常见问题
+## 9. 常见问题
 
 **问：为什么 ADFI 比实测记录的平均值低？**答：ADFI 是整个体重区间内的平均值，包括体重较小、采食较少的前期；实测记录可能只覆盖了体重较大的后期。
 

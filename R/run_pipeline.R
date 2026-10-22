@@ -9,7 +9,10 @@
 #' @param data Raw station data (see [prep_visits()]).
 #' @param station `"nedap"`, `"fire"` or `NULL` to detect it.
 #' @param qc QC settings from [qc_config()].
+#' @param breeds Optional breed table passed to [add_breed()] (columns
+#'   `responder` and `breed`).
 #' @param verbose 0 (silent), 1 (summary, default) or 2 (details).
+#' @param cores Number of CPU cores for the per-pig computations. Default 1.
 #'
 #' @return An object of class `ppt_pipeline`: a list with `visits`,
 #'   `weight`, `adg`, `adfi` and `fcr`, plus `removed` (every pig removed,
@@ -19,13 +22,15 @@
 #' res <- run_pipeline(fire, qc = qc_config(stage_range = c(60, 120)), verbose = 0)
 #' res
 #' res$fcr$summary[group == "all"]
-run_pipeline <- function(data, station = NULL, qc = qc_config(), verbose = 1) {
+run_pipeline <- function(data, station = NULL, qc = qc_config(), breeds = NULL,
+                         verbose = 1, cores = 1) {
   local_verbose(verbose)
   check_qc(qc)
   visits <- prep_visits(data, station = station, qc = qc, verbose = verbose)
-  weight <- clean_weight(visits, qc = qc, verbose = verbose)
-  adg <- calc_adg(weight, qc = qc, verbose = verbose)
-  adfi <- calc_adfi(visits, adg, qc = qc, verbose = verbose)
+  if (!is.null(breeds)) visits <- add_breed(visits, breeds, verbose = verbose)
+  weight <- clean_weight(visits, qc = qc, verbose = verbose, cores = cores)
+  adg <- calc_adg(weight, qc = qc, verbose = verbose, cores = cores)
+  adfi <- calc_adfi(visits, adg, qc = qc, verbose = verbose, cores = cores)
   fcr <- calc_fcr(adg, adfi, verbose = verbose)
   structure(
     list(visits = visits, weight = weight, adg = adg, adfi = adfi, fcr = fcr,

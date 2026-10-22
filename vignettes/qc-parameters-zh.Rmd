@@ -16,7 +16,7 @@ library(tidypptsda)
 library(data.table)
 ```
 
-tidypptsda 把整个分析流程中的全部阈值都集中在 `qc_config()` 返回的一个对象里。各分析函数通过 `qc` 参数接收这个对象，结果中的 `$settings` 也会原样保存这份设置，方便复现。本文逐一说明 36 个参数；三套预设的区别见《质控预设说明》。
+tidypptsda 把整个分析流程中的全部阈值都集中在 `qc_config()` 返回的一个对象里。各分析函数通过 `qc` 参数接收这个对象，结果中的 `$settings` 也会原样保存这份设置，方便复现。本文逐一说明 41 个参数；三套预设的区别见《质控预设说明》。
 
 ## 1. 基本用法
 
@@ -59,11 +59,11 @@ qc_config(entry_weight_max = 90)         # 进站体重上限不小于出栏体�
 |---|---|---|---|
 | 跨站 | `max_gap_days`、`max_overlap_days`、`max_jump_kg` | 3、1、10 | `prep_visits()` |
 | 体重记录 | `weight_range`、`weight_outlier`、`outlier_combine`、`rlm_cutoff`、`sd_max`、`loess_span`、`rel_dev_max`、`daily_drop_min` | 15–150、rlm、any、0.5、3、0.75、NULL、NULL | `clean_weight()` |
-| 个体判定 | `min_test_days`、`min_records`、`max_missing_rate`、`entry_weight_max`、`exit_weight_min`、`curve_r2_min` | 35、20、0.30、65、85、NULL | `clean_weight()` |
+| 个体判定 | `min_test_days`、`min_records`、`max_missing_rate`、`entry_weight_max`、`exit_weight_min`、`curve_r2_min`、`max_daily_jump_kg` | 35、20、0.30、65、85、NULL、NULL | `clean_weight()` |
 | 生长曲线 | `stage_range`、`curve_model`、`max_extrap_days` | 30–120、poly2、30 | `calc_adg()` |
-| 采食错误 | `fiv_range`、`fiv0_abs_max`、`duration_max`、`speed_fiv_lo_max`、`speed_strict_max`、`speed_range`、`idle_duration_max`、`trough_diff_range`、`max_unidentified_feed_kg` | −20–2000、20、3600、500、110、2–170、500、−20–1800、90 | `flag_feed_errors()` |
+| 采食错误 | `fiv_range`、`fiv0_abs_max`、`duration_max`、`speed_fiv_lo_max`、`speed_strict_max`、`speed_range`、`idle_duration_max`、`trough_diff_range`、`max_unidentified_feed_kg`、`fiv_max_by_weight` | −20–2000、20、3600、500、110、2–170、500、−20–1800、90、NULL | `flag_feed_errors()` |
 | 日采食 | `dfi_range`、`dfi_quantile`、`dfi_correct`、`impute_method`、`long_gap_days` | 0–6、NULL、lmm、linear、7 | `calc_adfi()` |
-| 可信度 | `max_edge_extrap_days`、`min_coverage` | 15、0.7 | `calc_fcr()` |
+| 可信度 | `max_edge_extrap_days`、`min_coverage`、`bin_width`、`min_bin_coverage_kg`、`bin_fcr_limits` | 15、0.7、10、6、NULL | `calc_fcr()` |
 
 单位约定：体重用 kg，单次访问的采食量和料槽重用 g，日采食量（`dfi_range`）用 kg，时间用秒（s）或天（d）。
 
@@ -127,7 +127,7 @@ rbindlist(lapply(c(0.3, 0.5, 0.7), function(k) {
 
 ## 5. 个体判定参数
 
-体重异常值剔除之后，`clean_weight()` 逐头猪判断能否用于生长分析。下表中前三个参数不满足时**剔除**该猪，后三个不满足时只**降级**为 `low_confidence`，该猪仍参与后续计算。
+体重异常值剔除之后，`clean_weight()` 逐头猪判断能否用于生长分析。下表中前三个参数不满足时**剔除**该猪，后四个不满足时只**降级**为 `low_confidence`，该猪仍参与后续计算。
 
 | 参数 | 含义 | 单位 | 默认值 | 不满足时 |
 |---|---|---|---|---|
@@ -137,6 +137,7 @@ rbindlist(lapply(c(0.3, 0.5, 0.7), function(k) {
 | `entry_weight_max` | 进站体重上限，取清洗后曲线在首条记录处的拟合值 | kg | 65 | 降级 |
 | `exit_weight_min` | 出栏体重下限，取清洗后曲线在末条记录处的拟合值 | kg | 85 | 降级 |
 | `curve_r2_min` | 可选规则：清洗后生长曲线的最小 R²（用 loess 方法时为 LOESS 曲线，否则为二次曲线） | — | NULL（关闭） | 降级 |
+| `max_daily_jump_kg` | 可选规则：相邻两个有记录的日子之间，日体重中位数的变化超过此值（按天折算），例如 4 | kg/天 | NULL（关闭） | 降级 |
 
 进站和出栏体重不达标的猪只降级、不剔除，因为它们的 ADG 还可以在 `calc_adg()` 中外推得到，并会带上相应的标记。
 
@@ -144,6 +145,12 @@ rbindlist(lapply(c(0.3, 0.5, 0.7), function(k) {
 
 - `min_test_days` 应短于计划测定期：计划测 60 天的批次，设为 40–45 天比较合适。
 - `curve_r2_min` 常用 0.99。在示例数据中，清洗前约有 1/4 的猪达不到这个值，所以只用来提示，不用来剔除。
+- 每头猪的最大日体重变化都记录在 `per_pig$max_daily_jump` 列中，即使 `max_daily_jump_kg` 是关闭的。体重突变通常意味着串号（两头猪共用一个耳标）或秤上同时站了两头猪。在示例数据中，日中位体重的噪声较大：阈值取 4 kg 时，NEDAP 有 12/29 头猪会被标记，所以这条规则默认关闭。建议先看 `max_daily_jump` 的分布，再决定阈值：
+
+```{r jump}
+w_n <- clean_weight(prep_visits(nedap, verbose = 0), verbose = 0)
+summary(w_n$per_pig$max_daily_jump)
+```
 
 ## 6. 生长曲线参数
 
@@ -195,8 +202,37 @@ rbindlist(lapply(list(c(30, 120), c(60, 120)), function(st) {
 | `idle_duration_max` | 9 FRV-0 | 采食速度为 0（没吃料）但停留时间超过此值，判为错误 | s | 500 |
 | `trough_diff_range` | 11–14 LWD/FWD | 相邻两次访问之间料槽重的变化范围（仅 FIRE） | g | −20、1800 |
 | `max_unidentified_feed_kg` | 料槽级 | 单个料槽在整个测定期内"未识别访问"的耗料量超过此值时给出警告 | kg | 90 |
+| `fiv_max_by_weight` | 2 FIV-hi | 可选：按体重段（可再按品种）设定单次采食上限，代替 `fiv_range` 的上限 | g | NULL（关闭） |
 
 规则 15、16（LTD-lo、FTD-lo：相邻访问在时间上重叠）没有参数。"前一次 / 后一次访问"指**同一料槽**上按进站时间排序的相邻访问，包括未识别耳标的访问。
+
+### 按体重和品种设定单次采食上限：`fiv_max_by_weight`
+
+固定的 2000 g 上限对小猪偏宽、对大猪偏严：25 kg 的猪一次吃不了 2 kg，而 120 kg 的猪一次吃 2.2 kg 也属正常。`fiv_max_by_weight` 是一张表，每行给出一个体重段的上限：
+
+- `weight_from`：体重段的下限（kg），一行的上限对"体重 ≥ 该值、且小于下一行"的访问生效；
+- `fiv_max`：单次采食上限（g）；
+- `breed`（可选）：品种。有这一列时按品种查表，没有出现在表中的品种仍使用 2000 g；`breed` 为 NA 的行作为其他品种的默认值。
+
+每次访问时猪的体重：在 `calc_adfi()` 中，自动使用 `calc_adg()` 清洗、拟合后的日体重；单独调用 `flag_feed_errors()` 时，可以用 `bw` 参数传入同样的日体重表，否则使用当天原始体重的中位数（测定初期常被异常值抬高，查到的体重段会偏重）。没有体重的日子用前后两天插值。未识别耳标的访问没有体重，仍使用 `fiv_range` 的上限。实际使用的上限保存在结果的 `fiv_max` 列中。
+
+包里附带一张示例表 `fiv_max_example()`，来自测定站内部的质控脚本（**不是文献值**），包括 YY、LL、DD 三个品种和 20–140 kg 的体重段：
+
+```{r fivmax}
+head(fiv_max_example(), 4)
+tab <- data.frame(weight_from = seq(20, 130, 10),
+                  fiv_max = fiv_max_example()[breed == "DD", fiv_max])     # 不分品种
+visits_n <- prep_visits(nedap, verbose = 0)
+adg_n <- calc_adg(clean_weight(visits_n, verbose = 0), verbose = 0)
+bw_fit <- adg_n$daily[, .(responder, date, bw = predicted)]        # 清洗后的日体重
+fixed <- flag_feed_errors(visits_n, verbose = 0)
+raw_bw <- flag_feed_errors(visits_n, qc_config(fiv_max_by_weight = tab), verbose = 0)
+fit_bw <- flag_feed_errors(visits_n, qc_config(fiv_max_by_weight = tab), bw = bw_fit, verbose = 0)
+c(fixed_2000g = sum(fixed$fiv_hi), by_weight_raw_bw = sum(raw_bw$fiv_hi),
+  by_weight_fitted_bw = sum(fit_bw$fiv_hi))
+```
+
+按品种使用时，先用 `add_breed()` 把品种列加进访问表（见《中文使用说明》）。
 
 ### 示例：`duration_max` 对 FIRE 错误率的影响
 
@@ -228,7 +264,7 @@ rbindlist(lapply(c(1800, 3600), function(d) {
 | `impute_method` | `"linear"`：区间内部直线内插、长缺口用 LOESS、两端用"日采食 ~ 体重"回归外推；`"loess"`：全部用 LOESS | — | `"linear"` | linear / loess |
 | `long_gap_days` | 内部连续缺失超过此天数时改用 LOESS（仅 `"linear"` 有效） | 天 | 7 | ≥ 1 |
 
-校正模型的形式是 `无错误日采食 ~ 站 + 当天体重 + ADG + 31 个错误协变量 + (1|猪)`，校正值 = 无错误日采食 − Σ(系数 × 错误协变量)。没有错误的日子不受影响。
+校正模型的形式是 `无错误日采食 ~ 站 + 品种 + 当天体重 + ADG + 31 个错误协变量 + (1|猪)`（品种只在数据中有 `breed` 列、且不止一个品种时加入），校正值 = 无错误日采食 − Σ(系数 × 错误协变量)。没有错误的日子不受影响。
 
 **调整建议**
 
@@ -243,6 +279,9 @@ rbindlist(lapply(c(1800, 3600), function(d) {
 |---|---|---|---|---|
 | `max_edge_extrap_days` | 区间开头或结尾，生长曲线或采食量连续外推超过此天数时降级 | 天 | 15 | ≥ 0 |
 | `min_coverage` | 区间内有实测（或校正）采食的天数占比低于此值时降级 | — | 0.7 | 0–1 |
+| `bin_width` | 分段检查的体重段宽度 | kg | 10 | ≥ 1 |
+| `min_bin_coverage_kg` | 中间体重段内，实测体重覆盖的范围小于此值时降级 | kg | 6 | 0 至 `bin_width` |
+| `bin_fcr_limits` | 可选：每个体重段料肉比的合理范围，超出时降级 | — | NULL（关闭） | 表：`weight_from`、`fcr_min`、`fcr_max` |
 
 ### 示例：`max_edge_extrap_days` 对可信个体数的影响
 
@@ -256,6 +295,22 @@ rbindlist(lapply(c(10, 15, 30), function(k) {
 ```
 
 缺失模拟显示：区间两端缺 10 天以内时，ADFI 误差约 2–4%；缺 20 天时约 7%；缺 30 天时为 9–14%。默认的 15 天是在"保留更多个体"和"保证精度"之间的折中。育种评估要求更高时可设为 10，只做描述性统计时可放宽到 20。
+
+### 分段检查：`$by_bin`
+
+`calc_fcr()` 把计算区间按 `bin_width`（默认 10 kg）分段，对每头猪的每一段计算采食量、增重和分段料肉比，结果保存在 `$by_bin` 中。有两项检查：
+
+1. **体重记录是否断档**：对首尾段之间的中间段，如果实测体重覆盖的范围小于 `min_bin_coverage_kg`（默认 6 kg），说明这一段体重记录不足，例如耳标脱落、不会进站或设备故障，该猪降级。首尾段不做这项检查，它们由 `max_edge_extrap_days` 管理。
+2. **分段料肉比是否合理**（可选）：设置 `bin_fcr_limits` 后，分段料肉比超出范围的段会被标出，该猪降级。包里附带的示例表 `bin_fcr_example()` 同样来自测定站内部脚本，**不是文献值**。
+
+```{r bins}
+res_n <- run_pipeline(nedap, qc = qc_config(bin_fcr_limits = bin_fcr_example()), verbose = 0)
+b <- res_n$fcr$by_bin
+c(segments = nrow(b), low_coverage = sum(b$low_coverage), fcr_outside = sum(b$fcr_out))
+b[fcr_out == TRUE, .(responder, weight_from, weight_to, fcr = round(fcr, 2), fcr_min, fcr_max)]
+```
+
+在示例数据中，分段料肉比超出范围的只有 15967 号的 50–70 kg 段。这头猪在 4 月下旬采食骤降、体重停止增长，很可能生过病，分段检查正好把它找了出来。
 
 ## 10. 常用设置示例
 
@@ -271,6 +326,12 @@ qc_config("casey", min_test_days = 30)
 
 # FIRE 设备，下料量 600 g/次
 qc_config("casey", trough_diff_range = c(-20, 2400))
+
+# 单次采食上限随体重变化，并检查分段料肉比
+qc_config("casey", fiv_max_by_weight = fiv_max_example(), bin_fcr_limits = bin_fcr_example())
+
+# 标记日体重突变超过 5 kg/天的猪
+qc_config("casey", max_daily_jump_kg = 5)
 
 # 更宽松的体重清洗：两种方法都判为异常才算异常值（比 "any" 标出的异常更少）
 qc_config("casey", weight_outlier = c("rlm", "loess"), outlier_combine = "majority")

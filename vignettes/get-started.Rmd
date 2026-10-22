@@ -130,6 +130,27 @@ summary(nedap_visits$weight)
 
 
 
+# add_breed
+
+Pig breed (or line) usually is not in the station export and cannot be
+read from the transponder number. `add_breed()` merges a breed table from
+your own records into the visit table. With a `breed` column:
+
+- `calc_adfi()` adds breed as a fixed effect to the correction model;
+- `fiv_max_by_weight` limits can differ by breed;
+- `calc_fcr()` summarises traits by breed.
+
+```{r example-add_breed}
+visits <- prep_visits(nedap, verbose = 0)
+# a breed table from your own herd records, one row per pig
+pigs <- unique(visits[identified == TRUE, responder])
+breeds <- data.frame(responder = pigs, breed = rep(c("YY", "LL"), length.out = length(pigs)))
+visits <- add_breed(visits, breeds)
+table(unique(visits[identified == TRUE, .(responder, breed)])$breed)
+```
+
+
+
 # clean_weight
 
 `clean_weight()` cleans the body weight records of identified visits in
@@ -260,13 +281,15 @@ weight stage as [calc_adg()], so that FCR compares like with like.
 day, the error-free intake `y` (sum of FIV over visits without error) is
 modelled with a linear mixed model fitted on **all** pig-days:
 
-`y ~ location + BW + ADG + 16 x PTE + 11 x OTD + 4 x FID + (1 | pig)`
+`y ~ location + breed + BW + ADG + 16 x PTE + 11 x OTD + 4 x FID + (1 | pig)`
 
 - PTE: share of the day's visits with error type p; OTD: occupation time
   of visits with error p (types 1, 2, 6-14); FID: feed intake of visits
   with error p (types 4, 5, 15, 16);
 - BW: predicted body weight of the day from [calc_adg()]; ADG of the pig;
-- `location` is a fixed effect when there is more than one station.
+- `location` is a fixed effect when there is more than one station, and
+  `breed` when the data have a `breed` column (see [add_breed()]) with
+  more than one breed.
 
 The corrected intake is `y - sum(b x error covariates)`: only the effects
 of the error covariates are removed, so a day without errors keeps its
@@ -314,6 +337,9 @@ gain) and its inverse, feed efficiency G:F = ADG / ADFI.
 Each pig gets `fcr_flag = "ok"` or `"low_confidence"`, with the reasons in
 `fcr_note`: the growth curve or the feed intake extrapolated over more
 than `max_edge_extrap_days` (default 15) at the start or end of the stage,
+an inner 10 kg class with recorded weights spanning less than
+`min_bin_coverage_kg` (default 6 kg), a segment FCR outside the optional
+`bin_fcr_limits`,
 ADG on part of the stage only, less than `min_coverage` (default 0.7) of
 the stage with recorded feed intake, or weight data flagged by
 [clean_weight()].
@@ -363,6 +389,21 @@ intermediate results.
 res <- run_pipeline(fire, qc = qc_config(stage_range = c(60, 120)), verbose = 0)
 res
 res$fcr$summary[group == "all"]
+```
+
+
+
+# write_results
+
+`write_results()` writes the tables of an analysis to CSV files named
+`<farm>_<table>_<date>.csv`, ready to send to the testing station. Files
+are UTF-8 with a byte order mark so that Excel shows Chinese text correctly.
+
+```{r example-write_results}
+res <- run_pipeline(nedap, verbose = 0)
+out <- write_results(res, dir = file.path(tempdir(), "results"), farm = "demo")
+out
+unlink(file.path(tempdir(), "results"), recursive = TRUE)
 ```
 
 
