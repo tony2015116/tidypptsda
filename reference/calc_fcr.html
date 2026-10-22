@@ -19,7 +19,7 @@ the traits."><meta property="og:image" content="https://tony2015116.github.io/ti
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.6.1</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.7.0</span>
       </span>
     </div>
 
@@ -133,44 +133,44 @@ feed (<code>feed_kg</code>), gain (<code>gain_kg</code>), segment <code>fcr</cod
 <span class="r-in"><span><span class="va">fcr</span> <span class="op">&lt;-</span> <span class="fu">calc_fcr</span><span class="op">(</span><span class="va">adg</span>, <span class="va">adfi</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">FCR over 30-120 kg</span> <span style="color: #00BBBB;">──────────────────────────────────────────────────────────</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> FCR for 29 pigs: 23 ok, 6 low confidence</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Mean FCR 2.41 (SD 0.15), ADG 1160 g/d, ADFI 2801 g/d</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> FCR for 29 pigs: 20 ok, 9 low confidence</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Mean FCR 2.42 (SD 0.14), ADG 1162 g/d, ADFI 2809 g/d</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">fcr</span><span class="op">$</span><span class="va">per_pig</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">adg</span>, <span class="va">adfi</span>, <span class="va">fcr</span>, <span class="va">fcr_flag</span>, <span class="va">fcr_note</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    responder       adg     adfi      fcr       fcr_flag</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       &lt;char&gt;     &lt;num&gt;    &lt;num&gt;    &lt;num&gt;         &lt;char&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:     13913 1171.8790 2616.719 2.232926             ok</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:     13918 1140.6265 2570.041 2.253183             ok</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:     13954  919.7008 2343.422 2.548026 low_confidence</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:     13996 1265.9909 2857.824 2.257381             ok</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:     14962 1249.0465 2818.537 2.256551             ok</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:     15006 1270.5759 3084.452 2.427602             ok</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                   fcr_note</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                     &lt;char&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:                                        </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:                                        </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3: weight records cover 5.0 kg of 80-90 kg</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:                                        </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:                                        </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:                                        </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:     13913 1170.6849 2616.853 2.235318             ok</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:     13918 1139.5646 2570.277 2.255490 low_confidence</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:     13954  886.5545 2310.346 2.605983 low_confidence</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4:     13996 1267.1864 2879.404 2.272281             ok</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5:     14962 1249.6328 2818.766 2.255675             ok</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6:     15006 1271.0526 3084.753 2.426928             ok</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                                        fcr_note</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                                          &lt;char&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:                                                             </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:                                          weight data flagged</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3: weight data flagged; weight records cover 5.0 kg of 80-90 kg</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4:                                                             </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5:                                                             </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6:                                                             </span>
 <span class="r-in"><span><span class="va">fcr</span><span class="op">$</span><span class="va">summary</span><span class="op">[</span><span class="va">group</span> <span class="op">==</span> <span class="st">"all"</span><span class="op">]</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     group        trait     n          min          max       median</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    &lt;char&gt;       &lt;char&gt; &lt;int&gt;        &lt;num&gt;        &lt;num&gt;        &lt;num&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:    all          adg    29  788.2016246 1329.9939338 1195.4404810</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:    all         adfi    29 1918.5410616 3517.5385491 2808.5847423</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:    all          fcr    29    2.2266875    2.8288859    2.4117169</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:    all           gf    29    0.3534961    0.4490976    0.4146424</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:    all   stage_days    29   67.6694817   97.8579101   74.8865629</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:    all start_weight    29   29.9999831   30.0000041   29.9999981</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7:    all   end_weight    29   84.5754696  120.0000029  119.9999988</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:    all          adg    29  793.3916048 1323.4965323 1195.3710603</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:    all         adfi    29 1934.0640577 3518.2230948 2809.0770981</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:    all          fcr    29    2.2273233    2.8296559    2.4191907</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4:    all           gf    29    0.3533999    0.4489694    0.4133614</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5:    all   stage_days    29   67.2591023  101.5165978   74.9907553</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6:    all start_weight    29   29.9999848   30.0000077   29.9999978</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7:    all   end_weight    29   83.3628148  120.0000027  119.9999979</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>            mean           sd           cv</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           &lt;num&gt;        &lt;num&gt;        &lt;num&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1: 1159.9380965 1.240203e+02 1.069198e-01</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2: 2800.9155074 3.523560e+02 1.258003e-01</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:    2.4144006 1.469139e-01 6.084903e-02</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:    0.4156041 2.428400e-02 5.843061e-02</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:   77.0849839 7.744381e+00 1.004655e-01</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:   29.9999977 3.864205e-06 1.288068e-07</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7:  118.7784622 6.578170e+00 5.538184e-02</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1: 1161.8388765 1.288442e+02 1.108968e-01</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2: 2808.8231142 3.605002e+02 1.283456e-01</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:    2.4175766 1.441554e-01 5.962804e-02</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4:    0.4150077 2.386968e-02 5.751624e-02</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5:   76.9896102 8.357676e+00 1.085559e-01</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6:   29.9999976 4.166519e-06 1.388840e-07</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7:  118.7366466 6.803354e+00 5.729785e-02</span>
 </code></pre></div>
     </div>
   </div>

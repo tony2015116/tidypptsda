@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.6.1</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.7.0</span>
       </span>
     </div>
 
@@ -68,6 +68,21 @@
       <small>Source: <a href="https://github.com/tony2015116/tidypptsda/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="page-header" data-toc-text="0.7.0" id="tidypptsda-070">tidypptsda 0.7.0<a class="anchor" aria-label="anchor" href="#tidypptsda-070"></a></h2>
+<div class="section level3">
+<h3 id="body-weight-0-7-0">Body weight<a class="anchor" aria-label="anchor" href="#body-weight-0-7-0"></a></h3>
+<ul><li><p><code><a href="../reference/clean_weight.html">clean_weight()</a></code> detects <strong>double-layer weights</strong> before the outlier methods: within each week, records are split into two groups; when both are tight bands that differ by at least <code>double_layer_gap</code> (default 8%) of the upper weight and the smaller one holds at least <code>double_layer_min_share</code> (default 15%) of the records, the layer that does not continue the pig’s growth in the other weeks is removed (<code>qc_flag = "double_layer"</code>). Pigs with two layers in at least <code>double_layer_flag_weeks</code> (default 3) weeks are flagged as low confidence (possibly two pigs on one transponder). Before, when both layers were about equally large, the curve ran between them and the daily median jumped from one layer to the other. New <code>per_pig</code> columns <code>n_weeks</code> and <code>double_layer_weeks</code>. Set <code>double_layer_gap = NULL</code> to switch it off.</p></li>
+<li><p><code><a href="../reference/clean_weight.html">clean_weight()</a></code> also handles <strong>unstable weights after entry</strong>: new pigs often show a wide smear of readings for days (pen mates’ weights mixed in while the pig itself hardly eats and may lose weight). Within <code>entry_noise_days</code> (default 21) after the first record, days whose interquartile range exceeds <code>entry_noise_iqr_kg</code> (default 3 kg) and 4 times the pig’s usual range are unstable; the period runs from entry to the last such day as long as at least half of the days are unstable. From the stable days after it, the weight is tracked back day by day and only records within <code>entry_noise_tol</code> (default 8%, at least 2 kg) of the next day’s weight are kept (<code>qc_flag = "entry_noise"</code>); the curve methods do not overrule the kept records. Pigs with a period longer than <code>entry_noise_flag_days</code> (default 14) or less than 30% of its records kept are flagged as low confidence. New <code>per_pig</code> columns <code>entry_noise_days</code> and <code>entry_noise_kept</code>.</p></li>
+</ul></div>
+<div class="section level3">
+<h3 id="adg-0-7-0">ADG<a class="anchor" aria-label="anchor" href="#adg-0-7-0"></a></h3>
+<ul><li>The stage now starts at the <strong>last</strong> time the growth curve rises through the lower stage weight before it first reaches the upper one. Before, a curve that passed 30 kg, dipped below and rose again started the stage at the first pass (only possible with flexible curves: poly3, loess).</li>
+<li>
+<code>lm_slope</code> is now the regression on all valid records between the stage start and end times, instead of on the records whose weight lies inside <code>stage_range</code>. A dip below 30 kg after the start no longer leaves a few isolated early records in the regression.</li>
+</ul><p>On the example data ADG changes by 2 g/d on average; pig 15961 (wide smear of readings for two weeks after entry) changes most, from 1211 to 1320 g/d.</p>
+</div>
+</div>
     <div class="section level2">
 <h2 class="page-header" data-toc-text="0.6.1" id="tidypptsda-061">tidypptsda 0.6.1<a class="anchor" aria-label="anchor" href="#tidypptsda-061"></a></h2>
 <div class="section level3">

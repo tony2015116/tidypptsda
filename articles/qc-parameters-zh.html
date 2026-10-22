@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.6.1</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.7.0</span>
       </span>
     </div>
 
@@ -108,7 +108,7 @@
 <p>tidypptsda 把整个分析流程中的全部阈值都集中在
 <code><a href="../reference/qc_config.html">qc_config()</a></code> 返回的一个对象里。各分析函数通过
 <code>qc</code> 参数接收这个对象，结果中的 <code>$settings</code>
-也会原样保存这份设置，方便复现。本文逐一说明 41
+也会原样保存这份设置，方便复现。本文逐一说明 48
 个参数；三套预设的区别见《质控预设说明》。</p>
 <div class="section level2">
 <h2 id="基本用法">1. 基本用法<a class="anchor" aria-label="anchor" href="#%E5%9F%BA%E6%9C%AC%E7%94%A8%E6%B3%95"></a>
@@ -146,7 +146,14 @@
 <span><span class="co">#&gt;   <span style="color: #00BB00;">loess_span</span>: 0.75</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">rel_dev_max</span>: NULL (off)</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">daily_drop_min</span>: NULL (off)</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">double_layer_gap</span>: 0.08</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">double_layer_min_share</span>: 0.15</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">entry_noise_days</span>: 21</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">entry_noise_iqr_kg</span>: 3</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">entry_noise_tol</span>: 0.08</span></span>
 <span><span class="co">#&gt; <span style="font-weight: bold;">Pig-level checks</span></span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">double_layer_flag_weeks</span>: 3</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">entry_noise_flag_days</span>: 14</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">min_test_days</span>: 35</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">min_records</span>: 20</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">max_missing_rate</span>: 0.3</span></span>
@@ -239,17 +246,17 @@
 <tr class="even">
 <td>体重记录</td>
 <td>
-<code>weight_range</code>、<code>weight_outlier</code>、<code>outlier_combine</code>、<code>rlm_cutoff</code>、<code>sd_max</code>、<code>loess_span</code>、<code>rel_dev_max</code>、<code>daily_drop_min</code>
+<code>weight_range</code>、<code>weight_outlier</code>、<code>outlier_combine</code>、<code>rlm_cutoff</code>、<code>sd_max</code>、<code>loess_span</code>、<code>rel_dev_max</code>、<code>daily_drop_min</code>、<code>double_layer_gap</code>、<code>double_layer_min_share</code>、<code>entry_noise_days</code>、<code>entry_noise_iqr_kg</code>、<code>entry_noise_tol</code>
 </td>
-<td>15–150、rlm、any、0.5、3、0.75、NULL、NULL</td>
+<td>15–150、rlm、any、0.5、3、0.75、NULL、NULL、0.08、0.15、21、3、0.08</td>
 <td><code><a href="../reference/clean_weight.html">clean_weight()</a></code></td>
 </tr>
 <tr class="odd">
 <td>个体判定</td>
 <td>
-<code>min_test_days</code>、<code>min_records</code>、<code>max_missing_rate</code>、<code>entry_weight_max</code>、<code>exit_weight_min</code>、<code>curve_r2_min</code>、<code>max_daily_jump_kg</code>
+<code>min_test_days</code>、<code>min_records</code>、<code>max_missing_rate</code>、<code>entry_weight_max</code>、<code>exit_weight_min</code>、<code>curve_r2_min</code>、<code>max_daily_jump_kg</code>、<code>double_layer_flag_weeks</code>、<code>entry_noise_flag_days</code>
 </td>
-<td>35、20、0.30、65、85、NULL、NULL</td>
+<td>35、20、0.30、65、85、NULL、NULL、3、14</td>
 <td><code><a href="../reference/clean_weight.html">clean_weight()</a></code></td>
 </tr>
 <tr class="even">
@@ -429,8 +436,75 @@ g，日采食量（<code>dfi_range</code>）用 kg，时间用秒（s）或天�
 <td>NULL（关闭）</td>
 <td>0–1</td>
 </tr>
+<tr class="odd">
+<td><code>double_layer_gap</code></td>
+<td>双层体重检测：同一周内两层体重的均值之差，至少达到上层均值的这一比例才算双层。设为
+NULL 关闭检测</td>
+<td>—</td>
+<td>0.08</td>
+<td>0–1 或 NULL</td>
+</tr>
+<tr class="even">
+<td><code>double_layer_min_share</code></td>
+<td>双层体重检测：较少的一层至少占该周记录的比例；比例更低的零星低值由
+rlm 等方法处理</td>
+<td>—</td>
+<td>0.15</td>
+<td>0–0.5</td>
+</tr>
+<tr class="odd">
+<td><code>entry_noise_days</code></td>
+<td>进站乱读数检测：只在首条记录后这么多天内寻找乱读数期。设为 NULL
+关闭</td>
+<td>天</td>
+<td>21</td>
+<td>≥ 1 或 NULL</td>
+</tr>
+<tr class="even">
+<td><code>entry_noise_iqr_kg</code></td>
+<td>进站乱读数检测：当天读数的四分位距超过此值、且超过这头猪平时日四分位距的
+4 倍，视为乱读数日</td>
+<td>kg</td>
+<td>3</td>
+<td>≥ 0</td>
+</tr>
+<tr class="odd">
+<td><code>entry_noise_tol</code></td>
+<td>进站乱读数检测：逐日回溯时，读数与后一天体重之差的容许比例（至少 2
+kg；某天没有读数可接受时，每天再放宽 0.5 kg）</td>
+<td>—</td>
+<td>0.08</td>
+<td>0–1</td>
+</tr>
 </tbody>
 </table>
+<div class="section level3">
+<h3 id="双层体重">双层体重<a class="anchor" aria-label="anchor" href="#%E5%8F%8C%E5%B1%82%E4%BD%93%E9%87%8D"></a>
+</h3>
+<p>一头猪在一台测定站上，有时会出现上下两层平行的体重记录。常见原因有三种：猪只有一部分站在秤上（下层偏轻）；两头猪同时上秤（上层约为两倍）；两头猪共用一个耳标（两层长期平行）。两层记录数接近时，rlm
+等方法的拟合曲线会落在两层之间，两层都不剔除，日中位体重在两层之间来回跳。</p>
+<p>所以 <code><a href="../reference/clean_weight.html">clean_weight()</a></code>
+在异常值检测<strong>之前</strong>先做双层检测：</p>
+<ol style="list-style-type: decimal">
+<li>对每头猪拟合二次稳健回归，取残差；</li>
+<li>按周分组（每周至少 20
+条记录），把残差分成上下两组（一维两均值聚类）；</li>
+<li>同时满足以下条件才判为双层：两组都是紧密的”层”（均值之差至少是每组标准差的
+3 倍，零散的离群点不算）；均值之差至少为上层均值的
+<code>double_layer_gap</code>；较少的一组至少占
+<code>double_layer_min_share</code>；</li>
+<li>保留哪一层：用没有双层的那些周拟合生长曲线并延伸到这一周，保留与之衔接的一层，剔除另一层（<code>qc_flag = "double_layer"</code>）。没有双层的周不足
+2 周时，按物理规律判断：一般剔除下层；下层不到上层的
+55%（上层约为两倍）时剔除上层；</li>
+<li>双层出现在 <code>double_layer_flag_weeks</code> 周以上的猪，降级为
+<code>low_confidence</code>，原因注明”可能两头猪共用一个耳标”。</li>
+</ol>
+<p>每头猪检测到双层的周数记录在 <code>per_pig$double_layer_weeks</code>
+中。在示例数据上，NEDAP 有 16
+头猪的个别周（多为进站后头一两周）检测到双层，1 头猪因双层持续 3
+周被降级；FIRE 有 6
+头猪进站头两天出现约两倍体重的读数（上层），被剔除。</p>
+</div>
 <div class="section level3">
 <h3 id="四种检测方法">四种检测方法<a class="anchor" aria-label="anchor" href="#%E5%9B%9B%E7%A7%8D%E6%A3%80%E6%B5%8B%E6%96%B9%E6%B3%95"></a>
 </h3>
@@ -488,9 +562,9 @@ g，日采食量（<code>dfi_range</code>）用 kg，时间用秒（s）或天�
 <span><span class="op">}</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    rlm_cutoff outlier_pct pigs_removed</span></span>
 <span><span class="co">#&gt;         &lt;num&gt;       &lt;num&gt;        &lt;int&gt;</span></span>
-<span><span class="co">#&gt; 1:        0.3        8.18            1</span></span>
-<span><span class="co">#&gt; 2:        0.5        9.45            1</span></span>
-<span><span class="co">#&gt; 3:        0.7       12.85            1</span></span></code></pre></div>
+<span><span class="co">#&gt; 1:        0.3       10.12            1</span></span>
+<span><span class="co">#&gt; 2:        0.5       11.11            1</span></span>
+<span><span class="co">#&gt; 3:        0.7       14.27            1</span></span></code></pre></div>
 <p><code>rlm_cutoff</code>
 越大，判定越严格，被标为异常的记录越多。默认值 0.5 来自 Jiao
 等（2014）。如果检查 <code>w$records</code>
@@ -505,12 +579,48 @@ g，日采食量（<code>dfi_range</code>）用 kg，时间用秒（s）或天�
 的含义直观，但目前没有文献依据，建议先在一个批次上试用，看看被剔除的记录（<code>w$records[grepl("rel_dev|daily_drop", qc_flag)]</code>）是否合理，再决定是否长期使用。</li>
 </ul>
 </div>
+<div class="section level3">
+<h3 id="进站乱读数逐日回溯追踪">进站乱读数（逐日回溯追踪）<a class="anchor" aria-label="anchor" href="#%E8%BF%9B%E7%AB%99%E4%B9%B1%E8%AF%BB%E6%95%B0%E9%80%90%E6%97%A5%E5%9B%9E%E6%BA%AF%E8%BF%BD%E8%B8%AA"></a>
+</h3>
+<p>新进站的猪常常有一段时间体重读数乱成一片：不成清晰的两层，而是在一个很宽的范围内连续分布。读数偏高的部分只可能来自别的猪（同栏较大的猪的体重记到了它头上），而这头猪自己采食很少，体重可能还在下降。乱读数占到一半左右时，rlm
+等方法的曲线会被整体拉高，把假的高值当成正常体重。</p>
+<p>所以 <code><a href="../reference/clean_weight.html">clean_weight()</a></code>
+在双层检测之后、异常值方法之前，再做一步逐日回溯追踪：</p>
+<ol style="list-style-type: decimal">
+<li>
+<strong>找乱读数日</strong>：在首条记录后
+<code>entry_noise_days</code> 天内，当天读数的四分位距超过
+<code>entry_noise_iqr_kg</code>、且超过这头猪平时日四分位距的 4
+倍；</li>
+<li>
+<strong>确定乱读数期</strong>：从进站开始，到最后一个乱读数日为止，并且这段时间内至少一半的日子是乱读数日。零星的个别乱读数日不算，交给
+rlm 等方法处理；</li>
+<li>
+<strong>从稳定期往回追</strong>：以乱读数期之后头 3
+个有记录日子的体重中位数为起点，从乱读数期的最后一天开始，一天一天往前推。只接受与”后一天体重”相差不超过
+<code>entry_noise_tol</code>（至少 2
+kg）的读数，当天被接受读数的中位数作为前一天的参照；其余读数剔除（<code>qc_flag = "entry_noise"</code>）。某天没有读数可接受时参照不变，容差每天放宽
+0.5 kg；</li>
+<li>
+<strong>被接受的读数不再由曲线方法复核</strong>：它们逐日衔接这头猪自己的体重，而二次曲线无法贴合进站后真实的掉重；</li>
+<li>
+<strong>个体判定</strong>：乱读数期超过
+<code>entry_noise_flag_days</code> 天，或期内被接受的读数不到 30%
+的猪，降级为 <code>low_confidence</code>。</li>
+</ol>
+<p>只追踪每天和后一天是否衔接，不假设生长形状，所以进站初期长得慢甚至掉重都能保留。每头猪的乱读数期天数和被接受读数的比例记录在
+<code>per_pig$entry_noise_days</code>、<code>per_pig$entry_noise_kept</code>
+中。</p>
+<p>在示例数据上，NEDAP 30 头猪中有 20 头检测到乱读数期（2–19 天），剔除
+1517 条读数，4 头猪因乱读数期较长被降级；FIRE 有 9 头猪，乱读数期只有
+1–3 天。</p>
+</div>
 </div>
 <div class="section level2">
 <h2 id="个体判定参数">5. 个体判定参数<a class="anchor" aria-label="anchor" href="#%E4%B8%AA%E4%BD%93%E5%88%A4%E5%AE%9A%E5%8F%82%E6%95%B0"></a>
 </h2>
 <p>体重异常值剔除之后，<code><a href="../reference/clean_weight.html">clean_weight()</a></code>
-逐头猪判断能否用于生长分析。下表中前三个参数不满足时<strong>剔除</strong>该猪，后四个不满足时只<strong>降级</strong>为
+逐头猪判断能否用于生长分析。下表中前三个参数不满足时<strong>剔除</strong>该猪，后六个不满足时只<strong>降级</strong>为
 <code>low_confidence</code>，该猪仍参与后续计算。</p>
 <table class="table">
 <colgroup>
@@ -579,6 +689,21 @@ g，日采食量（<code>dfi_range</code>）用 kg，时间用秒（s）或天�
 <td>NULL（关闭）</td>
 <td>降级</td>
 </tr>
+<tr class="even">
+<td><code>double_layer_flag_weeks</code></td>
+<td>检测到双层体重的周数达到此值时降级（可能两头猪共用一个耳标），见上文”双层体重”</td>
+<td>周</td>
+<td>3</td>
+<td>降级</td>
+</tr>
+<tr class="odd">
+<td><code>entry_noise_flag_days</code></td>
+<td>进站乱读数期超过此天数（或期内被接受的读数不到
+30%）时降级，见上文”进站乱读数”</td>
+<td>天</td>
+<td>14</td>
+<td>降级</td>
+</tr>
 </tbody>
 </table>
 <p>进站和出栏体重不达标的猪只降级、不剔除，因为它们的 ADG 还可以在
@@ -601,7 +726,7 @@ g，日采食量（<code>dfi_range</code>）用 kg，时间用秒（s）或天�
 <code class="sourceCode R"><span><span class="va">w_n</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/clean_weight.html">clean_weight</a></span><span class="op">(</span><span class="fu"><a href="../reference/prep_visits.html">prep_visits</a></span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">w_n</span><span class="op">$</span><span class="va">per_pig</span><span class="op">$</span><span class="va">max_daily_jump</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. </span></span>
-<span><span class="co">#&gt;   1.750   3.312   3.812   4.408   4.969  10.750</span></span></code></pre></div>
+<span><span class="co">#&gt;   1.750   3.312   3.750   3.983   4.438   7.375</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="生长曲线参数">6. 生长曲线参数<a class="anchor" aria-label="anchor" href="#%E7%94%9F%E9%95%BF%E6%9B%B2%E7%BA%BF%E5%8F%82%E6%95%B0"></a>
@@ -648,9 +773,21 @@ g，日采食量（<code>dfi_range</code>）用 kg，时间用秒（s）或天�
 </tr>
 </tbody>
 </table>
-<p>ADG 的计算方法：在拟合曲线上找出体重到达 <code>stage_range</code>
-下限和上限的时间点，用两端的体重差除以天数。时间点的搜索范围是首条记录前、末条记录后各
-<code>max_extrap_days</code> 天。</p>
+<p>ADG
+的计算方法：在拟合曲线上找出区间的起止时间，用两端的体重差除以天数。</p>
+<ul>
+<li>
+<strong>终点</strong>：曲线第一次到达 <code>stage_range</code>
+上限的时间；</li>
+<li>
+<strong>起点</strong>：在终点之前，曲线<strong>最后一次</strong>从下方越过下限的时间。如果前期数据波动使曲线先越过
+30 kg、又掉回 30 kg 以下，起点取之后真正进入区间的那一次；</li>
+<li>搜索范围是首条记录前、末条记录后各 <code>max_extrap_days</code>
+天。</li>
+</ul>
+<p>结果中的 <code>lm_slope</code>
+是另一种算法，供对照：取起止时间之间的<strong>全部</strong>有效体重记录做直线回归，斜率即日增重。它按时间截取，而不是按体重值筛选，所以区间开始后偶尔低于
+30 kg 的记录也会保留，不会出现前面孤立几个点、中间断开的情况。</p>
 <ul>
 <li>
 <code>gompertz</code> 用 <code>nls(SSgompertz)</code>
@@ -679,7 +816,7 @@ g，日采食量（<code>dfi_range</code>）用 kg，时间用秒（s）或天�
 <span><span class="op">}</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;     stage observed extrapolated fcr_ok fcr_low</span></span>
 <span><span class="co">#&gt;    &lt;char&gt;    &lt;int&gt;        &lt;int&gt;  &lt;int&gt;   &lt;int&gt;</span></span>
-<span><span class="co">#&gt; 1: 30-120        0           24      7      18</span></span>
+<span><span class="co">#&gt; 1: 30-120        0           24      6      19</span></span>
 <span><span class="co">#&gt; 2: 60-120       17            8     23       2</span></span></code></pre></div>
 <p><strong>调整建议</strong>：<code>stage_range</code>
 的两端都应落在大多数猪的实测体重范围之内。区间下限宜比典型进站体重高
@@ -1012,7 +1149,7 @@ LOESS</td>
 <span><span class="co">#&gt;    max_edge_extrap_days fcr_ok</span></span>
 <span><span class="co">#&gt;                   &lt;num&gt;  &lt;int&gt;</span></span>
 <span><span class="co">#&gt; 1:                   10      0</span></span>
-<span><span class="co">#&gt; 2:                   15      7</span></span>
+<span><span class="co">#&gt; 2:                   15      6</span></span>
 <span><span class="co">#&gt; 3:                   30     19</span></span></code></pre></div>
 <p>缺失模拟显示：区间两端缺 10 天以内时，ADFI 误差约 2–4%；缺 20 天时约
 7%；缺 30 天时为 9–14%。默认的 15
@@ -1043,13 +1180,12 @@ kg），说明这一段体重记录不足，例如耳标脱落、不会进站或
 <span><span class="va">b</span> <span class="op">&lt;-</span> <span class="va">res_n</span><span class="op">$</span><span class="va">fcr</span><span class="op">$</span><span class="va">by_bin</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>segments <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">b</span><span class="op">)</span>, low_coverage <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">b</span><span class="op">$</span><span class="va">low_coverage</span><span class="op">)</span>, fcr_outside <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">b</span><span class="op">$</span><span class="va">fcr_out</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;     segments low_coverage  fcr_outside </span></span>
-<span><span class="co">#&gt;          258            5            2</span></span>
+<span><span class="co">#&gt;          258            6            1</span></span>
 <span><span class="va">b</span><span class="op">[</span><span class="va">fcr_out</span> <span class="op">==</span> <span class="cn">TRUE</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">weight_from</span>, <span class="va">weight_to</span>, fcr <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">fcr</span>, <span class="fl">2</span><span class="op">)</span>, <span class="va">fcr_min</span>, <span class="va">fcr_max</span><span class="op">)</span><span class="op">]</span></span>
 <span><span class="co">#&gt; Key: &lt;responder&gt;</span></span>
 <span><span class="co">#&gt;    responder weight_from weight_to   fcr fcr_min fcr_max</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;       &lt;num&gt;     &lt;num&gt; &lt;num&gt;   &lt;num&gt;   &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:     15967          50        60   3.4    1.14    3.30</span></span>
-<span><span class="co">#&gt; 2:     15967          60        70   3.5    1.28    3.41</span></span></code></pre></div>
+<span><span class="co">#&gt; 1:     15967          60        70  3.57    1.28    3.41</span></span></code></pre></div>
 <p>在示例数据中，分段料肉比超出范围的只有 15967 号的 50–70 kg
 段。这头猪在 4
 月下旬采食骤降、体重停止增长，很可能生过病，分段检查正好把它找了出来。</p>

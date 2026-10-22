@@ -19,7 +19,7 @@ the ADG stage."><meta property="og:image" content="https://tony2015116.github.io
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.6.1</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.7.0</span>
       </span>
     </div>
 
@@ -145,52 +145,52 @@ Duroc pigs: I. <em>Journal of Animal Science</em>, 92, 2377-2386.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Visits with at least one error: <span style="font-weight: bold;">1.58%</span> of 31652 identified visits</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">ADFI over 30-120 kg</span> <span style="color: #00BBBB;">─────────────────────────────────────────────────────────</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Correction model: 2772 pig-days, 11 error covariates</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Stage days recorded without error (org): <span style="font-weight: bold;">1,959</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Correction model: 2778 pig-days, 11 error covariates</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Stage days recorded without error (org): <span style="font-weight: bold;">1,949</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Corrected (corr): <span style="font-weight: bold;">280</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Interpolated (iii): <span style="font-weight: bold;">1</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Extrapolated (elrp): <span style="font-weight: bold;">27</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Extrapolated (elrp): <span style="font-weight: bold;">32</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Missing: <span style="font-weight: bold;">0</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Pig-days outside dfi_range: <span style="font-weight: bold;">0</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Mean ADFI over the stage: 2801 g/d</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Mean ADFI over the stage: 2809 g/d</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">adfi</span><span class="op">$</span><span class="va">per_pig</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    responder location  stage     adfi     adg_type adfi_raw adfi_error_free</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       &lt;char&gt;   &lt;char&gt; &lt;char&gt;    &lt;num&gt;       &lt;char&gt;    &lt;num&gt;           &lt;num&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:     13913      101 30-120 2616.719     observed 2596.513        2595.679</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:     13918      101 30-120 2570.041     observed 2540.500        2539.662</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:     13954      101 30-120 2343.422 extrapolated 2317.260        2312.906</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:     13996      101 30-120 2857.824     observed 2835.890        2832.712</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:     14962      101 30-120 2818.537     observed 2800.425        2800.137</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:     15006      101 30-120 3084.452     observed 3071.028        3070.833</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:     13913      101 30-120 2616.853     observed 2596.513        2595.679</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:     13918      101 30-120 2570.277     observed 2540.500        2539.662</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:     13954      101 30-120 2310.346 extrapolated 2317.260        2312.906</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4:     13996      101 30-120 2879.404     observed 2856.625        2853.403</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5:     14962      101 30-120 2818.766     observed 2800.425        2800.137</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6:     15006      101 30-120 3084.753     observed 3071.028        3070.833</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    n_stage_days n_observed n_corrected n_interpolated n_extrapolated n_missing</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           &lt;int&gt;      &lt;int&gt;       &lt;int&gt;          &lt;int&gt;          &lt;int&gt;     &lt;int&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1:           78         78          12              0              0         0</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2:           80         80          15              0              0         0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:           99         96          15              0              3         0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:           73         73           8              0              0         0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:          102         96          15              0              6         0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4:           72         72           8              0              0         0</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 5:           73         73           9              0              0         0</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6:           72         72           7              0              0         0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    n_extrap_start n_extrap_end coverage</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>             &lt;int&gt;        &lt;int&gt;    &lt;num&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:              0            0 1.000000</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:              0            0 1.000000</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:              2            1 0.969697</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:              0            0 1.000000</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:              0            0 1.000000</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:              0            0 1.000000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    n_extrap_start n_extrap_end  coverage</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>             &lt;int&gt;        &lt;int&gt;     &lt;num&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:              0            0 1.0000000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:              0            0 1.0000000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:              5            1 0.9411765</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4:              0            0 1.0000000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5:              0            0 1.0000000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6:              0            0 1.0000000</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">adfi</span><span class="op">$</span><span class="va">daily</span><span class="op">[</span><span class="va">in_stage</span> <span class="op">==</span> <span class="cn">TRUE</span>, <span class="va">state</span><span class="op">]</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> corr elrp  iii  org </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  280   27    1 1959 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  280   32    1 1949 </span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">adfi</span><span class="op">$</span><span class="va">model</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           term      estimate    std_error      p_value</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>         &lt;char&gt;         &lt;num&gt;        &lt;num&gt;        &lt;num&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1: (Intercept)   -883.565519  294.8496966 2.754081e-03</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2: location102    -75.207470   60.1145736 2.220502e-01</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:          bw     24.930643    0.3435384 0.000000e+00</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:         adg      1.557668    0.2481588 1.209982e-06</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:  pte_fiv_hi -12786.859500 6072.7881333 3.533023e-02</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:  pte_otv_hi  -2668.620000 3480.0226472 4.432430e-01</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1: (Intercept)   -903.769543  271.6472281 8.894731e-04</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2: location102    -67.899813   57.2541792 2.463727e-01</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:          bw     25.090992    0.3410229 0.000000e+00</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4:         adg      1.557735    0.2274260 2.856764e-07</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5:  pte_fiv_hi -13021.069596 6062.0801193 3.180494e-02</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6:  pte_otv_hi  -2714.681970 3473.9024180 4.346053e-01</span>
 </code></pre></div>
     </div>
   </div>
