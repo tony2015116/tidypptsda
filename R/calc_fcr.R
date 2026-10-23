@@ -31,30 +31,10 @@
 #'   - `removed`, `settings`.
 #'
 #' @details
-#' With `method = "national"` in the QC settings ([qc_config()] preset
-#' `"national"`), FCR follows the national procedure instead:
-#' 1. daily weights over the test period (missing days interpolated
-#'    linearly inside, predicted by a quadratic curve at the ends) and daily
-#'    feed intake (missing days imputed by `impute_method`);
-#' 2. days whose weight lies in `stage_range` are split into `bin_width` kg
-#'    classes; a class with a weight gain below `bin_min_gain_kg` or an FCR
-#'    outside `bin_fcr_limits` is removed, and a pig with a removed class
-#'    between two kept ones is removed;
-#' 3. cumulative feed intake over the kept days is regressed on body weight
-#'    (pigs with R² <= `cfi_r2_min` are removed) and extended with that
-#'    slope to the stage limits;
-#' 4. FCR = (cumulative intake at the upper limit - at the lower limit) /
-#'    stage width.
-#'
-#' `per_pig` then also has `cfi_start`, `cfi_end` (kg), `cfi_r2`,
-#' `cfi_slope`, `weight_first`, `weight_last` (first and last kept daily
-#' weight), `extrap_kg_start`, `extrap_kg_end` (kg extended by the
-#' regression; more than `bin_width` gives `fcr_flag = "low_confidence"`),
-#' `n_classes` and `n_classes_removed`; `by_bin` gives `removed` (reason or
-#' `NA`) for each class; `cfi` gives every stage day: `weight`, `dfi`,
-#' `weight_from` (class), `kept` and the cumulative intake `cfi` (kg, kept
-#' days only). Plot it with [plot_cfi()]. ADG and ADFI are those of [calc_adg()] and
-#' [calc_adfi()].
+#' FCR = ADFI / ADG, with ADG the slope of the daily weights over the stage
+#' (observed, interpolated and curve-filled days, see [calc_adg()]) and ADFI
+#' the mean daily intake over the same days (recorded, corrected and
+#' imputed, see [calc_adfi()]).
 #'
 #' @seealso [calc_adg()], [calc_adfi()].
 #' @export
@@ -76,9 +56,6 @@ calc_fcr <- function(adg, adfi, min_coverage = adg$settings$min_coverage,
   }
   if (!identical(adg$settings$stage_range, adfi$settings$stage_range)) {
     cli::cli_abort("{.arg adg} and {.arg adfi} use different {.field stage_range}.")
-  }
-  if (identical(adg$settings$method, "national")) {
-    return(calc_fcr_national(adg, adfi))
   }
   ppt_msg("FCR over {adg$settings$stage_range[1]}-{adg$settings$stage_range[2]} kg", "h1")
 
@@ -158,169 +135,6 @@ calc_fcr <- function(adg, adfi, min_coverage = adg$settings$min_coverage,
 }
 
 # Feed intake, gain and FCR per body weight class of each pig.
-# FCR by the national method (qc_config("national")):
-# 1. daily weights (weighted means) of the test period, missing days
-#    interpolated linearly inside and predicted by a quadratic curve at the
-#    ends; daily feed intake from calc_adfi(), missing days imputed by the
-#    national rule;
-# 2. days whose weight lies in stage_range are split into bin_width classes;
-#    a class whose weight gain is below bin_min_gain_kg, or whose FCR is
-#    outside bin_fcr_limits, is removed; a pig with a removed (or missing)
-#    class between two kept classes is removed;
-# 3. cumulative feed intake over the kept days; it is regressed on body
-#    weight (linear) - pigs with R2 <= cfi_r2_min are removed - and the
-#    regression slope extends it from the first / last kept day to the
-#    stage limits;
-# 4. FCR = (CFI at the upper limit - CFI at the lower limit) / stage width.
-calc_fcr_national <- function(adg, adfi) {
-  qc <- adg$settings
-  lo <- qc$stage_range[1L]
-  hi <- qc$stage_range[2L]
-  ppt_msg("FCR over {lo}-{hi} kg (national method: cumulative feed intake)", "h1")
-  pigs <- adg$per_pig[!is.na(adg), responder]
-  dly <- adg$daily[responder %in% pigs, .(responder, location, date, seq_days, weight, predicted)]
-  feed <- adfi$daily[, .(responder, date, dfi, state)]
-
-  one <- function(id) {
-    d <- dly[responder == id]
-    data.table::setorder(d, date)
-    obs <- d[!is.na(weight)]
-    if (nrow(obs) < 5L) return(list(error = "fewer than 5 daily weights"))
-    days <- seq(min(obs$date), max(obs$date), by = 1)
-    g <- data.table::data.table(responder = id, date = days)
-    g[obs, on = "date", w_obs := i.weight]
-    # weights: linear interpolation inside, quadratic prediction at the ends
-    x <- as.numeric(g$date - min(g$date))
-    ok <- !is.na(g$w_obs)
-    g[, w := stats::approx(x[ok], w_obs[ok], xout = x)$y]
-    if (anyNA(g$w)) {
-      fit <- stats::lm(w_obs ~ x + I(x^2), data = data.frame(w_obs = g$w_obs[ok], x = x[ok]))
-      miss <- is.na(g$w)
-      g[miss, w := stats::predict(fit, newdata = data.frame(x = x[miss]))]
-    }
-    g[feed[responder == id], on = "date", `:=`(dfi = i.dfi, state = i.state)]
-    g[, in_band := w >= lo & w <= hi]
-    if (!any(g$in_band)) return(list(error = "no daily weight inside the stage"))
-    # impute missing intake on the stage days
-    dd <- g[, .(date, seq_days = as.integer(date - min(date)) + 1L, bw = w,
-                in_stage = in_band, state = data.table::fifelse(state %in% c("org", "corr"), state, NA_character_),
-                dfi_check = data.table::fifelse(state %in% c("org", "corr"), dfi, NA_real_))]
-    dd <- impute_dfi_one_pig(dd, qc)
-    g[, dfi := dd$dfi]
-    st <- g[in_band == TRUE]
-    if (anyNA(st$dfi)) return(list(error = "daily feed intake missing on stage days"))
-    width <- qc$bin_width
-    st[, weight_from := pmin(lo + floor((w - lo) / width) * width, hi - width)]
-    bins <- st[, .(n_days = .N, w_first = w[1L], w_last = w[.N], feed_kg = sum(dfi) / 1000),
-               by = weight_from]
-    bins[, `:=`(weight_to = pmin(weight_from + width, hi), gain_kg = w_last - w_first)]
-    bins[, fcr := data.table::fifelse(gain_kg > 0, feed_kg / gain_kg, NA_real_)]
-    bins[, `:=`(fcr_min = NA_real_, fcr_max = NA_real_)]
-    if (!is.null(qc$bin_fcr_limits)) {
-      lim <- data.table::as.data.table(qc$bin_fcr_limits)
-      bins[lim, on = "weight_from", `:=`(fcr_min = i.fcr_min, fcr_max = i.fcr_max)]
-    }
-    bins[, removed := data.table::fcase(
-      gain_kg < qc$bin_min_gain_kg, sprintf("gain %.1f kg < %s kg", gain_kg, qc$bin_min_gain_kg),
-      !is.na(fcr_min) & (is.na(fcr) | fcr < fcr_min | fcr > fcr_max),
-      sprintf("class FCR %.2f outside %s-%s", fcr, fcr_min, fcr_max),
-      default = NA_character_)]
-    data.table::setorder(bins, weight_from)
-    kept_bins <- bins[is.na(removed), weight_from]
-    out_bins <- data.table::copy(bins)[, responder := id]
-    # daily cumulative intake over the kept classes (for plot_cfi())
-    data.table::setorder(st, date)
-    days_tab <- st[, .(responder = id, date, weight = w, dfi, weight_from,
-                       kept = weight_from %in% kept_bins)]
-    days_tab[, cfi := NA_real_]
-    days_tab[kept == TRUE, cfi := cumsum(dfi) / 1000]
-    if (length(kept_bins) == 0L) {
-      return(list(error = "every weight class removed", bins = out_bins, cfi = days_tab))
-    }
-    expected <- seq(min(kept_bins), max(kept_bins), by = width)
-    if (!all(expected %in% kept_bins)) {
-      gapb <- setdiff(expected, kept_bins)
-      return(list(error = sprintf("weight class %s kg removed or missing between kept classes",
-                                  paste0(gapb, "-", gapb + width, collapse = ", ")),
-                  bins = out_bins, cfi = days_tab))
-    }
-    k <- st[weight_from %in% kept_bins]
-    data.table::setorder(k, date)
-    k[, cfi := cumsum(dfi) / 1000]
-    cf <- stats::lm(cfi ~ w, data = k)
-    r2 <- summary(cf)$r.squared
-    if (!is.finite(r2) || r2 <= qc$cfi_r2_min) {
-      return(list(error = sprintf("R2 of cumulative feed on weight %.3f <= %s", r2, qc$cfi_r2_min),
-                  bins = out_bins, cfi = days_tab))
-    }
-    b <- unname(stats::coef(cf)[2L])
-    first <- k[1L]
-    last <- k[.N]
-    cfi_lo <- first$cfi - b * (first$w - lo)
-    cfi_hi <- last$cfi + b * (hi - last$w)
-    list(per_pig = data.table::data.table(
-      responder = id, fcr = (cfi_hi - cfi_lo) / (hi - lo),
-      cfi_start = cfi_lo, cfi_end = cfi_hi, cfi_r2 = r2, cfi_slope = b,
-      weight_first = first$w, weight_last = last$w,
-      extrap_kg_start = max(0, first$w - lo), extrap_kg_end = max(0, hi - last$w),
-      n_classes = length(kept_bins), n_classes_removed = sum(!is.na(bins$removed))),
-      bins = out_bins, cfi = days_tab)
-  }
-  res <- lapply(pigs, one)
-  ok <- vapply(res, function(r) is.null(r$error), logical(1))
-  pp <- data.table::rbindlist(lapply(res[ok], `[[`, "per_pig"))
-  by_bin <- data.table::rbindlist(lapply(res, `[[`, "bins"), fill = TRUE)
-  if (nrow(by_bin) > 0L) {
-    data.table::setcolorder(by_bin, c("responder", "weight_from", "weight_to"))
-    by_bin[, c("w_first", "w_last") := NULL]
-  }
-  bad <- data.table::data.table(responder = pigs[!ok],
-                                reason = vapply(res[!ok], `[[`, "", "error"))
-  cfi <- data.table::rbindlist(lapply(res, `[[`, "cfi"), fill = TRUE)
-
-  a <- adg$per_pig[, intersect(c("responder", "location", "breed", "stage", "adg", "adg_type",
-                                "stage_days", "start_weight", "end_weight"), names(adg$per_pig)),
-                   with = FALSE]
-  f <- adfi$per_pig[, .(responder, adfi, coverage)]
-  per_pig <- merge(merge(a, f, by = "responder", all.x = TRUE), pp, by = "responder", all.x = TRUE)
-  per_pig[, gf := 1 / fcr]
-  max_edge <- qc$bin_width
-  per_pig[, fcr_note := data.table::fcase(
-    is.na(fcr), "no FCR",
-    extrap_kg_start > max_edge | extrap_kg_end > max_edge,
-    sprintf("cumulative feed extrapolated over %.0f kg", extrap_kg_start + extrap_kg_end),
-    default = "")]
-  per_pig[, fcr_flag := data.table::fcase(is.na(fcr), NA_character_,
-                                          nzchar(fcr_note), "low_confidence", default = "ok")]
-  data.table::setcolorder(per_pig, intersect(c("responder", "location", "breed", "stage", "adg", "adfi",
-                                     "fcr", "gf", "adg_type", "coverage", "fcr_flag", "fcr_note"),
-                                   names(per_pig)))
-  data.table::setorder(per_pig, location, responder)
-  loc <- per_pig[, .(responder, location)]
-  removed <- rbind(adfi$removed,
-                   new_removed(bad$responder, loc$location[match(bad$responder, loc$responder)],
-                               "calc_fcr", bad$reason))
-  summary <- rbind(trait_summary(per_pig, "all"), trait_summary(per_pig[fcr_flag %in% "ok"], "ok"))
-  if ("breed" %in% names(per_pig)) {
-    for (bb in sort(unique(stats::na.omit(per_pig$breed)))) {
-      summary <- rbind(summary, trait_summary(per_pig[breed %in% bb], paste("breed", bb)))
-    }
-  }
-  ppt_msg("FCR for {sum(!is.na(per_pig$fcr))} pig{?s}; {nrow(bad)} removed by the class and cumulative-feed checks",
-          if (nrow(bad) > 0L) "warning" else "success")
-  s <- summary[group == "all" & trait == "fcr"]
-  if (nrow(s) == 1L && s$n > 0) {
-    ppt_msg("Mean FCR {sprintf('%.2f', s$mean)} (SD {sprintf('%.2f', s$sd)})", "success")
-  }
-  if (nrow(cfi) > 0L) {
-    cfi <- merge(loc, cfi, by = "responder")
-    data.table::setorder(cfi, location, responder, date)
-  }
-  new_ppt_result(per_pig = per_pig, daily = adfi$daily, removed = removed,
-                 settings = qc, class = "ppt_fcr") |>
-    add_element(summary = summary, by_bin = by_bin, cfi = cfi)
-}
-
 fcr_by_bin <- function(adg, adfi, qc) {
   lo <- qc$stage_range[1L]
   hi <- qc$stage_range[2L]

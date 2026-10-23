@@ -6,7 +6,7 @@
 \usage{
 validate_adfi(
   adfi,
-  methods = c("linear", "loess"),
+  methods = c("loess_lm", "linear"),
   scenarios = c("random30", "blocks3", "late20", "early15"),
   reps = 5,
   min_coverage = 0.8,

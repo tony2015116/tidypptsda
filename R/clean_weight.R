@@ -8,18 +8,19 @@
 #'
 #' @param visits Visit table from [prep_visits()].
 #' @param qc QC settings from [qc_config()]. Used here: `weight_range`,
-#'   `weight_outlier`, `outlier_combine`, `rlm_cutoff`, `sd_max`,
-#'   `loess_span`, `rel_dev_max`, `daily_drop_min`, `min_records`,
-#'   `min_test_days`, `max_missing_rate`, `entry_weight_max`,
-#'   `exit_weight_min`, `curve_r2_min`.
+#'   `adapt_days`, `weight_track`, `track_tol`, `weight_outlier`,
+#'   `outlier_combine`, `rlm_cutoff`, `sd_max`, `loess_span`,
+#'   `min_records`, `min_test_days`, `max_missing_rate`, `entry_weight_max`,
+#'   `exit_weight_min`, `track_flag_share`, `smooth_r2_min`.
 #' @param verbose 0 (silent), 1 (summary, default) or 2 (details).
 #' @param cores Number of CPU cores for the per-pig computations. Default 1.
 #'
 #' @return An object of class `ppt_weight` (a list):
 #'   - `per_pig`: one row per pig with `n_records`, `n_valid`,
 #'     `n_outliers`, `first_date`, `last_date`, `test_days`,
-#'     `missing_rate`, `entry_weight`, `exit_weight` (kg, from the fitted
-#'     curve), `r2`, `track_removed` (share of the records removed by the
+#'     `missing_rate`, `entry_weight`, `exit_weight` (kg, from the LOESS
+#'     smooth of the valid weights), `r2` (R<c2><b2> of that smooth),
+#'     `track_removed` (share of the records removed by the
 #'     tracking, `NA` when not tracked), `status` (`"keep"`,
 #'     `"low_confidence"` or `"removed"`) and `reason`;
 #'   - `daily`: one row per pig and day for pigs not removed: median of the
@@ -37,11 +38,8 @@
 #'   `missing_rate > max_missing_rate` (share of test days without a valid
 #'   weight) remove the pig;
 #' - `entry_weight > entry_weight_max`, `exit_weight < exit_weight_min`,
-#'   `r2 < curve_r2_min`, `max_daily_jump > max_daily_jump_kg` (the
-#'   largest change of the daily median weight between consecutive recorded
-#'   days, kg/d), or a tracking that removes more than `track_flag_share`
-#'   of the records mark the pig `"low_confidence"`
-#'   but keep it: its
+#'   a tracking that removes more than `track_flag_share` of the records,
+#'   or `r2 < smooth_r2_min` mark the pig `"low_confidence"` but keep it: its
 #'   growth can still be estimated by extrapolation in [calc_adg()], with a
 #'   flag.
 #'
@@ -59,9 +57,9 @@
 #' # Records flagged as outliers
 #' head(w$records[outlier == TRUE])
 #'
-#' # Another QC preset
-#' w_national <- clean_weight(visits, qc = qc_config("national"), verbose = 0)
-#' table(w_national$per_pig$status)
+#' # Other outlier methods
+#' w_sd <- clean_weight(visits, qc = qc_config(weight_outlier = c("rlm", "sd")), verbose = 0)
+#' table(w_sd$per_pig$status)
 clean_weight <- function(visits, qc = qc_config(), verbose = 1, cores = 1) {
   local_verbose(verbose)
   local_cores(cores)
@@ -123,15 +121,6 @@ clean_weight <- function(visits, qc = qc_config(), verbose = 1, cores = 1) {
   per_pig[, test_days := as.integer(last_date - first_date) + 1L]
   per_pig[, missing_rate := 1 - valid_days / test_days]
   per_pig <- merge(per_pig, pig_fit, by = "responder", all.x = TRUE)
-  # R2 of a quadratic fit of the daily weights, and days without feed records
-  dw <- rec[outlier == FALSE, .(w = daily_weight_value(weight, rlm_w, qc$daily_weight)),
-            by = .(responder, date)]
-  per_pig <- merge(per_pig, dw[, .(r2_daily = daily_r2(date, w)), by = responder],
-                   by = "responder", all.x = TRUE)
-  fm <- dt[identified == TRUE, .(feed_missing = 1 - data.table::uniqueN(date) /
-                                   (as.integer(max(date) - min(date)) + 1)), by = responder]
-  per_pig <- merge(per_pig, fm, by = "responder", all.x = TRUE)
-  per_pig <- merge(per_pig, daily_jumps(rec), by = "responder", all.x = TRUE)
   per_pig <- merge(main_loc, per_pig, by = "responder", all.y = TRUE)
   pig_breed <- breed_of(dt)
   if (!is.null(pig_breed)) per_pig <- merge(pig_breed, per_pig, by = "responder", all.y = TRUE)
@@ -150,7 +139,7 @@ clean_weight <- function(visits, qc = qc_config(), verbose = 1, cores = 1) {
   daily <- rec[kept_pig == TRUE, .(
     location = location[1L],
     seq_days = seq_days[1L],
-    weight = daily_weight_value(weight[!outlier], rlm_w[!outlier], qc$daily_weight),
+    weight = if (any(!outlier)) stats::median(weight[!outlier]) else NA_real_,
     n_records = .N,
     n_outliers = sum(outlier)
   ), by = .(responder, date)]
@@ -175,44 +164,12 @@ clean_weight <- function(visits, qc = qc_config(), verbose = 1, cores = 1) {
 
 `%||%` <- function(x, y) if (is.null(x)) y else x
 
-# Representative weight of one day: median, or the mean weighted by the rlm
-# weights (national method; falls back to the median without rlm weights).
-daily_weight_value <- function(y, w, how = "median") {
-  if (length(y) == 0L) return(NA_real_)
-  if (identical(how, "weighted_mean") && !is.null(w) && any(!is.na(w)) && sum(w, na.rm = TRUE) > 0) {
-    ok <- !is.na(w)
-    return(sum(y[ok] * w[ok]) / sum(w[ok]))
-  }
-  stats::median(y)
-}
-
-# R2 of a quadratic fit of the daily weights over the days.
-daily_r2 <- function(day, w) {
-  ok <- !is.na(w)
-  if (sum(ok) < 5L) return(NA_real_)
-  x <- as.numeric(day[ok])
-  y <- w[ok]
-  f <- stats::lm(y ~ x + I(x^2))
-  1 - sum(stats::residuals(f)^2) / sum((y - mean(y))^2)
-}
-
 # Breed of each identified pig (first non-missing value), or NULL.
 breed_of <- function(dt) {
   if (!"breed" %in% names(dt)) return(NULL)
   out <- dt[identified == TRUE, .(breed = stats::na.omit(breed)[1L]), by = responder]
   out[, breed := as.character(breed)]
   out[]
-}
-
-# Largest change of the daily median valid weight between consecutive
-# recorded days, in kg per day.
-daily_jumps <- function(rec) {
-  d <- rec[outlier == FALSE, .(w = stats::median(weight)), by = .(responder, date)]
-  data.table::setorder(d, responder, date)
-  d[, rate := abs(w - data.table::shift(w)) / as.numeric(date - data.table::shift(date)),
-    by = responder]
-  d[, .(max_daily_jump = if (all(is.na(rate))) NA_real_ else max(rate, na.rm = TRUE)),
-    by = responder]
 }
 
 check_qc <- function(qc) {
@@ -276,8 +233,7 @@ detect_weight_outliers <- function(d, qc) {
       fit <- MASS::rlm(cbind(1, t, t^2), y, psi = MASS::psi.bisquare, maxit = 100)
       fits$rlm <- stats::fitted(fit)
       rlm_w <- fit$w
-      # the national method removes weights <= the cutoff
-      flags$rlm <- if (identical(qc$method, "national")) fit$w <= qc$rlm_cutoff else fit$w < qc$rlm_cutoff
+      flags$rlm <- fit$w < qc$rlm_cutoff
     } else if (m == "loess") {
       fits$loess <- loess_fit(t, y, qc$loess_span)
       r <- y - fits$loess
@@ -298,46 +254,19 @@ detect_weight_outliers <- function(d, qc) {
   outlier <- if (qc$outlier_combine == "any") rowSums(mat) > 0 else rowSums(mat) > ncol(mat) / 2
   by <- character(nrow(mat))
   for (m in colnames(mat)) by <- add_reason(by, mat[, m] %in% TRUE, m)
+  by[!outlier] <- ""
   ref <- fits[[1L]]
 
-  # a whole day off the curve: every record of the day has an rlm weight
-  # below day_weight_min
-  if (!is.null(qc$day_weight_min) && !is.null(rlm_w)) {
-    day_k <- d$date[keep]
-    bad <- tapply(rlm_w, day_k, function(v) all(v < qc$day_weight_min))
-    day_off <- as.character(day_k) %in% names(bad)[bad]
-    by <- add_reason(by, day_off & !outlier, "day_weight")
-    outlier <- outlier | day_off
-  }
-
-  if (!is.null(qc$rel_dev_max)) {
-    rel <- abs(y - ref) / ref > qc$rel_dev_max
-    by <- add_reason(by, rel, "rel_dev")
-    outlier <- outlier | rel
-  }
-  if (!is.null(qc$daily_drop_min)) {
-    drop <- daily_drop(d$date[keep], y, outlier, qc$daily_drop_min)
-    by <- add_reason(by, drop, "daily_drop")
-    outlier <- outlier | drop
-  }
-  # records kept by the tracking follow the pig's own weight day by day; a
-  # smooth curve cannot follow e.g. slow growth for weeks after entry, so the
-  # curve methods do not overrule them (they still give the fitted curve)
-  if (!is.na(tr$removed)) {
-    outlier[] <- FALSE
-  }
-  by[!outlier] <- ""
-
-  # Curve on the valid records: R2 and entry/exit weight.
+  # LOESS smooth of the valid records: R2 and entry/exit weight
   ok <- !outlier
   if (sum(ok) >= 5L) {
     tt <- t[ok]
     yy <- y[ok]
-    use_loess <- "loess" %in% qc$weight_outlier
-    clean_fit <- if (use_loess) loess_fit(tt, yy, qc$loess_span) else stats::fitted(stats::lm(yy ~ tt + I(tt^2)))
-    r2 <- 1 - sum((yy - clean_fit)^2) / sum((yy - mean(yy))^2)
-    entry_weight <- clean_fit[which.min(tt)]
-    exit_weight <- clean_fit[which.max(tt)]
+    sm <- tryCatch(loess_fit(tt, yy, qc$loess_span),
+                   error = function(e) stats::fitted(stats::lm(yy ~ tt + I(tt^2))))
+    r2 <- 1 - sum((yy - sm)^2) / sum((yy - mean(yy))^2)
+    entry_weight <- sm[which.min(tt)]
+    exit_weight <- sm[which.max(tt)]
   } else {
     r2 <- entry_weight <- exit_weight <- NA_real_
   }
@@ -420,14 +349,6 @@ stl_fit <- function(t, y, span) {
   as.numeric(comp)[day + 1L]
 }
 
-# Days whose median weight drops below `ratio` x the previous valid day.
-daily_drop <- function(date, y, outlier, ratio) {
-  med <- tapply(y[!outlier], date[!outlier], stats::median)
-  if (length(med) < 2L) return(rep(FALSE, length(y)))
-  bad_days <- names(med)[-1L][med[-1L] / med[-length(med)] < ratio]
-  as.character(date) %in% bad_days
-}
-
 add_reason <- function(by, flag, label) {
   by[flag] <- ifelse(nzchar(by[flag]), paste(by[flag], label, sep = ";"), label)
   by
@@ -446,15 +367,12 @@ pig_reasons <- function(p, qc, failed, type = c("remove", "flag")) {
         sprintf("entry weight %.1f kg > %s kg", p$entry_weight, qc$entry_weight_max))
     add(p$exit_weight < qc$exit_weight_min,
         sprintf("exit weight %.1f kg < %s kg", p$exit_weight, qc$exit_weight_min))
-    if (!is.null(qc$curve_r2_min)) {
-      add(p$r2 < qc$curve_r2_min, sprintf("curve R2 %.3f < %s", p$r2, qc$curve_r2_min))
-    }
     add(p$track_removed > qc$track_flag_share,
         sprintf("tracking removed %.0f%% of the weight records (possible weighing fault, e.g. a faulty load cell)",
                 100 * p$track_removed))
-    if (!is.null(qc$max_daily_jump_kg)) {
-      add(p$max_daily_jump > qc$max_daily_jump_kg,
-          sprintf("day-to-day weight change %.1f kg/d > %s kg/d", p$max_daily_jump, qc$max_daily_jump_kg))
+    if (!is.null(qc$smooth_r2_min)) {
+      add(p$r2 < qc$smooth_r2_min,
+          sprintf("R2 of the LOESS smooth %.3f < %s", p$r2, qc$smooth_r2_min))
     }
     return(vapply(reasons, function(x) paste(unique(x), collapse = "; "), character(1)))
   }
@@ -464,15 +382,6 @@ pig_reasons <- function(p, qc, failed, type = c("remove", "flag")) {
       sprintf("%d valid weights < %d", p$n_valid, as.integer(qc$min_records)))
   add(p$n_valid > 0 & p$test_days < qc$min_test_days,
       sprintf("test period %d d < %d d", p$test_days, as.integer(qc$min_test_days)))
-  if (!is.null(qc$daily_r2_min)) {
-    add(p$r2_daily < qc$daily_r2_min,
-        sprintf("R2 of the daily weights %.4f < %s", p$r2_daily, qc$daily_r2_min))
-  }
-  if (!is.null(qc$max_feed_missing)) {
-    add(p$feed_missing > qc$max_feed_missing,
-        sprintf("no feed record on %.0f%% of the test days > %.0f%%",
-                100 * p$feed_missing, 100 * qc$max_feed_missing))
-  }
   add(p$n_valid > 0 & p$missing_rate > qc$max_missing_rate,
       sprintf("missing rate %.0f%% > %.0f%%", 100 * p$missing_rate, 100 * qc$max_missing_rate))
   vapply(reasons, function(x) paste(unique(x), collapse = "; "), character(1))
@@ -489,8 +398,7 @@ report_clean_weight <- function(rec, per_pig, n_range, fits, qc) {
     "Outside weight range" = n_range,
     "Adaptation after entry (not used)" = rec[qc_flag == "adaptation", .N],
     "Outliers" = n_out,
-    "  of which removed by tracking" = if (isTRUE(qc$weight_track)) rec[qc_flag == "track", .N] else NULL,
-    "  of which whole days off the curve" = if (!is.null(qc$day_weight_min)) rec[qc_flag == "day_weight", .N] else NULL
+    "  of which removed by tracking" = if (isTRUE(qc$weight_track)) rec[qc_flag == "track", .N] else NULL
   ))
   if (length(qc$weight_outlier) > 1L) {
     ppt_bullets_counts(stats::setNames(method_counts, paste0("  flagged by ", names(method_counts))), level = 2L)

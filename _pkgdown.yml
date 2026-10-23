@@ -23,7 +23,7 @@ navbar:
 
 reference:
 - title: Quality-control settings
-  desc: Set every threshold of the pipeline in one object, starting from one of three presets.
+  desc: Set every threshold of the pipeline in one object; override single parameters.
   contents:
   - qc_config
   - fiv_max_example
@@ -34,7 +34,7 @@ reference:
   - prep_visits
   - add_breed
 - title: Body weight and daily gain
-  desc: Flag implausible body weights, then fit growth curves and compute ADG over a body weight stage.
+  desc: Flag implausible body weights, fill the missing daily weights of the stage and compute ADG as the slope of the daily weights.
   contents:
   - clean_weight
   - calc_adg
@@ -53,17 +53,17 @@ reference:
   contents:
   - write_results
 - title: Validation
-  desc: Check the outlier methods, growth curve models and feed intake imputation on your own data, by spoiling or hiding part of it on purpose.
+  desc: Check the outlier methods, growth curve models, weight fill and feed intake imputation on your own data, by spoiling or hiding part of it on purpose.
   contents:
   - validate_outliers
   - validate_adg
+  - validate_weight_fill
   - validate_adfi
 - title: Plots
   desc: One plot per station and one panel per pig; write them to files.
   contents:
   - plot_adg
   - plot_adfi
-  - plot_cfi
   - save_plots
 - title: Example data
   desc: Raw exports from NEDAP and FIRE stations, used in every example.
@@ -81,7 +81,7 @@ articles:
   contents:
   - tidypptsda-zh
   - qc-parameters-zh
-  - qc-presets-zh
+  - methods-zh
   - validation-zh
   - output-zh
 

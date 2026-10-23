@@ -26,6 +26,11 @@ feed intake correction (ADFI) and feed conversion ratio (FCR).
 - Feeder errors are flagged with the 16 criteria of Casey et al. (2005).
 - Daily feed intake is corrected with the linear mixed model of
   Jiao et al. (2014).
+- Body weights are tracked back from the reliable end of the test, then
+  checked by robust quadratic regression and LOESS.
+- Missing daily weights and feed intakes of the stage are filled (linear
+  interpolation or LOESS inside, growth curve or regression on body weight
+  at the ends); ADG is the slope of the daily weights, FCR = ADFI / ADG.
 - ADG and ADFI are computed over the same body weight stage, and every
   pig gets a confidence flag that explains how its values were obtained.
 - Nothing is removed silently: each step returns a `removed` table with
@@ -51,16 +56,16 @@ pak::pak("tony2015116/tidypptsda@v0.1.0")
 ```{r example, message = FALSE}
 library(tidypptsda)
 
-res <- run_pipeline(nedap, qc = qc_config("casey"), verbose = 0)
+res <- run_pipeline(nedap, verbose = 0)
 res
 
 head(res$fcr$per_pig[, .(responder, adg, adfi, fcr, fcr_flag)])
 ```
 
-Step by step, with any QC preset or setting:
+Step by step, with any QC setting:
 
 ```{r steps, eval = FALSE}
-qc      <- qc_config("casey", stage_range = c(30, 120))
+qc      <- qc_config(stage_range = c(30, 120))
 visits  <- prep_visits(fire, qc = qc)          # or read_station("export/")
 weight  <- clean_weight(visits, qc)
 adg     <- calc_adg(weight)

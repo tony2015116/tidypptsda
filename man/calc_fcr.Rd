@@ -42,32 +42,10 @@ weight stage, flag pigs whose values rely on extrapolation, and summarise
 the traits.
 }
 \details{
-With \code{method = "national"} in the QC settings (\code{\link[=qc_config]{qc_config()}} preset
-\code{"national"}), FCR follows the national procedure instead:
-\enumerate{
-\item daily weights over the test period (missing days interpolated
-linearly inside, predicted by a quadratic curve at the ends) and daily
-feed intake (missing days imputed by \code{impute_method});
-\item days whose weight lies in \code{stage_range} are split into \code{bin_width} kg
-classes; a class with a weight gain below \code{bin_min_gain_kg} or an FCR
-outside \code{bin_fcr_limits} is removed, and a pig with a removed class
-between two kept ones is removed;
-\item cumulative feed intake over the kept days is regressed on body weight
-(pigs with R² <= \code{cfi_r2_min} are removed) and extended with that
-slope to the stage limits;
-\item FCR = (cumulative intake at the upper limit - at the lower limit) /
-stage width.
-}
-
-\code{per_pig} then also has \code{cfi_start}, \code{cfi_end} (kg), \code{cfi_r2},
-\code{cfi_slope}, \code{weight_first}, \code{weight_last} (first and last kept daily
-weight), \code{extrap_kg_start}, \code{extrap_kg_end} (kg extended by the
-regression; more than \code{bin_width} gives \code{fcr_flag = "low_confidence"}),
-\code{n_classes} and \code{n_classes_removed}; \code{by_bin} gives \code{removed} (reason or
-\code{NA}) for each class; \code{cfi} gives every stage day: \code{weight}, \code{dfi},
-\code{weight_from} (class), \code{kept} and the cumulative intake \code{cfi} (kg, kept
-days only). Plot it with \code{\link[=plot_cfi]{plot_cfi()}}. ADG and ADFI are those of \code{\link[=calc_adg]{calc_adg()}} and
-\code{\link[=calc_adfi]{calc_adfi()}}.
+FCR = ADFI / ADG, with ADG the slope of the daily weights over the stage
+(observed, interpolated and curve-filled days, see \code{\link[=calc_adg]{calc_adg()}}) and ADFI
+the mean daily intake over the same days (recorded, corrected and
+imputed, see \code{\link[=calc_adfi]{calc_adfi()}}).
 }
 \examples{
 visits <- prep_visits(nedap, verbose = 0)

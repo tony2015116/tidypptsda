@@ -22,19 +22,19 @@ library(tidypptsda)
 
 | 步骤 | 函数 | 作用 |
 |---|---|---|
-| 0 | `qc_config()` | 设定全部质控参数（三套预设） |
+| 0 | `qc_config()` | 设定全部质控参数 |
 | 1 | `read_station()` | 读取测定站导出的 csv（多个文件或整个文件夹） |
 | 2 | `prep_visits()` | 整理为标准访问表 |
 | 2+ | `add_breed()` | 可选：合并你自己的品种（品系）表 |
 | 3 | `clean_weight()` | 体重质控：剔除异常值，判定每头猪是否可用 |
-| 4 | `calc_adg()` | 拟合生长曲线，计算体重区间内的日增重 |
+| 4 | `calc_adg()` | 补齐体重区间内每天的体重，回归斜率即日增重 |
 | 5 | `flag_feed_errors()` | 按 Casey 等（2005）的 16 条规则标记采食错误 |
-| 6 | `calc_adfi()` | 校正日采食量、插补缺失日，计算 ADFI |
-| 7 | `calc_fcr()` | 计算料肉比，并给出可信度标记 |
+| 6 | `calc_adfi()` | 校正日采食量、补齐缺失日，计算 ADFI |
+| 7 | `calc_fcr()` | 料肉比 = ADFI ÷ ADG，并给出可信度标记 |
 | 8 | `plot_adg()` / `plot_adfi()` / `save_plots()` | 按测定站出图并保存 |
 | 9 | `write_results()` | 把全部结果表导出为 csv |
 
-不需要中间结果时，用 `run_pipeline()` 一次跑完：
+每一步的方法和出处见《计算方法说明》。不需要中间结果时，用 `run_pipeline()` 一次跑完：
 
 ```{r pipeline}
 res <- run_pipeline(nedap, verbose = 0)
@@ -89,16 +89,10 @@ visits_b <- add_breed(visits_b, breeds)
 
 ## 3. 质控参数：`qc_config()`
 
-所有阈值都集中在一个对象里，以下三套预设可直接使用：
-
-- `"casey"`（默认）：采食错误判定采用 Casey 等（2005），体重先逐日回溯追踪、再用稳健回归（rlm），生长曲线为二次曲线，FCR = ADFI ÷ ADG，不合格的猪只降级、不删除；
-- `"national"`：按国家测定的 FCR 数据处理规程：体重的权重与整日规则、加权日体重、日体重 R² ≥ 0.995，10 kg 分段质控，FCR 用累计采食法计算，不合格的段和猪直接删除（采食错误和校正沿用本包的方法）。详见《质控预设说明》；
-- `"legacy"`：STL、rlm 和稳健 SD 三种方法组合检测异常，生长曲线用 Gompertz。
-
-在预设的基础上可以覆盖任意参数：
+所有阈值都集中在一个对象里。默认设置：体重先逐日回溯追踪、再用二次稳健回归（rlm）和 LOESS 检测异常值；区间内缺失的体重中间线性插值、两端用二次曲线；采食错误按 Casey 等（2005）判定、按 Jiao 等（2014）校正，缺失的采食短缺口用 LOESS、长缺口和两端用"日采食 ~ 体重"回归；FCR = ADFI ÷ ADG。任意参数都可以覆盖：
 
 ```{r qc}
-qc <- qc_config("casey", stage_range = c(30, 115), min_test_days = 40)
+qc <- qc_config(stage_range = c(30, 115), min_test_days = 40)
 qc$stage_range
 ```
 
@@ -111,8 +105,10 @@ qc$stage_range
 | `min_test_days` | 最少测定天数 | 35 |
 | `max_missing_rate` | 最大缺失率（无有效体重的天数比例） | 0.30 |
 | `entry_weight_max` / `exit_weight_min` | 进站体重上限 / 出栏体重下限（kg），不满足时标记为低可信度 | 65 / 85 |
+| `curve_model` | 填充区间两端体重的生长曲线：poly2、poly1、poly3、gompertz | poly2 |
+| `impute_method` | 采食填充：loess_lm（≤ 3 天 LOESS，其余回归）或 linear | loess_lm |
 | `max_extrap_days` | 生长曲线最多外推的天数 | 30 |
-| `max_edge_extrap_days` | 区间两端外推超过此天数的猪标记为低可信度 | 15 |
+| `max_edge_extrap_days` | 区间两端填充超过此天数的猪标记为低可信度 | 15 |
 | `duration_max` | 单次访问时长上限（s），对应错误类型 OTV-hi | 3600 |
 
 用 `print(qc_config())` 可以查看全部参数。参数名写错时，函数会提示最接近的正确名称。
@@ -124,7 +120,7 @@ qc$stage_range
 FIRE 示例数据中的猪在 45–60 kg 才进站，因此这里按第 7 节的建议，以 60–120 kg 作为计算区间：
 
 ```{r prep}
-qc_fire <- qc_config("casey", stage_range = c(60, 120))
+qc_fire <- qc_config(stage_range = c(60, 120))
 visits <- prep_visits(fire, qc = qc_fire, verbose = 1)
 ```
 
@@ -155,21 +151,27 @@ head(w$per_pig[, .(responder, n_valid, test_days, missing_rate, status, reason)]
 
 每头猪进站后头 7 天是**适应期**（`adapt_days = 7`），这几天的体重不参与分析（`qc_flag = "adaptation"`）。适应期的采食照常统计：如果这几天已经落在分析区间内（例如 45 kg 进站、区间 30–120 kg），计入 ADFI 和 FCR；如果猪还没到区间下限，则不计入。
 
-异常值检测之前，会先从测定末期往回**逐日追踪**每头猪的体重。测定站只有四条腿都站上秤才称重，读数偏轻的情况很少；进站初期猪小，常有几头猪同时挤进测定站，读数偏重。末期猪大、只容得下一头，读数最可靠，所以从末期开始往前推，只保留与预测体重衔接的读数（`qc_flag = "track"`）。追踪剔除超过 40% 记录的猪降级为 `low_confidence`（可能是称重异常，如体重传感器故障）。详见《质控参数详解》。
+异常值检测之前，会先从测定末期往回**逐日追踪**每头猪的体重。测定站只有四条腿都站上秤才称重，读数偏轻的情况很少；进站初期猪小，常有几头猪同时挤进测定站，读数偏重。末期猪大、只容得下一头，读数最可靠，所以从末期开始往前推，只保留与预测体重衔接的读数（`qc_flag = "track"`）。追踪之后，再用二次稳健回归（rlm，bisquare 权重 < 0.5）和 LOESS 平滑曲线（偏离超过 3 倍稳健标准差）找出零散的异常读数。追踪剔除超过 40% 记录的猪降级为 `low_confidence`（可能是称重异常，如体重传感器故障）；有效体重对 LOESS 平滑曲线的 R² 低于 0.99 的猪也降级。详见《质控参数详解》。
 
 ### 4.3 日增重
 
 ```{r adg}
 adg <- calc_adg(w)
-head(adg$per_pig[, .(responder, adg_type, start_date, end_date, adg, r_squared, adg_curve)])
+head(adg$per_pig[, .(responder, adg_type, adg, r_squared, n_observed_days, n_interpolated_days, n_curve_days)])
 ```
 
-ADG 默认是**直线回归的斜率**（`adg_method = "lm"`）：先用剔除异常值后的体重拟合生长曲线，求出区间的起止时间（终点是曲线第一次到达上限的时间；起点是在此之前曲线**最后一次**越过下限的时间），再对这段时间内的全部有效体重做直线回归，斜率就是日增重，可靠性看 `r_squared`。另一种算法"区间体重差 ÷ 所需天数"保存在 `adg_curve` 列，设置 `qc_config(adg_method = "curve")` 时作为 ADG 使用。进站后有适应期、前期长得慢的批次，可以设置 `qc_config(curve_margin_kg = 5)`，只用区间附近的记录拟合曲线。`adg_type` 说明这个数值是怎么来的：
+日增重分三步计算：
+
+1. 用剔除异常值后的体重拟合生长曲线（默认二次曲线），求出区间的起止时间：终点是曲线第一次到达上限的时间；起点是在此之前曲线**最后一次**越过下限的时间；
+2. 把区间内每一天的体重补齐：有记录的日子用当天中位数；两个有记录的日子之间缺失的，用**线性插值**；首个有记录日之前、末个有记录日之后的，用**生长曲线**（晚进站、早出栏时）；
+3. 区间内全部日体重（实测 + 填充）对日期做直线回归，**斜率就是日增重**，可靠性看 `r_squared`。
+
+每天的体重和来源在 `adg$daily` 的 `weight_filled`、`source` 列中。`adg_type` 说明区间两端是否在实测期内：
 
 | adg_type | 含义 |
 |---|---|
 | observed | 区间两端都在实测期内 |
-| extrapolated | 需要外推，但外推不超过 `max_extrap_days` |
+| extrapolated | 需要用生长曲线外推，但外推不超过 `max_extrap_days` |
 | partial | 外推后仍到达不了区间端点，只用覆盖到的部分计算 |
 | none | 覆盖不足 7 天，不计算 ADG |
 
@@ -183,14 +185,14 @@ table(adfi$daily[in_stage == TRUE, state])
 日采食量的校正分两步：
 
 1. **校正**：对每头猪的每一天，先求"无错误访问的采食量之和" Y，再用混合模型扣除错误项的影响（Jiao 等，2014）。没有错误的日子保持原值不变。
-2. **插补**：只在与 ADG 相同的体重区间内进行。区间中间缺失的日子用线性内插，连续缺失超过7 天时改用 LOESS；区间两端缺失的日子，用每头猪的"日采食 ~ 体重"回归外推。
+2. **填充**：只在与 ADG 相同的体重区间内进行。两个有记录的日子之间，连续缺失不超过 3 天的用 LOESS 平滑插补，超过 3 天的用每头猪的"日采食 ~ 体重"线性回归；区间两端缺失的日子同样用这个回归。回归用的是上一步补齐后的日体重。`qc_config(impute_method = "linear")` 时，中间改用线性插值。
 
 `state` 列标明每一天的来源：
 
 - `org`：原始记录，当天没有错误访问；
 - `corr`：经过校正；
-- `iii`：内插得到；
-- `elrp`：外推得到；
+- `iii`：在两个有记录的日子之间填充；
+- `elrp`：在区间两端填充；
 - `missing`：无法估计。
 
 校正模型的系数保存在 `adfi$model` 中；各类错误的发生率可以这样查看：
@@ -210,7 +212,7 @@ fcr$summary[group == "all", lapply(.SD, function(x) if (is.numeric(x)) round(x, 
 
 `fcr_flag = "low_confidence"` 的原因写在 `fcr_note` 中，常见的有：
 
-- 生长曲线或采食量在区间开头或结尾外推超过 15 天，通常是进站太晚或出栏太早；
+- 体重或采食量在区间开头或结尾填充超过 15 天，通常是进站太晚或出栏太早；
 - ADG 只覆盖了区间的一部分；
 - 区间内实测采食的天数不足 70%；
 - 中间某个 10 kg 体重段的体重记录覆盖不足 6 kg（记录断档）；
@@ -235,7 +237,7 @@ h <- plot_adfi(adfi, responders = c("35853", "35855", "35877"))
 h$plot[[1]]
 ```
 
-每个测定站输出一张图，每头猪一个分面。保存为图片：
+生长曲线图中，蓝色点是实测日体重，橙色点是线性插值的日体重，紫色点是用生长曲线填充的日体重；绿色曲线是生长曲线，黑色虚线是日增重的回归线。每个测定站输出一张图，每头猪一个分面。保存为图片：
 
 ```{r save, eval = FALSE}
 save_plots(g, path = "结果/生长曲线", prefix = "站", suffix = "growth", device = "png")
@@ -263,7 +265,7 @@ write_results(res, dir = "结果", farm = "A01")
 | `fcr` | 每头猪的 ADG、ADFI、FCR 和可信度标记 |
 | `by_bin` | 每个体重段的采食、增重和分段料肉比 |
 | `daily_feed` | 每天的采食量（原始、校正、插补） |
-| `daily_weight` | 每天的体重（实测和拟合） |
+| `daily_weight` | 每天的体重（实测、填充和生长曲线） |
 | `weight_pigs` | 每头猪的体重质控结果 |
 | `feed_model` | 采食校正模型的系数 |
 | `summary` | 性状汇总统计 |
@@ -300,7 +302,7 @@ parallel::detectCores()                         # 查看电脑有几个核心
 
 ### 方法验证
 
-想知道哪种异常值检测方法、生长曲线或插补方法更适合自己的数据，可以用 `validate_outliers()`、`validate_adg()` 和 `validate_adfi()` 在本批次数据上检验，详见《方法验证》。
+想知道哪种异常值检测方法、生长曲线、体重填充或采食插补方法更适合自己的数据，可以用 `validate_outliers()`、`validate_adg()`、`validate_weight_fill()` 和 `validate_adfi()` 在本批次数据上检验，详见《方法验证》。
 
 ## 7. 结果怎么用
 
@@ -325,7 +327,7 @@ parallel::detectCores()                         # 查看电脑有几个核心
 **问：为什么 ADFI 比实测记录的平均值低？**答：ADFI 是整个体重区间内的平均值，包括体重较小、采食较少的前期；实测记录可能只覆盖了体重较大的后期。
 
 **问：旧版本的函数还能用吗？**
-答：从 0.3.0 起，`preprocess_data()`、`adg_get()` 等旧函数名已删除，请改用本文介绍的新函数。需要旧版行为时，可安装 0.1.0：`pak::pak("tony2015116/tidypptsda@v0.1.0")`。
+答：从 0.3.0 起，`preprocess_data()`、`adg_get()` 等旧函数名已删除，请改用本文介绍的新函数；从 1.0.0 起，预设（`qc_config("national")` 等）、`calc_fcr()` 的累计采食法和 `plot_cfi()` 已删除。需要旧版行为时，可安装 0.1.0：`pak::pak("tony2015116/tidypptsda@v0.1.0")`。
 
 **问：如何只分析某个测定站或某几头猪？**答：可以在 `prep_visits()` 之后筛选，例如 `visits[location == "101"]`；作图时用`locations` 和 `responders` 参数指定。
 

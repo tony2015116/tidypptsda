@@ -55,7 +55,7 @@ calc_adfi <- function(visits, adg, qc = adg$settings, verbose = 1, cores = 1) {
   flagged <- if ("n_errors" %in% names(visits)) {
     as_dt(visits, "visits")
   } else {
-    flag_feed_errors(visits, qc, bw = adg$daily[, .(responder, date, bw = predicted)],
+    flag_feed_errors(visits, qc, bw = adg_bw(adg)[, .(responder, date, bw)],
                      verbose = ppt_verbose())
   }
 
@@ -66,7 +66,7 @@ calc_adfi <- function(visits, adg, qc = adg$settings, verbose = 1, cores = 1) {
                                              names(adg$per_pig)), with = FALSE]
   data.table::setnames(pigs, "location", "pig_location")
   cov <- daily_error_covariates(flagged)[responder %in% pigs$responder]
-  bw <- adg$daily[, .(responder, date, seq_days, bw = predicted, in_stage)]
+  bw <- adg_bw(adg)
   cov <- merge(cov, bw, by = c("responder", "date"), all.x = TRUE)
   cov <- merge(cov, pigs[, intersect(c("responder", "adg", "breed"), names(pigs)), with = FALSE],
                by = "responder")
@@ -90,8 +90,7 @@ calc_adfi <- function(visits, adg, qc = adg$settings, verbose = 1, cores = 1) {
   n_quant <- cov[check_flag %in% "dfi_quantile", .N]
 
   # 5d. stage grid and imputation
-  grid <- adg$daily[responder %in% pigs$responder,
-                    .(responder, date, seq_days, bw = predicted, in_stage)]
+  grid <- bw[responder %in% pigs$responder]
   keep_cols <- c("responder", "date", "location", "n_visits", "n_error_visits",
                  "dfi_raw", "y", "dfi_corrected", "dfi_check", "all_error")
   daily <- merge(grid, cov[, keep_cols, with = FALSE],
@@ -281,69 +280,58 @@ lmm_ri_reml <- function(y, X, group) {
        sigma2_u = s2_e * exp(log_lambda), n_obs = N, n_groups = n_groups)
 }
 
+# Daily body weight for the feed intake steps: the filled daily weight of
+# calc_adg() (observed, interpolated or growth curve), the curve otherwise.
+adg_bw <- function(adg) {
+  d <- adg$daily
+  bw <- if ("weight_filled" %in% names(d)) data.table::fifelse(is.na(d$weight_filled), d$predicted, d$weight_filled) else d$predicted
+  data.table::data.table(responder = d$responder, date = d$date, seq_days = d$seq_days,
+                         bw = bw, in_stage = d$in_stage)
+}
+
 # Impute the stage days of one pig.
+# - inside the recorded period ("iii"): gaps of up to long_gap_days days by a
+#   robust LOESS of intake over the days, longer gaps by a regression of
+#   intake on body weight ("loess_lm"); or linear interpolation ("linear");
+# - before the first / after the last recorded day ("elrp"): regression of
+#   intake on body weight.
 impute_dfi_one_pig <- function(d, qc) {
   d <- data.table::copy(d)
   ok <- !is.na(d$dfi_check)
   d[, dfi := dfi_check]
   need <- d$in_stage & !ok
-  if (!any(need)) {
+  if (!any(need) || sum(ok) < 5L) {
     d[in_stage == TRUE & is.na(state), state := "missing"]
     return(d)
   }
   x <- d$seq_days
-  if (sum(ok) < 5L) {
-    d[need, state := "missing"]
-    return(d)
-  }
   inside <- need & (x > min(x[ok]) & x < max(x[ok])) %in% TRUE
   outside <- need & !inside
-
-  if (qc$impute_method == "linear") {
-    if (any(inside)) {
-      val <- stats::approx(x[ok], d$dfi_check[ok], xout = x[inside])$y
-      # long gaps: robust LOESS instead of a straight line
-      long <- run_length(inside)[inside] > qc$long_gap_days
-      if (any(long) && sum(ok) >= 10L) {
-        pred <- loess_extend(x[ok], d$dfi_check[ok], qc$loess_span)
-        val[long] <- pmax(0, pred(x[inside][long]))
-      }
-      d[inside, `:=`(dfi = val, state = "iii")]
+  okb <- ok & !is.na(d$bw)
+  bw_fit <- if (sum(okb) >= 5L) stats::lm(dfi_check ~ bw, data = d[okb]) else NULL
+  by_bw <- function(rows) {
+    rows <- rows & !is.na(d$bw)
+    if (!is.null(bw_fit) && any(rows)) {
+      d[rows, dfi := pmax(0, stats::predict(bw_fit, newdata = d[rows]))]
     }
-    if (any(outside)) {
-      okb <- ok & !is.na(d$bw)
-      if (sum(okb) >= 5L && all(!is.na(d$bw[outside]))) {
-        f <- stats::lm(dfi_check ~ bw, data = d[okb])
-        d[outside, `:=`(dfi = pmax(0, stats::predict(f, newdata = d[outside])),
-                        state = "elrp")]
-      } else {
-        d[outside, state := "missing"]
-      }
-    }
-  } else if (qc$impute_method == "national") {
-    # gaps of <= long_gap_days days: LOESS smoothing over the days; longer
-    # gaps: linear regression of daily intake on body weight
-    run <- run_length(need)
-    short <- need & run <= qc$long_gap_days
-    long <- need & !short
-    if (any(short)) {
-      pred <- loess_extend(x[ok], d$dfi_check[ok], qc$loess_span)
-      d[short, dfi := pmax(0, pred(x[short]))]
-    }
-    if (any(long)) {
-      okb <- ok & !is.na(d$bw)
-      if (sum(okb) >= 5L && all(!is.na(d$bw[long]))) {
-        f <- stats::lm(dfi_check ~ bw, data = d[okb])
-        d[long, dfi := pmax(0, stats::predict(f, newdata = d[long]))]
-      }
-    }
-    done <- need & !is.na(d$dfi)
-    d[done, state := data.table::fifelse(inside[done], "iii", "elrp")]
-  } else {
-    pred <- loess_extend(x[ok], d$dfi_check[ok], qc$loess_span)
-    d[inside, `:=`(dfi = pmax(0, pred(x[inside])), state = "iii")]
-    d[outside, `:=`(dfi = pmax(0, pred(x[outside])), state = "elrp")]
   }
+
+  if (any(inside)) {
+    if (qc$impute_method == "linear") {
+      d[inside, dfi := stats::approx(x[ok], d$dfi_check[ok], xout = x[inside])$y]
+    } else {
+      gap <- run_length(need)
+      short <- inside & gap <= qc$long_gap_days
+      if (any(short)) {
+        pred <- loess_extend(x[ok], d$dfi_check[ok], qc$loess_span)
+        d[short, dfi := pmax(0, pred(x[short]))]
+      }
+      by_bw(inside & !short)
+    }
+  }
+  by_bw(outside)
+  done <- need & !is.na(d$dfi)
+  d[done, state := data.table::fifelse(inside[done], "iii", "elrp")]
   d[in_stage == TRUE & is.na(state), state := "missing"]
   d
 }

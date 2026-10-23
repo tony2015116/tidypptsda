@@ -8,32 +8,29 @@
 #'
 #' @param weight Result of [clean_weight()].
 #' @param qc QC settings; by default the ones used by [clean_weight()].
-#'   Used here: `stage_range`, `curve_model`, `adg_method`, `curve_margin_kg`,
-#'   `loess_span`, `max_extrap_days`.
+#'   Used here: `stage_range`, `curve_model`, `max_extrap_days`.
 #' @param verbose 0 (silent), 1 (summary, default) or 2 (details).
 #' @param cores Number of CPU cores for the per-pig computations. Default 1.
 #'
 #' @return An object of class `ppt_adg` (a list):
 #'   - `per_pig`: one row per pig (pigs removed by [clean_weight()] are not
-#'     included) with `stage`, `curve_used`, `curve_r2`, `curve_start` /
-#'     `curve_end` (first and last day of the records the curve was fitted
-#'     to, see `curve_margin_kg`), `adg_type`,
+#'     included) with `stage`, `curve_used`, `curve_r2`, `adg_type`,
 #'     `start_date` / `end_date` and `start_weight` / `end_weight` (when the
 #'     curve reaches the stage limits, kg), `stage_days`,
 #'     `extrap_days_start` / `extrap_days_end` (days the curve is
 #'     extrapolated before the first / after the last weight), `adg` (g/d,
-#'     by `adg_method`), `adg_source` (`"lm"` or `"curve"`), `adg_curve`
-#'     (g/d, stage weight difference / days of the growth curve),
-#'     `lm_slope` (g/d, linear regression on all valid records between the
-#'     stage start and end times), `r_squared` (of that regression),
-#'     `lm_weight_from` / `lm_weight_to` (kg, weight range covered by that
-#'     regression), `weight_status`
-#'     and `weight_reason` (from [clean_weight()]);
+#'     slope of the daily weights over the stage), `r_squared` (of that
+#'     regression), `n_observed_days`, `n_interpolated_days`,
+#'     `n_curve_days` (stage days by source of the weight), `adg_curve`
+#'     (g/d, stage weight difference / days of the growth curve, for
+#'     comparison), `weight_status` and `weight_reason` (from
+#'     [clean_weight()]);
 #'   - `daily`: one row per pig and day from `start_date` to `end_date` and
 #'     over the recorded days: observed `weight` (daily median, kg, `NA` on
-#'     predicted days), `predicted` weight with `lower` / `upper` limits
-#'     (± 1.96 residual SD), `in_stage` and `source` (`"observed"` or
-#'     `"predicted"`);
+#'     days without valid weight), `weight_filled` (observed, interpolated
+#'     or curve weight, kg), `source` (`"observed"`, `"interpolated"` or
+#'     `"curve"`), `predicted` weight of the growth curve with `lower` /
+#'     `upper` limits (<c2><b1> 1.96 residual SD) and `in_stage`;
 #'   - `removed`: pigs removed so far, plus pigs without ADG;
 #'   - `settings`: QC settings.
 #'
@@ -46,8 +43,11 @@
 #' head(adg$per_pig[, .(responder, adg_type, start_date, end_date, stage_days, adg)])
 #'
 #' # Gompertz curve, with quadratic fallback
-#' adg_g <- calc_adg(w, qc = qc_config("casey", curve_model = "gompertz"), verbose = 0)
+#' adg_g <- calc_adg(w, qc = qc_config(curve_model = "gompertz"), verbose = 0)
 #' table(adg_g$per_pig$curve_used)
+#'
+#' # Source of the daily weights over the stage
+#' table(adg$daily[in_stage == TRUE, source])
 calc_adg <- function(weight, qc = weight$settings, verbose = 1, cores = 1) {
   local_verbose(verbose)
   local_cores(cores)
@@ -90,12 +90,10 @@ calc_adg <- function(weight, qc = weight$settings, verbose = 1, cores = 1) {
   }
 
   cols <- c("responder", "location", "breed", "stage", "curve_used", "curve_r2",
-            "curve_start", "curve_end",
             "adg_type", "start_date", "end_date", "start_weight", "end_weight",
-            "stage_days", "extrap_days_start", "extrap_days_end", "adg", "adg_source",
-            "adg_curve", "lm_slope", "r_squared", "lm_weight_from", "lm_weight_to",
-            "weight_status",
-            "weight_reason")
+            "stage_days", "extrap_days_start", "extrap_days_end", "adg", "r_squared",
+            "n_observed_days", "n_interpolated_days", "n_curve_days", "adg_curve",
+            "weight_status", "weight_reason")
   per_pig <- per_pig[, intersect(cols, names(per_pig)), with = FALSE]
   data.table::setorder(per_pig, location, responder)
 
@@ -110,19 +108,20 @@ calc_adg <- function(weight, qc = weight$settings, verbose = 1, cores = 1) {
                  settings = qc, class = "ppt_adg")
 }
 
-# ADG for one pig. `d` holds its valid weight records.
-adg_one_pig <- function(d, qc, day0) {
+# ADG for one pig. `d` holds its valid weight records. `fill = "curve"`
+# fills every missing day from the growth curve (used by
+# validate_weight_fill() to compare with the linear interpolation).
+adg_one_pig <- function(d, qc, day0, fill = "linear") {
   first_day <- min(d$date)
   t <- as.numeric(difftime(d$entry_time, as.POSIXct(first_day, tz = "UTC"),
                            units = "days"))
   y <- d$weight
-  win <- curve_window(d$date, y, qc)
-  curve <- fit_growth_curve(t[win], y[win], qc$curve_model, qc$loess_span)
+  curve <- fit_growth_curve(t, y, qc$curve_model)
 
   lo <- qc$stage_range[1L]
   hi <- qc$stage_range[2L]
-  tmin <- min(t[win])
-  tmax <- max(t[win])
+  tmin <- min(t)
+  tmax <- max(t)
   from <- tmin - qc$max_extrap_days
   to <- tmax + qc$max_extrap_days
 
@@ -133,85 +132,81 @@ adg_one_pig <- function(d, qc, day0) {
   a <- if (is.na(t_lo)) tmin else t_lo
   b <- if (is.na(t_hi)) tmax else t_hi
   tol <- 0.5
-
-  if (b - a < 7) {
-    adg_type <- "none"
-    adg <- NA_real_
+  none <- b - a < 7
+  adg_type <- if (none) {
+    "none"
+  } else if (is.na(t_lo) || is.na(t_hi)) {
+    "partial"
+  } else if (t_lo >= tmin - tol && t_hi <= tmax + tol) {
+    "observed"
   } else {
-    adg <- (curve$pred(b) - curve$pred(a)) * 1000 / (b - a)
-    adg_type <- if (is.na(t_lo) || is.na(t_hi)) {
-      "partial"
-    } else if (t_lo >= tmin - tol && t_hi <= tmax + tol) {
-      "observed"
-    } else {
-      "extrapolated"
-    }
+    "extrapolated"
   }
+  adg_curve <- if (none) NA_real_ else (curve$pred(b) - curve$pred(a)) * 1000 / (b - a)
 
-  # Linear regression on all records between the stage start and end times
-  # (cut by time, not by weight, so that a dip below `lo` after the start
-  # does not leave isolated early records in the regression).
-  inside <- adg_type != "none" & t >= a & t <= b
-  lm_slope <- r_squared <- lm_from <- lm_to <- NA_real_
-  if (sum(inside) >= 5L && diff(range(t[inside])) >= 7) {
-    lfit <- stats::lm(y[inside] ~ t[inside])
-    lm_slope <- unname(stats::coef(lfit)[2L]) * 1000
-    r_squared <- summary(lfit)$r.squared
-    lm_from <- min(stats::fitted(lfit))
-    lm_to <- max(stats::fitted(lfit))
-  }
-  adg_curve <- adg
-  use_lm <- identical(qc$adg_method, "lm") && !is.na(lm_slope)
-  if (use_lm) adg <- lm_slope
-  adg_source <- if (is.na(adg)) NA_character_ else if (use_lm) "lm" else "curve"
-
-  # Daily table: the stage period plus the recorded days.
-  obs <- d[, .(weight = daily_weight_value(weight, if ("rlm_w" %in% names(d)) rlm_w else NULL,
-                                            qc$daily_weight)), by = date]
-  stage_days_idx <- if (adg_type == "none") integer() else seq(floor(a), ceiling(b) - 1)
-  idx <- sort(unique(c(stage_days_idx, as.integer(obs$date - first_day))))
+  # Daily weights over the stage and the recorded days: observed (daily
+  # median), linear interpolation between recorded days, growth curve before
+  # the first and after the last recorded day.
+  obs <- d[, .(weight = stats::median(weight)), by = date]
+  obs_idx <- as.integer(obs$date - first_day)
+  stage_idx <- if (none) integer() else seq(floor(a), ceiling(b) - 1)
+  idx <- sort(unique(c(stage_idx, obs_idx)))
   dates <- first_day + idx
   pred <- curve$pred(idx + 0.5)
+  w_obs <- obs$weight[match(idx, obs_idx)]
+  miss <- is.na(w_obs)
+  interp <- miss & idx > min(obs_idx) & idx < max(obs_idx) & fill == "linear"
+  filled <- w_obs
+  if (any(interp)) filled[interp] <- stats::approx(obs_idx, obs$weight, xout = idx[interp])$y
+  filled[miss & !interp] <- pred[miss & !interp]
   daily <- data.table::data.table(
     date = dates,
     seq_days = as.integer(dates - day0) + 1L,
-    weight = obs$weight[match(dates, obs$date)],
+    weight = w_obs,
+    weight_filled = filled,
+    source = data.table::fcase(!miss, "observed", interp, "interpolated", default = "curve"),
     predicted = pred,
     lower = pred - 1.96 * curve$sigma,
-    upper = pred + 1.96 * curve$sigma
+    upper = pred + 1.96 * curve$sigma,
+    in_stage = !none & (idx + 1) > a & idx < b
   )
-  daily[, `:=`(
-    source = data.table::fifelse(is.na(weight), "predicted", "observed"),
-    in_stage = adg_type != "none" & (idx + 1) > a & idx < b
-  )]
+
+  # ADG: slope of the daily weights over the stage days
+  st <- daily[in_stage == TRUE]
+  adg <- r_squared <- NA_real_
+  if (nrow(st) >= 7L) {
+    x <- as.numeric(st$date)
+    lfit <- stats::lm(st$weight_filled ~ x)
+    adg <- unname(stats::coef(lfit)[2L]) * 1000
+    r_squared <- summary(lfit)$r.squared
+  } else {
+    adg_type <- "none"
+  }
 
   data.table::data.table(
     curve_used = curve$name,
     curve_r2 = curve$r2,
-    curve_start = min(d$date[win]),
-    curve_end = max(d$date[win]),
     adg_type = adg_type,
     start_date = if (is.na(t_lo)) as.Date(NA) else first_day + floor(t_lo),
     end_date = if (is.na(t_hi)) as.Date(NA) else first_day + floor(t_hi),
-    start_weight = if (adg_type == "none") NA_real_ else curve$pred(a),
-    end_weight = if (adg_type == "none") NA_real_ else curve$pred(b),
-    stage_days = if (adg_type == "none") NA_real_ else b - a,
-    extrap_days_start = if (adg_type == "none") NA_real_ else max(0, tmin - a),
-    extrap_days_end = if (adg_type == "none") NA_real_ else max(0, b - tmax),
+    start_weight = if (none) NA_real_ else curve$pred(a),
+    end_weight = if (none) NA_real_ else curve$pred(b),
+    stage_days = if (none) NA_real_ else b - a,
+    extrap_days_start = if (none) NA_real_ else max(0, tmin - a),
+    extrap_days_end = if (none) NA_real_ else max(0, b - tmax),
     adg = adg,
-    adg_source = adg_source,
-    adg_curve = adg_curve,
-    lm_slope = lm_slope,
     r_squared = r_squared,
-    lm_weight_from = lm_from,
-    lm_weight_to = lm_to,
+    n_observed_days = sum(st$source == "observed"),
+    n_interpolated_days = sum(st$source == "interpolated"),
+    n_curve_days = sum(st$source == "curve"),
+    adg_curve = adg_curve,
     daily = list(daily)
   )
 }
 
 # Fit a growth curve. Returns a prediction function, the fitted values,
 # the residual SD, R2 and the name of the model actually used.
-fit_growth_curve <- function(t, y, model, span = 0.75) {
+fit_growth_curve <- function(t, y, model) {
   fit_poly <- function(k, name = paste0("poly", k)) {
     f <- stats::lm(y ~ poly(t, k, raw = TRUE))
     b <- stats::coef(f)
@@ -224,20 +219,6 @@ fit_growth_curve <- function(t, y, model, span = 0.75) {
     poly1 = fit_poly(1),
     poly2 = fit_poly(2),
     poly3 = fit_poly(3),
-    loess = {
-      f <- stats::loess(y ~ t, span = span, degree = 2, family = "symmetric")
-      core <- function(x) unname(stats::predict(f, newdata = data.frame(t = x)))
-      rng <- range(t)
-      h <- min(7, diff(rng) / 2)
-      s_lo <- (core(rng[1] + h) - core(rng[1])) / h
-      s_hi <- (core(rng[2]) - core(rng[2] - h)) / h
-      # linear continuation of the end slopes outside the recorded range
-      pred <- function(x) {
-        p <- core(pmin(pmax(x, rng[1]), rng[2]))
-        p + pmin(x - rng[1], 0) * s_lo + pmax(x - rng[2], 0) * s_hi
-      }
-      list(pred = pred, fitted = stats::fitted(f), name = "loess")
-    },
     gompertz = {
       f <- tryCatch(stats::nls(y ~ stats::SSgompertz(t, Asym, b2, b3)),
                     error = function(e) NULL)
@@ -253,28 +234,6 @@ fit_growth_curve <- function(t, y, model, span = 0.75) {
   curve$sigma <- stats::sd(res)
   curve$r2 <- 1 - sum(res^2) / sum((y - mean(y))^2)
   curve
-}
-
-# First time in [from, to] at which `pred` rises to `target`. NA if the
-# curve is already above the target at `from` or never reaches it.
-# Records used for the growth curve (see `curve_margin_kg` in qc_config()):
-# from the last day below the stage minus the margin to the first day above
-# the stage plus the margin, by time.
-curve_window <- function(date, y, qc) {
-  all <- rep(TRUE, length(y))
-  m <- qc$curve_margin_kg
-  if (is.null(m)) return(all)
-  dm <- vapply(split(y, date), stats::median, numeric(1))
-  days <- as.Date(names(dm))
-  lo <- qc$stage_range[1L] - m
-  hi <- qc$stage_range[2L] + m
-  above <- which(dm > hi)
-  end <- if (length(above) > 0L) days[above[1L]] else max(days)
-  below <- which(dm < lo & days < end)
-  start <- if (length(below) > 0L) days[max(below)] else min(days)
-  win <- date >= start & date <= end
-  if (sum(win) < 10L || data.table::uniqueN(date[win]) < 7L) return(all)
-  win
 }
 
 # Last time in [from, to] at which the curve rises through `target`, NA if it

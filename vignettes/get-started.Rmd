@@ -59,19 +59,15 @@ Small internal tools shared by every function of the package:
 # qc_config
 
 All quality-control thresholds live in one object created by `qc_config()`.
-Three presets are available, and any single parameter can be overridden.
+Any single parameter can be overridden.
 
 ```{r example-qc_config}
-# Default preset
+# Default settings
 qc <- qc_config()
 qc$duration_max
 
-# Another preset with one parameter overridden
-qc_national <- qc_config("national", min_test_days = 50)
-qc_national
-
-# Optional rules are off (NULL) unless switched on
-qc_config("casey", daily_drop_min = 0.90)$daily_drop_min
+# Override single parameters
+qc_config(stage_range = c(40, 110), weight_outlier = c("rlm", "loess", "sd"))
 ```
 
 
@@ -156,20 +152,22 @@ table(unique(visits[identified == TRUE, .(responder, breed)])$breed)
 `clean_weight()` cleans the body weight records of identified visits in
 three layers:
 
-1. **record rules**: weights outside `weight_range` are flagged;
-2. **outlier detection per pig**: one or more methods fit a curve to each
-   pig and flag records far from it:
-   - `"rlm"`: quadratic robust regression with bisquare weights
+1. **record rules**: weights outside `weight_range` and weights of the
+   adaptation period (`adapt_days`) are flagged;
+2. **outlier detection per pig**: the weight is first tracked back from the
+   end of the test (`weight_track`); then one or more methods fit a curve
+   to the remaining records of each pig and flag records far from it:
+   - `"rlm"` (default): quadratic robust regression with bisquare weights
      (`MASS::rlm`), records with weight below `rlm_cutoff` are outliers;
-   - `"loess"`: robust LOESS (`family = "symmetric"`), residuals beyond
-     `sd_max` robust SDs;
+   - `"loess"` (default): robust LOESS (`family = "symmetric"`), residuals
+     beyond `sd_max` robust SDs;
    - `"stl"`: STL decomposition of the daily median weight (weekly
      period, robust), residuals beyond `sd_max` robust SDs. Falls back to
      LOESS for pigs with fewer than 14 days;
    - `"sd"`: quadratic least squares, residuals beyond `sd_max` SDs;
-   - optional `rel_dev_max` and `daily_drop_min` rules;
 3. **pig checks**: number of valid records, test length, missing rate,
-   entry and exit weight, and optionally the curve R².
+   entry and exit weight, share removed by the tracking and the R<c2><b2> of the
+   LOESS smooth.
 
 Nothing is deleted silently: every record keeps a `qc_flag`, and every
 removed pig is listed in `removed` with the reason.
@@ -185,9 +183,9 @@ w$removed
 # Records flagged as outliers
 head(w$records[outlier == TRUE])
 
-# Another QC preset
-w_national <- clean_weight(visits, qc = qc_config("national"), verbose = 0)
-table(w_national$per_pig$status)
+# Other outlier methods
+w_sd <- clean_weight(visits, qc = qc_config(weight_outlier = c("rlm", "sd")), verbose = 0)
+table(w_sd$per_pig$status)
 ```
 
 
@@ -198,15 +196,22 @@ table(w_national$per_pig$status)
 `stage_range` (default 30-120 kg):
 
 1. a growth curve is fitted to the valid weight records of each pig
-   (`curve_model`: polynomial, robust LOESS or Gompertz; Gompertz falls back
-   to a quadratic curve when it does not converge);
+   (`curve_model`: `"poly2"` by default, `"poly1"`, `"poly3"` or
+   `"gompertz"`; Gompertz falls back to a quadratic curve when it does not
+   converge);
 2. the stage end is the first time the curve reaches the upper stage
    weight; the stage start is the **last** time the curve rises through the
    lower stage weight before that. A curve that dips back below 30 kg (for
    example after noisy early records) therefore starts the stage only once
    the pig has really entered it. The search runs up to `max_extrap_days`
    before the first and after the last record;
-3. ADG = weight difference / days between these two times.
+3. every day of the stage gets a body weight: the daily median of the valid
+   records (`"observed"`); a day without valid weight between two recorded
+   days is filled by linear interpolation (`"interpolated"`); a day before
+   the first or after the last recorded day is filled by the growth curve
+   (`"curve"`);
+4. ADG = slope of the linear regression of these daily weights on the day,
+   over the stage days. Its R<c2><b2> tells how straight the growth was.
 
 Every pig gets an `adg_type`:
 
@@ -214,7 +219,7 @@ Every pig gets an `adg_type`:
 - `"extrapolated"`: at least one limit needs extrapolation, but no more
   than `max_extrap_days`;
 - `"partial"`: a limit is not reached even after extrapolation. ADG is then
-  the mean slope of the curve over the part of the stage that is covered;
+  computed over the part of the stage that is covered;
 - `"none"`: less than 7 days of the stage are covered; ADG is `NA`.
 
 ```{r example-calc_adg}
@@ -224,8 +229,11 @@ adg <- calc_adg(w)
 head(adg$per_pig[, .(responder, adg_type, start_date, end_date, stage_days, adg)])
 
 # Gompertz curve, with quadratic fallback
-adg_g <- calc_adg(w, qc = qc_config("casey", curve_model = "gompertz"), verbose = 0)
+adg_g <- calc_adg(w, qc = qc_config(curve_model = "gompertz"), verbose = 0)
 table(adg_g$per_pig$curve_used)
+
+# Source of the daily weights over the stage
+table(adg$daily[in_stage == TRUE, source])
 ```
 
 
@@ -289,7 +297,8 @@ modelled with a linear mixed model fitted on **all** pig-days:
 - PTE: share of the day's visits with error type p; OTD: occupation time
   of visits with error p (types 1, 2, 6-14); FID: feed intake of visits
   with error p (types 4, 5, 15, 16);
-- BW: predicted body weight of the day from [calc_adg()]; ADG of the pig;
+- BW: body weight of the day from [calc_adg()] (observed, interpolated or
+  from the growth curve, column `weight_filled`); ADG of the pig;
 - `location` is a fixed effect when there is more than one station, and
   `breed` when the data have a `breed` column (see [add_breed()]) with
   more than one breed.
@@ -304,20 +313,22 @@ have no error-free intake and are imputed.
 
 - corrected intake below 0, outside `dfi_range`, or outside the optional
   `dfi_quantile` limits is set to missing;
-- `impute_method = "linear"` (default): linear interpolation inside the
-  recorded period (`"iii"`), robust LOESS for gaps longer than
-  `long_gap_days`, and a per-pig regression of intake on body weight
-  outside the recorded period (`"elrp"`);
-- `impute_method = "loess"`: a robust LOESS of daily intake over days,
-  used both inside and outside the recorded period.
+- `impute_method = "loess_lm"` (default): a gap of up to `long_gap_days`
+  (3) days between recorded days is filled from a robust LOESS smooth of
+  the daily intake over the days; a longer gap, and the days before the
+  first or after the last recorded day, are filled by a per-pig linear
+  regression of daily intake on body weight;
+- `impute_method = "linear"`: linear interpolation between recorded days
+  (whatever the gap length), the same regression on body weight at the
+  ends.
 
-A simulation on the example data (random gaps, long gaps, late entry,
-early exit) found no curve better than the others in every situation:
-precision depends mainly on how many days are missing at the stage ends,
-which is why such pigs are flagged by [calc_fcr()].
+Use [validate_adfi()] to compare both on your own data: precision depends
+mainly on how many days are missing at the stage ends, which is why such
+pigs are flagged by [calc_fcr()].
 
 Day states: `"org"` (no error, recorded value), `"corr"` (corrected),
-`"iii"` (interpolated), `"elrp"` (extrapolated), `"missing"`.
+`"iii"` (filled between recorded days), `"elrp"` (filled before the first or
+after the last recorded day), `"missing"`.
 
 ```{r example-calc_adfi}
 visits <- prep_visits(nedap, verbose = 0)
@@ -423,9 +434,11 @@ result comes to what is known:
 - `validate_adg()` compares growth curve models by k-fold cross-validation on
   recorded days, and by how much ADG changes when the first or last days of
   the test are hidden (late entry, early exit);
-- `validate_adfi()` hides recorded feed intake days (random days, blocks,
-  start or end of the stage), imputes them again and compares ADFI with the
-  recorded value.
+- `validate_weight_fill()` hides recorded daily weights of the stage (random
+  days, blocks, start or end), fills them again with each weight fill method
+  and compares the filled weights and ADG with the recorded ones;
+- `validate_adfi()` hides recorded feed intake days in the same way, imputes
+  them again and compares ADFI with the recorded value.
 
 ```{r example-validate}
 visits <- prep_visits(nedap, verbose = 0)
@@ -436,10 +449,14 @@ vo <- validate_outliers(visits, reps = 1)
 vo$summary
 
 # 2. growth curve models
-va <- validate_adg(w, models = c("poly1", "poly2", "loess"))
+va <- validate_adg(w, models = c("poly1", "poly2", "poly3"))
 va$summary
 
-# 3. feed intake imputation
+# 3. weight fill methods
+vw <- validate_weight_fill(w, methods = c("linear", "poly2"), scenarios = c("blocks3", "late20"), reps = 1)
+vw$summary
+
+# 4. feed intake imputation
 adfi <- calc_adfi(visits, calc_adg(w, verbose = 0), verbose = 0)
 vf <- validate_adfi(adfi, scenarios = c("random30", "late20"), reps = 2)
 vf$summary

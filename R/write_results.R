@@ -20,7 +20,7 @@
 #' - `fcr`: one row per pig with ADG, ADFI, FCR and confidence flags;
 #' - `by_bin`: feed, gain and FCR per body weight class;
 #' - `daily_feed`: daily feed intake (recorded, corrected, imputed);
-#' - `daily_weight`: daily body weight (recorded and fitted);
+#' - `daily_weight`: daily body weight (observed, filled and fitted);
 #' - `weight_pigs`: weight checks of every pig;
 #' - `feed_model`: coefficients of the feed intake correction model;
 #' - `removed`: removed pigs with step and reason;
@@ -72,6 +72,5 @@ settings_table <- function(qc) {
     v <- qc[[nm]]
     if (is.null(v)) "NULL" else if (is.data.frame(v)) sprintf("table (%d rows)", nrow(v)) else paste(v, collapse = ", ")
   }, character(1))
-  data.table::data.table(parameter = c("profile", names(qc)),
-                         value = c(attr(qc, "profile") %||% "", unname(val)))
+  data.table::data.table(parameter = names(qc), value = unname(val))
 }

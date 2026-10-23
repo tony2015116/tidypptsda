@@ -92,61 +92,6 @@ test_that("a stage outside the data gives no R warnings", {
   expect_true(all(r$fcr$by_bin$weight_coverage_kg == 0))
 })
 
-test_that("the national method computes FCR from cumulative feed intake", {
-  r <- run_pipeline(nedap, qc = qc_config("national"), verbose = 0)
-  q <- r$fcr$settings
-  expect_equal(q$method, "national")
-  p <- r$fcr$per_pig
-  expect_true(all(c("fcr", "cfi_start", "cfi_end", "cfi_r2", "n_classes") %in% names(p)))
-  ok <- p[!is.na(fcr)]
-  expect_gt(nrow(ok), 5L)
-  expect_true(all(ok$fcr > 1.5 & ok$fcr < 4))
-  expect_true(all(ok$cfi_r2 > q$cfi_r2_min))
-  expect_equal(ok$fcr, (ok$cfi_end - ok$cfi_start) / 90)
-  # removed classes and pigs are logged with a reason
-  expect_true("removed" %in% names(r$fcr$by_bin))
-  rm <- r$fcr$removed[step == "calc_fcr"]
-  expect_setequal(rm$responder, p[is.na(fcr) & !is.na(adg), responder])
-  expect_true(all(nzchar(rm$reason)))
-  # another stage: classes start at its lower limit
-  r2 <- run_pipeline(fire, qc = qc_config("national", stage_range = c(60, 120)), verbose = 0)
-  expect_true(all(r2$fcr$by_bin$weight_from %in% seq(60, 110, 10)))
-  ok2 <- r2$fcr$per_pig[!is.na(fcr)]
-  expect_equal(ok2$fcr, (ok2$cfi_end - ok2$cfi_start) / 60)
-})
-
-test_that("plot_cfi draws the cumulative feed intake of the national method", {
-  r <- run_pipeline(fire, qc = qc_config("national", stage_range = c(60, 120)), verbose = 0)
-  cf <- r$fcr$cfi
-  expect_true(all(c("responder", "location", "date", "weight", "dfi", "weight_from", "kept", "cfi") %in% names(cf)))
-  expect_true(all(is.na(cf[kept == FALSE, cfi])))
-  g <- plot_cfi(r$fcr, verbose = 0)
-  expect_equal(g$location, c("101", "102"))
-  f <- tempfile(fileext = ".pdf")
-  grDevices::pdf(f)
-  expect_no_warning(print(g$plot[[1]]))
-  grDevices::dev.off()
-  unlink(f)
-  std <- run_pipeline(fire, qc = qc_config(stage_range = c(60, 120)), verbose = 0)
-  expect_error(plot_cfi(std$fcr), "national")
-})
-
-test_that("national imputation: LOESS for short gaps, regression on weight for long ones", {
-  set.seed(5)
-  n <- 60
-  d <- data.table::data.table(seq_days = 1:n, bw = 30 + 1:n, in_stage = TRUE,
-                              dfi_check = 1500 + 20 * (1:n) + stats::rnorm(n, 0, 50))
-  d[c(10, 11), dfi_check := NA]        # short gap
-  d[30:40, dfi_check := NA]            # long gap
-  d[, state := data.table::fifelse(is.na(dfi_check), NA_character_, "org")]
-  q <- qc_config(impute_method = "national", long_gap_days = 3)
-  out <- impute_dfi_one_pig(d, q)
-  expect_false(anyNA(out$dfi))
-  truth <- 1500 + 20 * (1:n)
-  expect_lt(max(abs(out$dfi[c(10, 11, 30:40)] - truth[c(10, 11, 30:40)])), 150)
-  expect_true(all(out$state[c(10, 11, 30:40)] == "iii"))
-})
-
 test_that("feed of the adaptation days counts only inside the stage", {
   v <- prep_visits(nedap, verbose = 0)
   a <- calc_adg(clean_weight(v, verbose = 0), verbose = 0)

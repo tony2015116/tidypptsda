@@ -16,25 +16,24 @@ library(tidypptsda)
 library(data.table)
 ```
 
-tidypptsda 把整个分析流程中的全部阈值都集中在 `qc_config()` 返回的一个对象里。各分析函数通过 `qc` 参数接收这个对象，结果中的 `$settings` 也会原样保存这份设置，方便复现。本文逐一说明 54 个参数；三套预设的区别见《质控预设说明》。
+tidypptsda 把整个分析流程中的全部阈值都集中在 `qc_config()` 返回的一个对象里。各分析函数通过 `qc` 参数接收这个对象，结果中的 `$settings` 也会原样保存这份设置，方便复现。本文逐一说明全部 42 个参数；每一步用的是什么方法、方法出自哪里，见《计算方法说明》。
 
 ## 1. 基本用法
 
 ```{r basic}
-qc <- qc_config()                                   # 默认预设 casey
-qc <- qc_config("national")                         # 换一套预设
-qc <- qc_config("casey", stage_range = c(30, 115))  # 在预设基础上覆盖个别参数
+qc <- qc_config()                                 # 默认设置
+qc <- qc_config(stage_range = c(30, 115))         # 覆盖个别参数
 qc$stage_range
 ```
 
-- 第一个参数 `profile` 指定预设，其余参数必须带名字，例如 `duration_max = 1800`。
-- 被覆盖的参数会替换预设中的值，未提到的参数保持预设值不变。
-- 可选规则的默认值为 `NULL`，表示关闭。给它赋一个数值就打开；如果预设里已经打开，传 `NULL` 可以关掉。
+- 参数必须带名字，例如 `duration_max = 1800`。没有提到的参数保持默认值。
+- 可选规则的默认值为 `NULL`，表示关闭；给它赋一个值就打开。默认打开的可选规则（如 `smooth_r2_min`），传 `NULL` 可以关掉。
+- 1.0.0 版起不再有预设（casey、national、legacy），`qc_config("national")` 会报错并提示改法。
 
 查看全部参数：
 
 ```{r print}
-qc_config("casey")
+qc_config()
 ```
 
 ### 参数检查
@@ -55,18 +54,17 @@ qc_config(entry_weight_max = 90)         # 进站体重上限不小于出栏体�
 
 ## 2. 参数总览
 
-| 分组 | 参数 | 默认值（casey） | 作用于 |
+| 分组 | 参数 | 默认值 | 作用于 |
 |---|---|---|---|
-| 方法 | `method` | standard | 全流程（`calc_fcr()` 的算法） |
 | 跨站 | `max_gap_days`、`max_overlap_days`、`max_jump_kg` | 3、1、10 | `prep_visits()` |
-| 体重记录 | `weight_range`、`adapt_days`、`weight_outlier`、`outlier_combine`、`rlm_cutoff`、`day_weight_min`、`daily_weight`、`sd_max`、`loess_span`、`rel_dev_max`、`daily_drop_min`、`weight_track`、`track_tol` | 15–150、7、rlm、any、0.5、NULL、median、3、0.75、NULL、NULL、TRUE、0.08 | `clean_weight()` |
-| 个体判定 | `min_test_days`、`min_records`、`max_missing_rate`、`entry_weight_max`、`exit_weight_min`、`curve_r2_min`、`max_daily_jump_kg`、`track_flag_share`、`daily_r2_min`、`max_feed_missing` | 35、20、0.30、65、85、NULL、NULL、0.4、NULL、NULL | `clean_weight()` |
-| 生长曲线 | `stage_range`、`curve_model`、`adg_method`、`curve_margin_kg`、`max_extrap_days` | 30–120、poly2、lm、NULL、30 | `calc_adg()` |
+| 体重记录 | `weight_range`、`adapt_days`、`weight_track`、`track_tol`、`weight_outlier`、`outlier_combine`、`rlm_cutoff`、`sd_max`、`loess_span` | 15–150、7、TRUE、0.08、rlm + loess、any、0.5、3、0.75 | `clean_weight()` |
+| 个体判定 | `min_records`、`min_test_days`、`max_missing_rate`、`entry_weight_max`、`exit_weight_min`、`track_flag_share`、`smooth_r2_min` | 20、35、0.30、65、85、0.4、0.99 | `clean_weight()` |
+| 生长曲线与体重填充 | `stage_range`、`curve_model`、`max_extrap_days` | 30–120、poly2、30 | `calc_adg()` |
 | 采食错误 | `fiv_range`、`fiv0_abs_max`、`duration_max`、`speed_fiv_lo_max`、`speed_strict_max`、`speed_range`、`idle_duration_max`、`trough_diff_range`、`max_unidentified_feed_kg`、`fiv_max_by_weight` | −20–2000、20、3600、500、110、2–170、500、−20–1800、90、NULL | `flag_feed_errors()` |
-| 日采食 | `dfi_range`、`dfi_quantile`、`dfi_correct`、`impute_method`、`long_gap_days` | 0–6、NULL、lmm、linear、7 | `calc_adfi()` |
-| 可信度 | `max_edge_extrap_days`、`min_coverage`、`bin_width`、`min_bin_coverage_kg`、`bin_fcr_limits`、`bin_min_gain_kg`、`cfi_r2_min` | 15、0.7、10、6、NULL、6、0.95 | `calc_fcr()` |
+| 日采食 | `dfi_range`、`dfi_quantile`、`dfi_correct`、`impute_method`、`long_gap_days` | 0–6、NULL、lmm、loess_lm、3 | `calc_adfi()` |
+| 可信度 | `max_edge_extrap_days`、`min_coverage`、`bin_width`、`min_bin_coverage_kg`、`bin_fcr_limits` | 15、0.7、10、6、NULL | `calc_fcr()` |
 
-`stage_range` 只是默认的分析区间，可以改成任意体重段，例如 `qc_config(stage_range = c(40, 110))`。所有用到区间的地方都会跟着变：ADG 的起止点和直线回归的时间段、ADFI 计入哪些天、适应期的采食是否计入、10 kg 分段（从区间下限开始划分）、national 方法的累计采食起止点和 FCR 分母（区间宽度），以及图中的虚线。
+`stage_range` 只是默认的分析区间，可以改成任意体重段，例如 `qc_config(stage_range = c(40, 110))`。所有用到区间的地方都会跟着变：区间的起止时间、要填充的日子、ADG 的回归、ADFI 计入哪些天、适应期的采食是否计入、10 kg 分段（从区间下限开始划分），以及图中的虚线。
 
 单位约定：体重用 kg，单次访问的采食量和料槽重用 g，日采食量（`dfi_range`）用 kg，时间用秒（s）或天（d）。
 
@@ -87,23 +85,19 @@ qc_config(entry_weight_max = 90)         # 进站体重上限不小于出栏体�
 
 ## 4. 体重记录参数
 
-这组参数作用于 `clean_weight()` 的前两层：单条记录规则和逐头猪的异常值检测。
+这组参数作用于 `clean_weight()` 的前两层：单条记录规则和逐头猪的异常值检测。处理顺序是：体重范围 → 适应期 → 逐日回溯追踪 → `weight_outlier` 中的方法。
 
 | 参数 | 含义 | 单位 | 默认值 | 取值范围 |
 |---|---|---|---|---|
-| `adapt_days` | 进站适应期：每头猪首次访问后这么多天内的体重不参与分析（`qc_flag = "adaptation"`）。这几天的采食照常统计：若落在 `stage_range` 内（如 45 kg 进站、区间 30–120 kg），计入 ADFI 和 FCR；若还在区间下限以下，则不计入。设为 0 关闭 | 天 | 7 | ≥ 0 |
 | `weight_range` | 单条体重的有效范围，超出的记录标记为 `weight_range` | kg | 15–150 | 两个递增的非负数 |
-| `weight_outlier` | 异常值检测方法，可多选：`"rlm"`、`"loess"`、`"stl"`、`"sd"` | — | `"rlm"` | 见下文 |
-| `outlier_combine` | 多种方法的合并方式：`"any"` 表示任一方法判为异常即为异常；`"majority"` 表示超过半数方法判为异常才算 | — | `"any"` | any / majority |
-| `rlm_cutoff` | rlm 法：稳健回归权重低于此值的记录判为异常（`method = "national"` 时为"不高于"） | — | 0.5 | 0–1 |
-| `day_weight_min` | 可选：某天**每一条**记录的 rlm 权重都低于此值时，整天的体重判为异常（`qc_flag = "day_weight"`），需要 `weight_outlier` 中有 rlm | — | NULL（national 为 0.90） | 0–1 或 NULL |
-| `daily_weight` | 日体重代表值：`"median"` 为当天有效体重的中位数；`"weighted_mean"` 为按 rlm 权重的加权平均 | — | `"median"`（national 为加权平均） | median / weighted_mean |
-| `sd_max` | loess、stl、sd 法：残差超过多少倍标准差判为异常（loess 和 stl 用稳健标准差 MAD，sd 法用普通标准差） | 倍 | 3 | ≥ 0 |
-| `loess_span` | LOESS 的平滑窗口占数据的比例，越大越平滑 | — | 0.75 | 0.1–1 |
-| `rel_dev_max` | 可选规则：实测体重与拟合曲线的相对偏差超过此值即判为异常，例如 0.25 表示偏离 25% | — | NULL（关闭） | 0–1 |
-| `daily_drop_min` | 可选规则：当天体重中位数与前一天之比低于此值时，当天全部记录判为异常，例如 0.90 | — | NULL（关闭） | 0–1 |
+| `adapt_days` | 进站适应期：每头猪首次访问后这么多天内的体重不参与分析（`qc_flag = "adaptation"`）。这几天的采食照常统计：若落在 `stage_range` 内（如 45 kg 进站、区间 30–120 kg），计入 ADFI 和 FCR；若还在区间下限以下，则不计入。设为 0 关闭 | 天 | 7 | ≥ 0 |
 | `weight_track` | 从测定末期逐日往回追踪体重，剔除与之不衔接的读数，见下文"逐日回溯追踪" | — | TRUE | TRUE / FALSE |
 | `track_tol` | 追踪时读数与当天预测体重之差的容许比例（至少 2 kg；某天没有读数可保留时，每天再放宽 0.5 kg） | — | 0.08 | 0–1 |
+| `weight_outlier` | 追踪之后，对剩下的记录再用哪些方法检测异常值，可多选：`"rlm"`、`"loess"`、`"stl"`、`"sd"` | — | `c("rlm", "loess")` | 见下文 |
+| `outlier_combine` | 多种方法的合并方式：`"any"` 表示任一方法判为异常即为异常；`"majority"` 表示超过半数方法判为异常才算 | — | `"any"` | any / majority |
+| `rlm_cutoff` | rlm 法：稳健回归权重低于此值的记录判为异常 | — | 0.5 | 0–1 |
+| `sd_max` | loess、stl、sd 法：残差超过多少倍标准差判为异常（loess 和 stl 用稳健标准差 MAD，sd 法用普通标准差） | 倍 | 3 | ≥ 0 |
+| `loess_span` | LOESS 的平滑窗口占数据的比例，越大越平滑。也用于个体判定中的 LOESS 平滑曲线和采食插补 | — | 0.75 | 0.1–1 |
 
 ### 逐日回溯追踪
 
@@ -115,17 +109,17 @@ qc_config(entry_weight_max = 90)         # 进站体重上限不小于出栏体�
 2. **逐日往前推**：按当前日增重预测前一天的体重，只保留与预测值相差不超过 `track_tol`（至少 2 kg）的读数，其余剔除（`qc_flag = "track"`）；
 3. **日增重随时更新**：用其后 10 天内已保留的日体重重新估计，所以进站初期长得慢、甚至停滞，也能跟得上；
 4. **某天没有读数可保留时**，按预测值继续往前推，容差每天放宽 0.5 kg，不会跳到另一群读数上；
-5. 被保留的读数**不再由 rlm 等方法复核**：平滑的曲线贴不住进站后几周的缓慢生长，复核反而会把真实的体重删掉。`weight_outlier` 中的方法只用于没有追踪的猪（有记录的日子少于 7 天、或测定期短于 14 天），以及设置 `weight_track = FALSE` 时；
+5. 追踪保留下来的读数，再交给 `weight_outlier` 中的方法（默认 rlm 和 loess）复核，去掉追踪容差以内、但仍明显偏离曲线的零散读数。没有追踪的猪（有记录的日子少于 7 天、或测定期短于 14 天），以及设置 `weight_track = FALSE` 时，只用这些方法；
 6. **个体判定**：追踪剔除的记录超过 `track_flag_share`（默认 40%）的猪，降级为 `low_confidence`，原因注明"可能是称重异常，如体重传感器故障"。例如一头猪在 50–100 kg 时仍长期出现两条相差约 20 kg 的平行体重带，这时秤上只容得下一头猪，只能是称重本身出了问题。
 
-每头猪被追踪剔除的记录比例记录在 `per_pig$track_removed` 中。在示例数据上，去掉 7 天适应期之后，NEDAP 还有 4.9% 的记录被追踪剔除（每头猪中位数 3.6%），FIRE 为 0.4%。
+每头猪被追踪剔除的记录比例记录在 `per_pig$track_removed` 中。在示例数据上，去掉 7 天适应期之后，NEDAP 有 5% 的记录被追踪剔除，rlm 和 loess 又标出约 2%；FIRE 分别为 0.3% 和 2%。追踪之后再复核，对 ADG 的影响很小：与只追踪相比，平均差 1–2 g/d。
 
 ### 四种检测方法
 
 | 方法 | 做法 | 适用情况 |
 |---|---|---|
-| `rlm` | 每头猪拟合二次稳健回归（`MASS::rlm`，bisquare 权重），权重小于 `rlm_cutoff` 的记录为异常。方法来自 Jiao 等（2014） | 通用的默认方法；对成段的离群值很稳健 |
-| `loess` | 每头猪拟合稳健 LOESS（`family = "symmetric"`），残差超过 `sd_max` 倍 MAD 为异常 | 生长曲线不规则时（如中途停滞、生病） |
+| `rlm`（默认） | 每头猪拟合二次稳健回归（`MASS::rlm`，bisquare 权重），权重小于 `rlm_cutoff` 的记录为异常。方法来自 Jiao 等（2014） | 通用的方法；对成段的离群值很稳健 |
+| `loess`（默认） | 每头猪拟合稳健 LOESS 平滑曲线（`family = "symmetric"`），偏离曲线超过 `sd_max` 倍 MAD 的记录为异常 | 能贴住不规则的生长（如中途停滞、生病），弥补二次曲线的不足 |
 | `stl` | 对日中位体重做 STL 分解（周期 7 天，稳健模式），用"趋势 + 周期"作为参照；不足 14 天时改用 loess | 怀疑存在周期性干扰时；生长曲线本身没有周期，效果通常与 loess 接近 |
 | `sd` | 每头猪拟合二次最小二乘曲线，残差超过 `sd_max` 倍标准差为异常 | 传统做法；离群值多时，标准差会被拉大，检出率偏低 |
 
@@ -146,85 +140,66 @@ rbindlist(lapply(c(0.3, 0.5, 0.7), function(k) {
 **调整建议**
 
 - 测定站的称量下限较高，或者小猪数据不可靠时，把 `weight_range` 的下限调高，例如 `c(20, 150)`。
-- `rel_dev_max` 和 `daily_drop_min` 的含义直观，但目前没有文献依据，建议先在一个批次上试用，看看被剔除的记录（`w$records[grepl("rel_dev|daily_drop", qc_flag)]`）是否合理，再决定是否长期使用。
+- 各方法的检出率和误删率可以用 `validate_outliers()` 在自己的数据上比较，见《方法验证》。
 
 ## 5. 个体判定参数
 
-体重异常值剔除之后，`clean_weight()` 逐头猪判断能否用于生长分析。下表中前三个参数不满足时**剔除**该猪，后五个不满足时只**降级**为 `low_confidence`，该猪仍参与后续计算。
+体重异常值剔除之后，`clean_weight()` 逐头猪判断能否用于生长分析。下表中前三个参数不满足时**剔除**该猪，后四个不满足时只**降级**为 `low_confidence`，该猪仍参与后续计算。
 
 | 参数 | 含义 | 单位 | 默认值 | 不满足时 |
 |---|---|---|---|---|
 | `min_records` | 最少有效体重记录数 | 条 | 20 | 剔除 |
 | `min_test_days` | 最短测定期：首条到末条有效体重之间的天数 | 天 | 35 | 剔除 |
 | `max_missing_rate` | 最大缺失率：测定期内没有有效体重的天数占比 | — | 0.30 | 剔除 |
-| `entry_weight_max` | 进站体重上限，取清洗后曲线在首条记录处的拟合值 | kg | 65 | 降级 |
-| `exit_weight_min` | 出栏体重下限，取清洗后曲线在末条记录处的拟合值 | kg | 85 | 降级 |
-| `curve_r2_min` | 可选规则：清洗后生长曲线的最小 R²（用 loess 方法时为 LOESS 曲线，否则为二次曲线） | — | NULL（关闭） | 降级 |
-| `max_daily_jump_kg` | 可选规则：相邻两个有记录的日子之间，日体重中位数的变化超过此值（按天折算），例如 4 | kg/天 | NULL（关闭） | 降级 |
-| `daily_r2_min` | 可选：日体重对日期做二次曲线拟合，R² 低于此值时**剔除** | — | NULL（national 为 0.995） | 剔除 |
-| `max_feed_missing` | 可选：测定期内没有任何采食记录的天数占比超过此值时**剔除** | — | NULL（national 为 0.10） | 剔除 |
+| `entry_weight_max` | 进站体重上限，取有效体重的 LOESS 平滑曲线在首条记录处的值 | kg | 65 | 降级 |
+| `exit_weight_min` | 出栏体重下限，取 LOESS 平滑曲线在末条记录处的值 | kg | 85 | 降级 |
 | `track_flag_share` | 逐日回溯追踪剔除的记录比例超过此值时降级（可能是称重异常，如体重传感器故障），见上文"逐日回溯追踪" | — | 0.4 | 降级 |
+| `smooth_r2_min` | 有效体重对其 LOESS 平滑曲线的 R² 低于此值时降级；`NULL` 关闭 | — | 0.99 | 降级 |
 
-进站和出栏体重不达标的猪只降级、不剔除，因为它们的 ADG 还可以在 `calc_adg()` 中外推得到，并会带上相应的标记。
+进站和出栏体重不达标的猪只降级、不剔除，因为它们的 ADG 还可以在 `calc_adg()` 中靠生长曲线填充两端得到，并会带上相应的标记。
+
+### LOESS 平滑曲线的 R²：`smooth_r2_min`
+
+LOESS 能贴住生长曲线的起伏，所以有效体重对它的 R² 反映的是**读数本身的噪声**，而不是生长是否"标准"。在示例数据和用户提供的 NEDAP 数据中，保留的猪 R² 都在 0.993 以上（中位数约 0.998），只有测定期 9 天的那头 FIRE 猪为 0.96。默认的 0.99 只会标出读数明显杂乱的猪。注意 R² 受体重跨度影响：测定期越短、跨度越小，R² 天然越低。
+
+```{r smooth-r2}
+w_n <- clean_weight(prep_visits(nedap, verbose = 0), verbose = 0)
+summary(w_n$per_pig$r2)
+```
 
 **调整建议**
 
 - `min_test_days` 应短于计划测定期：计划测 60 天的批次，设为 40–45 天比较合适。
-- `curve_r2_min` 常用 0.99。在示例数据中，清洗前约有 1/4 的猪达不到这个值，所以只用来提示，不用来剔除。
-- 每头猪的最大日体重变化都记录在 `per_pig$max_daily_jump` 列中，即使 `max_daily_jump_kg` 是关闭的。体重突变通常意味着串号（两头猪共用一个耳标）或秤上同时站了两头猪。在示例数据中，日中位体重的噪声较大：阈值取 4 kg 时，NEDAP 有 12/29 头猪会被标记，所以这条规则默认关闭。建议先看 `max_daily_jump` 的分布，再决定阈值：
+- 如果某批次有很多猪因 `smooth_r2_min` 被降级，先用 `plot_adg(adg, weight = w)` 看图：是秤的问题还是阈值太严。
 
-```{r jump}
-w_n <- clean_weight(prep_visits(nedap, verbose = 0), verbose = 0)
-summary(w_n$per_pig$max_daily_jump)
-```
-
-## 6. 生长曲线参数
+## 6. 生长曲线与体重填充参数
 
 作用于 `calc_adg()`。
 
 | 参数 | 含义 | 单位 | 默认值 | 取值范围 |
 |---|---|---|---|---|
 | `stage_range` | 计算 ADG、ADFI、FCR 的体重区间 | kg | 30–120 | 必须落在 `weight_range` 之内 |
-| `curve_model` | 生长曲线：`"poly1"`、`"poly2"`、`"poly3"`（1–3 次多项式）、`"loess"`、`"gompertz"` | — | `"poly2"` | 见左 |
-| `adg_method` | 日增重的算法：`"lm"` 为区间起止时间之间全部有效体重的直线回归斜率（`lm_slope`，可靠性看 `r_squared`）；`"curve"` 为区间体重差 ÷ 生长曲线所需天数（`adg_curve`）。两种结果都会输出 | — | `"lm"` | lm / curve |
-| `curve_margin_kg` | 可选：只用区间附近的记录拟合生长曲线，见下文 | kg | NULL（用全部记录） | ≥ 0 |
+| `curve_model` | 生长曲线：`"poly2"`（二次）、`"poly1"`（直线）、`"poly3"`（三次）、`"gompertz"`。用来确定区间的起止时间，并填充首条记录之前、末条记录之后的体重 | — | `"poly2"` | 见左 |
 | `max_extrap_days` | 曲线在首条记录之前、末条记录之后最多外推的天数 | 天 | 30 | ≥ 0 |
 
-区间的起止时间由生长曲线确定：
+计算分三步：
 
-- **终点**：曲线第一次到达 `stage_range` 上限的时间；
-- **起点**：在终点之前，曲线**最后一次**从下方越过下限的时间。如果前期数据波动使曲线先越过 30 kg、又掉回 30 kg 以下，起点取之后真正进入区间的那一次；
-- 搜索范围是首条记录前、末条记录后各 `max_extrap_days` 天。
+1. **区间的起止时间**由生长曲线确定。终点：曲线第一次到达 `stage_range` 上限的时间；起点：在终点之前，曲线**最后一次**从下方越过下限的时间（前期数据波动使曲线先越过 30 kg、又掉回去时，起点取之后真正进入区间的那一次）。搜索范围是首条记录前、末条记录后各 `max_extrap_days` 天。
+2. **把区间内每一天的体重补齐**：有有效体重的日子用当天中位数（`source = "observed"`）；两个有记录的日子之间缺失的日子，用前后两天**线性插值**（`"interpolated"`）；首条记录之前、末条记录之后的日子，用**生长曲线**的值（`"curve"`）。结果在 `adg$daily$weight_filled`。
+3. **日增重** = 区间内全部日体重（实测 + 填充）对日期做直线回归的斜率（`adg`，g/d），可靠性看 `r_squared`。各来源的天数在 `n_observed_days`、`n_interpolated_days`、`n_curve_days` 中。
 
-日增重有两种算法，由 `adg_method` 选择，结果中两者都有：
+`adg_curve` 是生长曲线在区间两端的体重差 ÷ 天数，只用来对照。`r_squared` 受体重跨度影响，只在同一批次、同一区间内比较才有意义。`gompertz` 用 `nls(SSgompertz)` 拟合，不收敛时自动改用二次曲线，实际使用的曲线记录在 `curve_used` 列中。
 
-- **`"lm"`（默认）**：取起止时间之间的**全部**有效体重记录做直线回归，斜率即日增重（`lm_slope`），可靠性看 `r_squared`。按时间截取，而不是按体重值筛选，所以区间开始后偶尔低于下限的记录也会保留。斜率只反映有记录的那一段：`lm_weight_from`、`lm_weight_to` 是回归线覆盖的体重范围，测定结束时还没到区间上限的猪，斜率只代表到末次体重为止的那段；
-- **`"curve"`**：区间体重差 ÷ 曲线从起点到终点所需的天数（`adg_curve`），区间两端不在测定期内时靠曲线外推。
+哪种曲线填充两端更准，可以用 `validate_weight_fill()` 在自己的数据上比较（见《方法验证》）：
 
-`r_squared` 受体重跨度影响：跨度越大 R² 天然越高，所以只在同一批次、同一区间内比较才有意义。有记录的部分不足 5 条或不足 7 天、算不出斜率时，自动改用曲线法，`adg_source` 列注明实际用的是哪种。
-
-- `gompertz` 用 `nls(SSgompertz)` 拟合。不收敛时自动改用二次曲线，实际使用的曲线记录在 `curve_used` 列中。
-- `loess` 曲线超出观测范围的部分，按两端的斜率直线延伸。
-
-### 只用区间附近的记录拟合：`curve_margin_kg`
-
-默认用一头猪的全部有效记录拟合生长曲线。如果进站后有几周长得很慢（进站适应期），二次曲线要同时贴合"前期平、后期陡"两段，会把穿过区间下限的时间点拉早，日增重偏低。
-
-设置 `curve_margin_kg` 后，只用区间附近的记录拟合：从日中位体重**最后一次**低于"下限 − `curve_margin_kg`"的那天，到**第一次**超过"上限 + `curve_margin_kg`"的那天，按时间截取。剩余记录不足 10 条或不足 7 天时，自动改用全部记录。实际使用的起止日期记录在 `curve_start`、`curve_end` 列中。
-
-```{r margin}
+```{r curves}
 w_n <- clean_weight(prep_visits(nedap, verbose = 0), verbose = 0)
-rbindlist(lapply(list(NULL, 10, 5, 2), function(m) {
-  a <- calc_adg(w_n, qc = qc_config(curve_margin_kg = m), verbose = 0)$per_pig
-  data.table(curve_margin_kg = if (is.null(m)) "NULL（全部）" else m,
-             mean_adg = round(mean(a$adg)),
-             mean_abs_diff_lm_slope = round(mean(abs(a$adg - a$lm_slope), na.rm = TRUE), 1))
+rbindlist(lapply(c("poly1", "poly2", "poly3", "gompertz"), function(m) {
+  a <- calc_adg(w_n, qc = qc_config(curve_model = m), verbose = 0)$per_pig
+  data.table(curve_model = m, mean_adg = round(mean(a$adg, na.rm = TRUE)),
+             curve_days = sum(a$n_curve_days))
 }))
 ```
-
-`mean_abs_diff_lm_slope` 是 ADG 与 `lm_slope`（起止时间之间的直线回归斜率）的平均差距。截取后，曲线主要由区间内的数据决定，两种算法更接近。
-
-**调整建议**：进站体重明显低于区间下限、进站后有适应期的批次，建议设为 5。注意：没有到达区间上限、需要外推终点的猪（`adg_type = "extrapolated"`），截取后曲线只剩区间内的一段，外推更依赖末段走势，ADG 可能比不截取时略低，应结合 `lm_slope` 一起看。
 
 ### 示例：`stage_range` 对 FIRE 数据的影响
 
@@ -273,7 +248,7 @@ rbindlist(lapply(list(c(30, 120), c(60, 120)), function(st) {
 - `fiv_max`：单次采食上限（g）；
 - `breed`（可选）：品种。有这一列时按品种查表，没有出现在表中的品种仍使用 2000 g；`breed` 为 NA 的行作为其他品种的默认值。
 
-每次访问时猪的体重：在 `calc_adfi()` 中，自动使用 `calc_adg()` 清洗、拟合后的日体重；单独调用 `flag_feed_errors()` 时，可以用 `bw` 参数传入同样的日体重表，否则使用当天原始体重的中位数（测定初期常被异常值抬高，查到的体重段会偏重）。没有体重的日子用前后两天插值。未识别耳标的访问没有体重，仍使用 `fiv_range` 的上限。实际使用的上限保存在结果的 `fiv_max` 列中。
+每次访问时猪的体重：在 `calc_adfi()` 中，自动使用 `calc_adg()` 补齐后的日体重（`weight_filled`）；单独调用 `flag_feed_errors()` 时，可以用 `bw` 参数传入同样的日体重表，否则使用当天原始体重的中位数（测定初期常被异常值抬高，查到的体重段会偏重）。没有体重的日子用前后两天插值。未识别耳标的访问没有体重，仍使用 `fiv_range` 的上限。实际使用的上限保存在结果的 `fiv_max` 列中。
 
 包里附带一张示例表 `fiv_max_example()`，来自测定站内部的质控脚本（**不是文献值**），包括 YY、LL、DD 三个品种和 20–140 kg 的体重段：
 
@@ -283,7 +258,7 @@ tab <- data.frame(weight_from = seq(20, 130, 10),
                   fiv_max = fiv_max_example()[breed == "DD", fiv_max])     # 不分品种
 visits_n <- prep_visits(nedap, verbose = 0)
 adg_n <- calc_adg(clean_weight(visits_n, verbose = 0), verbose = 0)
-bw_fit <- adg_n$daily[, .(responder, date, bw = predicted)]        # 清洗后的日体重
+bw_fit <- adg_n$daily[, .(responder, date, bw = weight_filled)]    # 补齐后的日体重
 fixed <- flag_feed_errors(visits_n, verbose = 0)
 raw_bw <- flag_feed_errors(visits_n, qc_config(fiv_max_by_weight = tab), verbose = 0)
 fit_bw <- flag_feed_errors(visits_n, qc_config(fiv_max_by_weight = tab), bw = bw_fit, verbose = 0)
@@ -320,15 +295,15 @@ rbindlist(lapply(c(1800, 3600), function(d) {
 | `dfi_range` | 校正后日采食量的合理范围，超出的日子视为缺失、交给插补 | kg | 0–6 | 两个递增的非负数 |
 | `dfi_quantile` | 可选规则：按全部猪日的分位数截断，例如 `c(0.025, 0.99)` 表示低于 2.5% 分位或高于 99% 分位的日子视为缺失 | — | NULL（关闭） | 0–1 |
 | `dfi_correct` | `"lmm"`：按 Jiao 等（2014）用混合模型校正；`"none"`：不校正，直接用原始记录 | — | `"lmm"` | lmm / none |
-| `impute_method` | `"linear"`：区间内部直线内插、长缺口用 LOESS、两端用"日采食 ~ 体重"回归外推；`"loess"`：全部用 LOESS；`"national"`：连续缺失不超过 `long_gap_days` 天用 LOESS 平滑，超过时用"日采食 ~ 体重"线性回归 | — | `"linear"` | linear / loess / national |
-| `long_gap_days` | `"linear"`：内部连续缺失超过此天数时改用 LOESS；`"national"`：区分短缺失和长缺失的天数（national 为 3） | 天 | 7 | ≥ 1 |
+| `impute_method` | `"loess_lm"`：两个有记录的日子之间，连续缺失不超过 `long_gap_days` 天用 LOESS 平滑插补，超过时用"日采食 ~ 体重"线性回归；区间两端（首个有记录日之前、末个有记录日之后）用同一个回归。`"linear"`：中间一律线性插值，两端同样用回归 | — | `"loess_lm"` | loess_lm / linear |
+| `long_gap_days` | `"loess_lm"`：区分短缺失和长缺失的天数 | 天 | 3 | ≥ 1 |
 
-校正模型的形式是 `无错误日采食 ~ 站 + 品种 + 当天体重 + ADG + 31 个错误协变量 + (1|猪)`（品种只在数据中有 `breed` 列、且不止一个品种时加入），校正值 = 无错误日采食 − Σ(系数 × 错误协变量)。没有错误的日子不受影响。
+回归中的体重是 `calc_adg()` 补齐后的日体重（`weight_filled`）。校正模型的形式是 `无错误日采食 ~ 站 + 品种 + 当天体重 + ADG + 31 个错误协变量 + (1|猪)`（品种只在数据中有 `breed` 列、且不止一个品种时加入），校正值 = 无错误日采食 − Σ(系数 × 错误协变量)。没有错误的日子不受影响。
 
 **调整建议**
 
 - 公猪后期日采食量可能超过 4 kg，`dfi_range` 的上限不宜低于 5 kg。
-- 用模拟数据比较过，几种插补方法在随机缺失时结果几乎相同；`impute_method` 保持默认即可（详见项目文档《采食插补方法模拟评估》）。
+- 两种插补方法在随机缺失时结果几乎相同，差别主要在成段缺失；可以用 `validate_adfi()` 在自己的数据上比较。
 
 ## 9. 可信度参数
 
@@ -340,9 +315,7 @@ rbindlist(lapply(c(1800, 3600), function(d) {
 | `min_coverage` | 区间内有实测（或校正）采食的天数占比低于此值时降级 | — | 0.7 | 0–1 |
 | `bin_width` | 分段检查的体重段宽度 | kg | 10 | ≥ 1 |
 | `min_bin_coverage_kg` | 中间体重段内，实测体重覆盖的范围小于此值时降级 | kg | 6 | 0 至 `bin_width` |
-| `bin_min_gain_kg` | national 方法：体重段内实际增重低于此值时，删除该段 | kg | 6 | ≥ 0 |
-| `cfi_r2_min` | national 方法：累计采食对体重线性回归的 R² 不高于此值时，剔除该猪 | — | 0.95 | 0–1 |
-| `bin_fcr_limits` | 可选：每个体重段料肉比的合理范围，超出时降级（national 方法中删除该段） | — | NULL（关闭） | 表：`weight_from`、`fcr_min`、`fcr_max` |
+| `bin_fcr_limits` | 可选：每个体重段料肉比的合理范围，超出时降级 | — | NULL（关闭） | 表：`weight_from`、`fcr_min`、`fcr_max` |
 
 ### 示例：`max_edge_extrap_days` 对可信个体数的影响
 
@@ -377,25 +350,25 @@ b[fcr_out == TRUE, .(responder, weight_from, weight_to, fcr = round(fcr, 2), fcr
 
 ```{r recipes, eval = FALSE}
 # 晚进站批次（45–60 kg 进站）
-qc_config("casey", stage_range = c(60, 120))
+qc_config(stage_range = c(60, 120))
 
 # 115 kg 左右出栏
-qc_config("casey", stage_range = c(30, 110))
+qc_config(stage_range = c(30, 110))
 
 # 测定期较短的批次（计划 50 天）
-qc_config("casey", min_test_days = 30)
+qc_config(min_test_days = 30)
 
 # FIRE 设备，下料量 600 g/次
-qc_config("casey", trough_diff_range = c(-20, 2400))
+qc_config(trough_diff_range = c(-20, 2400))
 
 # 单次采食上限随体重变化，并检查分段料肉比
-qc_config("casey", fiv_max_by_weight = fiv_max_example(), bin_fcr_limits = bin_fcr_example())
+qc_config(fiv_max_by_weight = fiv_max_example(), bin_fcr_limits = bin_fcr_example())
 
-# 标记日体重突变超过 5 kg/天的猪
-qc_config("casey", max_daily_jump_kg = 5)
+# 两端用直线填充体重，采食中间用线性插值
+qc_config(curve_model = "poly1", impute_method = "linear")
 
-# 更宽松的体重清洗：两种方法都判为异常才算异常值（比 "any" 标出的异常更少）
-qc_config("casey", weight_outlier = c("rlm", "loess"), outlier_combine = "majority")
+# 更宽松的体重清洗：两种方法都判为异常才算异常值
+qc_config(weight_outlier = c("rlm", "loess"), outlier_combine = "majority")
 ```
 
 ## 参考文献

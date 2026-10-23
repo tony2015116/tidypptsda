@@ -41,7 +41,7 @@ run_pipeline <- function(data, station = NULL, qc = qc_config(), breeds = NULL,
 
 #' @export
 print.ppt_pipeline <- function(x, ...) {
-  cli::cli_h2("tidypptsda pipeline ({toupper(attr(x$visits, 'station'))}, profile {.val {attr(x$fcr$settings, 'profile')}})")
+  cli::cli_h2("tidypptsda pipeline ({toupper(attr(x$visits, 'station'))})")
   n_id <- data.table::uniqueN(x$visits$responder, na.rm = TRUE)
   p <- x$fcr$per_pig
   cli::cli_bullets(c(

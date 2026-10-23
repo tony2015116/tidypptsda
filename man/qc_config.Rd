@@ -2,47 +2,22 @@
 % Please edit documentation in R/qc_config.R
 \name{qc_config}
 \alias{qc_config}
-\title{Build Quality-Control Settings from a Preset}
+\title{Build Quality-Control Settings}
 \usage{
-qc_config(profile = c("casey", "national", "legacy"), ...)
+qc_config(...)
 }
 \arguments{
-\item{profile}{Preset to start from:
-\itemize{
-\item \code{"casey"} (default): feeder error criteria of Casey et al. (2005),
-robust regression (\code{MASS::rlm}) for body weight outliers and a
-quadratic growth curve.
-\item \code{"national"}: the national FCR procedure (chapter 6, "FCR raw data
-processing"): rlm weights <= 0.25 removed, whole days whose records
-all have rlm weights < 0.90 removed, daily weight = mean weighted by
-the rlm weights, pigs with a daily-weight R² < 0.995 (quadratic) or
-more than 10\% of days without feed removed, 10 kg weight classes
-checked and FCR from cumulative feed intake (\code{method = "national"}).
-Feed errors and their correction are those of the package.
-\item \code{"legacy"}: STL + robust regression + robust SD outlier detection
-and a Gompertz growth curve.
-}}
-
 \item{...}{Parameters to override, as \code{name = value}. See \strong{Parameters}.}
 }
 \value{
-An object of class \code{ppt_qc}: a named list of parameters with the
-preset name in attribute \code{"profile"}.
+An object of class \code{ppt_qc}: a named list of parameters.
 }
 \description{
 Build the set of quality-control (QC) thresholds used by the whole
-pipeline. Start from a preset with \code{profile} and override any parameter
-through \code{...}.
+pipeline. Every parameter has a default; override any of them through
+\code{...}.
 }
 \section{Parameters}{
-
-\strong{Method}
-\itemize{
-\item \code{method}: \code{"standard"} (default): FCR = ADFI / ADG over the stage;
-\code{"national"}: FCR from the cumulative feed intake between the stage
-limits, with the weight-class checks of the national procedure (see
-\code{\link[=calc_fcr]{calc_fcr()}}).
-}
 
 \strong{Station transfer} (pigs seen at several stations)
 \itemize{
@@ -54,31 +29,16 @@ overlap is treated as transponder misreads. Default 1.
 warning. Default 10.
 }
 
-\strong{Body weight records}
+\strong{Body weight records} (used by \code{\link[=clean_weight]{clean_weight()}}, in this order)
 \itemize{
-\item \code{weight_range}: valid body weight of a single record, kg.
+\item \code{weight_range}: valid body weight of a single record, kg. Default
+\code{c(15, 150)}.
 \item \code{adapt_days}: adaptation period after entry, days (default 7). Body
 weights of the first \code{adapt_days} days after a pig's first visit are
-not used (\code{qc_flag = "adaptation"}). Its feed intake is kept: it counts
-for ADFI and FCR when these days lie inside \code{stage_range} (e.g. a pig
-that enters at 45 kg with a 30-120 kg stage), and not when the pig is
-still below the stage. 0 = off.
-\item \code{weight_outlier}: one or more of \code{"rlm"}, \code{"loess"}, \code{"stl"}, \code{"sd"}.
-\item \code{outlier_combine}: \code{"any"} (outlier for any method) or \code{"majority"}.
-\item \code{rlm_cutoff}: records with a robust regression weight below this are
-outliers (at or below with \code{method = "national"}). Default 0.5.
-\item \code{day_weight_min}: optional, a day on which every record has an rlm
-weight below this is removed as a whole (\code{qc_flag = "day_weight"};
-national: 0.90). Needs \code{"rlm"} in \code{weight_outlier}. \code{NULL} = off.
-\item \code{daily_weight}: daily body weight from the valid records: \code{"median"}
-(default) or \code{"weighted_mean"} (mean weighted by the rlm weights,
-national).
-\item \code{sd_max}: residuals beyond this many robust SDs (MAD) are outliers.
-\item \code{loess_span}: smoothing span for LOESS. Default 0.75.
-\item \code{rel_dev_max}: optional, relative deviation from the curve above which
-a record is an outlier (e.g. 0.25). \code{NULL} = off.
-\item \code{daily_drop_min}: optional, a day whose weight is below this ratio of
-the previous day is an outlier (e.g. 0.90). \code{NULL} = off.
+not used (\code{qc_flag = "adaptation"}). Their feed intake is kept: it
+counts for ADFI and FCR when these days lie inside \code{stage_range} (e.g. a
+pig that enters at 45 kg with a 30-120 kg stage), and not when the pig
+is still below the stage. 0 = off.
 \item \code{weight_track}: track the weight of each pig back from the end of the
 test (default \code{TRUE}). The scale only counts a pig standing on it with
 all four feet, so a reading is too light only rarely, while several
@@ -90,56 +50,47 @@ is tracked back day by day: a record is kept when it lies within
 \code{track_tol} (default 8\%, at least 2 kg, widened by 0.5 kg per day
 without kept records) of the weight expected for that day; the daily
 gain is updated from the kept daily weights of the next 10 days. Other
-records are removed (\code{qc_flag = "track"}). The outlier methods
-(\code{weight_outlier}) do not remove kept records, since a smooth curve
-cannot follow e.g. slow growth for weeks after entry; they are used
-for pigs that are not tracked (less than 7 recorded days or a test
-shorter than 14 days) and when \code{weight_track = FALSE}.
+records are removed (\code{qc_flag = "track"}). Pigs with less than 7
+recorded days or a test shorter than 14 days are not tracked.
+\item \code{weight_outlier}: outlier methods applied to the remaining records, one
+or more of \code{"rlm"} (quadratic robust regression, bisquare weights; a
+record with a weight below \code{rlm_cutoff} is an outlier), \code{"loess"}
+(robust LOESS smooth; a record more than \code{sd_max} robust SDs from it is
+an outlier), \code{"stl"} (trend + weekly component of the daily median
+weight) and \code{"sd"} (quadratic least squares, \code{sd_max} SDs). Default
+\code{c("rlm", "loess")}.
+\item \code{outlier_combine}: \code{"any"} (outlier for any method, default) or
+\code{"majority"}.
+\item \code{rlm_cutoff}: default 0.5.
+\item \code{sd_max}: default 3.
+\item \code{loess_span}: smoothing span for LOESS and STL. Default 0.75.
 }
 
-\strong{Pig-level checks}
+\strong{Pig-level checks} (used by \code{\link[=clean_weight]{clean_weight()}})
 \itemize{
-\item \code{min_test_days}, \code{min_records}: minimum test length (days) and number
-of valid weight records.
-\item \code{max_missing_rate}: maximum share of days without a valid weight.
-\item \code{daily_r2_min}: optional, pigs whose daily weights fit a quadratic
-curve with an R² below this are removed (national: 0.995). \code{NULL} = off.
-\item \code{max_feed_missing}: optional, pigs without any feed record on more than
-this share of their test days are removed (national: 0.10). \code{NULL} =
-off.
-\item \code{entry_weight_max}, \code{exit_weight_min}: maximum entry and minimum exit
-body weight, kg.
-\item \code{curve_r2_min}: optional, pigs whose growth curve R² is below this are
-flagged as low confidence (not removed). \code{NULL} = off.
-\item \code{max_daily_jump_kg}: optional, pigs whose daily median weight changes
-by more than this many kg per day between consecutive days are flagged
-as low confidence (not removed). \code{NULL} = off.
-\item \code{track_flag_share}: pigs whose tracking removes more than this share
-of their records are flagged as low confidence: the scale probably did
-not weigh them correctly for a long time (e.g. a faulty load cell).
-Default 0.4.
+\item \code{min_records}, \code{min_test_days}, \code{max_missing_rate}: a pig with fewer
+valid weights (default 20), a shorter test (default 35 days) or a larger
+share of test days without a valid weight (default 0.30) is removed.
+\item \code{entry_weight_max}, \code{exit_weight_min}: a pig entering heavier (default
+65 kg) or leaving lighter (default 85 kg) is flagged as low confidence.
+\item \code{track_flag_share}: a pig whose tracking removes more than this share of
+its records (default 0.4) is flagged as low confidence: the scale
+probably did not weigh it correctly for a long time (e.g. a faulty load
+cell).
+\item \code{smooth_r2_min}: a pig whose valid weights fit their LOESS smooth with
+an R\if{html}{\out{<c2>}}\if{html}{\out{<b2>}} below this (default 0.99) is flagged as low confidence.
 }
 
-\strong{Growth and ADG}
+\strong{Growth, filled weights and ADG} (used by \code{\link[=calc_adg]{calc_adg()}})
 \itemize{
-\item \code{stage_range}: body weight interval for ADG and FCR, kg.
-\item \code{curve_model}: \code{"poly1"}, \code{"poly2"}, \code{"poly3"}, \code{"loess"} or
-\code{"gompertz"} (falls back to \code{"poly2"} when it does not converge).
-\item \code{adg_method}: \code{"lm"} (default): ADG is the slope of a linear
-regression of all valid weight records between the stage start and end
-times (\code{lm_slope}; its R² is \code{r_squared}); \code{"curve"}: ADG is the weight
-difference of the stage divided by the days the growth curve needs for
-it. Both are always reported (\code{lm_slope}, \code{adg_curve}). With \code{"lm"}, a
-pig without enough records in the stage (< 5 records or < 7 days) gets
-the curve ADG (\code{adg_source}).
-\item \code{curve_margin_kg}: optional, fit the growth curve only to the records
-around the stage: from the last day whose daily median weight is below
-\code{stage_range[1] - curve_margin_kg} to the first day above
-\code{stage_range[2] + curve_margin_kg} (cut by time, not by weight). Early
-weeks far below the stage (e.g. slow growth after entry) then no longer
-bend the curve. Falls back to all records when fewer than 10 records or
-7 days remain. \code{NULL} (default) = all records; 5 is a sensible value.
-\item \code{max_extrap_days}: maximum extrapolation of the curve, days.
+\item \code{stage_range}: body weight interval for ADG, ADFI and FCR, kg. Default
+\code{c(30, 120)}.
+\item \code{curve_model}: growth curve that fixes the stage start and end and fills
+the weights before the first and after the last recorded day:
+\code{"poly2"} (default), \code{"poly1"}, \code{"poly3"} or \code{"gompertz"} (falls back
+to \code{"poly2"} when it does not converge). Missing days between recorded
+days are always filled by linear interpolation.
+\item \code{max_extrap_days}: maximum extrapolation of the curve, days. Default 30.
 }
 
 \strong{Feeder errors} (Casey et al. 2005, Table 3)
@@ -164,27 +115,27 @@ weight class), \code{fiv_max} (g) and optionally \code{breed}. See
 \code{\link[=fiv_max_example]{fiv_max_example()}}. \code{NULL} = off.
 }
 
-\strong{Daily feed intake}
+\strong{Daily feed intake} (used by \code{\link[=calc_adfi]{calc_adfi()}})
 \itemize{
 \item \code{dfi_range}: valid daily feed intake, kg.
 \item \code{dfi_quantile}: optional, lower and upper quantile cut-offs (e.g.
 \code{c(0.025, 0.99)}). \code{NULL} = off.
 \item \code{dfi_correct}: \code{"lmm"} (Jiao et al. 2014) or \code{"none"}.
-\item \code{impute_method}: \code{"linear"} (linear interpolation, LOESS for long
-gaps, intake ~ body weight regression at the stage ends), \code{"loess"}
-(robust LOESS over days everywhere) or \code{"national"} (gaps of up to
-\code{long_gap_days} days: LOESS over days; longer gaps: linear regression
-of intake on body weight).
-\item \code{long_gap_days}: inside gaps longer than this many days are imputed
-with LOESS instead of a straight line (\code{impute_method = "linear"}), or
-by regression on body weight (\code{"national"}, 3 days). Default 7.
+\item \code{impute_method}: how missing stage days are filled.
+\code{"loess_lm"} (default): gaps between recorded days of up to
+\code{long_gap_days} days are filled from a robust LOESS smooth of the daily
+intake, longer gaps and the days before the first / after the last
+recorded day by a linear regression of daily intake on body weight;
+\code{"linear"}: linear interpolation between recorded days, the same
+regression at the ends.
+\item \code{long_gap_days}: default 3.
 }
 
 \strong{Confidence flags} (used by \code{\link[=calc_fcr]{calc_fcr()}})
 \itemize{
-\item \code{max_edge_extrap_days}: a pig is \code{"low_confidence"} when the growth
-curve or the feed intake is extrapolated over more than this many days
-at the start or the end of the stage. Default 15.
+\item \code{max_edge_extrap_days}: a pig is \code{"low_confidence"} when its weights or
+its feed intake are filled over more than this many days at the start
+or the end of the stage. Default 15.
 \item \code{min_coverage}: minimum share of stage days with recorded feed intake.
 Default 0.7.
 \item \code{bin_width}: width of the body weight classes used for the segment
@@ -193,12 +144,7 @@ checks of \code{\link[=calc_fcr]{calc_fcr()}}, kg. Default 10.
 weights span less than this many kg flags the pig. Default 6.
 \item \code{bin_fcr_limits}: optional table of plausible FCR per weight class,
 columns \code{weight_from} (kg), \code{fcr_min}, \code{fcr_max}. See
-\code{\link[=bin_fcr_example]{bin_fcr_example()}}. \code{NULL} = off (national: table 5 of the procedure).
-\item \code{bin_min_gain_kg}: national method: a weight class whose weight gain is
-below this is removed. Default 6.
-\item \code{cfi_r2_min}: national method: pigs whose cumulative feed intake fits
-body weight (linear) with an R² at or below this are removed. Default
-0.95.
+\code{\link[=bin_fcr_example]{bin_fcr_example()}}. \code{NULL} = off.
 }
 }
 
