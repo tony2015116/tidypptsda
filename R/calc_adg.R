@@ -8,7 +8,7 @@
 #'
 #' @param weight Result of [clean_weight()].
 #' @param qc QC settings; by default the ones used by [clean_weight()].
-#'   Used here: `stage_range`, `curve_model`, `curve_margin_kg`,
+#'   Used here: `stage_range`, `curve_model`, `adg_method`, `curve_margin_kg`,
 #'   `loess_span`, `max_extrap_days`.
 #' @param verbose 0 (silent), 1 (summary, default) or 2 (details).
 #' @param cores Number of CPU cores for the per-pig computations. Default 1.
@@ -21,9 +21,12 @@
 #'     `start_date` / `end_date` and `start_weight` / `end_weight` (when the
 #'     curve reaches the stage limits, kg), `stage_days`,
 #'     `extrap_days_start` / `extrap_days_end` (days the curve is
-#'     extrapolated before the first / after the last weight), `adg` (g/d),
+#'     extrapolated before the first / after the last weight), `adg` (g/d,
+#'     by `adg_method`), `adg_source` (`"lm"` or `"curve"`), `adg_curve`
+#'     (g/d, stage weight difference / days of the growth curve),
 #'     `lm_slope` (g/d, linear regression on all valid records between the
-#'     stage start and end times, for comparison), `r_squared` (of that
+#'     stage start and end times), `r_squared` (of that regression),
+#'     `lm_weight_from` / `lm_weight_to` (kg, weight range covered by that
 #'     regression), `weight_status`
 #'     and `weight_reason` (from [clean_weight()]);
 #'   - `daily`: one row per pig and day from `start_date` to `end_date` and
@@ -89,8 +92,9 @@ calc_adg <- function(weight, qc = weight$settings, verbose = 1, cores = 1) {
   cols <- c("responder", "location", "breed", "stage", "curve_used", "curve_r2",
             "curve_start", "curve_end",
             "adg_type", "start_date", "end_date", "start_weight", "end_weight",
-            "stage_days", "extrap_days_start", "extrap_days_end", "adg", "lm_slope",
-            "r_squared", "weight_status",
+            "stage_days", "extrap_days_start", "extrap_days_end", "adg", "adg_source",
+            "adg_curve", "lm_slope", "r_squared", "lm_weight_from", "lm_weight_to",
+            "weight_status",
             "weight_reason")
   per_pig <- per_pig[, intersect(cols, names(per_pig)), with = FALSE]
   data.table::setorder(per_pig, location, responder)
@@ -148,15 +152,22 @@ adg_one_pig <- function(d, qc, day0) {
   # (cut by time, not by weight, so that a dip below `lo` after the start
   # does not leave isolated early records in the regression).
   inside <- adg_type != "none" & t >= a & t <= b
-  lm_slope <- r_squared <- NA_real_
+  lm_slope <- r_squared <- lm_from <- lm_to <- NA_real_
   if (sum(inside) >= 5L && diff(range(t[inside])) >= 7) {
     lfit <- stats::lm(y[inside] ~ t[inside])
     lm_slope <- unname(stats::coef(lfit)[2L]) * 1000
     r_squared <- summary(lfit)$r.squared
+    lm_from <- min(stats::fitted(lfit))
+    lm_to <- max(stats::fitted(lfit))
   }
+  adg_curve <- adg
+  use_lm <- identical(qc$adg_method, "lm") && !is.na(lm_slope)
+  if (use_lm) adg <- lm_slope
+  adg_source <- if (is.na(adg)) NA_character_ else if (use_lm) "lm" else "curve"
 
   # Daily table: the stage period plus the recorded days.
-  obs <- d[, .(weight = stats::median(weight)), by = date]
+  obs <- d[, .(weight = daily_weight_value(weight, if ("rlm_w" %in% names(d)) rlm_w else NULL,
+                                            qc$daily_weight)), by = date]
   stage_days_idx <- if (adg_type == "none") integer() else seq(floor(a), ceiling(b) - 1)
   idx <- sort(unique(c(stage_days_idx, as.integer(obs$date - first_day))))
   dates <- first_day + idx
@@ -188,8 +199,12 @@ adg_one_pig <- function(d, qc, day0) {
     extrap_days_start = if (adg_type == "none") NA_real_ else max(0, tmin - a),
     extrap_days_end = if (adg_type == "none") NA_real_ else max(0, b - tmax),
     adg = adg,
+    adg_source = adg_source,
+    adg_curve = adg_curve,
     lm_slope = lm_slope,
     r_squared = r_squared,
+    lm_weight_from = lm_from,
+    lm_weight_to = lm_to,
     daily = list(daily)
   )
 }

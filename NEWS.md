@@ -1,3 +1,54 @@
+# tidypptsda 0.9.0
+
+## National method
+
+* `qc_config("national")` now implements the national FCR procedure
+  (chapter 6 "FCR raw data processing") as a whole pipeline
+  (`method = "national"`), replacing the earlier, unverified LOESS-based
+  preset. Body weights: range 20-140 kg; rlm (bisquare) weights <= 0.25
+  removed (`rlm_cutoff`); a day whose records all have rlm weights < 0.90 is
+  removed (`day_weight_min`, `qc_flag = "day_weight"`); daily weight = mean
+  weighted by the rlm weights (`daily_weight = "weighted_mean"`); pigs with
+  a daily-weight R² (quadratic) < 0.995 (`daily_r2_min`), a test shorter
+  than 40 days or more than 10% of days without feed (`max_feed_missing`)
+  are removed. Feed errors and their correction are those of the package;
+  missing days are imputed by LOESS for gaps of up to 3 days and by a
+  regression of intake on body weight for longer gaps
+  (`impute_method = "national"`). `calc_fcr()` then removes 10 kg classes
+  with a gain below `bin_min_gain_kg` (6 kg) or an FCR outside table 5
+  (`bin_fcr_limits`), removes pigs with a removed class between kept ones,
+  regresses cumulative feed intake on body weight (pigs with R² <=
+  `cfi_r2_min`, 0.95, removed), extends it to the stage limits and computes
+  FCR = (CFI at the upper limit - CFI at the lower limit) / stage width.
+  New `per_pig` columns `cfi_start`, `cfi_end`, `cfi_r2`, `cfi_slope`,
+  `weight_first`, `weight_last`, `extrap_kg_start`, `extrap_kg_end`,
+  `n_classes`, `n_classes_removed`; `by_bin$removed`.
+
+## ADG
+
+* New QC parameter `adg_method`: `"lm"` (new default) uses the slope of a
+  linear regression of all valid weights between the stage start and end
+  times (with its R² in `r_squared`); `"curve"` uses the stage weight
+  difference / days of the growth curve (the earlier default). Both are
+  reported (`lm_slope`, `adg_curve`); `adg_source` tells which one `adg`
+  is; `lm_weight_from` / `lm_weight_to` give the weight range covered by
+  the regression.
+
+## Body weight
+
+* New QC parameter `adapt_days` (default 7): weights of the first 7 days
+  after a pig's first visit are not used (`qc_flag = "adaptation"`). Their
+  feed intake still counts when these days lie inside `stage_range`, and
+  not when the pig is below it.
+* New per-pig columns `r2_daily` and `feed_missing`; records keep their rlm
+  weight in `rlm_w`.
+
+## Documentation
+
+* New Chinese article "输出结果说明" describing every output table and
+  column. The parameter and preset articles describe the national method,
+  `adapt_days`, `adg_method` and how `stage_range` drives every step.
+
 # tidypptsda 0.8.0
 
 ## Body weight: tracking from the end of the test

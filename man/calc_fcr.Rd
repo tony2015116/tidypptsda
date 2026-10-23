@@ -41,6 +41,32 @@ Compute feed conversion ratio (FCR) from ADG and ADFI over the same body
 weight stage, flag pigs whose values rely on extrapolation, and summarise
 the traits.
 }
+\details{
+With \code{method = "national"} in the QC settings (\code{\link[=qc_config]{qc_config()}} preset
+\code{"national"}), FCR follows the national procedure instead:
+\enumerate{
+\item daily weights over the test period (missing days interpolated
+linearly inside, predicted by a quadratic curve at the ends) and daily
+feed intake (missing days imputed by \code{impute_method});
+\item days whose weight lies in \code{stage_range} are split into \code{bin_width} kg
+classes; a class with a weight gain below \code{bin_min_gain_kg} or an FCR
+outside \code{bin_fcr_limits} is removed, and a pig with a removed class
+between two kept ones is removed;
+\item cumulative feed intake over the kept days is regressed on body weight
+(pigs with R² <= \code{cfi_r2_min} are removed) and extended with that
+slope to the stage limits;
+\item FCR = (cumulative intake at the upper limit - at the lower limit) /
+stage width.
+}
+
+\code{per_pig} then also has \code{cfi_start}, \code{cfi_end} (kg), \code{cfi_r2},
+\code{cfi_slope}, \code{weight_first}, \code{weight_last} (first and last kept daily
+weight), \code{extrap_kg_start}, \code{extrap_kg_end} (kg extended by the
+regression; more than \code{bin_width} gives \code{fcr_flag = "low_confidence"}),
+\code{n_classes} and \code{n_classes_removed}; \code{by_bin} gives \code{removed} (reason or
+\code{NA}) for each class. ADG and ADFI are those of \code{\link[=calc_adg]{calc_adg()}} and
+\code{\link[=calc_adfi]{calc_adfi()}}.
+}
 \examples{
 visits <- prep_visits(nedap, verbose = 0)
 adg <- calc_adg(clean_weight(visits, verbose = 0), verbose = 0)

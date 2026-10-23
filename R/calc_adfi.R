@@ -320,6 +320,24 @@ impute_dfi_one_pig <- function(d, qc) {
         d[outside, state := "missing"]
       }
     }
+  } else if (qc$impute_method == "national") {
+    # gaps of <= long_gap_days days: LOESS smoothing over the days; longer
+    # gaps: linear regression of daily intake on body weight
+    run <- run_length(need)
+    short <- need & run <= qc$long_gap_days
+    long <- need & !short
+    if (any(short)) {
+      pred <- loess_extend(x[ok], d$dfi_check[ok], qc$loess_span)
+      d[short, dfi := pmax(0, pred(x[short]))]
+    }
+    if (any(long)) {
+      okb <- ok & !is.na(d$bw)
+      if (sum(okb) >= 5L && all(!is.na(d$bw[long]))) {
+        f <- stats::lm(dfi_check ~ bw, data = d[okb])
+        d[long, dfi := pmax(0, stats::predict(f, newdata = d[long]))]
+      }
+    }
+    d[need & !is.na(dfi), state := data.table::fifelse(inside[need & !is.na(dfi)], "iii", "elrp")]
   } else {
     pred <- loess_extend(x[ok], d$dfi_check[ok], qc$loess_span)
     d[inside, `:=`(dfi = pmax(0, pred(x[inside])), state = "iii")]

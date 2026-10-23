@@ -10,7 +10,7 @@ calc_adg(weight, qc = weight$settings, verbose = 1, cores = 1)
 \item{weight}{Result of \code{\link[=clean_weight]{clean_weight()}}.}
 
 \item{qc}{QC settings; by default the ones used by \code{\link[=clean_weight]{clean_weight()}}.
-Used here: \code{stage_range}, \code{curve_model}, \code{curve_margin_kg},
+Used here: \code{stage_range}, \code{curve_model}, \code{adg_method}, \code{curve_margin_kg},
 \code{loess_span}, \code{max_extrap_days}.}
 
 \item{verbose}{0 (silent), 1 (summary, default) or 2 (details).}
@@ -27,9 +27,12 @@ to, see \code{curve_margin_kg}), \code{adg_type},
 \code{start_date} / \code{end_date} and \code{start_weight} / \code{end_weight} (when the
 curve reaches the stage limits, kg), \code{stage_days},
 \code{extrap_days_start} / \code{extrap_days_end} (days the curve is
-extrapolated before the first / after the last weight), \code{adg} (g/d),
+extrapolated before the first / after the last weight), \code{adg} (g/d,
+by \code{adg_method}), \code{adg_source} (\code{"lm"} or \code{"curve"}), \code{adg_curve}
+(g/d, stage weight difference / days of the growth curve),
 \code{lm_slope} (g/d, linear regression on all valid records between the
-stage start and end times, for comparison), \code{r_squared} (of that
+stage start and end times), \code{r_squared} (of that regression),
+\code{lm_weight_from} / \code{lm_weight_to} (kg, weight range covered by that
 regression), \code{weight_status}
 and \code{weight_reason} (from \code{\link[=clean_weight]{clean_weight()}});
 \item \code{daily}: one row per pig and day from \code{start_date} to \code{end_date} and

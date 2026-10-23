@@ -147,6 +147,8 @@ outlier_qc <- function(qc, m) {
 validate_outlier_job <- function(job, qc, methods, adg_true, cores = 1L) {
   d <- job$d
   q <- if (job$method == "none") qc else outlier_qc(qc, methods[[job$method]])
+  # the clean records already start after the adaptation period
+  q <- qc_set(q, list(adapt_days = 0))
   w <- clean_weight(d, q, verbose = 0, cores = cores)
   if (job$method == "none") {
     w$records[qc_flag != "weight_range", `:=`(outlier = FALSE, qc_flag = "")]
@@ -195,7 +197,7 @@ validate_outlier_job <- function(job, qc, methods, adg_true, cores = 1L) {
 #' @return A list of class `ppt_validation` with
 #' - `summary`: one row per model: `cv_rmse` and `cv_mae` (kg, weight of the
 #'   left-out records), and for each truncation (`late10`, `early10`, ...)
-#'   the ADG `bias`, `rmse` (g/d) and Spearman rank correlation `spearman`
+#'   the growth-curve ADG (`adg_curve`) `bias`, `rmse` (g/d) and Spearman rank correlation `spearman`
 #'   with the full-data ADG, and how many pigs still get an ADG (`n`);
 #' - `cv`: cross-validation error of every pig and model;
 #' - `truncation`: ADG of every pig, model and truncation;
@@ -280,7 +282,8 @@ validate_adg_one_pig <- function(d, qc, models, trim_days, day0) {
     q <- qc_set(qc, list(curve_model = m))
     adg_of <- function(dd) {
       if (data.table::uniqueN(dd$date) < 10L) return(NA_real_)
-      tryCatch(suppressWarnings(adg_one_pig(dd, q, day0)$adg), error = function(e) NA_real_)
+      # the growth curve ADG: this compares curve models
+      tryCatch(suppressWarnings(adg_one_pig(dd, q, day0)$adg_curve), error = function(e) NA_real_)
     }
     full <- adg_of(d)
     last_day <- max(d$date)

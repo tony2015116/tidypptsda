@@ -14,7 +14,7 @@ line_pig <- function(id = "p1", start = 30, rate = 1, days = 95, noise = 0.3,
   )
 }
 no_checks <- function(...) {
-  qc_config(min_test_days = 7, min_records = 5, max_missing_rate = 1, ...)
+  qc_config(min_test_days = 7, min_records = 5, max_missing_rate = 1, adapt_days = 0, ...)
 }
 
 test_that("a perfectly linear pig gives the exact ADG", {
@@ -99,12 +99,30 @@ test_that("curve_margin_kg fits the curve around the stage only", {
   w <- clean_weight(pig, q, verbose = 0)
   all <- calc_adg(w, verbose = 0)$per_pig
   cut <- calc_adg(w, qc = qc_set(q, list(curve_margin_kg = 5)), verbose = 0)$per_pig
-  expect_lt(abs(cut$adg - 1000), abs(all$adg - 1000))
-  expect_equal(cut$adg, 1000, tolerance = 0.02)
+  expect_lt(abs(cut$adg_curve - 1000), abs(all$adg_curve - 1000))
+  expect_equal(cut$adg_curve, 1000, tolerance = 0.02)
   expect_gt(cut$curve_start, all$curve_start)
   expect_lt(cut$curve_end, all$curve_end)
   # too few records left: all records are used
   expect_true(all(curve_window(as.Date("2024-01-01") + 0:5, 10 + 0:5, qc_set(q, list(curve_margin_kg = 5)))))
+})
+
+test_that("adg_method chooses between the regression slope and the curve", {
+  pig <- line_pig(start = 25, rate = 1, days = 100, noise = 0.3)
+  w <- clean_weight(pig, no_checks(), verbose = 0)
+  a_lm <- calc_adg(w, verbose = 0)$per_pig
+  a_cv <- calc_adg(w, qc = qc_set(no_checks(), list(adg_method = "curve")), verbose = 0)$per_pig
+  expect_equal(a_lm$adg, a_lm$lm_slope)
+  expect_equal(a_lm$adg_source, "lm")
+  expect_equal(a_cv$adg, a_cv$adg_curve)
+  expect_equal(a_cv$adg_source, "curve")
+  expect_equal(a_lm$adg_curve, a_cv$adg_curve)
+  expect_true(a_lm$lm_weight_from >= 29 && a_lm$lm_weight_to <= 121)
+  # another stage moves everything with it
+  a2 <- calc_adg(w, qc = qc_set(no_checks(), list(stage_range = c(40, 100))), verbose = 0)$per_pig
+  expect_equal(a2$stage, "40-100")
+  expect_equal(a2$start_weight, 40, tolerance = 1e-6)
+  expect_true(a2$lm_weight_from >= 39 && a2$lm_weight_to <= 101)
 })
 
 test_that("calc_adg explains when no pig is left", {

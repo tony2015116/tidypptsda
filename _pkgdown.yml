@@ -82,6 +82,7 @@ articles:
   - qc-parameters-zh
   - qc-presets-zh
   - validation-zh
+  - output-zh
 
 news:
   one_page: true

@@ -1,6 +1,6 @@
 Package: tidypptsda
 Title: Process and Analyse Pig Performance Testing Station Data
-Version: 0.8.0
+Version: 0.9.0
 Authors@R: 
     person("Meng", "Guo", , "tony2015116@163.com", role = c("aut", "cre", "cph"))
 Description: Tools to clean and analyse visit records from automatic pig
