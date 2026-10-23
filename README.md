@@ -74,6 +74,11 @@ plot_adg(adg, weight = weight) |> save_plots("plots", suffix = "growth")
 
 <img src="man/figures/README-plot-1.png" width="100%" />
 
+Daily feed intake over the stage: recorded, error-free, corrected and
+filled days, with the ADFI as a dashed line:
+
+<img src="man/figures/README-plot-adfi-1.png" width="100%" />
+
 ## References
 
 Casey, D. S., Stern, H. S., & Dekkers, J. C. M. (2005). Identification

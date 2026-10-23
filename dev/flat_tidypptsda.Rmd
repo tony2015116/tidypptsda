@@ -4569,7 +4569,7 @@ plot_adg <- function(adg, weight = NULL, responders = NULL, locations = NULL,
   stage_rng <- adg$settings$stage_range
   rec <- if (!is.null(weight)) weight$records[responder %in% daily$responder] else NULL
 
-  cols <- c(record = "#BBBBBB", outlier = "#D55E00", observed = "#0072B2",
+  cols <- c(record = "#BBBBBB", outlier = "#666666", observed = "#0072B2",
             interpolated = "#E69F00", filled = "#CC79A7", curve = "#009E73",
             slope = "#000000", stage = "#000000")
   info[, label := sprintf("ADG %s g/d (R2 %s, %s)\n%s-%s kg in %s d",
@@ -4620,7 +4620,7 @@ plot_adfi <- function(adfi, responders = NULL, locations = NULL, ncol = 3,
   cols <- c(raw = "#BBBBBB", org = "#0072B2", corr = "#E69F00",
             iii = "#009E73", elrp = "#CC79A7", missing = "#D55E00")
   labels <- c(raw = "recorded", org = "error-free", corr = "corrected",
-              iii = "interpolated", elrp = "extrapolated", missing = "missing")
+              iii = "filled (between records)", elrp = "filled (stage ends)", missing = "missing")
 
   plots <- lapply(split(daily, by = "location", sorted = TRUE), function(d) {
     lv <- natural_order(unique(d$responder))
@@ -4710,8 +4710,12 @@ adg_station_plot <- function(d, rec, lab, lv, stage_rng, cols, ncol) {
     r <- data.table::copy(rec)[, responder := factor(responder, levels = lv)]
     r[, kind := data.table::fifelse(outlier, "outlier", "record")]
     r <- r[, .(date, responder, weight, kind)]
-    p <- p + ggplot2::geom_point(data = r, ggplot2::aes(y = weight, colour = kind),
-                                 size = 0.4, alpha = 0.6)
+    # outliers as small grey crosses, so that they do not look like filled weights
+    p <- p +
+      ggplot2::geom_point(data = r[kind == "record"], ggplot2::aes(y = weight, colour = kind),
+                          size = 0.4, alpha = 0.6) +
+      ggplot2::geom_point(data = r[kind == "outlier"], ggplot2::aes(y = weight, colour = kind),
+                          size = 0.7, alpha = 0.6, shape = 4)
   }
   # ADG regression line over the stage days
   sl <- d[in_stage == TRUE & !is.na(weight_filled),
@@ -4723,14 +4727,15 @@ adg_station_plot <- function(d, rec, lab, lv, stage_rng, cols, ncol) {
            if (!is.null(rec)) c("record", "outlier"))
   brk <- intersect(brk, c(unique(d$kind), "curve", if (nrow(sl) > 0L) "slope", if (!is.null(rec)) c("record", "outlier")))
   p <- p +
-    ggplot2::geom_line(ggplot2::aes(y = predicted, colour = "curve"), linewidth = 0.6)
-  if (nrow(sl) > 0L) {
-    p <- p + ggplot2::geom_line(data = sl, ggplot2::aes(x = x, y = y, colour = "slope"),
-                                linewidth = 0.5, linetype = "longdash")
-  }
-  p +
     ggplot2::geom_point(data = d[!is.na(weight_filled)],
                         ggplot2::aes(y = weight_filled, colour = kind), size = 0.9) +
+    ggplot2::geom_line(ggplot2::aes(y = predicted, colour = "curve"), linewidth = 0.6)
+  # the ADG line on top of the points
+  if (nrow(sl) > 0L) {
+    p <- p + ggplot2::geom_line(data = sl, ggplot2::aes(x = x, y = y, colour = "slope"),
+                                linewidth = 0.6, linetype = "longdash")
+  }
+  p +
     ggplot2::geom_text(data = lab, ggplot2::aes(label = label),
                        x = -Inf, y = Inf, hjust = -0.05, vjust = 1.2,
                        size = 2.8, inherit.aes = FALSE) +
@@ -4743,7 +4748,7 @@ adg_station_plot <- function(d, rec, lab, lv, stage_rng, cols, ncol) {
                  slope = "ADG regression line", record = "weight record", outlier = "outlier")[brk],
       guide = ggplot2::guide_legend(override.aes = list(
         linetype = ifelse(brk %in% c("curve", "slope"), "solid", "blank"),
-        shape = ifelse(brk %in% c("curve", "slope"), NA, 16),
+        shape = ifelse(brk %in% c("curve", "slope"), NA, ifelse(brk == "outlier", 4, 16)),
         size = ifelse(brk %in% c("record", "outlier"), 1, 1.5)))
     ) +
     ggplot2::labs(title = paste("Station", loc), x = NULL, y = "Body weight (kg)") +
