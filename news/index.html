@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.8.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.9.0</span>
       </span>
     </div>
 
@@ -51,6 +51,9 @@
     <li>
       <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线与采食插补</a>
     </li>
+    <li>
+      <a href="../articles/output-zh.html">输出结果说明</a>
+    </li>
   </ul></li>
 <li>
   <a href="../news/index.html">Changelog</a>
@@ -74,6 +77,27 @@
       <small>Source: <a href="https://github.com/tony2015116/tidypptsda/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="page-header" data-toc-text="0.9.0" id="tidypptsda-090">tidypptsda 0.9.0<a class="anchor" aria-label="anchor" href="#tidypptsda-090"></a></h2>
+<div class="section level3">
+<h3 id="national-method-0-9-0">National method<a class="anchor" aria-label="anchor" href="#national-method-0-9-0"></a></h3>
+<ul><li>
+<code>qc_config("national")</code> now implements the national FCR procedure (chapter 6 “FCR raw data processing”) as a whole pipeline (<code>method = "national"</code>), replacing the earlier, unverified LOESS-based preset. Body weights: range 20-140 kg; rlm (bisquare) weights &lt;= 0.25 removed (<code>rlm_cutoff</code>); a day whose records all have rlm weights &lt; 0.90 is removed (<code>day_weight_min</code>, <code>qc_flag = "day_weight"</code>); daily weight = mean weighted by the rlm weights (<code>daily_weight = "weighted_mean"</code>); pigs with a daily-weight R² (quadratic) &lt; 0.995 (<code>daily_r2_min</code>), a test shorter than 40 days or more than 10% of days without feed (<code>max_feed_missing</code>) are removed. Feed errors and their correction are those of the package; missing days are imputed by LOESS for gaps of up to 3 days and by a regression of intake on body weight for longer gaps (<code>impute_method = "national"</code>). <code><a href="../reference/calc_fcr.html">calc_fcr()</a></code> then removes 10 kg classes with a gain below <code>bin_min_gain_kg</code> (6 kg) or an FCR outside table 5 (<code>bin_fcr_limits</code>), removes pigs with a removed class between kept ones, regresses cumulative feed intake on body weight (pigs with R² &lt;= <code>cfi_r2_min</code>, 0.95, removed), extends it to the stage limits and computes FCR = (CFI at the upper limit - CFI at the lower limit) / stage width. New <code>per_pig</code> columns <code>cfi_start</code>, <code>cfi_end</code>, <code>cfi_r2</code>, <code>cfi_slope</code>, <code>weight_first</code>, <code>weight_last</code>, <code>extrap_kg_start</code>, <code>extrap_kg_end</code>, <code>n_classes</code>, <code>n_classes_removed</code>; <code>by_bin$removed</code>.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="adg-0-9-0">ADG<a class="anchor" aria-label="anchor" href="#adg-0-9-0"></a></h3>
+<ul><li>New QC parameter <code>adg_method</code>: <code>"lm"</code> (new default) uses the slope of a linear regression of all valid weights between the stage start and end times (with its R² in <code>r_squared</code>); <code>"curve"</code> uses the stage weight difference / days of the growth curve (the earlier default). Both are reported (<code>lm_slope</code>, <code>adg_curve</code>); <code>adg_source</code> tells which one <code>adg</code> is; <code>lm_weight_from</code> / <code>lm_weight_to</code> give the weight range covered by the regression.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="body-weight-0-9-0">Body weight<a class="anchor" aria-label="anchor" href="#body-weight-0-9-0"></a></h3>
+<ul><li>New QC parameter <code>adapt_days</code> (default 7): weights of the first 7 days after a pig’s first visit are not used (<code>qc_flag = "adaptation"</code>). Their feed intake still counts when these days lie inside <code>stage_range</code>, and not when the pig is below it.</li>
+<li>New per-pig columns <code>r2_daily</code> and <code>feed_missing</code>; records keep their rlm weight in <code>rlm_w</code>.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="documentation-0-9-0">Documentation<a class="anchor" aria-label="anchor" href="#documentation-0-9-0"></a></h3>
+<ul><li>New Chinese article “输出结果说明” describing every output table and column. The parameter and preset articles describe the national method, <code>adapt_days</code>, <code>adg_method</code> and how <code>stage_range</code> drives every step.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="page-header" data-toc-text="0.8.0" id="tidypptsda-080">tidypptsda 0.8.0<a class="anchor" aria-label="anchor" href="#tidypptsda-080"></a></h2>
 <div class="section level3">

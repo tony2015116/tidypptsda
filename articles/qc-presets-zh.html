@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.8.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.9.0</span>
       </span>
     </div>
 
@@ -71,6 +71,9 @@
     </li>
     <li>
       <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线与采食插补</a>
+    </li>
+    <li>
+      <a href="../articles/output-zh.html">输出结果说明</a>
     </li>
   </ul>
 </li>
@@ -113,7 +116,7 @@
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://r-datatable.com" class="external-link">data.table</a></span><span class="op">)</span></span></code></pre></div>
 <p><code><a href="../reference/qc_config.html">qc_config()</a></code>
 提供三套预设：<code>casey</code>（默认）、<code>national</code> 和
-<code>legacy</code>。每套预设是 45
+<code>legacy</code>。每套预设是 54
 个质控参数的一组完整取值，只在部分参数上互不相同。本文说明三套预设各自的设计思路、它们的区别，以及如何选择。每个参数的具体含义见《质控参数详解》。</p>
 <div class="section level2">
 <h2 id="一句话区别">1. 一句话区别<a class="anchor" aria-label="anchor" href="#%E4%B8%80%E5%8F%A5%E8%AF%9D%E5%8C%BA%E5%88%AB"></a>
@@ -131,47 +134,50 @@
 <th>预设</th>
 <th>体重异常检测</th>
 <th>生长曲线</th>
-<th>采食插补</th>
+<th>FCR 算法</th>
 <th>个体要求</th>
 <th>适合</th>
 </tr></thead>
 <tbody>
 <tr class="odd">
 <td><code>casey</code></td>
-<td>rlm 稳健回归</td>
+<td>逐日回溯追踪（未追踪的猪用 rlm）</td>
 <td>二次曲线</td>
-<td>直线内插，长缺口用 LOESS</td>
+<td>ADFI ÷ ADG，异常只标记、不删除</td>
 <td>测定 ≥ 35 天，缺失 ≤ 30%</td>
-<td>大多数批次；有文献依据，结果容易解释</td>
+<td>大多数批次；保留每头猪，可信度用标记区分</td>
 </tr>
 <tr class="even">
 <td><code>national</code></td>
-<td>LOESS</td>
-<td>LOESS</td>
-<td>LOESS</td>
-<td>测定 ≥ 60 天，缺失 ≤ 15%，曲线 R² ≥ 0.99</td>
-<td>测定期长、数据完整、要求严格的批次</td>
+<td>rlm（权重 ≤ 0.25）+ 整日规则</td>
+<td>二次曲线</td>
+<td>累计采食法，10 kg 分段质控，不合格的段和猪直接删除</td>
+<td>测定 ≥ 40 天，采食缺失 ≤ 10%，日体重 R² ≥ 0.995</td>
+<td>需要与国家测定规程一致的结果</td>
 </tr>
 <tr class="odd">
 <td><code>legacy</code></td>
-<td>STL + rlm + SD 三法合并</td>
+<td>逐日回溯追踪（未追踪的猪用 STL + rlm + SD）</td>
 <td>Gompertz</td>
-<td>直线内插</td>
+<td>同 casey</td>
 <td>同 casey</td>
 <td>想沿用传统组合方法，或与以往结果对比</td>
 </tr>
 </tbody>
 </table>
-<p>三套预设的<strong>采食错误判定完全相同</strong>，都采用 Casey
-等（2005）的 16 条规则，日采食都用 Jiao
-等（2014）的混合模型校正。区别集中在体重清洗、生长曲线和个体判定上。</p>
+<p>三套预设都有 7
+天进站适应期（<code>adapt_days = 7</code>），日增重默认都用直线回归斜率（<code>adg_method = "lm"</code>）。</p>
+<p>三套预设的<strong>采食错误判定和日采食校正完全相同</strong>：都采用
+Casey 等（2005）的 16 条规则，日采食都用 Jiao
+等（2014）的混合模型校正。区别集中在体重清洗、个体判定和 FCR
+的算法上。</p>
 </div>
 <div class="section level2">
 <h2 id="参数差异">2. 参数差异<a class="anchor" aria-label="anchor" href="#%E5%8F%82%E6%95%B0%E5%B7%AE%E5%BC%82"></a>
 </h2>
 <p>只列出与 <code>casey</code> 不同的参数：</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">f</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">v</span><span class="op">)</span> <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">v</span><span class="op">)</span><span class="op">)</span> <span class="st">"NULL（关闭）"</span> <span class="kw">else</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="va">v</span>, collapse <span class="op">=</span> <span class="st">", "</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">f</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">v</span><span class="op">)</span> <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">v</span><span class="op">)</span><span class="op">)</span> <span class="st">"NULL（关闭）"</span> <span class="kw">else</span> <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">is.data.frame</a></span><span class="op">(</span><span class="va">v</span><span class="op">)</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"表（%d 行）"</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">v</span><span class="op">)</span><span class="op">)</span> <span class="kw">else</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="va">v</span>, collapse <span class="op">=</span> <span class="st">", "</span><span class="op">)</span></span>
 <span><span class="va">cs</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"casey"</span><span class="op">)</span>; <span class="va">na</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"national"</span><span class="op">)</span>; <span class="va">lg</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"legacy"</span><span class="op">)</span></span>
 <span><span class="va">diff_params</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">cs</span><span class="op">)</span><span class="op">[</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/mapply.html" class="external-link">mapply</a></span><span class="op">(</span><span class="va">identical</span>, <span class="va">cs</span>, <span class="va">na</span><span class="op">)</span> <span class="op">|</span> <span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/mapply.html" class="external-link">mapply</a></span><span class="op">(</span><span class="va">identical</span>, <span class="va">cs</span>, <span class="va">lg</span><span class="op">)</span><span class="op">]</span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/data.table/man/data.table.html" class="external-link">data.table</a></span><span class="op">(</span></span>
@@ -180,16 +186,24 @@
 <span>  national <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply</a></span><span class="op">(</span><span class="va">diff_params</span>, <span class="kw">function</span><span class="op">(</span><span class="va">p</span><span class="op">)</span> <span class="fu">f</span><span class="op">(</span><span class="va">na</span><span class="op">[[</span><span class="va">p</span><span class="op">]</span><span class="op">]</span><span class="op">)</span>, <span class="st">""</span><span class="op">)</span>,</span>
 <span>  legacy <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply</a></span><span class="op">(</span><span class="va">diff_params</span>, <span class="kw">function</span><span class="op">(</span><span class="va">p</span><span class="op">)</span> <span class="fu">f</span><span class="op">(</span><span class="va">lg</span><span class="op">[[</span><span class="va">p</span><span class="op">]</span><span class="op">]</span><span class="op">)</span>, <span class="st">""</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co">#&gt;                参数        casey national       legacy</span></span>
-<span><span class="co">#&gt;              &lt;char&gt;       &lt;char&gt;   &lt;char&gt;       &lt;char&gt;</span></span>
-<span><span class="co">#&gt; 1:     weight_range      15, 150  25, 140      25, 140</span></span>
-<span><span class="co">#&gt; 2:   weight_outlier          rlm    loess stl, rlm, sd</span></span>
-<span><span class="co">#&gt; 3:    min_test_days           35       60           35</span></span>
-<span><span class="co">#&gt; 4: max_missing_rate          0.3     0.15          0.3</span></span>
-<span><span class="co">#&gt; 5:     curve_r2_min NULL（关闭）     0.99 NULL（关闭）</span></span>
-<span><span class="co">#&gt; 6:      stage_range      30, 120  30, 120      45, 110</span></span>
-<span><span class="co">#&gt; 7:      curve_model        poly2    loess     gompertz</span></span>
-<span><span class="co">#&gt; 8:    impute_method       linear    loess       linear</span></span></code></pre></div>
+<span><span class="co">#&gt;                 参数        casey      national       legacy</span></span>
+<span><span class="co">#&gt;               &lt;char&gt;       &lt;char&gt;        &lt;char&gt;       &lt;char&gt;</span></span>
+<span><span class="co">#&gt;  1:           method     standard      national     standard</span></span>
+<span><span class="co">#&gt;  2:     weight_range      15, 150       20, 140      25, 140</span></span>
+<span><span class="co">#&gt;  3:   weight_outlier          rlm           rlm stl, rlm, sd</span></span>
+<span><span class="co">#&gt;  4:       rlm_cutoff          0.5          0.25          0.5</span></span>
+<span><span class="co">#&gt;  5:   day_weight_min NULL（关闭）           0.9 NULL（关闭）</span></span>
+<span><span class="co">#&gt;  6:     daily_weight       median weighted_mean       median</span></span>
+<span><span class="co">#&gt;  7:     weight_track         TRUE         FALSE         TRUE</span></span>
+<span><span class="co">#&gt;  8:    min_test_days           35            40           35</span></span>
+<span><span class="co">#&gt;  9: max_missing_rate          0.3             1          0.3</span></span>
+<span><span class="co">#&gt; 10:     daily_r2_min NULL（关闭）         0.995 NULL（关闭）</span></span>
+<span><span class="co">#&gt; 11: max_feed_missing NULL（关闭）           0.1 NULL（关闭）</span></span>
+<span><span class="co">#&gt; 12:      stage_range      30, 120       30, 120      45, 110</span></span>
+<span><span class="co">#&gt; 13:      curve_model        poly2         poly2     gompertz</span></span>
+<span><span class="co">#&gt; 14:    impute_method       linear      national       linear</span></span>
+<span><span class="co">#&gt; 15:    long_gap_days            7             3            7</span></span>
+<span><span class="co">#&gt; 16:   bin_fcr_limits NULL（关闭）    表（9 行） NULL（关闭）</span></span></code></pre></div>
 <p>其余参数在三套预设中取值相同，包括跨站、采食错误、日采食范围、可信度等各组参数。</p>
 </div>
 <div class="section level2">
@@ -234,71 +248,87 @@
 <h2 id="national">4. national<a class="anchor" aria-label="anchor" href="#national"></a>
 </h2>
 <div class="section level3">
-<h3 id="设计思路-1">设计思路<a class="anchor" aria-label="anchor" href="#%E8%AE%BE%E8%AE%A1%E6%80%9D%E8%B7%AF-1"></a>
+<h3 id="来源">来源<a class="anchor" aria-label="anchor" href="#%E6%9D%A5%E6%BA%90"></a>
 </h3>
-<p>这套预设整理自国内测定站数据处理中常见的参数（<strong>原始出处未核实</strong>，参数含义按本包的理解实现）。它的特点是：</p>
-<ul>
-<li>
-<strong>用 LOESS
-代替参数曲线</strong>：体重清洗、生长曲线和采食插补都使用局部加权回归（<code>loess_span = 0.75</code>），不对生长曲线的形状作任何假设；</li>
-<li>
-<strong>个体要求更严</strong>：测定期 ≥ 60 天，缺失率 ≤
-15%，有效体重范围收窄到 25–140 kg；</li>
-<li>
-<strong>曲线质量门槛</strong>：清洗后 LOESS 曲线的 R² &lt; 0.99
-时，标记为低可信度（不剔除）。</li>
-</ul>
-<p>原始资料中还有几个参数，含义不够明确，本包把它们实现为<strong>默认关闭</strong>的可选规则：</p>
-<table class="table">
-<colgroup>
-<col width="33%">
-<col width="33%">
-<col width="33%">
-</colgroup>
-<thead><tr class="header">
-<th>原始参数</th>
-<th>本包对应</th>
-<th>本包的理解</th>
-</tr></thead>
-<tbody>
-<tr class="odd">
-<td><code>weight_threshold = 0.25</code></td>
-<td><code>rel_dev_max</code></td>
-<td>实测体重偏离拟合曲线超过 25% 判为异常</td>
-</tr>
-<tr class="even">
-<td><code>daily_weight_threshold = 0.90</code></td>
-<td><code>daily_drop_min</code></td>
-<td>当天体重低于前一天的 90% 判为异常</td>
-</tr>
-<tr class="odd">
-<td><code>impute_r2_min = 0.95</code></td>
-<td>已删除</td>
-<td>累积采食曲线的 R² 几乎总高于 0.95，起不到把关作用</td>
-</tr>
-</tbody>
-</table>
-<p>确认含义后，可以这样打开：</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"national"</span>, rel_dev_max <span class="op">=</span> <span class="fl">0.25</span>, daily_drop_min <span class="op">=</span> <span class="fl">0.90</span><span class="op">)</span></span></code></pre></div>
+<p>这套预设按国家种猪测定的 FCR 数据处理规程（第六章”FCR
+原始数据处理”）实现，覆盖从原始记录到校正 FCR
+的整套流程，而不只是一组质控参数，所以它设置了
+<code>method = "national"</code>，<code><a href="../reference/calc_fcr.html">calc_fcr()</a></code>
+会改用累计采食法。本包的实现中，<strong>采食错误判定和日采食校正沿用本包的方法</strong>（Casey
+等 2005 的 16 条规则 + Jiao 等 2014 的混合模型），不采用规程中的 9
+类异常和校正方法。</p>
 </div>
 <div class="section level3">
-<h3 id="优点与局限-1">优点与局限<a class="anchor" aria-label="anchor" href="#%E4%BC%98%E7%82%B9%E4%B8%8E%E5%B1%80%E9%99%90-1"></a>
+<h3 id="流程">流程<a class="anchor" aria-label="anchor" href="#%E6%B5%81%E7%A8%8B"></a>
+</h3>
+<p><strong>体重</strong></p>
+<ol style="list-style-type: decimal">
+<li>体重范围 20–140 kg；</li>
+<li>对每头猪的全部体重做二次稳健回归（bisquare 权重），<strong>权重 ≤
+0.25</strong> 的记录判为异常；</li>
+<li>某一天<strong>每一条</strong>记录的权重都 &lt;
+0.90，整天的体重判为异常；</li>
+<li>每天的体重代表值 =
+当天有效记录按回归权重的<strong>加权平均</strong>；</li>
+<li>用日体重重新拟合二次曲线，<strong>R² &lt; 0.995
+的猪剔除</strong>；</li>
+<li>日体重缺失的天：中间用线性插值，首尾用二次曲线预测。</li>
+</ol>
+<p><strong>个体完整性</strong>：测定期 &lt; 40
+天，或没有任何采食记录的天数 &gt; 10%，剔除。</p>
+<p><strong>日采食</strong>：沿用本包的错误判定和校正；校正后日采食为 0
+或 &gt; 6 kg 的天视为缺失。缺失的填补：连续缺失 ≤ 3 天用 LOESS
+平滑，&gt; 3 天用”日采食 ~ 体重”线性回归。</p>
+<p><strong>分段质控与 FCR</strong></p>
+<ol style="list-style-type: decimal">
+<li>取日体重落在区间内的天，从区间下限起每 10 kg 一段；</li>
+<li>段内实际增重（末日体重 − 首日体重）&lt; 6 kg 的段删除；</li>
+<li>段料肉比 = 段内采食量之和 ÷ 段内增重，超出规程表 5
+范围的段删除；</li>
+<li>两个保留段之间有段被删除或缺失的猪，整头剔除；</li>
+<li>在保留的天上累加日采食，得到累计采食量；对体重做线性回归，<strong>R²
+≤ 0.95 的猪剔除</strong>；</li>
+<li>首尾保留段没覆盖到的区间端点，用回归斜率外推累计采食量；</li>
+<li>
+<strong>FCR = (区间上限处的累计采食 − 下限处的累计采食) ÷
+区间宽度</strong>（30–120 kg 时为 90 kg）。</li>
+</ol>
+<p>区间可以通过 <code>stage_range</code>
+改成其他体重段，分段、端点和分母都会跟着变。规程表 5 只给了 30–120 kg
+内各段的范围，其他体重段没有对应的段料肉比限值。</p>
+</div>
+<div class="section level3">
+<h3 id="与-casey-的主要区别">与 casey 的主要区别<a class="anchor" aria-label="anchor" href="#%E4%B8%8E-casey-%E7%9A%84%E4%B8%BB%E8%A6%81%E5%8C%BA%E5%88%AB"></a>
 </h3>
 <ul>
-<li>优点：能适应形状不规则的生长曲线；对数据完整性要求高，留下的个体质量好。</li>
-<li>局限：LOESS
-在数据两端的外推只按端点斜率直线延伸，进站晚或出栏早的猪误差较大；测定期
-≥ 60 天的要求会剔除较多个体，测定期较短的批次需要相应调低
-<code>min_test_days</code>。</li>
+<li>
+<strong>删除，而不是标记</strong>：规程对 R²
+不达标、中间段缺失、累计采食回归不好的猪直接剔除，原因写在
+<code>$removed</code> 中；casey 保留每头猪，只降为低可信度；</li>
+<li>
+<strong>没有逐日回溯追踪</strong>：进站初期多头小猪同时上秤造成的偏重读数，只能靠
+rlm 处理。这类读数多时，日体重的二次曲线 R² 会低于
+0.995，整头猪被剔除；</li>
+<li>
+<strong>FCR
+的起止点由日体重决定</strong>，而不是由生长曲线决定。</li>
 </ul>
+</div>
+<div class="section level3">
+<h3 id="用法-1">用法<a class="anchor" aria-label="anchor" href="#%E7%94%A8%E6%B3%95-1"></a>
+</h3>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">data</span>, qc <span class="op">=</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"national"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">res</span><span class="op">$</span><span class="va">fcr</span><span class="op">$</span><span class="va">per_pig</span>      <span class="co"># FCR 以及累计采食的起止值、回归 R² 等</span></span>
+<span><span class="va">res</span><span class="op">$</span><span class="va">fcr</span><span class="op">$</span><span class="va">by_bin</span>       <span class="co"># 每头猪每个 10 kg 段，及删除原因</span></span>
+<span><span class="va">res</span><span class="op">$</span><span class="va">removed</span>          <span class="co"># 被剔除的猪和原因</span></span></code></pre></div>
 </div>
 </div>
 <div class="section level2">
 <h2 id="legacy">5. legacy<a class="anchor" aria-label="anchor" href="#legacy"></a>
 </h2>
 <div class="section level3">
-<h3 id="设计思路-2">设计思路<a class="anchor" aria-label="anchor" href="#%E8%AE%BE%E8%AE%A1%E6%80%9D%E8%B7%AF-2"></a>
+<h3 id="设计思路-1">设计思路<a class="anchor" aria-label="anchor" href="#%E8%AE%BE%E8%AE%A1%E6%80%9D%E8%B7%AF-1"></a>
 </h3>
 <p>传统的”多种统计方法组合”做法：</p>
 <ul>
@@ -324,7 +354,7 @@ kg（原始资料中的”测试体重范围”），有效体重范围为 25–
 </ul>
 </div>
 <div class="section level3">
-<h3 id="优点与局限-2">优点与局限<a class="anchor" aria-label="anchor" href="#%E4%BC%98%E7%82%B9%E4%B8%8E%E5%B1%80%E9%99%90-2"></a>
+<h3 id="优点与局限-1">优点与局限<a class="anchor" aria-label="anchor" href="#%E4%BC%98%E7%82%B9%E4%B8%8E%E5%B1%80%E9%99%90-1"></a>
 </h3>
 <ul>
 <li>优点：三种方法互相补充，异常值检出最全；Gompertz
@@ -371,17 +401,17 @@ kg（原始资料中的”测试体重范围”），有效体重范围为 25–
 <span><span class="fu"><a href="https://rdrr.io/pkg/data.table/man/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"casey"</span>, <span class="st">"national"</span>, <span class="st">"legacy"</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">p</span><span class="op">)</span> <span class="fu">run_one</span><span class="op">(</span><span class="va">nedap</span>, <span class="va">p</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;        预设 异常记录_pct  保留  降级  剔除   ADG  ADFI   FCR FCR可信</span></span>
 <span><span class="co">#&gt;      &lt;char&gt;        &lt;num&gt; &lt;int&gt; &lt;int&gt; &lt;int&gt; &lt;num&gt; &lt;num&gt; &lt;num&gt;   &lt;int&gt;</span></span>
-<span><span class="co">#&gt; 1:    casey         10.5    28     1     1  1170  2823  2.41      23</span></span>
-<span><span class="co">#&gt; 2: national         13.3    27     1     2  1160  2821  2.44      22</span></span>
-<span><span class="co">#&gt; 3:   legacy         13.3    28     1     1  1203  2988  2.49      27</span></span>
+<span><span class="co">#&gt; 1:    casey         15.7    28     1     1  1202  2847  2.37      23</span></span>
+<span><span class="co">#&gt; 2: national         18.6    28     0     2  1217  2881  2.36       8</span></span>
+<span><span class="co">#&gt; 3:   legacy         17.3    28     1     1  1221  2997  2.46      27</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"FIRE（统一使用 60-120 kg）\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; FIRE（统一使用 60-120 kg）</span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/data.table/man/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"casey"</span>, <span class="st">"national"</span>, <span class="st">"legacy"</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">p</span><span class="op">)</span> <span class="fu">run_one</span><span class="op">(</span><span class="va">fire</span>, <span class="va">p</span>, stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">60</span>, <span class="fl">120</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;        预设 异常记录_pct  保留  降级  剔除   ADG  ADFI   FCR FCR可信</span></span>
 <span><span class="co">#&gt;      &lt;char&gt;        &lt;num&gt; &lt;int&gt; &lt;int&gt; &lt;int&gt; &lt;num&gt; &lt;num&gt; &lt;num&gt;   &lt;int&gt;</span></span>
-<span><span class="co">#&gt; 1:    casey          2.0    25     0     1  1223  3265  2.68      22</span></span>
-<span><span class="co">#&gt; 2: national          2.7    24     0     2  1215  3249  2.68      21</span></span>
-<span><span class="co">#&gt; 3:   legacy          2.7    25     0     1  1219  3264  2.69      21</span></span></code></pre></div>
+<span><span class="co">#&gt; 1:    casey         12.0    23     2     1  1197  3247  2.72      21</span></span>
+<span><span class="co">#&gt; 2: national         15.5    20     2     4  1199  3239  2.67       9</span></span>
+<span><span class="co">#&gt; 3:   legacy         12.8    23     2     1  1197  3241  2.72      20</span></span></code></pre></div>
 <p>注意：legacy 在 NEDAP 上使用的是它默认的 45–110 kg 区间，所以它的
 ADG、ADFI
 与另外两套不是在同一体重段上算的，只能看趋势，不能直接比较数值。</p>
@@ -400,15 +430,14 @@ ADG、ADFI
 <span>            <span class="fu"><a href="https://rdrr.io/r/base/funprog.html" class="external-link">Map</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">p</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/setattr.html" class="external-link">setnames</a></span><span class="op">(</span><span class="fu">fcr_of</span><span class="op">(</span><span class="va">p</span><span class="op">)</span>, <span class="st">"fcr"</span>, <span class="va">p</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"casey"</span>, <span class="st">"national"</span>, <span class="st">"legacy"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/cor.html" class="external-link">cor</a></span><span class="op">(</span><span class="va">m</span><span class="op">[</span>, <span class="op">-</span><span class="fl">1</span><span class="op">]</span>, method <span class="op">=</span> <span class="st">"spearman"</span>, use <span class="op">=</span> <span class="st">"complete.obs"</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span></span>
 <span><span class="co">#&gt;          casey national legacy</span></span>
-<span><span class="co">#&gt; casey    1.000     0.90  0.914</span></span>
-<span><span class="co">#&gt; national 0.900     1.00  0.960</span></span>
-<span><span class="co">#&gt; legacy   0.914     0.96  1.000</span></span></code></pre></div>
+<span><span class="co">#&gt; casey    1.000    0.729  0.979</span></span>
+<span><span class="co">#&gt; national 0.729    1.000  0.671</span></span>
+<span><span class="co">#&gt; legacy   0.979    0.671  1.000</span></span></code></pre></div>
 <p>相关系数越接近
-1，说明换用不同的预设对个体排名的影响越小。在示例数据上，national 与
-legacy 的排名很接近（0.96 左右），casey 与另外两套稍有差异（约
-0.90–0.91）。差异主要来自生长曲线的形式：casey 用二次曲线，另外两套用
-LOESS 和
-Gompertz。这也说明，同一个育种群体应固定使用同一套预设，否则换方法本身就可能改变个体排序。</p>
+1，说明换用不同的预设对个体排名的影响越小。在示例数据上，casey 与 legacy
+的排名很接近（约 0.98）；national 与它们差别较大（约
+0.67–0.73），因为它剔除了较多的猪和体重段，FCR
+用累计采食法计算，起止点也由日体重而不是生长曲线决定。这也说明，同一个育种群体应固定使用同一套预设，否则换方法本身就可能改变个体排序。</p>
 </div>
 </div>
 <div class="section level2">
@@ -419,10 +448,9 @@ Gompertz。这也说明，同一个育种群体应固定使用同一套预设，
 <strong>没有特别要求时，用
 <code>casey</code></strong>。它的方法有文献依据，便于写进论文的材料与方法部分。</li>
 <li>
-<strong>测定期长（≥ 60 天）、数据完整、要求严格时，用
-<code>national</code></strong>。如果剔除的个体太多，先看
-<code>$removed</code> 里的原因，再适当放宽 <code>min_test_days</code> 或
-<code>max_missing_rate</code>。</li>
+<strong>需要与国家测定规程一致的结果时，用
+<code>national</code></strong>。它会直接剔除不合格的段和猪，剔除的个体往往较多；先看
+<code>$removed</code> 里的原因，再决定是否放宽相应参数。</li>
 <li>
 <strong>需要和以往用”多方法组合”处理的结果对比时，用
 <code>legacy</code></strong>。记得把 <code>stage_range</code>

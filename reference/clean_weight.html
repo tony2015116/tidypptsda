@@ -18,7 +18,7 @@ pig whether its weight data are good enough for growth analysis."><meta property
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.8.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.9.0</span>
       </span>
     </div>
 
@@ -51,6 +51,9 @@ pig whether its weight data are good enough for growth analysis."><meta property
     </li>
     <li>
       <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线与采食插补</a>
+    </li>
+    <li>
+      <a href="../articles/output-zh.html">输出结果说明</a>
     </li>
   </ul></li>
 <li>
@@ -154,51 +157,52 @@ settings.</p></div>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Cleaning body weight (</span><span style="color: #00BB00; font-weight: bold;">rlm</span><span style="font-weight: bold;">)</span> <span style="color: #00BBBB;">──────────────────────────────────────────────────</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Weight records: <span style="font-weight: bold;">31,472</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Outside weight range: <span style="font-weight: bold;">0</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Outliers: <span style="font-weight: bold;">3,314</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span>  of which removed by tracking: <span style="font-weight: bold;">3,313</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Adaptation after entry (not used): <span style="font-weight: bold;">3,404</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Outliers: <span style="font-weight: bold;">4,947</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span>  of which removed by tracking: <span style="font-weight: bold;">1,543</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #BBBB00;">!</span> Pigs kept: 28, low confidence: 1, removed: 1</span>
 <span class="r-in"><span><span class="va">w</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> ── <span style="color: #0000BB; font-weight: bold;">&lt;ppt_weight&gt;</span> ──</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Pigs: 30 (keep 28, low confidence 1, removed 1)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">$per_pig</span>: 30 rows x 16 columns</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">$per_pig</span>: 30 rows x 18 columns</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">$daily</span>: 2789 rows x 7 columns</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">$removed</span>: 1 row x 4 columns</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">$records</span>: 31472 rows x 9 columns</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">$records</span>: 31472 rows x 10 columns</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> QC profile: <span style="color: #0000BB;">"casey"</span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Why pigs were removed</span></span></span>
 <span class="r-in"><span><span class="va">w</span><span class="op">$</span><span class="va">removed</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    responder location         step                 reason</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>       &lt;char&gt;   &lt;char&gt;       &lt;char&gt;                 &lt;char&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:     15964      101 clean_weight test period 2 d &lt; 35 d</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    responder location         step               reason</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       &lt;char&gt;   &lt;char&gt;       &lt;char&gt;               &lt;char&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:     15964      101 clean_weight 0 valid weights &lt; 20</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Records flagged as outliers</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">w</span><span class="op">$</span><span class="va">records</span><span class="op">[</span><span class="va">outlier</span> <span class="op">==</span> <span class="cn">TRUE</span><span class="op">]</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    responder location       date seq_days          entry_time weight   fitted</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>       &lt;char&gt;   &lt;char&gt;     &lt;Date&gt;    &lt;int&gt;              &lt;POSc&gt;  &lt;num&gt;    &lt;num&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:     13913      101 2024-02-20        2 2024-02-20 01:05:04   31.0 21.16833</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:     13913      101 2024-02-20        2 2024-02-20 06:52:21   28.5 21.37602</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:     13913      101 2024-02-20        2 2024-02-20 06:53:50   29.5 21.37691</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:     13913      101 2024-02-20        2 2024-02-20 08:46:55   30.0 21.44464</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:     13913      101 2024-02-20        2 2024-02-20 11:28:05   29.5 21.54121</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:     13913      101 2024-02-20        2 2024-02-20 11:32:56   27.5 21.54412</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    outlier qc_flag</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     &lt;lgcl&gt;  &lt;char&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:    TRUE   track</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:    TRUE   track</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:    TRUE   track</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:    TRUE   track</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:    TRUE   track</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:    TRUE   track</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    responder location       date seq_days          entry_time weight fitted</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       &lt;char&gt;   &lt;char&gt;     &lt;Date&gt;    &lt;int&gt;              &lt;POSc&gt;  &lt;num&gt;  &lt;num&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:     13913      101 2024-02-19        1 2024-02-19 22:21:41   23.5     NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:     13913      101 2024-02-20        2 2024-02-20 01:00:02   23.5     NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:     13913      101 2024-02-20        2 2024-02-20 01:05:04   31.0     NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4:     13913      101 2024-02-20        2 2024-02-20 02:53:50   23.5     NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5:     13913      101 2024-02-20        2 2024-02-20 04:27:26   24.0     NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6:     13913      101 2024-02-20        2 2024-02-20 06:52:21   28.5     NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    rlm_w outlier    qc_flag</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    &lt;num&gt;  &lt;lgcl&gt;     &lt;char&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:    NA    TRUE adaptation</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:    NA    TRUE adaptation</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:    NA    TRUE adaptation</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4:    NA    TRUE adaptation</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5:    NA    TRUE adaptation</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6:    NA    TRUE adaptation</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Another QC preset</span></span></span>
 <span class="r-in"><span><span class="va">w_national</span> <span class="op">&lt;-</span> <span class="fu">clean_weight</span><span class="op">(</span><span class="va">visits</span>, qc <span class="op">=</span> <span class="fu"><a href="qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"national"</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">w_national</span><span class="op">$</span><span class="va">per_pig</span><span class="op">$</span><span class="va">status</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>           keep low_confidence        removed </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>             27              1              2 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    keep removed </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>      28       2 </span>
 </code></pre></div>
     </div>
   </div>

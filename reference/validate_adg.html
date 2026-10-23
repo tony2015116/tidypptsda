@@ -26,7 +26,7 @@ all records of the same model.
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.8.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.9.0</span>
       </span>
     </div>
 
@@ -59,6 +59,9 @@ all records of the same model.
     </li>
     <li>
       <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线与采食插补</a>
+    </li>
+    <li>
+      <a href="../articles/output-zh.html">输出结果说明</a>
     </li>
   </ul></li>
 <li>
@@ -154,7 +157,7 @@ Default <code>c(10, 20)</code>.</p></dd>
     <h2>Value</h2>
     <p>A list of class <code>ppt_validation</code> with</p><ul><li><p><code>summary</code>: one row per model: <code>cv_rmse</code> and <code>cv_mae</code> (kg, weight of the
 left-out records), and for each truncation (<code>late10</code>, <code>early10</code>, ...)
-the ADG <code>bias</code>, <code>rmse</code> (g/d) and Spearman rank correlation <code>spearman</code>
+the growth-curve ADG (<code>adg_curve</code>) <code>bias</code>, <code>rmse</code> (g/d) and Spearman rank correlation <code>spearman</code>
 with the full-data ADG, and how many pigs still get an ADG (<code>n</code>);</p></li>
 <li><p><code>cv</code>: cross-validation error of every pig and model;</p></li>
 <li><p><code>truncation</code>: ADG of every pig, model and truncation;</p></li>

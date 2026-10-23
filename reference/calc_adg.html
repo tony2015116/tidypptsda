@@ -18,7 +18,7 @@ average daily gain (ADG) over a body weight stage."><meta property="og:image" co
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.8.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.9.0</span>
       </span>
     </div>
 
@@ -51,6 +51,9 @@ average daily gain (ADG) over a body weight stage."><meta property="og:image" co
     </li>
     <li>
       <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线与采食插补</a>
+    </li>
+    <li>
+      <a href="../articles/output-zh.html">输出结果说明</a>
     </li>
   </ul></li>
 <li>
@@ -95,7 +98,7 @@ average daily gain (ADG) over a body weight stage.</p>
 
 <dt id="arg-qc">qc<a class="anchor" aria-label="anchor" href="#arg-qc"></a></dt>
 <dd><p>QC settings; by default the ones used by <code><a href="clean_weight.html">clean_weight()</a></code>.
-Used here: <code>stage_range</code>, <code>curve_model</code>, <code>curve_margin_kg</code>,
+Used here: <code>stage_range</code>, <code>curve_model</code>, <code>adg_method</code>, <code>curve_margin_kg</code>,
 <code>loess_span</code>, <code>max_extrap_days</code>.</p></dd>
 
 
@@ -116,9 +119,12 @@ to, see <code>curve_margin_kg</code>), <code>adg_type</code>,
 <code>start_date</code> / <code>end_date</code> and <code>start_weight</code> / <code>end_weight</code> (when the
 curve reaches the stage limits, kg), <code>stage_days</code>,
 <code>extrap_days_start</code> / <code>extrap_days_end</code> (days the curve is
-extrapolated before the first / after the last weight), <code>adg</code> (g/d),
+extrapolated before the first / after the last weight), <code>adg</code> (g/d,
+by <code>adg_method</code>), <code>adg_source</code> (<code>"lm"</code> or <code>"curve"</code>), <code>adg_curve</code>
+(g/d, stage weight difference / days of the growth curve),
 <code>lm_slope</code> (g/d, linear regression on all valid records between the
-stage start and end times, for comparison), <code>r_squared</code> (of that
+stage start and end times), <code>r_squared</code> (of that regression),
+<code>lm_weight_from</code> / <code>lm_weight_to</code> (kg, weight range covered by that
 regression), <code>weight_status</code>
 and <code>weight_reason</code> (from <code><a href="clean_weight.html">clean_weight()</a></code>);</p></li>
 <li><p><code>daily</code>: one row per pig and day from <code>start_date</code> to <code>end_date</code> and
@@ -141,21 +147,21 @@ predicted days), <code>predicted</code> weight with <code>lower</code> / <code>u
 <span class="r-in"><span><span class="va">adg</span> <span class="op">&lt;-</span> <span class="fu">calc_adg</span><span class="op">(</span><span class="va">w</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">ADG over 30-120 kg (</span><span style="color: #00BB00; font-weight: bold;">poly2</span><span style="font-weight: bold;"> curve)</span> <span style="color: #00BBBB;">────────────────────────────────────────────</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Observed (stage inside the records): <span style="font-weight: bold;">24</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Extrapolated: <span style="font-weight: bold;">4</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Observed (stage inside the records): <span style="font-weight: bold;">21</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Extrapolated: <span style="font-weight: bold;">7</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Partial (stage not fully reached): <span style="font-weight: bold;">1</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> No ADG: <span style="font-weight: bold;">0</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #BBBB00;">!</span> 1 pig does not reach the whole stage: ADG is based on part of it (adg_type = "partial").</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Mean ADG: 1170 g/d (SD 122)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Mean ADG: 1202 g/d (SD 130)</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">adg</span><span class="op">$</span><span class="va">per_pig</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">adg_type</span>, <span class="va">start_date</span>, <span class="va">end_date</span>, <span class="va">stage_days</span>, <span class="va">adg</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    responder     adg_type start_date   end_date stage_days      adg</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       &lt;char&gt;       &lt;char&gt;     &lt;Date&gt;     &lt;Date&gt;      &lt;num&gt;    &lt;num&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:     13913     observed 2024-03-01 2024-05-16   76.73557 1172.859</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:     13918     observed 2024-03-06 2024-05-24   79.04064 1138.655</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:     13954 extrapolated 2024-03-05 2024-05-27   82.92620 1085.302</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:     13996     observed 2024-02-27 2024-05-08   70.96490 1268.233</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:     14962     observed 2024-02-25 2024-05-07   72.19671 1246.594</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:     15006     observed 2024-02-26 2024-05-07   70.86011 1270.108</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:     13913     observed 2024-03-02 2024-05-16   75.64390 1208.605</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:     13918     observed 2024-03-07 2024-05-24   78.55231 1165.052</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:     13954 extrapolated 2024-03-10 2024-05-28   79.41279 1116.762</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4:     13996     observed 2024-02-28 2024-05-07   69.18097 1328.523</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5:     14962     observed 2024-02-26 2024-05-07   70.59744 1272.878</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6:     15006     observed 2024-02-28 2024-05-07   68.90897 1314.881</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Gompertz curve, with quadratic fallback</span></span></span>
 <span class="r-in"><span><span class="va">adg_g</span> <span class="op">&lt;-</span> <span class="fu">calc_adg</span><span class="op">(</span><span class="va">w</span>, qc <span class="op">=</span> <span class="fu"><a href="qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"casey"</span>, curve_model <span class="op">=</span> <span class="st">"gompertz"</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></span>

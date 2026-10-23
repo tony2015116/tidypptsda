@@ -27,7 +27,7 @@ before use."><meta property="og:image" content="https://tony2015116.github.io/ti
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.8.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.9.0</span>
       </span>
     </div>
 
@@ -60,6 +60,9 @@ before use."><meta property="og:image" content="https://tony2015116.github.io/ti
     </li>
     <li>
       <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线与采食插补</a>
+    </li>
+    <li>
+      <a href="../articles/output-zh.html">输出结果说明</a>
     </li>
   </ul></li>
 <li>
@@ -165,33 +168,41 @@ before use.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> ── <span style="font-weight: bold;">QC settings: profile </span><span style="color: #0000BB; font-weight: bold;">"national"</span> ──</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">Method</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">method</span>: national</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">Station transfer</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">max_gap_days</span>: 3</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">max_overlap_days</span>: 1</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">max_jump_kg</span>: 10</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">Body weight records</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">weight_range</span>: 25, 140</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">weight_outlier</span>: loess</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">weight_range</span>: 20, 140</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">adapt_days</span>: 7</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">weight_outlier</span>: rlm</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">outlier_combine</span>: any</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">rlm_cutoff</span>: 0.5</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">rlm_cutoff</span>: 0.25</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">day_weight_min</span>: 0.9</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">daily_weight</span>: weighted_mean</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">sd_max</span>: 3</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">loess_span</span>: 0.75</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">rel_dev_max</span>: NULL (off)</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">daily_drop_min</span>: NULL (off)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">weight_track</span>: TRUE</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">weight_track</span>: FALSE</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">track_tol</span>: 0.08</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">Pig-level checks</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">track_flag_share</span>: 0.4</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">min_test_days</span>: 50</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">min_records</span>: 20</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">max_missing_rate</span>: 0.15</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">max_missing_rate</span>: 1</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">entry_weight_max</span>: 65</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">exit_weight_min</span>: 85</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">curve_r2_min</span>: 0.99</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">curve_r2_min</span>: NULL (off)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">daily_r2_min</span>: 0.995</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">max_feed_missing</span>: 0.1</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">max_daily_jump_kg</span>: NULL (off)</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">Growth and ADG</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">stage_range</span>: 30, 120</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">curve_model</span>: loess</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">curve_model</span>: poly2</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">adg_method</span>: lm</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">curve_margin_kg</span>: NULL (off)</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">max_extrap_days</span>: 30</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">Feeder errors</span></span>
@@ -209,14 +220,16 @@ before use.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">dfi_range</span>: 0, 6</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">dfi_quantile</span>: NULL (off)</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">dfi_correct</span>: lmm</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">impute_method</span>: loess</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">long_gap_days</span>: 7</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">impute_method</span>: national</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">long_gap_days</span>: 3</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">Confidence flags</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">max_edge_extrap_days</span>: 15</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">min_coverage</span>: 0.7</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">bin_width</span>: 10</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">min_bin_coverage_kg</span>: 6</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">bin_fcr_limits</span>: NULL (off)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">bin_min_gain_kg</span>: 6</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">cfi_r2_min</span>: 0.95</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   <span style="color: #00BB00;">bin_fcr_limits</span>: table (9 rows)</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Optional rules are off (NULL) unless switched on</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"casey"</span>, daily_drop_min <span class="op">=</span> <span class="fl">0.90</span><span class="op">)</span><span class="op">$</span><span class="va">daily_drop_min</span></span></span>
