@@ -18,7 +18,7 @@ calc_fcr() in a row with the same QC settings."><meta property="og:image" conten
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.9.1</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.0.0</span>
       </span>
     </div>
 
@@ -47,10 +47,10 @@ calc_fcr() in a row with the same QC settings."><meta property="og:image" conten
       <a href="../articles/qc-parameters-zh.html">质控参数详解：qc_config()</a>
     </li>
     <li>
-      <a href="../articles/qc-presets-zh.html">质控预设说明：casey、national、legacy</a>
+      <a href="../articles/methods-zh.html">计算方法说明：从原始记录到料肉比</a>
     </li>
     <li>
-      <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线与采食插补</a>
+      <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线、体重填充与采食插补</a>
     </li>
     <li>
       <a href="../articles/output-zh.html">输出结果说明</a>
@@ -136,33 +136,33 @@ with the step and the reason).</p>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu">run_pipeline</span><span class="op">(</span><span class="va">fire</span>, qc <span class="op">=</span> <span class="fu"><a href="qc_config.html">qc_config</a></span><span class="op">(</span>stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">60</span>, <span class="fl">120</span><span class="op">)</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">res</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> ── <span style="font-weight: bold;">tidypptsda pipeline (FIRE, profile </span><span style="color: #0000BB; font-weight: bold;">"casey"</span><span style="font-weight: bold;">)</span> ──</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> ── <span style="font-weight: bold;">tidypptsda pipeline (FIRE)</span> ──</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Pigs in the data: 26</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Pigs with weight data kept: 25</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Pigs with ADG: 25</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Pigs with FCR: 25 (21 ok, 4 low confidence)</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Removed pigs: 1 (see <span style="color: #00BB00;">$removed</span>)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Mean ADG 1197 g/d, ADFI 3247 g/d, FCR 2.72</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Mean ADG 1206 g/d, ADFI 3247 g/d, FCR 2.70</span>
 <span class="r-in"><span><span class="va">res</span><span class="op">$</span><span class="va">fcr</span><span class="op">$</span><span class="va">summary</span><span class="op">[</span><span class="va">group</span> <span class="op">==</span> <span class="st">"all"</span><span class="op">]</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     group        trait     n          min          max       median</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    &lt;char&gt;       &lt;char&gt; &lt;int&gt;        &lt;num&gt;        &lt;num&gt;        &lt;num&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:    all          adg    25  958.5133884 1443.0160675 1198.5280244</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:    all         adfi    25 2590.0953650 3875.2260149 3222.1898814</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:    all          fcr    25    2.3800056    3.1378168    2.7022005</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:    all           gf    25    0.3186929    0.4201671    0.3700688</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:    all   stage_days    25   41.1284461   63.4861094   49.5961893</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:    all start_weight    25   59.9999797   60.0000044   59.9999952</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7:    all   end_weight    25  119.9999802  120.0000022  119.9999951</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>            mean           sd           cv</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>           &lt;num&gt;        &lt;num&gt;        &lt;num&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1: 1196.7068351 1.061096e+02 8.866799e-02</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2: 3246.9956514 2.526221e+02 7.780181e-02</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:    2.7207294 1.725843e-01 6.343309e-02</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:    0.3689288 2.275006e-02 6.166517e-02</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:   49.9299150 4.670036e+00 9.353182e-02</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:   59.9999943 5.796431e-06 9.660718e-08</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7:  119.9999949 5.022255e-06 4.185213e-08</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     group        trait     n          min          max       median        mean</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    &lt;char&gt;       &lt;char&gt; &lt;int&gt;        &lt;num&gt;        &lt;num&gt;        &lt;num&gt;       &lt;num&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:    all          adg    25  935.1431063 1460.4727545 1205.5702281 1205.906667</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:    all         adfi    25 2573.3440493 3875.9427630 3220.8412989 3246.854206</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:    all          fcr    25    2.3511112    3.0234748    2.6729799    2.699263</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4:    all           gf    25    0.3307453    0.4253308    0.3741143    0.371687</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5:    all   stage_days    25   40.1872671   63.7703240   49.2257352   49.796940</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6:    all start_weight    25   59.9999805   60.0000044   59.9999943   59.999994</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7:    all   end_weight    25  119.9999801  120.0000042  119.9999944  119.999994</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>              sd           cv</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>           &lt;num&gt;        &lt;num&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1: 1.065266e+02 8.833737e-02</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2: 2.517844e+02 7.754717e-02</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3: 1.584629e-01 5.870600e-02</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4: 2.164107e-02 5.822391e-02</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5: 4.791491e+00 9.622059e-02</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6: 5.503639e-06 9.172733e-08</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7: 4.646078e-06 3.871732e-08</span>
 </code></pre></div>
     </div>
   </div>

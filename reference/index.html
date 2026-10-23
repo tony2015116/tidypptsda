@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.9.1</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.0.0</span>
       </span>
     </div>
 
@@ -46,10 +46,10 @@
       <a href="../articles/qc-parameters-zh.html">质控参数详解：qc_config()</a>
     </li>
     <li>
-      <a href="../articles/qc-presets-zh.html">质控预设说明：casey、national、legacy</a>
+      <a href="../articles/methods-zh.html">计算方法说明：从原始记录到料肉比</a>
     </li>
     <li>
-      <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线与采食插补</a>
+      <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线、体重填充与采食插补</a>
     </li>
     <li>
       <a href="../articles/output-zh.html">输出结果说明</a>
@@ -78,12 +78,12 @@
 
     <table class="ref-index"><colgroup><col class="alias"><col class="title"></colgroup><tbody><tr><th colspan="2">
           <h2 id="quality-control-settings">Quality-control settings <a href="#quality-control-settings" class="anchor" aria-hidden="true"></a></h2>
-          <p class="section-desc"></p><p>Set every threshold of the pipeline in one object, starting from one of three presets.</p>
+          <p class="section-desc"></p><p>Set every threshold of the pipeline in one object; override single parameters.</p>
         </th>
       </tr></tbody><tbody><tr><td>
           <p><code><a href="qc_config.html">qc_config()</a></code> </p>
         </td>
-        <td><p>Build Quality-Control Settings from a Preset</p></td>
+        <td><p>Build Quality-Control Settings</p></td>
       </tr><tr><td>
           <p><code><a href="fiv_max_example.html">fiv_max_example()</a></code> <code><a href="fiv_max_example.html">bin_fcr_example()</a></code> </p>
         </td>
@@ -106,7 +106,7 @@
         <td><p>Add Breed Information to a Visit Table</p></td>
       </tr></tbody><tbody><tr><th colspan="2">
           <h2 id="body-weight-and-daily-gain">Body weight and daily gain <a href="#body-weight-and-daily-gain" class="anchor" aria-hidden="true"></a></h2>
-          <p class="section-desc"></p><p>Flag implausible body weights, then fit growth curves and compute ADG over a body weight stage.</p>
+          <p class="section-desc"></p><p>Flag implausible body weights, fill the missing daily weights of the stage and compute ADG as the slope of the daily weights.</p>
         </th>
       </tr></tbody><tbody><tr><td>
           <p><code><a href="clean_weight.html">clean_weight()</a></code> </p>
@@ -150,7 +150,7 @@
         <td><p>Write Analysis Results to CSV Files</p></td>
       </tr></tbody><tbody><tr><th colspan="2">
           <h2 id="validation">Validation <a href="#validation" class="anchor" aria-hidden="true"></a></h2>
-          <p class="section-desc"></p><p>Check the outlier methods, growth curve models and feed intake imputation on your own data, by spoiling or hiding part of it on purpose.</p>
+          <p class="section-desc"></p><p>Check the outlier methods, growth curve models, weight fill and feed intake imputation on your own data, by spoiling or hiding part of it on purpose.</p>
         </th>
       </tr></tbody><tbody><tr><td>
           <p><code><a href="validate_outliers.html">validate_outliers()</a></code> </p>
@@ -160,6 +160,10 @@
           <p><code><a href="validate_adg.html">validate_adg()</a></code> </p>
         </td>
         <td><p>Validate Growth Curve Models</p></td>
+      </tr><tr><td>
+          <p><code><a href="validate_weight_fill.html">validate_weight_fill()</a></code> </p>
+        </td>
+        <td><p>Validate Body Weight Fill Methods</p></td>
       </tr><tr><td>
           <p><code><a href="validate_adfi.html">validate_adfi()</a></code> </p>
         </td>
@@ -176,10 +180,6 @@
           <p><code><a href="plot_adfi.html">plot_adfi()</a></code> </p>
         </td>
         <td><p>Plot Daily Feed Intake per Station</p></td>
-      </tr><tr><td>
-          <p><code><a href="plot_cfi.html">plot_cfi()</a></code> </p>
-        </td>
-        <td><p>Plot Cumulative Feed Intake (National Method)</p></td>
       </tr><tr><td>
           <p><code><a href="save_plots.html">save_plots()</a></code> </p>
         </td>

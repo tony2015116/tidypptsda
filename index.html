@@ -38,7 +38,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.9.1</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.0.0</span>
       </span>
     </div>
 
@@ -69,10 +69,10 @@
       <a href="articles/qc-parameters-zh.html">质控参数详解：qc_config()</a>
     </li>
     <li>
-      <a href="articles/qc-presets-zh.html">质控预设说明：casey、national、legacy</a>
+      <a href="articles/methods-zh.html">计算方法说明：从原始记录到料肉比</a>
     </li>
     <li>
-      <a href="articles/validation-zh.html">方法验证：异常值检测、生长曲线与采食插补</a>
+      <a href="articles/validation-zh.html">方法验证：异常值检测、生长曲线、体重填充与采食插补</a>
     </li>
     <li>
       <a href="articles/output-zh.html">输出结果说明</a>
@@ -112,6 +112,8 @@
 <ul>
 <li>Feeder errors are flagged with the 16 criteria of Casey et al. (2005).</li>
 <li>Daily feed intake is corrected with the linear mixed model of Jiao et al. (2014).</li>
+<li>Body weights are tracked back from the reliable end of the test, then checked by robust quadratic regression and LOESS.</li>
+<li>Missing daily weights and feed intakes of the stage are filled (linear interpolation or LOESS inside, growth curve or regression on body weight at the ends); ADG is the slope of the daily weights, FCR = ADFI / ADG.</li>
 <li>ADG and ADFI are computed over the same body weight stage, and every pig gets a confidence flag that explains how its values were obtained.</li>
 <li>Nothing is removed silently: each step returns a <code>removed</code> table with the reason.</li>
 <li>Few dependencies: cli, data.table, ggplot2, and MASS / nlme which ship with R.</li>
@@ -132,20 +134,20 @@
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://tony2015116.github.io/tidypptsda/">tidypptsda</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">nedap</span>, qc <span class="op">=</span> <span class="fu"><a href="reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"casey"</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
+<span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="va">res</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">res</span><span class="op">$</span><span class="va">fcr</span><span class="op">$</span><span class="va">per_pig</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">adg</span>, <span class="va">adfi</span>, <span class="va">fcr</span>, <span class="va">fcr_flag</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
-<span><span class="co">#&gt;    responder       adg     adfi      fcr fcr_flag</span></span>
-<span><span class="co">#&gt; 1:     13913 1171.8790 2616.719 2.232926       ok</span></span>
-<span><span class="co">#&gt; 2:     13918 1140.6265 2570.041 2.253183       ok</span></span>
-<span><span class="co">#&gt; 3:     13954  919.7008 2343.422 2.548026       ok</span></span>
-<span><span class="co">#&gt; 4:     13996 1265.9909 2857.824 2.257381       ok</span></span>
-<span><span class="co">#&gt; 5:     14962 1249.0465 2818.537 2.256551       ok</span></span>
-<span><span class="co">#&gt; 6:     15006 1270.5759 3084.452 2.427602       ok</span></span></code></pre></div>
-<p>Step by step, with any QC preset or setting:</p>
+<span><span class="co">#&gt;    responder      adg     adfi      fcr       fcr_flag</span></span>
+<span><span class="co">#&gt; 1:     13913 1209.897 2642.642 2.184187             ok</span></span>
+<span><span class="co">#&gt; 2:     13918 1162.966 2566.360 2.206737             ok</span></span>
+<span><span class="co">#&gt; 3:     13954 1124.224 2681.416 2.385125 low_confidence</span></span>
+<span><span class="co">#&gt; 4:     13996 1334.979 2860.269 2.142557             ok</span></span>
+<span><span class="co">#&gt; 5:     14962 1278.746 2830.564 2.213547             ok</span></span>
+<span><span class="co">#&gt; 6:     15006 1317.472 3121.557 2.369353             ok</span></span></code></pre></div>
+<p>Step by step, with any QC setting:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">qc</span>      <span class="op">&lt;-</span> <span class="fu"><a href="reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"casey"</span>, stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>, <span class="fl">120</span><span class="op">)</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">qc</span>      <span class="op">&lt;-</span> <span class="fu"><a href="reference/qc_config.html">qc_config</a></span><span class="op">(</span>stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>, <span class="fl">120</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">visits</span>  <span class="op">&lt;-</span> <span class="fu"><a href="reference/prep_visits.html">prep_visits</a></span><span class="op">(</span><span class="va">fire</span>, qc <span class="op">=</span> <span class="va">qc</span><span class="op">)</span>          <span class="co"># or read_station("export/")</span></span>
 <span><span class="va">weight</span>  <span class="op">&lt;-</span> <span class="fu"><a href="reference/clean_weight.html">clean_weight</a></span><span class="op">(</span><span class="va">visits</span>, <span class="va">qc</span><span class="op">)</span></span>
 <span><span class="va">adg</span>     <span class="op">&lt;-</span> <span class="fu"><a href="reference/calc_adg.html">calc_adg</a></span><span class="op">(</span><span class="va">weight</span><span class="op">)</span></span>

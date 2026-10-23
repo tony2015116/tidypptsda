@@ -4,9 +4,9 @@
 <url><loc>https://tony2015116.github.io/tidypptsda/LICENSE.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/articles/get-started.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/articles/index.html</loc></url>
+<url><loc>https://tony2015116.github.io/tidypptsda/articles/methods-zh.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/articles/output-zh.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/articles/qc-parameters-zh.html</loc></url>
-<url><loc>https://tony2015116.github.io/tidypptsda/articles/qc-presets-zh.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/articles/tidypptsda-zh.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/articles/validation-zh.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/authors.html</loc></url>
@@ -24,7 +24,6 @@
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/nedap.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/plot_adfi.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/plot_adg.html</loc></url>
-<url><loc>https://tony2015116.github.io/tidypptsda/reference/plot_cfi.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/prep_visits.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/qc_config.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/read_station.html</loc></url>
@@ -33,6 +32,7 @@
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/validate_adfi.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/validate_adg.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/validate_outliers.html</loc></url>
+<url><loc>https://tony2015116.github.io/tidypptsda/reference/validate_weight_fill.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/write_results.html</loc></url>
 </urlset>
 

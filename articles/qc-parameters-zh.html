@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.9.1</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.0.0</span>
       </span>
     </div>
 
@@ -67,10 +67,10 @@
       <a href="../articles/qc-parameters-zh.html">质控参数详解：qc_config()</a>
     </li>
     <li>
-      <a href="../articles/qc-presets-zh.html">质控预设说明：casey、national、legacy</a>
+      <a href="../articles/methods-zh.html">计算方法说明：从原始记录到料肉比</a>
     </li>
     <li>
-      <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线与采食插补</a>
+      <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线、体重填充与采食插补</a>
     </li>
     <li>
       <a href="../articles/output-zh.html">输出结果说明</a>
@@ -117,33 +117,32 @@
 <p>tidypptsda 把整个分析流程中的全部阈值都集中在
 <code><a href="../reference/qc_config.html">qc_config()</a></code> 返回的一个对象里。各分析函数通过
 <code>qc</code> 参数接收这个对象，结果中的 <code>$settings</code>
-也会原样保存这份设置，方便复现。本文逐一说明 54
-个参数；三套预设的区别见《质控预设说明》。</p>
+也会原样保存这份设置，方便复现。本文逐一说明全部 42
+个参数；每一步用的是什么方法、方法出自哪里，见《计算方法说明》。</p>
 <div class="section level2">
 <h2 id="基本用法">1. 基本用法<a class="anchor" aria-label="anchor" href="#%E5%9F%BA%E6%9C%AC%E7%94%A8%E6%B3%95"></a>
 </h2>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">qc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="op">)</span>                                   <span class="co"># 默认预设 casey</span></span>
-<span><span class="va">qc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"national"</span><span class="op">)</span>                         <span class="co"># 换一套预设</span></span>
-<span><span class="va">qc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"casey"</span>, stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>, <span class="fl">115</span><span class="op">)</span><span class="op">)</span>  <span class="co"># 在预设基础上覆盖个别参数</span></span>
+<code class="sourceCode R"><span><span class="va">qc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="op">)</span>                                 <span class="co"># 默认设置</span></span>
+<span><span class="va">qc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>, <span class="fl">115</span><span class="op">)</span><span class="op">)</span>         <span class="co"># 覆盖个别参数</span></span>
 <span><span class="va">qc</span><span class="op">$</span><span class="va">stage_range</span></span>
 <span><span class="co">#&gt; [1]  30 115</span></span></code></pre></div>
 <ul>
-<li>第一个参数 <code>profile</code> 指定预设，其余参数必须带名字，例如
-<code>duration_max = 1800</code>。</li>
-<li>被覆盖的参数会替换预设中的值，未提到的参数保持预设值不变。</li>
+<li>参数必须带名字，例如
+<code>duration_max = 1800</code>。没有提到的参数保持默认值。</li>
 <li>可选规则的默认值为
-<code>NULL</code>，表示关闭。给它赋一个数值就打开；如果预设里已经打开，传
-<code>NULL</code> 可以关掉。</li>
+<code>NULL</code>，表示关闭；给它赋一个值就打开。默认打开的可选规则（如
+<code>smooth_r2_min</code>），传 <code>NULL</code> 可以关掉。</li>
+<li>1.0.0
+版起不再有预设（casey、national、legacy），<code>qc_config("national")</code>
+会报错并提示改法。</li>
 </ul>
 <p>查看全部参数：</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"casey"</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; ── <span style="font-weight: bold;">QC settings: profile </span><span style="color: #0000BB; font-weight: bold;">"casey"</span> ──</span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">QC settings</span> ──</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; <span style="font-weight: bold;">Method</span></span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">method</span>: standard</span></span>
 <span><span class="co">#&gt; <span style="font-weight: bold;">Station transfer</span></span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">max_gap_days</span>: 3</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">max_overlap_days</span>: 1</span></span>
@@ -151,33 +150,24 @@
 <span><span class="co">#&gt; <span style="font-weight: bold;">Body weight records</span></span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">weight_range</span>: 15, 150</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">adapt_days</span>: 7</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">weight_outlier</span>: rlm</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">outlier_combine</span>: any</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">rlm_cutoff</span>: 0.5</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">day_weight_min</span>: NULL (off)</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">daily_weight</span>: median</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">sd_max</span>: 3</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">loess_span</span>: 0.75</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">rel_dev_max</span>: NULL (off)</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">daily_drop_min</span>: NULL (off)</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">weight_track</span>: TRUE</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">track_tol</span>: 0.08</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">weight_outlier</span>: rlm , loess</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">outlier_combine</span>: any</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">rlm_cutoff</span>: 0.5</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">sd_max</span>: 3</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">loess_span</span>: 0.75</span></span>
 <span><span class="co">#&gt; <span style="font-weight: bold;">Pig-level checks</span></span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">track_flag_share</span>: 0.4</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">min_test_days</span>: 35</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">min_records</span>: 20</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">min_test_days</span>: 35</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">max_missing_rate</span>: 0.3</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">entry_weight_max</span>: 65</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">exit_weight_min</span>: 85</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">curve_r2_min</span>: NULL (off)</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">daily_r2_min</span>: NULL (off)</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">max_feed_missing</span>: NULL (off)</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">max_daily_jump_kg</span>: NULL (off)</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">track_flag_share</span>: 0.4</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">smooth_r2_min</span>: 0.99</span></span>
 <span><span class="co">#&gt; <span style="font-weight: bold;">Growth and ADG</span></span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">stage_range</span>: 30, 120</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">curve_model</span>: poly2</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">adg_method</span>: lm</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">curve_margin_kg</span>: NULL (off)</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">max_extrap_days</span>: 30</span></span>
 <span><span class="co">#&gt; <span style="font-weight: bold;">Feeder errors</span></span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">fiv_range</span>: -20, 2000</span></span>
@@ -194,15 +184,13 @@
 <span><span class="co">#&gt;   <span style="color: #00BB00;">dfi_range</span>: 0, 6</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">dfi_quantile</span>: NULL (off)</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">dfi_correct</span>: lmm</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">impute_method</span>: linear</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">long_gap_days</span>: 7</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">impute_method</span>: loess_lm</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">long_gap_days</span>: 3</span></span>
 <span><span class="co">#&gt; <span style="font-weight: bold;">Confidence flags</span></span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">max_edge_extrap_days</span>: 15</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">min_coverage</span>: 0.7</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">bin_width</span>: 10</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">min_bin_coverage_kg</span>: 6</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">bin_min_gain_kg</span>: 6</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">cfi_r2_min</span>: 0.95</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">bin_fcr_limits</span>: NULL (off)</span></span></code></pre></div>
 <div class="section level3">
 <h3 id="参数检查">参数检查<a class="anchor" aria-label="anchor" href="#%E5%8F%82%E6%95%B0%E6%A3%80%E6%9F%A5"></a>
@@ -247,17 +235,11 @@
 <thead><tr class="header">
 <th>分组</th>
 <th>参数</th>
-<th>默认值（casey）</th>
+<th>默认值</th>
 <th>作用于</th>
 </tr></thead>
 <tbody>
 <tr class="odd">
-<td>方法</td>
-<td><code>method</code></td>
-<td>standard</td>
-<td>全流程（<code><a href="../reference/calc_fcr.html">calc_fcr()</a></code> 的算法）</td>
-</tr>
-<tr class="even">
 <td>跨站</td>
 <td>
 <code>max_gap_days</code>、<code>max_overlap_days</code>、<code>max_jump_kg</code>
@@ -265,31 +247,31 @@
 <td>3、1、10</td>
 <td><code><a href="../reference/prep_visits.html">prep_visits()</a></code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>体重记录</td>
 <td>
-<code>weight_range</code>、<code>adapt_days</code>、<code>weight_outlier</code>、<code>outlier_combine</code>、<code>rlm_cutoff</code>、<code>day_weight_min</code>、<code>daily_weight</code>、<code>sd_max</code>、<code>loess_span</code>、<code>rel_dev_max</code>、<code>daily_drop_min</code>、<code>weight_track</code>、<code>track_tol</code>
+<code>weight_range</code>、<code>adapt_days</code>、<code>weight_track</code>、<code>track_tol</code>、<code>weight_outlier</code>、<code>outlier_combine</code>、<code>rlm_cutoff</code>、<code>sd_max</code>、<code>loess_span</code>
 </td>
-<td>15–150、7、rlm、any、0.5、NULL、median、3、0.75、NULL、NULL、TRUE、0.08</td>
-<td><code><a href="../reference/clean_weight.html">clean_weight()</a></code></td>
-</tr>
-<tr class="even">
-<td>个体判定</td>
-<td>
-<code>min_test_days</code>、<code>min_records</code>、<code>max_missing_rate</code>、<code>entry_weight_max</code>、<code>exit_weight_min</code>、<code>curve_r2_min</code>、<code>max_daily_jump_kg</code>、<code>track_flag_share</code>、<code>daily_r2_min</code>、<code>max_feed_missing</code>
-</td>
-<td>35、20、0.30、65、85、NULL、NULL、0.4、NULL、NULL</td>
+<td>15–150、7、TRUE、0.08、rlm + loess、any、0.5、3、0.75</td>
 <td><code><a href="../reference/clean_weight.html">clean_weight()</a></code></td>
 </tr>
 <tr class="odd">
-<td>生长曲线</td>
+<td>个体判定</td>
 <td>
-<code>stage_range</code>、<code>curve_model</code>、<code>adg_method</code>、<code>curve_margin_kg</code>、<code>max_extrap_days</code>
+<code>min_records</code>、<code>min_test_days</code>、<code>max_missing_rate</code>、<code>entry_weight_max</code>、<code>exit_weight_min</code>、<code>track_flag_share</code>、<code>smooth_r2_min</code>
 </td>
-<td>30–120、poly2、lm、NULL、30</td>
-<td><code><a href="../reference/calc_adg.html">calc_adg()</a></code></td>
+<td>20、35、0.30、65、85、0.4、0.99</td>
+<td><code><a href="../reference/clean_weight.html">clean_weight()</a></code></td>
 </tr>
 <tr class="even">
+<td>生长曲线与体重填充</td>
+<td>
+<code>stage_range</code>、<code>curve_model</code>、<code>max_extrap_days</code>
+</td>
+<td>30–120、poly2、30</td>
+<td><code><a href="../reference/calc_adg.html">calc_adg()</a></code></td>
+</tr>
+<tr class="odd">
 <td>采食错误</td>
 <td>
 <code>fiv_range</code>、<code>fiv0_abs_max</code>、<code>duration_max</code>、<code>speed_fiv_lo_max</code>、<code>speed_strict_max</code>、<code>speed_range</code>、<code>idle_duration_max</code>、<code>trough_diff_range</code>、<code>max_unidentified_feed_kg</code>、<code>fiv_max_by_weight</code>
@@ -297,29 +279,28 @@
 <td>−20–2000、20、3600、500、110、2–170、500、−20–1800、90、NULL</td>
 <td><code><a href="../reference/flag_feed_errors.html">flag_feed_errors()</a></code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>日采食</td>
 <td>
 <code>dfi_range</code>、<code>dfi_quantile</code>、<code>dfi_correct</code>、<code>impute_method</code>、<code>long_gap_days</code>
 </td>
-<td>0–6、NULL、lmm、linear、7</td>
+<td>0–6、NULL、lmm、loess_lm、3</td>
 <td><code><a href="../reference/calc_adfi.html">calc_adfi()</a></code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>可信度</td>
 <td>
-<code>max_edge_extrap_days</code>、<code>min_coverage</code>、<code>bin_width</code>、<code>min_bin_coverage_kg</code>、<code>bin_fcr_limits</code>、<code>bin_min_gain_kg</code>、<code>cfi_r2_min</code>
+<code>max_edge_extrap_days</code>、<code>min_coverage</code>、<code>bin_width</code>、<code>min_bin_coverage_kg</code>、<code>bin_fcr_limits</code>
 </td>
-<td>15、0.7、10、6、NULL、6、0.95</td>
+<td>15、0.7、10、6、NULL</td>
 <td><code><a href="../reference/calc_fcr.html">calc_fcr()</a></code></td>
 </tr>
 </tbody>
 </table>
 <p><code>stage_range</code> 只是默认的分析区间，可以改成任意体重段，例如
-<code>qc_config(stage_range = c(40, 110))</code>。所有用到区间的地方都会跟着变：ADG
-的起止点和直线回归的时间段、ADFI 计入哪些天、适应期的采食是否计入、10 kg
-分段（从区间下限开始划分）、national 方法的累计采食起止点和 FCR
-分母（区间宽度），以及图中的虚线。</p>
+<code>qc_config(stage_range = c(40, 110))</code>。所有用到区间的地方都会跟着变：区间的起止时间、要填充的日子、ADG
+的回归、ADFI 计入哪些天、适应期的采食是否计入、10 kg
+分段（从区间下限开始划分），以及图中的虚线。</p>
 <p>单位约定：体重用 kg，单次访问的采食量和料槽重用
 g，日采食量（<code>dfi_range</code>）用 kg，时间用秒（s）或天（d）。</p>
 </div>
@@ -383,7 +364,8 @@ g，日采食量（<code>dfi_range</code>）用 kg，时间用秒（s）或天�
 <h2 id="体重记录参数">4. 体重记录参数<a class="anchor" aria-label="anchor" href="#%E4%BD%93%E9%87%8D%E8%AE%B0%E5%BD%95%E5%8F%82%E6%95%B0"></a>
 </h2>
 <p>这组参数作用于 <code><a href="../reference/clean_weight.html">clean_weight()</a></code>
-的前两层：单条记录规则和逐头猪的异常值检测。</p>
+的前两层：单条记录规则和逐头猪的异常值检测。处理顺序是：体重范围 →
+适应期 → 逐日回溯追踪 → <code>weight_outlier</code> 中的方法。</p>
 <table class="table">
 <colgroup>
 <col width="20%">
@@ -401,6 +383,14 @@ g，日采食量（<code>dfi_range</code>）用 kg，时间用秒（s）或天�
 </tr></thead>
 <tbody>
 <tr class="odd">
+<td><code>weight_range</code></td>
+<td>单条体重的有效范围，超出的记录标记为 <code>weight_range</code>
+</td>
+<td>kg</td>
+<td>15–150</td>
+<td>两个递增的非负数</td>
+</tr>
+<tr class="even">
 <td><code>adapt_days</code></td>
 <td>进站适应期：每头猪首次访问后这么多天内的体重不参与分析（<code>qc_flag = "adaptation"</code>）。这几天的采食照常统计：若落在
 <code>stage_range</code> 内（如 45 kg 进站、区间 30–120 kg），计入 ADFI
@@ -409,20 +399,27 @@ g，日采食量（<code>dfi_range</code>）用 kg，时间用秒（s）或天�
 <td>7</td>
 <td>≥ 0</td>
 </tr>
+<tr class="odd">
+<td><code>weight_track</code></td>
+<td>从测定末期逐日往回追踪体重，剔除与之不衔接的读数，见下文”逐日回溯追踪”</td>
+<td>—</td>
+<td>TRUE</td>
+<td>TRUE / FALSE</td>
+</tr>
 <tr class="even">
-<td><code>weight_range</code></td>
-<td>单条体重的有效范围，超出的记录标记为 <code>weight_range</code>
-</td>
-<td>kg</td>
-<td>15–150</td>
-<td>两个递增的非负数</td>
+<td><code>track_tol</code></td>
+<td>追踪时读数与当天预测体重之差的容许比例（至少 2
+kg；某天没有读数可保留时，每天再放宽 0.5 kg）</td>
+<td>—</td>
+<td>0.08</td>
+<td>0–1</td>
 </tr>
 <tr class="odd">
 <td><code>weight_outlier</code></td>
-<td>异常值检测方法，可多选：<code>"rlm"</code>、<code>"loess"</code>、<code>"stl"</code>、<code>"sd"</code>
+<td>追踪之后，对剩下的记录再用哪些方法检测异常值，可多选：<code>"rlm"</code>、<code>"loess"</code>、<code>"stl"</code>、<code>"sd"</code>
 </td>
 <td>—</td>
-<td><code>"rlm"</code></td>
+<td><code>c("rlm", "loess")</code></td>
 <td>见下文</td>
 </tr>
 <tr class="even">
@@ -436,31 +433,10 @@ g，日采食量（<code>dfi_range</code>）用 kg，时间用秒（s）或天�
 </tr>
 <tr class="odd">
 <td><code>rlm_cutoff</code></td>
-<td>rlm
-法：稳健回归权重低于此值的记录判为异常（<code>method = "national"</code>
-时为”不高于”）</td>
+<td>rlm 法：稳健回归权重低于此值的记录判为异常</td>
 <td>—</td>
 <td>0.5</td>
 <td>0–1</td>
-</tr>
-<tr class="even">
-<td><code>day_weight_min</code></td>
-<td>可选：某天<strong>每一条</strong>记录的 rlm
-权重都低于此值时，整天的体重判为异常（<code>qc_flag = "day_weight"</code>），需要
-<code>weight_outlier</code> 中有 rlm</td>
-<td>—</td>
-<td>NULL（national 为 0.90）</td>
-<td>0–1 或 NULL</td>
-</tr>
-<tr class="odd">
-<td><code>daily_weight</code></td>
-<td>日体重代表值：<code>"median"</code>
-为当天有效体重的中位数；<code>"weighted_mean"</code> 为按 rlm
-权重的加权平均</td>
-<td>—</td>
-<td>
-<code>"median"</code>（national 为加权平均）</td>
-<td>median / weighted_mean</td>
 </tr>
 <tr class="even">
 <td><code>sd_max</code></td>
@@ -472,41 +448,11 @@ g，日采食量（<code>dfi_range</code>）用 kg，时间用秒（s）或天�
 </tr>
 <tr class="odd">
 <td><code>loess_span</code></td>
-<td>LOESS 的平滑窗口占数据的比例，越大越平滑</td>
+<td>LOESS 的平滑窗口占数据的比例，越大越平滑。也用于个体判定中的 LOESS
+平滑曲线和采食插补</td>
 <td>—</td>
 <td>0.75</td>
 <td>0.1–1</td>
-</tr>
-<tr class="even">
-<td><code>rel_dev_max</code></td>
-<td>可选规则：实测体重与拟合曲线的相对偏差超过此值即判为异常，例如 0.25
-表示偏离 25%</td>
-<td>—</td>
-<td>NULL（关闭）</td>
-<td>0–1</td>
-</tr>
-<tr class="odd">
-<td><code>daily_drop_min</code></td>
-<td>可选规则：当天体重中位数与前一天之比低于此值时，当天全部记录判为异常，例如
-0.90</td>
-<td>—</td>
-<td>NULL（关闭）</td>
-<td>0–1</td>
-</tr>
-<tr class="even">
-<td><code>weight_track</code></td>
-<td>从测定末期逐日往回追踪体重，剔除与之不衔接的读数，见下文”逐日回溯追踪”</td>
-<td>—</td>
-<td>TRUE</td>
-<td>TRUE / FALSE</td>
-</tr>
-<tr class="odd">
-<td><code>track_tol</code></td>
-<td>追踪时读数与当天预测体重之差的容许比例（至少 2
-kg；某天没有读数可保留时，每天再放宽 0.5 kg）</td>
-<td>—</td>
-<td>0.08</td>
-<td>0–1</td>
 </tr>
 </tbody>
 </table>
@@ -530,10 +476,11 @@ kg）的读数，其余剔除（<code>qc_flag = "track"</code>）；</li>
 <li>
 <strong>某天没有读数可保留时</strong>，按预测值继续往前推，容差每天放宽
 0.5 kg，不会跳到另一群读数上；</li>
-<li>被保留的读数<strong>不再由 rlm
-等方法复核</strong>：平滑的曲线贴不住进站后几周的缓慢生长，复核反而会把真实的体重删掉。<code>weight_outlier</code>
-中的方法只用于没有追踪的猪（有记录的日子少于 7 天、或测定期短于 14
-天），以及设置 <code>weight_track = FALSE</code> 时；</li>
+<li>追踪保留下来的读数，再交给 <code>weight_outlier</code>
+中的方法（默认 rlm 和
+loess）复核，去掉追踪容差以内、但仍明显偏离曲线的零散读数。没有追踪的猪（有记录的日子少于
+7 天、或测定期短于 14 天），以及设置 <code>weight_track = FALSE</code>
+时，只用这些方法；</li>
 <li>
 <strong>个体判定</strong>：追踪剔除的记录超过
 <code>track_flag_share</code>（默认 40%）的猪，降级为
@@ -542,8 +489,9 @@ kg）的读数，其余剔除（<code>qc_flag = "track"</code>）；</li>
 的平行体重带，这时秤上只容得下一头猪，只能是称重本身出了问题。</li>
 </ol>
 <p>每头猪被追踪剔除的记录比例记录在 <code>per_pig$track_removed</code>
-中。在示例数据上，去掉 7 天适应期之后，NEDAP 还有 4.9%
-的记录被追踪剔除（每头猪中位数 3.6%），FIRE 为 0.4%。</p>
+中。在示例数据上，去掉 7 天适应期之后，NEDAP 有 5% 的记录被追踪剔除，rlm
+和 loess 又标出约 2%；FIRE 分别为 0.3% 和 2%。追踪之后再复核，对 ADG
+的影响很小：与只追踪相比，平均差 1–2 g/d。</p>
 </div>
 <div class="section level3">
 <h3 id="四种检测方法">四种检测方法<a class="anchor" aria-label="anchor" href="#%E5%9B%9B%E7%A7%8D%E6%A3%80%E6%B5%8B%E6%96%B9%E6%B3%95"></a>
@@ -561,17 +509,20 @@ kg）的读数，其余剔除（<code>qc_flag = "track"</code>）；</li>
 </tr></thead>
 <tbody>
 <tr class="odd">
-<td><code>rlm</code></td>
+<td>
+<code>rlm</code>（默认）</td>
 <td>每头猪拟合二次稳健回归（<code><a href="https://rdrr.io/pkg/MASS/man/rlm.html" class="external-link">MASS::rlm</a></code>，bisquare
 权重），权重小于 <code>rlm_cutoff</code> 的记录为异常。方法来自 Jiao
 等（2014）</td>
-<td>通用的默认方法；对成段的离群值很稳健</td>
+<td>通用的方法；对成段的离群值很稳健</td>
 </tr>
 <tr class="even">
-<td><code>loess</code></td>
-<td>每头猪拟合稳健 LOESS（<code>family = "symmetric"</code>），残差超过
-<code>sd_max</code> 倍 MAD 为异常</td>
-<td>生长曲线不规则时（如中途停滞、生病）</td>
+<td>
+<code>loess</code>（默认）</td>
+<td>每头猪拟合稳健 LOESS
+平滑曲线（<code>family = "symmetric"</code>），偏离曲线超过
+<code>sd_max</code> 倍 MAD 的记录为异常</td>
+<td>能贴住不规则的生长（如中途停滞、生病），弥补二次曲线的不足</td>
 </tr>
 <tr class="odd">
 <td><code>stl</code></td>
@@ -602,9 +553,9 @@ kg）的读数，其余剔除（<code>qc_flag = "track"</code>）；</li>
 <span><span class="op">}</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    rlm_cutoff outlier_pct pigs_removed</span></span>
 <span><span class="co">#&gt;         &lt;num&gt;       &lt;num&gt;        &lt;int&gt;</span></span>
-<span><span class="co">#&gt; 1:        0.3       15.72            1</span></span>
-<span><span class="co">#&gt; 2:        0.5       15.72            1</span></span>
-<span><span class="co">#&gt; 3:        0.7       15.72            1</span></span></code></pre></div>
+<span><span class="co">#&gt; 1:        0.3       17.22            1</span></span>
+<span><span class="co">#&gt; 2:        0.5       18.01            1</span></span>
+<span><span class="co">#&gt; 3:        0.7       21.66            1</span></span></code></pre></div>
 <p><code>rlm_cutoff</code>
 越大，判定越严格，被标为异常的记录越多。默认值 0.5 来自 Jiao
 等（2014）。如果检查 <code>w$records</code>
@@ -614,9 +565,8 @@ kg）的读数，其余剔除（<code>qc_flag = "track"</code>）；</li>
 <li>测定站的称量下限较高，或者小猪数据不可靠时，把
 <code>weight_range</code> 的下限调高，例如
 <code>c(20, 150)</code>。</li>
-<li>
-<code>rel_dev_max</code> 和 <code>daily_drop_min</code>
-的含义直观，但目前没有文献依据，建议先在一个批次上试用，看看被剔除的记录（<code>w$records[grepl("rel_dev|daily_drop", qc_flag)]</code>）是否合理，再决定是否长期使用。</li>
+<li>各方法的检出率和误删率可以用 <code><a href="../reference/validate_outliers.html">validate_outliers()</a></code>
+在自己的数据上比较，见《方法验证》。</li>
 </ul>
 </div>
 </div>
@@ -624,7 +574,7 @@ kg）的读数，其余剔除（<code>qc_flag = "track"</code>）；</li>
 <h2 id="个体判定参数">5. 个体判定参数<a class="anchor" aria-label="anchor" href="#%E4%B8%AA%E4%BD%93%E5%88%A4%E5%AE%9A%E5%8F%82%E6%95%B0"></a>
 </h2>
 <p>体重异常值剔除之后，<code><a href="../reference/clean_weight.html">clean_weight()</a></code>
-逐头猪判断能否用于生长分析。下表中前三个参数不满足时<strong>剔除</strong>该猪，后五个不满足时只<strong>降级</strong>为
+逐头猪判断能否用于生长分析。下表中前三个参数不满足时<strong>剔除</strong>该猪，后四个不满足时只<strong>降级</strong>为
 <code>low_confidence</code>，该猪仍参与后续计算。</p>
 <table class="table">
 <colgroup>
@@ -665,50 +615,17 @@ kg）的读数，其余剔除（<code>qc_flag = "track"</code>）；</li>
 </tr>
 <tr class="even">
 <td><code>entry_weight_max</code></td>
-<td>进站体重上限，取清洗后曲线在首条记录处的拟合值</td>
+<td>进站体重上限，取有效体重的 LOESS 平滑曲线在首条记录处的值</td>
 <td>kg</td>
 <td>65</td>
 <td>降级</td>
 </tr>
 <tr class="odd">
 <td><code>exit_weight_min</code></td>
-<td>出栏体重下限，取清洗后曲线在末条记录处的拟合值</td>
+<td>出栏体重下限，取 LOESS 平滑曲线在末条记录处的值</td>
 <td>kg</td>
 <td>85</td>
 <td>降级</td>
-</tr>
-<tr class="even">
-<td><code>curve_r2_min</code></td>
-<td>可选规则：清洗后生长曲线的最小 R²（用 loess 方法时为 LOESS
-曲线，否则为二次曲线）</td>
-<td>—</td>
-<td>NULL（关闭）</td>
-<td>降级</td>
-</tr>
-<tr class="odd">
-<td><code>max_daily_jump_kg</code></td>
-<td>可选规则：相邻两个有记录的日子之间，日体重中位数的变化超过此值（按天折算），例如
-4</td>
-<td>kg/天</td>
-<td>NULL（关闭）</td>
-<td>降级</td>
-</tr>
-<tr class="even">
-<td><code>daily_r2_min</code></td>
-<td>可选：日体重对日期做二次曲线拟合，R²
-低于此值时<strong>剔除</strong>
-</td>
-<td>—</td>
-<td>NULL（national 为 0.995）</td>
-<td>剔除</td>
-</tr>
-<tr class="odd">
-<td><code>max_feed_missing</code></td>
-<td>可选：测定期内没有任何采食记录的天数占比超过此值时<strong>剔除</strong>
-</td>
-<td>—</td>
-<td>NULL（national 为 0.10）</td>
-<td>剔除</td>
 </tr>
 <tr class="even">
 <td><code>track_flag_share</code></td>
@@ -717,32 +634,45 @@ kg）的读数，其余剔除（<code>qc_flag = "track"</code>）；</li>
 <td>0.4</td>
 <td>降级</td>
 </tr>
+<tr class="odd">
+<td><code>smooth_r2_min</code></td>
+<td>有效体重对其 LOESS 平滑曲线的 R² 低于此值时降级；<code>NULL</code>
+关闭</td>
+<td>—</td>
+<td>0.99</td>
+<td>降级</td>
+</tr>
 </tbody>
 </table>
 <p>进站和出栏体重不达标的猪只降级、不剔除，因为它们的 ADG 还可以在
-<code><a href="../reference/calc_adg.html">calc_adg()</a></code> 中外推得到，并会带上相应的标记。</p>
+<code><a href="../reference/calc_adg.html">calc_adg()</a></code>
+中靠生长曲线填充两端得到，并会带上相应的标记。</p>
+<div class="section level3">
+<h3 id="loess-平滑曲线的-r²smooth_r2_min">LOESS 平滑曲线的 R²：<code>smooth_r2_min</code><a class="anchor" aria-label="anchor" href="#loess-%E5%B9%B3%E6%BB%91%E6%9B%B2%E7%BA%BF%E7%9A%84-r%C2%B2smooth_r2_min"></a>
+</h3>
+<p>LOESS 能贴住生长曲线的起伏，所以有效体重对它的 R²
+反映的是<strong>读数本身的噪声</strong>，而不是生长是否”标准”。在示例数据和用户提供的
+NEDAP 数据中，保留的猪 R² 都在 0.993 以上（中位数约 0.998），只有测定期
+9 天的那头 FIRE 猪为 0.96。默认的 0.99 只会标出读数明显杂乱的猪。注意 R²
+受体重跨度影响：测定期越短、跨度越小，R² 天然越低。</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">w_n</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/clean_weight.html">clean_weight</a></span><span class="op">(</span><span class="fu"><a href="../reference/prep_visits.html">prep_visits</a></span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">w_n</span><span class="op">$</span><span class="va">per_pig</span><span class="op">$</span><span class="va">r2</span><span class="op">)</span></span>
+<span><span class="co">#&gt;    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.     NAs </span></span>
+<span><span class="co">#&gt;  0.9946  0.9977  0.9983  0.9980  0.9986  0.9990       1</span></span></code></pre></div>
 <p><strong>调整建议</strong></p>
 <ul>
 <li>
 <code>min_test_days</code> 应短于计划测定期：计划测 60
 天的批次，设为 40–45 天比较合适。</li>
-<li>
-<code>curve_r2_min</code> 常用 0.99。在示例数据中，清洗前约有 1/4
-的猪达不到这个值，所以只用来提示，不用来剔除。</li>
-<li>每头猪的最大日体重变化都记录在 <code>per_pig$max_daily_jump</code>
-列中，即使 <code>max_daily_jump_kg</code>
-是关闭的。体重突变通常意味着串号（两头猪共用一个耳标）或秤上同时站了两头猪。在示例数据中，日中位体重的噪声较大：阈值取
-4 kg 时，NEDAP 有 12/29 头猪会被标记，所以这条规则默认关闭。建议先看
-<code>max_daily_jump</code> 的分布，再决定阈值：</li>
+<li>如果某批次有很多猪因 <code>smooth_r2_min</code> 被降级，先用
+<code>plot_adg(adg, weight = w)</code>
+看图：是秤的问题还是阈值太严。</li>
 </ul>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">w_n</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/clean_weight.html">clean_weight</a></span><span class="op">(</span><span class="fu"><a href="../reference/prep_visits.html">prep_visits</a></span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">w_n</span><span class="op">$</span><span class="va">per_pig</span><span class="op">$</span><span class="va">max_daily_jump</span><span class="op">)</span></span>
-<span><span class="co">#&gt;    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.     NAs </span></span>
-<span><span class="co">#&gt;   2.500   3.500   3.750   4.233   5.000   7.000       1</span></span></code></pre></div>
+</div>
 </div>
 <div class="section level2">
-<h2 id="生长曲线参数">6. 生长曲线参数<a class="anchor" aria-label="anchor" href="#%E7%94%9F%E9%95%BF%E6%9B%B2%E7%BA%BF%E5%8F%82%E6%95%B0"></a>
+<h2 id="生长曲线与体重填充参数">6. 生长曲线与体重填充参数<a class="anchor" aria-label="anchor" href="#%E7%94%9F%E9%95%BF%E6%9B%B2%E7%BA%BF%E4%B8%8E%E4%BD%93%E9%87%8D%E5%A1%AB%E5%85%85%E5%8F%82%E6%95%B0"></a>
 </h2>
 <p>作用于 <code><a href="../reference/calc_adg.html">calc_adg()</a></code>。</p>
 <table class="table">
@@ -770,29 +700,10 @@ kg）的读数，其余剔除（<code>qc_flag = "track"</code>）；</li>
 </tr>
 <tr class="even">
 <td><code>curve_model</code></td>
-<td>生长曲线：<code>"poly1"</code>、<code>"poly2"</code>、<code>"poly3"</code>（1–3
-次多项式）、<code>"loess"</code>、<code>"gompertz"</code>
-</td>
+<td>生长曲线：<code>"poly2"</code>（二次）、<code>"poly1"</code>（直线）、<code>"poly3"</code>（三次）、<code>"gompertz"</code>。用来确定区间的起止时间，并填充首条记录之前、末条记录之后的体重</td>
 <td>—</td>
 <td><code>"poly2"</code></td>
 <td>见左</td>
-</tr>
-<tr class="odd">
-<td><code>adg_method</code></td>
-<td>日增重的算法：<code>"lm"</code>
-为区间起止时间之间全部有效体重的直线回归斜率（<code>lm_slope</code>，可靠性看
-<code>r_squared</code>）；<code>"curve"</code> 为区间体重差 ÷
-生长曲线所需天数（<code>adg_curve</code>）。两种结果都会输出</td>
-<td>—</td>
-<td><code>"lm"</code></td>
-<td>lm / curve</td>
-</tr>
-<tr class="even">
-<td><code>curve_margin_kg</code></td>
-<td>可选：只用区间附近的记录拟合生长曲线，见下文</td>
-<td>kg</td>
-<td>NULL（用全部记录）</td>
-<td>≥ 0</td>
 </tr>
 <tr class="odd">
 <td><code>max_extrap_days</code></td>
@@ -803,72 +714,46 @@ kg）的读数，其余剔除（<code>qc_flag = "track"</code>）；</li>
 </tr>
 </tbody>
 </table>
-<p>区间的起止时间由生长曲线确定：</p>
-<ul>
+<p>计算分三步：</p>
+<ol style="list-style-type: decimal">
 <li>
-<strong>终点</strong>：曲线第一次到达 <code>stage_range</code>
-上限的时间；</li>
+<strong>区间的起止时间</strong>由生长曲线确定。终点：曲线第一次到达
+<code>stage_range</code>
+上限的时间；起点：在终点之前，曲线<strong>最后一次</strong>从下方越过下限的时间（前期数据波动使曲线先越过
+30
+kg、又掉回去时，起点取之后真正进入区间的那一次）。搜索范围是首条记录前、末条记录后各
+<code>max_extrap_days</code> 天。</li>
 <li>
-<strong>起点</strong>：在终点之前，曲线<strong>最后一次</strong>从下方越过下限的时间。如果前期数据波动使曲线先越过
-30 kg、又掉回 30 kg 以下，起点取之后真正进入区间的那一次；</li>
-<li>搜索范围是首条记录前、末条记录后各 <code>max_extrap_days</code>
-天。</li>
-</ul>
-<p>日增重有两种算法，由 <code>adg_method</code>
-选择，结果中两者都有：</p>
-<ul>
+<strong>把区间内每一天的体重补齐</strong>：有有效体重的日子用当天中位数（<code>source = "observed"</code>）；两个有记录的日子之间缺失的日子，用前后两天<strong>线性插值</strong>（<code>"interpolated"</code>）；首条记录之前、末条记录之后的日子，用<strong>生长曲线</strong>的值（<code>"curve"</code>）。结果在
+<code>adg$daily$weight_filled</code>。</li>
 <li>
-<strong><code>"lm"</code>（默认）</strong>：取起止时间之间的<strong>全部</strong>有效体重记录做直线回归，斜率即日增重（<code>lm_slope</code>），可靠性看
-<code>r_squared</code>。按时间截取，而不是按体重值筛选，所以区间开始后偶尔低于下限的记录也会保留。斜率只反映有记录的那一段：<code>lm_weight_from</code>、<code>lm_weight_to</code>
-是回归线覆盖的体重范围，测定结束时还没到区间上限的猪，斜率只代表到末次体重为止的那段；</li>
-<li>
-<strong><code>"curve"</code></strong>：区间体重差 ÷
-曲线从起点到终点所需的天数（<code>adg_curve</code>），区间两端不在测定期内时靠曲线外推。</li>
-</ul>
-<p><code>r_squared</code> 受体重跨度影响：跨度越大 R²
-天然越高，所以只在同一批次、同一区间内比较才有意义。有记录的部分不足 5
-条或不足 7 天、算不出斜率时，自动改用曲线法，<code>adg_source</code>
-列注明实际用的是哪种。</p>
-<ul>
-<li>
-<code>gompertz</code> 用 <code>nls(SSgompertz)</code>
-拟合。不收敛时自动改用二次曲线，实际使用的曲线记录在
-<code>curve_used</code> 列中。</li>
-<li>
-<code>loess</code>
-曲线超出观测范围的部分，按两端的斜率直线延伸。</li>
-</ul>
-<div class="section level3">
-<h3 id="只用区间附近的记录拟合curve_margin_kg">只用区间附近的记录拟合：<code>curve_margin_kg</code><a class="anchor" aria-label="anchor" href="#%E5%8F%AA%E7%94%A8%E5%8C%BA%E9%97%B4%E9%99%84%E8%BF%91%E7%9A%84%E8%AE%B0%E5%BD%95%E6%8B%9F%E5%90%88curve_margin_kg"></a>
-</h3>
-<p>默认用一头猪的全部有效记录拟合生长曲线。如果进站后有几周长得很慢（进站适应期），二次曲线要同时贴合”前期平、后期陡”两段，会把穿过区间下限的时间点拉早，日增重偏低。</p>
-<p>设置 <code>curve_margin_kg</code>
-后，只用区间附近的记录拟合：从日中位体重<strong>最后一次</strong>低于”下限
-−
-<code>curve_margin_kg</code>“的那天，到<strong>第一次</strong>超过”上限
-+ <code>curve_margin_kg</code>“的那天，按时间截取。剩余记录不足 10
-条或不足 7 天时，自动改用全部记录。实际使用的起止日期记录在
-<code>curve_start</code>、<code>curve_end</code> 列中。</p>
+<strong>日增重</strong> = 区间内全部日体重（实测 +
+填充）对日期做直线回归的斜率（<code>adg</code>，g/d），可靠性看
+<code>r_squared</code>。各来源的天数在
+<code>n_observed_days</code>、<code>n_interpolated_days</code>、<code>n_curve_days</code>
+中。</li>
+</ol>
+<p><code>adg_curve</code> 是生长曲线在区间两端的体重差 ÷
+天数，只用来对照。<code>r_squared</code>
+受体重跨度影响，只在同一批次、同一区间内比较才有意义。<code>gompertz</code>
+用 <code>nls(SSgompertz)</code>
+拟合，不收敛时自动改用二次曲线，实际使用的曲线记录在
+<code>curve_used</code> 列中。</p>
+<p>哪种曲线填充两端更准，可以用 <code><a href="../reference/validate_weight_fill.html">validate_weight_fill()</a></code>
+在自己的数据上比较（见《方法验证》）：</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">w_n</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/clean_weight.html">clean_weight</a></span><span class="op">(</span><span class="fu"><a href="../reference/prep_visits.html">prep_visits</a></span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/pkg/data.table/man/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="cn">NULL</span>, <span class="fl">10</span>, <span class="fl">5</span>, <span class="fl">2</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">m</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="va">a</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calc_adg.html">calc_adg</a></span><span class="op">(</span><span class="va">w_n</span>, qc <span class="op">=</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>curve_margin_kg <span class="op">=</span> <span class="va">m</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span><span class="op">$</span><span class="va">per_pig</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/data.table.html" class="external-link">data.table</a></span><span class="op">(</span>curve_margin_kg <span class="op">=</span> <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">m</span><span class="op">)</span><span class="op">)</span> <span class="st">"NULL（全部）"</span> <span class="kw">else</span> <span class="va">m</span>,</span>
-<span>             mean_adg <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">a</span><span class="op">$</span><span class="va">adg</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>             mean_abs_diff_lm_slope <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">a</span><span class="op">$</span><span class="va">adg</span> <span class="op">-</span> <span class="va">a</span><span class="op">$</span><span class="va">lm_slope</span><span class="op">)</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/pkg/data.table/man/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"poly1"</span>, <span class="st">"poly2"</span>, <span class="st">"poly3"</span>, <span class="st">"gompertz"</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">m</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">a</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calc_adg.html">calc_adg</a></span><span class="op">(</span><span class="va">w_n</span>, qc <span class="op">=</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>curve_model <span class="op">=</span> <span class="va">m</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span><span class="op">$</span><span class="va">per_pig</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/data.table.html" class="external-link">data.table</a></span><span class="op">(</span>curve_model <span class="op">=</span> <span class="va">m</span>, mean_adg <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">a</span><span class="op">$</span><span class="va">adg</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>             curve_days <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">a</span><span class="op">$</span><span class="va">n_curve_days</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">}</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt;    curve_margin_kg mean_adg mean_abs_diff_lm_slope</span></span>
-<span><span class="co">#&gt;             &lt;char&gt;    &lt;num&gt;                  &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:    NULL（全部）     1202                      0</span></span>
-<span><span class="co">#&gt; 2:              10     1202                      0</span></span>
-<span><span class="co">#&gt; 3:               5     1202                      0</span></span>
-<span><span class="co">#&gt; 4:               2     1202                      0</span></span></code></pre></div>
-<p><code>mean_abs_diff_lm_slope</code> 是 ADG 与
-<code>lm_slope</code>（起止时间之间的直线回归斜率）的平均差距。截取后，曲线主要由区间内的数据决定，两种算法更接近。</p>
-<p><strong>调整建议</strong>：进站体重明显低于区间下限、进站后有适应期的批次，建议设为
-5。注意：没有到达区间上限、需要外推终点的猪（<code>adg_type = "extrapolated"</code>），截取后曲线只剩区间内的一段，外推更依赖末段走势，ADG
-可能比不截取时略低，应结合 <code>lm_slope</code> 一起看。</p>
-</div>
+<span><span class="co">#&gt;    curve_model mean_adg curve_days</span></span>
+<span><span class="co">#&gt;         &lt;char&gt;    &lt;num&gt;      &lt;int&gt;</span></span>
+<span><span class="co">#&gt; 1:       poly1     1207         42</span></span>
+<span><span class="co">#&gt; 2:       poly2     1205         35</span></span>
+<span><span class="co">#&gt; 3:       poly3     1199         65</span></span>
+<span><span class="co">#&gt; 4:    gompertz     1200         62</span></span></code></pre></div>
 <div class="section level3">
 <h3 id="示例stage_range-对-fire-数据的影响">示例：<code>stage_range</code> 对 FIRE 数据的影响<a class="anchor" aria-label="anchor" href="#%E7%A4%BA%E4%BE%8Bstage_range-%E5%AF%B9-fire-%E6%95%B0%E6%8D%AE%E7%9A%84%E5%BD%B1%E5%93%8D"></a>
 </h3>
@@ -1012,7 +897,8 @@ kg，而 120 kg 的猪一次吃 2.2 kg 也属正常。<code>fiv_max_by_weight</c
 2000 g；<code>breed</code> 为 NA 的行作为其他品种的默认值。</li>
 </ul>
 <p>每次访问时猪的体重：在 <code><a href="../reference/calc_adfi.html">calc_adfi()</a></code> 中，自动使用
-<code><a href="../reference/calc_adg.html">calc_adg()</a></code> 清洗、拟合后的日体重；单独调用
+<code><a href="../reference/calc_adg.html">calc_adg()</a></code>
+补齐后的日体重（<code>weight_filled</code>）；单独调用
 <code><a href="../reference/flag_feed_errors.html">flag_feed_errors()</a></code> 时，可以用 <code>bw</code>
 参数传入同样的日体重表，否则使用当天原始体重的中位数（测定初期常被异常值抬高，查到的体重段会偏重）。没有体重的日子用前后两天插值。未识别耳标的访问没有体重，仍使用
 <code>fiv_range</code> 的上限。实际使用的上限保存在结果的
@@ -1032,7 +918,7 @@ YY、LL、DD 三个品种和 20–140 kg 的体重段：</p>
 <span>                  fiv_max <span class="op">=</span> <span class="fu"><a href="../reference/fiv_max_example.html">fiv_max_example</a></span><span class="op">(</span><span class="op">)</span><span class="op">[</span><span class="va">breed</span> <span class="op">==</span> <span class="st">"DD"</span>, <span class="va">fiv_max</span><span class="op">]</span><span class="op">)</span>     <span class="co"># 不分品种</span></span>
 <span><span class="va">visits_n</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/prep_visits.html">prep_visits</a></span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="va">adg_n</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calc_adg.html">calc_adg</a></span><span class="op">(</span><span class="fu"><a href="../reference/clean_weight.html">clean_weight</a></span><span class="op">(</span><span class="va">visits_n</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
-<span><span class="va">bw_fit</span> <span class="op">&lt;-</span> <span class="va">adg_n</span><span class="op">$</span><span class="va">daily</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">date</span>, bw <span class="op">=</span> <span class="va">predicted</span><span class="op">)</span><span class="op">]</span>        <span class="co"># 清洗后的日体重</span></span>
+<span><span class="va">bw_fit</span> <span class="op">&lt;-</span> <span class="va">adg_n</span><span class="op">$</span><span class="va">daily</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">date</span>, bw <span class="op">=</span> <span class="va">weight_filled</span><span class="op">)</span><span class="op">]</span>    <span class="co"># 补齐后的日体重</span></span>
 <span><span class="va">fixed</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flag_feed_errors.html">flag_feed_errors</a></span><span class="op">(</span><span class="va">visits_n</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="va">raw_bw</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flag_feed_errors.html">flag_feed_errors</a></span><span class="op">(</span><span class="va">visits_n</span>, <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>fiv_max_by_weight <span class="op">=</span> <span class="va">tab</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="va">fit_bw</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flag_feed_errors.html">flag_feed_errors</a></span><span class="op">(</span><span class="va">visits_n</span>, <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>fiv_max_by_weight <span class="op">=</span> <span class="va">tab</span><span class="op">)</span>, bw <span class="op">=</span> <span class="va">bw_fit</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
@@ -1119,28 +1005,25 @@ YY、LL、DD 三个品种和 20–140 kg 的体重段：</p>
 <tr class="even">
 <td><code>impute_method</code></td>
 <td>
-<code>"linear"</code>：区间内部直线内插、长缺口用
-LOESS、两端用”日采食 ~ 体重”回归外推；<code>"loess"</code>：全部用
-LOESS；<code>"national"</code>：连续缺失不超过
-<code>long_gap_days</code> 天用 LOESS 平滑，超过时用”日采食 ~
-体重”线性回归</td>
+<code>"loess_lm"</code>：两个有记录的日子之间，连续缺失不超过
+<code>long_gap_days</code> 天用 LOESS 平滑插补，超过时用”日采食 ~
+体重”线性回归；区间两端（首个有记录日之前、末个有记录日之后）用同一个回归。<code>"linear"</code>：中间一律线性插值，两端同样用回归</td>
 <td>—</td>
-<td><code>"linear"</code></td>
-<td>linear / loess / national</td>
+<td><code>"loess_lm"</code></td>
+<td>loess_lm / linear</td>
 </tr>
 <tr class="odd">
 <td><code>long_gap_days</code></td>
 <td>
-<code>"linear"</code>：内部连续缺失超过此天数时改用
-LOESS；<code>"national"</code>：区分短缺失和长缺失的天数（national 为
-3）</td>
+<code>"loess_lm"</code>：区分短缺失和长缺失的天数</td>
 <td>天</td>
-<td>7</td>
+<td>3</td>
 <td>≥ 1</td>
 </tr>
 </tbody>
 </table>
-<p>校正模型的形式是
+<p>回归中的体重是 <code><a href="../reference/calc_adg.html">calc_adg()</a></code>
+补齐后的日体重（<code>weight_filled</code>）。校正模型的形式是
 <code>无错误日采食 ~ 站 + 品种 + 当天体重 + ADG + 31 个错误协变量 + (1|猪)</code>（品种只在数据中有
 <code>breed</code> 列、且不止一个品种时加入），校正值 = 无错误日采食 −
 Σ(系数 × 错误协变量)。没有错误的日子不受影响。</p>
@@ -1148,8 +1031,8 @@ LOESS；<code>"national"</code>：区分短缺失和长缺失的天数（nationa
 <ul>
 <li>公猪后期日采食量可能超过 4 kg，<code>dfi_range</code> 的上限不宜低于
 5 kg。</li>
-<li>用模拟数据比较过，几种插补方法在随机缺失时结果几乎相同；<code>impute_method</code>
-保持默认即可（详见项目文档《采食插补方法模拟评估》）。</li>
+<li>两种插补方法在随机缺失时结果几乎相同，差别主要在成段缺失；可以用
+<code><a href="../reference/validate_adfi.html">validate_adfi()</a></code> 在自己的数据上比较。</li>
 </ul>
 </div>
 <div class="section level2">
@@ -1203,24 +1086,8 @@ LOESS；<code>"national"</code>：区分短缺失和长缺失的天数（nationa
 </td>
 </tr>
 <tr class="odd">
-<td><code>bin_min_gain_kg</code></td>
-<td>national 方法：体重段内实际增重低于此值时，删除该段</td>
-<td>kg</td>
-<td>6</td>
-<td>≥ 0</td>
-</tr>
-<tr class="even">
-<td><code>cfi_r2_min</code></td>
-<td>national 方法：累计采食对体重线性回归的 R²
-不高于此值时，剔除该猪</td>
-<td>—</td>
-<td>0.95</td>
-<td>0–1</td>
-</tr>
-<tr class="odd">
 <td><code>bin_fcr_limits</code></td>
-<td>可选：每个体重段料肉比的合理范围，超出时降级（national
-方法中删除该段）</td>
+<td>可选：每个体重段料肉比的合理范围，超出时降级</td>
 <td>—</td>
 <td>NULL（关闭）</td>
 <td>表：<code>weight_from</code>、<code>fcr_min</code>、<code>fcr_max</code>
@@ -1242,7 +1109,7 @@ LOESS；<code>"national"</code>：区分短缺失和长缺失的天数（nationa
 <span><span class="co">#&gt;                   &lt;num&gt;  &lt;int&gt;</span></span>
 <span><span class="co">#&gt; 1:                   10      0</span></span>
 <span><span class="co">#&gt; 2:                   15      2</span></span>
-<span><span class="co">#&gt; 3:                   30     12</span></span></code></pre></div>
+<span><span class="co">#&gt; 3:                   30     13</span></span></code></pre></div>
 <p>缺失模拟显示：区间两端缺 10 天以内时，ADFI 误差约 2–4%；缺 20 天时约
 7%；缺 30 天时为 9–14%。默认的 15
 天是在”保留更多个体”和”保证精度”之间的折中。育种评估要求更高时可设为
@@ -1272,12 +1139,17 @@ kg），说明这一段体重记录不足，例如耳标脱落、不会进站或
 <span><span class="va">b</span> <span class="op">&lt;-</span> <span class="va">res_n</span><span class="op">$</span><span class="va">fcr</span><span class="op">$</span><span class="va">by_bin</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>segments <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">b</span><span class="op">)</span>, low_coverage <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">b</span><span class="op">$</span><span class="va">low_coverage</span><span class="op">)</span>, fcr_outside <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">b</span><span class="op">$</span><span class="va">fcr_out</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;     segments low_coverage  fcr_outside </span></span>
-<span><span class="co">#&gt;          258            5            1</span></span>
+<span><span class="co">#&gt;          257            5            6</span></span>
 <span><span class="va">b</span><span class="op">[</span><span class="va">fcr_out</span> <span class="op">==</span> <span class="cn">TRUE</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">weight_from</span>, <span class="va">weight_to</span>, fcr <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">fcr</span>, <span class="fl">2</span><span class="op">)</span>, <span class="va">fcr_min</span>, <span class="va">fcr_max</span><span class="op">)</span><span class="op">]</span></span>
 <span><span class="co">#&gt; Key: &lt;responder&gt;</span></span>
 <span><span class="co">#&gt;    responder weight_from weight_to   fcr fcr_min fcr_max</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;       &lt;num&gt;     &lt;num&gt; &lt;num&gt;   &lt;num&gt;   &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:     15967          60        70  3.59    1.28    3.41</span></span></code></pre></div>
+<span><span class="co">#&gt; 1:     13954          80        90  4.02    1.36    3.86</span></span>
+<span><span class="co">#&gt; 2:     14969          70        80  3.63    1.35    3.59</span></span>
+<span><span class="co">#&gt; 3:     15034          30        40  3.32    0.76    3.16</span></span>
+<span><span class="co">#&gt; 4:     15604          80        90  4.14    1.36    3.86</span></span>
+<span><span class="co">#&gt; 5:     15961          70        80  3.72    1.35    3.59</span></span>
+<span><span class="co">#&gt; 6:     15967          70        80  5.05    1.35    3.59</span></span></code></pre></div>
 <p>在示例数据中，分段料肉比超出范围的只有 15967 号的 50–70 kg
 段。这头猪在 4
 月下旬采食骤降、体重停止增长，很可能生过病，分段检查正好把它找了出来。</p>
@@ -1288,25 +1160,25 @@ kg），说明这一段体重记录不足，例如耳标脱落、不会进站或
 </h2>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># 晚进站批次（45–60 kg 进站）</span></span>
-<span><span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"casey"</span>, stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">60</span>, <span class="fl">120</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">60</span>, <span class="fl">120</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># 115 kg 左右出栏</span></span>
-<span><span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"casey"</span>, stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>, <span class="fl">110</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>, <span class="fl">110</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># 测定期较短的批次（计划 50 天）</span></span>
-<span><span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"casey"</span>, min_test_days <span class="op">=</span> <span class="fl">30</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>min_test_days <span class="op">=</span> <span class="fl">30</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># FIRE 设备，下料量 600 g/次</span></span>
-<span><span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"casey"</span>, trough_diff_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">-</span><span class="fl">20</span>, <span class="fl">2400</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>trough_diff_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">-</span><span class="fl">20</span>, <span class="fl">2400</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># 单次采食上限随体重变化，并检查分段料肉比</span></span>
-<span><span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"casey"</span>, fiv_max_by_weight <span class="op">=</span> <span class="fu"><a href="../reference/fiv_max_example.html">fiv_max_example</a></span><span class="op">(</span><span class="op">)</span>, bin_fcr_limits <span class="op">=</span> <span class="fu"><a href="../reference/fiv_max_example.html">bin_fcr_example</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>fiv_max_by_weight <span class="op">=</span> <span class="fu"><a href="../reference/fiv_max_example.html">fiv_max_example</a></span><span class="op">(</span><span class="op">)</span>, bin_fcr_limits <span class="op">=</span> <span class="fu"><a href="../reference/fiv_max_example.html">bin_fcr_example</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># 标记日体重突变超过 5 kg/天的猪</span></span>
-<span><span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"casey"</span>, max_daily_jump_kg <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span>
+<span><span class="co"># 两端用直线填充体重，采食中间用线性插值</span></span>
+<span><span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>curve_model <span class="op">=</span> <span class="st">"poly1"</span>, impute_method <span class="op">=</span> <span class="st">"linear"</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># 更宽松的体重清洗：两种方法都判为异常才算异常值（比 "any" 标出的异常更少）</span></span>
-<span><span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"casey"</span>, weight_outlier <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"rlm"</span>, <span class="st">"loess"</span><span class="op">)</span>, outlier_combine <span class="op">=</span> <span class="st">"majority"</span><span class="op">)</span></span></code></pre></div>
+<span><span class="co"># 更宽松的体重清洗：两种方法都判为异常才算异常值</span></span>
+<span><span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>weight_outlier <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"rlm"</span>, <span class="st">"loess"</span><span class="op">)</span>, outlier_combine <span class="op">=</span> <span class="st">"majority"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="参考文献">参考文献<a class="anchor" aria-label="anchor" href="#%E5%8F%82%E8%80%83%E6%96%87%E7%8C%AE"></a>

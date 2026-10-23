@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.9.1</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.0.0</span>
       </span>
     </div>
 
@@ -67,10 +67,10 @@
       <a href="../articles/qc-parameters-zh.html">质控参数详解：qc_config()</a>
     </li>
     <li>
-      <a href="../articles/qc-presets-zh.html">质控预设说明：casey、national、legacy</a>
+      <a href="../articles/methods-zh.html">计算方法说明：从原始记录到料肉比</a>
     </li>
     <li>
-      <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线与采食插补</a>
+      <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线、体重填充与采食插补</a>
     </li>
     <li>
       <a href="../articles/output-zh.html">输出结果说明</a>
@@ -133,7 +133,7 @@
 <tr class="odd">
 <td>0</td>
 <td><code><a href="../reference/qc_config.html">qc_config()</a></code></td>
-<td>设定全部质控参数（三套预设）</td>
+<td>设定全部质控参数</td>
 </tr>
 <tr class="even">
 <td>1</td>
@@ -158,7 +158,7 @@
 <tr class="even">
 <td>4</td>
 <td><code><a href="../reference/calc_adg.html">calc_adg()</a></code></td>
-<td>拟合生长曲线，计算体重区间内的日增重</td>
+<td>补齐体重区间内每天的体重，回归斜率即日增重</td>
 </tr>
 <tr class="odd">
 <td>5</td>
@@ -168,12 +168,12 @@
 <tr class="even">
 <td>6</td>
 <td><code><a href="../reference/calc_adfi.html">calc_adfi()</a></code></td>
-<td>校正日采食量、插补缺失日，计算 ADFI</td>
+<td>校正日采食量、补齐缺失日，计算 ADFI</td>
 </tr>
 <tr class="odd">
 <td>7</td>
 <td><code><a href="../reference/calc_fcr.html">calc_fcr()</a></code></td>
-<td>计算料肉比，并给出可信度标记</td>
+<td>料肉比 = ADFI ÷ ADG，并给出可信度标记</td>
 </tr>
 <tr class="even">
 <td>8</td>
@@ -190,19 +190,20 @@
 </tr>
 </tbody>
 </table>
-<p>不需要中间结果时，用 <code><a href="../reference/run_pipeline.html">run_pipeline()</a></code> 一次跑完：</p>
+<p>每一步的方法和出处见《计算方法说明》。不需要中间结果时，用
+<code><a href="../reference/run_pipeline.html">run_pipeline()</a></code> 一次跑完：</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="va">res</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; ── <span style="font-weight: bold;">tidypptsda pipeline (NEDAP, profile </span><span style="color: #0000BB; font-weight: bold;">"casey"</span><span style="font-weight: bold;">)</span> ──</span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">tidypptsda pipeline (NEDAP)</span> ──</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Pigs in the data: 30</span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Pigs with weight data kept: 29</span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Pigs with ADG: 29</span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Pigs with FCR: 29 (23 ok, 6 low confidence)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Removed pigs: 1 (see <span style="color: #00BB00;">$removed</span>)</span></span>
-<span><span class="co">#&gt; Mean ADG 1202 g/d, ADFI 2847 g/d, FCR 2.37</span></span></code></pre></div>
+<span><span class="co">#&gt; Mean ADG 1205 g/d, ADFI 2847 g/d, FCR 2.36</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="数据要求">2. 数据要求<a class="anchor" aria-label="anchor" href="#%E6%95%B0%E6%8D%AE%E8%A6%81%E6%B1%82"></a>
@@ -264,24 +265,14 @@ kg，<code>Topup Amount</code>（下料量）为可选列。</p>
 <div class="section level2">
 <h2 id="质控参数qc_config">3. 质控参数：<code>qc_config()</code><a class="anchor" aria-label="anchor" href="#%E8%B4%A8%E6%8E%A7%E5%8F%82%E6%95%B0qc_config"></a>
 </h2>
-<p>所有阈值都集中在一个对象里，以下三套预设可直接使用：</p>
-<ul>
-<li>
-<code>"casey"</code>（默认）：采食错误判定采用 Casey
-等（2005），体重先逐日回溯追踪、再用稳健回归（rlm），生长曲线为二次曲线，FCR
-= ADFI ÷ ADG，不合格的猪只降级、不删除；</li>
-<li>
-<code>"national"</code>：按国家测定的 FCR
-数据处理规程：体重的权重与整日规则、加权日体重、日体重 R² ≥ 0.995，10 kg
-分段质控，FCR
-用累计采食法计算，不合格的段和猪直接删除（采食错误和校正沿用本包的方法）。详见《质控预设说明》；</li>
-<li>
-<code>"legacy"</code>：STL、rlm 和稳健 SD
-三种方法组合检测异常，生长曲线用 Gompertz。</li>
-</ul>
-<p>在预设的基础上可以覆盖任意参数：</p>
+<p>所有阈值都集中在一个对象里。默认设置：体重先逐日回溯追踪、再用二次稳健回归（rlm）和
+LOESS
+检测异常值；区间内缺失的体重中间线性插值、两端用二次曲线；采食错误按
+Casey 等（2005）判定、按 Jiao 等（2014）校正，缺失的采食短缺口用
+LOESS、长缺口和两端用”日采食 ~ 体重”回归；FCR = ADFI ÷
+ADG。任意参数都可以覆盖：</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">qc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"casey"</span>, stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>, <span class="fl">115</span><span class="op">)</span>, min_test_days <span class="op">=</span> <span class="fl">40</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">qc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>, <span class="fl">115</span><span class="op">)</span>, min_test_days <span class="op">=</span> <span class="fl">40</span><span class="op">)</span></span>
 <span><span class="va">qc</span><span class="op">$</span><span class="va">stage_range</span></span>
 <span><span class="co">#&gt; [1]  30 115</span></span></code></pre></div>
 <p>最常调整的几个参数：</p>
@@ -325,13 +316,23 @@ kg，<code>Topup Amount</code>（下料量）为可选列。</p>
 <td>65 / 85</td>
 </tr>
 <tr class="even">
+<td><code>curve_model</code></td>
+<td>填充区间两端体重的生长曲线：poly2、poly1、poly3、gompertz</td>
+<td>poly2</td>
+</tr>
+<tr class="odd">
+<td><code>impute_method</code></td>
+<td>采食填充：loess_lm（≤ 3 天 LOESS，其余回归）或 linear</td>
+<td>loess_lm</td>
+</tr>
+<tr class="even">
 <td><code>max_extrap_days</code></td>
 <td>生长曲线最多外推的天数</td>
 <td>30</td>
 </tr>
 <tr class="odd">
 <td><code>max_edge_extrap_days</code></td>
-<td>区间两端外推超过此天数的猪标记为低可信度</td>
+<td>区间两端填充超过此天数的猪标记为低可信度</td>
 <td>15</td>
 </tr>
 <tr class="even">
@@ -353,7 +354,7 @@ kg，<code>Topup Amount</code>（下料量）为可选列。</p>
 <p>FIRE 示例数据中的猪在 45–60 kg 才进站，因此这里按第 7 节的建议，以
 60–120 kg 作为计算区间：</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">qc_fire</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"casey"</span>, stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">60</span>, <span class="fl">120</span><span class="op">)</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">qc_fire</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">60</span>, <span class="fl">120</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">visits</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/prep_visits.html">prep_visits</a></span><span class="op">(</span><span class="va">fire</span>, qc <span class="op">=</span> <span class="va">qc_fire</span>, verbose <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Preparing FIRE visits</span> <span style="color: #00BBBB;">───────────────────────────────────────────────────────</span></span></span>
@@ -387,22 +388,22 @@ kg，<code>Topup Amount</code>（下料量）为可选列。</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">w</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/clean_weight.html">clean_weight</a></span><span class="op">(</span><span class="va">visits</span>, qc <span class="op">=</span> <span class="va">qc_fire</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Cleaning body weight (</span><span style="color: #00BB00; font-weight: bold;">rlm</span><span style="font-weight: bold;">)</span> <span style="color: #00BBBB;">──────────────────────────────────────────────────</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Cleaning body weight (</span><span style="color: #00BB00; font-weight: bold;">rlm + loess</span><span style="font-weight: bold;">)</span> <span style="color: #00BBBB;">──────────────────────────────────────────</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Weight records: <span style="font-weight: bold;">9,310</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Outside weight range: <span style="font-weight: bold;">15</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Adaptation after entry (not used): <span style="font-weight: bold;">1,069</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Outliers: <span style="font-weight: bold;">1,105</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Outliers: <span style="font-weight: bold;">1,285</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span>  of which removed by tracking: <span style="font-weight: bold;">33</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> Pigs kept: 23, low confidence: 2, removed: 1</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">w</span><span class="op">$</span><span class="va">per_pig</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">n_valid</span>, <span class="va">test_days</span>, <span class="va">missing_rate</span>, <span class="va">status</span>, <span class="va">reason</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    responder n_valid test_days missing_rate status reason</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;   &lt;int&gt;     &lt;int&gt;        &lt;num&gt; &lt;char&gt; &lt;char&gt;</span></span>
-<span><span class="co">#&gt; 1:     25822     394        58            0   keep       </span></span>
-<span><span class="co">#&gt; 2:     35853     426        59            0   keep       </span></span>
-<span><span class="co">#&gt; 3:     35855     515        59            0   keep       </span></span>
-<span><span class="co">#&gt; 4:     35862     392        59            0   keep       </span></span>
-<span><span class="co">#&gt; 5:     35865     360        59            0   keep       </span></span>
-<span><span class="co">#&gt; 6:     35869     415        59            0   keep</span></span></code></pre></div>
+<span><span class="co">#&gt; 1:     25822     374        56   0.00000000   keep       </span></span>
+<span><span class="co">#&gt; 2:     35853     417        59   0.00000000   keep       </span></span>
+<span><span class="co">#&gt; 3:     35855     489        59   0.00000000   keep       </span></span>
+<span><span class="co">#&gt; 4:     35862     383        58   0.00000000   keep       </span></span>
+<span><span class="co">#&gt; 5:     35865     353        59   0.01694915   keep       </span></span>
+<span><span class="co">#&gt; 6:     35869     407        59   0.00000000   keep</span></span></code></pre></div>
 <p><code>status</code> 有三种取值：</p>
 <ul>
 <li>
@@ -419,9 +420,11 @@ kg，<code>Topup Amount</code>（下料量）为可选列。</p>
 天是<strong>适应期</strong>（<code>adapt_days = 7</code>），这几天的体重不参与分析（<code>qc_flag = "adaptation"</code>）。适应期的采食照常统计：如果这几天已经落在分析区间内（例如
 45 kg 进站、区间 30–120 kg），计入 ADFI 和
 FCR；如果猪还没到区间下限，则不计入。</p>
-<p>异常值检测之前，会先从测定末期往回<strong>逐日追踪</strong>每头猪的体重。测定站只有四条腿都站上秤才称重，读数偏轻的情况很少；进站初期猪小，常有几头猪同时挤进测定站，读数偏重。末期猪大、只容得下一头，读数最可靠，所以从末期开始往前推，只保留与预测体重衔接的读数（<code>qc_flag = "track"</code>）。追踪剔除超过
-40% 记录的猪降级为
-<code>low_confidence</code>（可能是称重异常，如体重传感器故障）。详见《质控参数详解》。</p>
+<p>异常值检测之前，会先从测定末期往回<strong>逐日追踪</strong>每头猪的体重。测定站只有四条腿都站上秤才称重，读数偏轻的情况很少；进站初期猪小，常有几头猪同时挤进测定站，读数偏重。末期猪大、只容得下一头，读数最可靠，所以从末期开始往前推，只保留与预测体重衔接的读数（<code>qc_flag = "track"</code>）。追踪之后，再用二次稳健回归（rlm，bisquare
+权重 &lt; 0.5）和 LOESS 平滑曲线（偏离超过 3
+倍稳健标准差）找出零散的异常读数。追踪剔除超过 40% 记录的猪降级为
+<code>low_confidence</code>（可能是称重异常，如体重传感器故障）；有效体重对
+LOESS 平滑曲线的 R² 低于 0.99 的猪也降级。详见《质控参数详解》。</p>
 </div>
 <div class="section level3">
 <h3 id="日增重">4.3 日增重<a class="anchor" aria-label="anchor" href="#%E6%97%A5%E5%A2%9E%E9%87%8D"></a>
@@ -434,24 +437,35 @@ FCR；如果猪还没到区间下限，则不计入。</p>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Extrapolated: <span style="font-weight: bold;">13</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Partial (stage not fully reached): <span style="font-weight: bold;">0</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> No ADG: <span style="font-weight: bold;">0</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Mean ADG: 1197 g/d (SD 106)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">adg</span><span class="op">$</span><span class="va">per_pig</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">adg_type</span>, <span class="va">start_date</span>, <span class="va">end_date</span>, <span class="va">adg</span>, <span class="va">r_squared</span>, <span class="va">adg_curve</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
-<span><span class="co">#&gt;    responder     adg_type start_date   end_date      adg r_squared adg_curve</span></span>
-<span><span class="co">#&gt;       &lt;char&gt;       &lt;char&gt;     &lt;Date&gt;     &lt;Date&gt;    &lt;num&gt;     &lt;num&gt;     &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:     25822     observed 2024-01-01 2024-02-19 1245.075 0.9938723  1217.097</span></span>
-<span><span class="co">#&gt; 2:     35853     observed 2023-12-26 2024-02-13 1230.926 0.9892010  1227.261</span></span>
-<span><span class="co">#&gt; 3:     35855 extrapolated 2023-12-25 2024-02-07 1351.598 0.9892353  1363.024</span></span>
-<span><span class="co">#&gt; 4:     35862     observed 2023-12-27 2024-02-16 1176.076 0.9935314  1171.163</span></span>
-<span><span class="co">#&gt; 5:     35865     observed 2023-12-29 2024-02-17 1186.024 0.9930397  1189.355</span></span>
-<span><span class="co">#&gt; 6:     35869 extrapolated 2024-01-15 2024-03-08 1111.074 0.9916432  1134.857</span></span></code></pre></div>
-<p>ADG
-默认是<strong>直线回归的斜率</strong>（<code>adg_method = "lm"</code>）：先用剔除异常值后的体重拟合生长曲线，求出区间的起止时间（终点是曲线第一次到达上限的时间；起点是在此之前曲线<strong>最后一次</strong>越过下限的时间），再对这段时间内的全部有效体重做直线回归，斜率就是日增重，可靠性看
-<code>r_squared</code>。另一种算法”区间体重差 ÷ 所需天数”保存在
-<code>adg_curve</code> 列，设置
-<code>qc_config(adg_method = "curve")</code> 时作为 ADG
-使用。进站后有适应期、前期长得慢的批次，可以设置
-<code>qc_config(curve_margin_kg = 5)</code>，只用区间附近的记录拟合曲线。<code>adg_type</code>
-说明这个数值是怎么来的：</p>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Mean ADG: 1206 g/d (SD 107)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">adg</span><span class="op">$</span><span class="va">per_pig</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">adg_type</span>, <span class="va">adg</span>, <span class="va">r_squared</span>, <span class="va">n_observed_days</span>, <span class="va">n_interpolated_days</span>, <span class="va">n_curve_days</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
+<span><span class="co">#&gt;    responder     adg_type      adg r_squared n_observed_days</span></span>
+<span><span class="co">#&gt;       &lt;char&gt;       &lt;char&gt;    &lt;num&gt;     &lt;num&gt;           &lt;int&gt;</span></span>
+<span><span class="co">#&gt; 1:     25822     observed 1245.450 0.9974731              50</span></span>
+<span><span class="co">#&gt; 2:     35853     observed 1243.582 0.9934323              50</span></span>
+<span><span class="co">#&gt; 3:     35855 extrapolated 1357.855 0.9951225              44</span></span>
+<span><span class="co">#&gt; 4:     35862     observed 1172.778 0.9963732              52</span></span>
+<span><span class="co">#&gt; 5:     35865     observed 1194.068 0.9955332              50</span></span>
+<span><span class="co">#&gt; 6:     35869 extrapolated 1152.201 0.9976253              39</span></span>
+<span><span class="co">#&gt;    n_interpolated_days n_curve_days</span></span>
+<span><span class="co">#&gt;                  &lt;int&gt;        &lt;int&gt;</span></span>
+<span><span class="co">#&gt; 1:                   0            0</span></span>
+<span><span class="co">#&gt; 2:                   0            0</span></span>
+<span><span class="co">#&gt; 3:                   0            1</span></span>
+<span><span class="co">#&gt; 4:                   0            0</span></span>
+<span><span class="co">#&gt; 5:                   1            0</span></span>
+<span><span class="co">#&gt; 6:                   0           14</span></span></code></pre></div>
+<p>日增重分三步计算：</p>
+<ol style="list-style-type: decimal">
+<li>用剔除异常值后的体重拟合生长曲线（默认二次曲线），求出区间的起止时间：终点是曲线第一次到达上限的时间；起点是在此之前曲线<strong>最后一次</strong>越过下限的时间；</li>
+<li>把区间内每一天的体重补齐：有记录的日子用当天中位数；两个有记录的日子之间缺失的，用<strong>线性插值</strong>；首个有记录日之前、末个有记录日之后的，用<strong>生长曲线</strong>（晚进站、早出栏时）；</li>
+<li>区间内全部日体重（实测 +
+填充）对日期做直线回归，<strong>斜率就是日增重</strong>，可靠性看
+<code>r_squared</code>。</li>
+</ol>
+<p>每天的体重和来源在 <code>adg$daily</code> 的
+<code>weight_filled</code>、<code>source</code>
+列中。<code>adg_type</code> 说明区间两端是否在实测期内：</p>
 <table class="table">
 <thead><tr class="header">
 <th>adg_type</th>
@@ -464,7 +478,7 @@ FCR；如果猪还没到区间下限，则不计入。</p>
 </tr>
 <tr class="even">
 <td>extrapolated</td>
-<td>需要外推，但外推不超过 <code>max_extrap_days</code>
+<td>需要用生长曲线外推，但外推不超过 <code>max_extrap_days</code>
 </td>
 </tr>
 <tr class="odd">
@@ -488,18 +502,18 @@ FCR；如果猪还没到区间下限，则不计入。</p>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Visits with at least one error: <span style="font-weight: bold;">2.62%</span> of 9743 identified visits</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">ADFI over 60-120 kg</span> <span style="color: #00BBBB;">─────────────────────────────────────────────────────────</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Correction model: 1492 pig-days, 16 error covariates</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Stage days recorded without error (org): <span style="font-weight: bold;">1,132</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Corrected (corr): <span style="font-weight: bold;">83</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Correction model: 1490 pig-days, 16 error covariates</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Stage days recorded without error (org): <span style="font-weight: bold;">1,133</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Corrected (corr): <span style="font-weight: bold;">84</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Interpolated (iii): <span style="font-weight: bold;">4</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Extrapolated (elrp): <span style="font-weight: bold;">50</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Extrapolated (elrp): <span style="font-weight: bold;">49</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Missing: <span style="font-weight: bold;">0</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Pig-days outside dfi_range: <span style="font-weight: bold;">7</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Mean ADFI over the stage: 3247 g/d</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">adfi</span><span class="op">$</span><span class="va">daily</span><span class="op">[</span><span class="va">in_stage</span> <span class="op">==</span> <span class="cn">TRUE</span>, <span class="va">state</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; corr elrp  iii  org </span></span>
-<span><span class="co">#&gt;   83   50    4 1132</span></span></code></pre></div>
+<span><span class="co">#&gt;   84   49    4 1133</span></span></code></pre></div>
 <p>日采食量的校正分两步：</p>
 <ol style="list-style-type: decimal">
 <li>
@@ -507,10 +521,11 @@ FCR；如果猪还没到区间下限，则不计入。</p>
 Y，再用混合模型扣除错误项的影响（Jiao
 等，2014）。没有错误的日子保持原值不变。</li>
 <li>
-<strong>插补</strong>：只在与 ADG
-相同的体重区间内进行。区间中间缺失的日子用线性内插，连续缺失超过7
-天时改用 LOESS；区间两端缺失的日子，用每头猪的”日采食 ~
-体重”回归外推。</li>
+<strong>填充</strong>：只在与 ADG
+相同的体重区间内进行。两个有记录的日子之间，连续缺失不超过 3 天的用
+LOESS 平滑插补，超过 3 天的用每头猪的”日采食 ~
+体重”线性回归；区间两端缺失的日子同样用这个回归。回归用的是上一步补齐后的日体重。<code>qc_config(impute_method = "linear")</code>
+时，中间改用线性插值。</li>
 </ol>
 <p><code>state</code> 列标明每一天的来源：</p>
 <ul>
@@ -519,9 +534,9 @@ Y，再用混合模型扣除错误项的影响（Jiao
 <li>
 <code>corr</code>：经过校正；</li>
 <li>
-<code>iii</code>：内插得到；</li>
+<code>iii</code>：在两个有记录的日子之间填充；</li>
 <li>
-<code>elrp</code>：外推得到；</li>
+<code>elrp</code>：在区间两端填充；</li>
 <li>
 <code>missing</code>：无法估计。</li>
 </ul>
@@ -551,19 +566,19 @@ Y，再用混合模型扣除错误项的影响（Jiao
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">FCR over 60-120 kg</span> <span style="color: #00BBBB;">──────────────────────────────────────────────────────────</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> FCR for 25 pigs: 21 ok, 4 low confidence</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Mean FCR 2.72 (SD 0.17), ADG 1197 g/d, ADFI 3247 g/d</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Mean FCR 2.70 (SD 0.16), ADG 1206 g/d, ADFI 3247 g/d</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">fcr</span><span class="op">$</span><span class="va">per_pig</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">adg</span>, <span class="va">adfi</span>, <span class="va">fcr</span>, <span class="va">fcr_flag</span>, <span class="va">fcr_note</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    responder      adg     adfi      fcr       fcr_flag</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;    &lt;num&gt;    &lt;num&gt;    &lt;num&gt;         &lt;char&gt;</span></span>
-<span><span class="co">#&gt; 1:     25822 1245.075 3212.040 2.579796 low_confidence</span></span>
-<span><span class="co">#&gt; 2:     35853 1230.926 3222.190 2.617696             ok</span></span>
-<span><span class="co">#&gt; 3:     35855 1351.598 3875.226 2.867145             ok</span></span>
-<span><span class="co">#&gt; 4:     35862 1176.076 3243.991 2.758317             ok</span></span>
-<span><span class="co">#&gt; 5:     35865 1186.024 3157.105 2.661923             ok</span></span>
-<span><span class="co">#&gt; 6:     35869 1111.074 3486.346 3.137817             ok</span></span>
+<span><span class="co">#&gt; 1:     25822 1245.450 3200.302 2.569595 low_confidence</span></span>
+<span><span class="co">#&gt; 2:     35853 1243.582 3220.841 2.589971             ok</span></span>
+<span><span class="co">#&gt; 3:     35855 1357.855 3875.943 2.854460             ok</span></span>
+<span><span class="co">#&gt; 4:     35862 1172.778 3243.425 2.765592             ok</span></span>
+<span><span class="co">#&gt; 5:     35865 1194.068 3157.331 2.644180             ok</span></span>
+<span><span class="co">#&gt; 6:     35869 1152.201 3476.451 3.017227             ok</span></span>
 <span><span class="co">#&gt;                                   fcr_note</span></span>
 <span><span class="co">#&gt;                                     &lt;char&gt;</span></span>
-<span><span class="co">#&gt; 1: weight records cover 5.0 kg of 70-80 kg</span></span>
+<span><span class="co">#&gt; 1: weight records cover 5.1 kg of 70-80 kg</span></span>
 <span><span class="co">#&gt; 2:                                        </span></span>
 <span><span class="co">#&gt; 3:                                        </span></span>
 <span><span class="co">#&gt; 4:                                        </span></span>
@@ -572,17 +587,17 @@ Y，再用混合模型扣除错误项的影响（Jiao
 <span><span class="va">fcr</span><span class="op">$</span><span class="va">summary</span><span class="op">[</span><span class="va">group</span> <span class="op">==</span> <span class="st">"all"</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">.SD</span>, <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">is.numeric</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">x</span>, <span class="fl">2</span><span class="op">)</span> <span class="kw">else</span> <span class="va">x</span><span class="op">)</span><span class="op">]</span></span>
 <span><span class="co">#&gt;     group        trait     n     min     max  median    mean     sd    cv</span></span>
 <span><span class="co">#&gt;    &lt;char&gt;       &lt;char&gt; &lt;num&gt;   &lt;num&gt;   &lt;num&gt;   &lt;num&gt;   &lt;num&gt;  &lt;num&gt; &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:    all          adg    25  958.51 1443.02 1198.53 1196.71 106.11  0.09</span></span>
-<span><span class="co">#&gt; 2:    all         adfi    25 2590.10 3875.23 3222.19 3247.00 252.62  0.08</span></span>
-<span><span class="co">#&gt; 3:    all          fcr    25    2.38    3.14    2.70    2.72   0.17  0.06</span></span>
-<span><span class="co">#&gt; 4:    all           gf    25    0.32    0.42    0.37    0.37   0.02  0.06</span></span>
-<span><span class="co">#&gt; 5:    all   stage_days    25   41.13   63.49   49.60   49.93   4.67  0.09</span></span>
+<span><span class="co">#&gt; 1:    all          adg    25  935.14 1460.47 1205.57 1205.91 106.53  0.09</span></span>
+<span><span class="co">#&gt; 2:    all         adfi    25 2573.34 3875.94 3220.84 3246.85 251.78  0.08</span></span>
+<span><span class="co">#&gt; 3:    all          fcr    25    2.35    3.02    2.67    2.70   0.16  0.06</span></span>
+<span><span class="co">#&gt; 4:    all           gf    25    0.33    0.43    0.37    0.37   0.02  0.06</span></span>
+<span><span class="co">#&gt; 5:    all   stage_days    25   40.19   63.77   49.23   49.80   4.79  0.10</span></span>
 <span><span class="co">#&gt; 6:    all start_weight    25   60.00   60.00   60.00   60.00   0.00  0.00</span></span>
 <span><span class="co">#&gt; 7:    all   end_weight    25  120.00  120.00  120.00  120.00   0.00  0.00</span></span></code></pre></div>
 <p><code>fcr_flag = "low_confidence"</code> 的原因写在
 <code>fcr_note</code> 中，常见的有：</p>
 <ul>
-<li>生长曲线或采食量在区间开头或结尾外推超过 15
+<li>体重或采食量在区间开头或结尾填充超过 15
 天，通常是进站太晚或出栏太早；</li>
 <li>ADG 只覆盖了区间的一部分；</li>
 <li>区间内实测采食的天数不足 70%；</li>
@@ -598,12 +613,12 @@ Y，再用混合模型扣除错误项的影响（Jiao
 <span><span class="co">#&gt; Key: &lt;responder&gt;</span></span>
 <span><span class="co">#&gt;    responder weight_from weight_to feed_kg gain_kg   fcr weight_coverage_kg</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;       &lt;num&gt;     &lt;num&gt;   &lt;num&gt;   &lt;num&gt; &lt;num&gt;              &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:     25822          60        70    22.1    10.0  2.20                9.1</span></span>
-<span><span class="co">#&gt; 2:     25822          70        80    23.8     9.9  2.40                5.0</span></span>
-<span><span class="co">#&gt; 3:     25822          80        90    25.7     9.8  2.62                8.1</span></span>
-<span><span class="co">#&gt; 4:     25822          90       100    28.4     9.7  2.93                9.2</span></span>
-<span><span class="co">#&gt; 5:     25822         100       110    33.4    10.8  3.10                8.1</span></span>
-<span><span class="co">#&gt; 6:     25822         110       120    24.0     9.4  2.55                7.5</span></span></code></pre></div>
+<span><span class="co">#&gt; 1:     25822          60        70    24.6    10.2  2.40                9.1</span></span>
+<span><span class="co">#&gt; 2:     25822          70        80    21.4     5.9  3.59                5.1</span></span>
+<span><span class="co">#&gt; 3:     25822          80        90    25.7     9.3  2.78                8.1</span></span>
+<span><span class="co">#&gt; 4:     25822          90       100    32.0    10.3  3.09                9.2</span></span>
+<span><span class="co">#&gt; 5:     25822         100       110    23.0     9.7  2.37                8.1</span></span>
+<span><span class="co">#&gt; 6:     25822         110       120    30.8     8.9  3.47                8.0</span></span></code></pre></div>
 </div>
 </div>
 <div class="section level2">
@@ -619,7 +634,7 @@ Y，再用混合模型扣除错误项的影响（Jiao
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Created 1 feed intake plot</span></span>
 <span><span class="va">h</span><span class="op">$</span><span class="va">plot</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span></span></code></pre></div>
 <p><img src="tidypptsda-zh_files/figure-html/plot-adfi-1.png" class="r-plt" alt="" width="100%"></p>
-<p>每个测定站输出一张图，每头猪一个分面。保存为图片：</p>
+<p>生长曲线图中，蓝色点是实测日体重，橙色点是线性插值的日体重，紫色点是用生长曲线填充的日体重；绿色曲线是生长曲线，黑色虚线是日增重的回归线。每个测定站输出一张图，每头猪一个分面。保存为图片：</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/save_plots.html">save_plots</a></span><span class="op">(</span><span class="va">g</span>, path <span class="op">=</span> <span class="st">"结果/生长曲线"</span>, prefix <span class="op">=</span> <span class="st">"站"</span>, suffix <span class="op">=</span> <span class="st">"growth"</span>, device <span class="op">=</span> <span class="st">"png"</span><span class="op">)</span></span></code></pre></div>
 <p>保存图片的时间几乎都花在 ggplot2 绘图上：每个测定站（15 头猪左右）约
@@ -664,7 +679,7 @@ Y，再用混合模型扣除错误项的影响（Jiao
 </tr>
 <tr class="even">
 <td><code>daily_weight</code></td>
-<td>每天的体重（实测和拟合）</td>
+<td>每天的体重（实测、填充和生长曲线）</td>
 </tr>
 <tr class="odd">
 <td><code>weight_pigs</code></td>
@@ -755,9 +770,10 @@ Windows 上，并行要求本包是正式安装的（而不是用
 <div class="section level3">
 <h3 id="方法验证">方法验证<a class="anchor" aria-label="anchor" href="#%E6%96%B9%E6%B3%95%E9%AA%8C%E8%AF%81"></a>
 </h3>
-<p>想知道哪种异常值检测方法、生长曲线或插补方法更适合自己的数据，可以用
-<code><a href="../reference/validate_outliers.html">validate_outliers()</a></code>、<code><a href="../reference/validate_adg.html">validate_adg()</a></code> 和
-<code><a href="../reference/validate_adfi.html">validate_adfi()</a></code> 在本批次数据上检验，详见《方法验证》。</p>
+<p>想知道哪种异常值检测方法、生长曲线、体重填充或采食插补方法更适合自己的数据，可以用
+<code><a href="../reference/validate_outliers.html">validate_outliers()</a></code>、<code><a href="../reference/validate_adg.html">validate_adg()</a></code>、<code><a href="../reference/validate_weight_fill.html">validate_weight_fill()</a></code>
+和 <code><a href="../reference/validate_adfi.html">validate_adfi()</a></code>
+在本批次数据上检验，详见《方法验证》。</p>
 </div>
 </div>
 <div class="section level2">
@@ -807,7 +823,10 @@ kg。</li>
 是整个体重区间内的平均值，包括体重较小、采食较少的前期；实测记录可能只覆盖了体重较大的后期。</p>
 <p><strong>问：旧版本的函数还能用吗？</strong> 答：从 0.3.0
 起，<code>preprocess_data()</code>、<code>adg_get()</code>
-等旧函数名已删除，请改用本文介绍的新函数。需要旧版行为时，可安装
+等旧函数名已删除，请改用本文介绍的新函数；从 1.0.0
+起，预设（<code>qc_config("national")</code>
+等）、<code><a href="../reference/calc_fcr.html">calc_fcr()</a></code> 的累计采食法和 <code>plot_cfi()</code>
+已删除。需要旧版行为时，可安装
 0.1.0：<code>pak::pak("tony2015116/tidypptsda@v0.1.0")</code>。</p>
 <p><strong>问：如何只分析某个测定站或某几头猪？</strong>答：可以在
 <code><a href="../reference/prep_visits.html">prep_visits()</a></code> 之后筛选，例如

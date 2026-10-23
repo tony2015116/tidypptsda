@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.9.1</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.0.0</span>
       </span>
     </div>
 
@@ -46,10 +46,10 @@
       <a href="../articles/qc-parameters-zh.html">质控参数详解：qc_config()</a>
     </li>
     <li>
-      <a href="../articles/qc-presets-zh.html">质控预设说明：casey、national、legacy</a>
+      <a href="../articles/methods-zh.html">计算方法说明：从原始记录到料肉比</a>
     </li>
     <li>
-      <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线与采食插补</a>
+      <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线、体重填充与采食插补</a>
     </li>
     <li>
       <a href="../articles/output-zh.html">输出结果说明</a>
@@ -78,9 +78,50 @@
     </div>
 
     <div class="section level2">
+<h2 class="page-header" data-toc-text="1.0.0" id="tidypptsda-100">tidypptsda 1.0.0<a class="anchor" aria-label="anchor" href="#tidypptsda-100"></a></h2>
+<p>A simpler, single method from the weight records to FCR. Breaking changes are marked with <strong>(breaking)</strong>.</p>
+<div class="section level3">
+<h3 id="settings-1-0-0">Settings<a class="anchor" aria-label="anchor" href="#settings-1-0-0"></a></h3>
+<ul><li>
+<strong>(breaking)</strong> The presets <code>"casey"</code>, <code>"national"</code> and <code>"legacy"</code> are removed: <code><a href="../reference/qc_config.html">qc_config()</a></code> takes only named parameters (<code>qc_config("national")</code> gives an error that says what to do instead). Removed parameters: <code>method</code>, <code>day_weight_min</code>, <code>daily_weight</code>, <code>rel_dev_max</code>, <code>daily_drop_min</code>, <code>daily_r2_min</code>, <code>max_feed_missing</code>, <code>curve_r2_min</code>, <code>max_daily_jump_kg</code>, <code>adg_method</code>, <code>curve_margin_kg</code>, <code>bin_min_gain_kg</code>, <code>cfi_r2_min</code>; <code>curve_model = "loess"</code> is removed.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="body-weight-1-0-0">Body weight<a class="anchor" aria-label="anchor" href="#body-weight-1-0-0"></a></h3>
+<ul><li>
+<code>weight_outlier</code> defaults to <code>c("rlm", "loess")</code>: after the tracking from the end of the test, the remaining records are checked by quadratic robust regression (bisquare weight &lt; 0.5) and by a robust LOESS smooth (more than 3 robust SDs away). Tracked records are no longer exempt from these methods.</li>
+<li>New pig-level flag <code>smooth_r2_min</code> (default 0.99): a pig whose valid weights fit their LOESS smooth with a lower R² is flagged as low confidence. <code>per_pig$r2</code>, <code>entry_weight</code> and <code>exit_weight</code> now come from this smooth. <code>r2_daily</code>, <code>feed_missing</code> and <code>max_daily_jump</code> are removed.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="adg-1-0-0">ADG<a class="anchor" aria-label="anchor" href="#adg-1-0-0"></a></h3>
+<ul><li>
+<strong>(breaking)</strong> Every day of the stage gets a body weight (<code>daily$weight_filled</code>): the observed daily median; linear interpolation between recorded days; the growth curve (<code>curve_model</code>: <code>"poly2"</code>, <code>"poly1"</code>, <code>"poly3"</code> or <code>"gompertz"</code>) before the first and after the last recorded day. <code>daily$source</code> is <code>"observed"</code>, <code>"interpolated"</code> or <code>"curve"</code>.</li>
+<li>
+<strong>(breaking)</strong> ADG is the slope of the linear regression of these daily weights on the day over the stage, with <code>r_squared</code>. New columns <code>n_observed_days</code>, <code>n_interpolated_days</code>, <code>n_curve_days</code>; <code>adg_curve</code> stays for comparison. <code>adg_source</code>, <code>lm_slope</code>, <code>lm_weight_from</code>, <code>lm_weight_to</code>, <code>curve_start</code> and <code>curve_end</code> are removed.</li>
+<li>
+<code><a href="../reference/plot_adg.html">plot_adg()</a></code> colours the daily weights by source and draws the ADG regression line.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="feed-intake-and-fcr-1-0-0">Feed intake and FCR<a class="anchor" aria-label="anchor" href="#feed-intake-and-fcr-1-0-0"></a></h3>
+<ul><li>
+<strong>(breaking)</strong> <code>impute_method</code> is <code>"loess_lm"</code> (default) or <code>"linear"</code>. <code>"loess_lm"</code>: gaps of up to <code>long_gap_days</code> (now 3) days between recorded days from a robust LOESS smooth, longer gaps and the stage ends from a per-pig regression of daily intake on body weight. <code>"linear"</code>: linear interpolation inside, the same regression at the ends. The body weight of the regression, of the correction model and of <code>fiv_max_by_weight</code> is the filled daily weight.</li>
+<li>
+<strong>(breaking)</strong> FCR is always ADFI / ADG: the national cumulative feed method, <code>$cfi</code> and <code>plot_cfi()</code> are removed.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="validation-1-0-0">Validation<a class="anchor" aria-label="anchor" href="#validation-1-0-0"></a></h3>
+<ul><li>New <code><a href="../reference/validate_weight_fill.html">validate_weight_fill()</a></code>: hides recorded daily weights of the stage (random days, blocks, start, end), fills them with linear interpolation or a growth curve and compares filled weights and ADG with the recorded ones.</li>
+<li>
+<code><a href="../reference/validate_outliers.html">validate_outliers()</a></code> compares method sets with or without the tracking (<code>"track"</code> in a set). <code><a href="../reference/validate_adg.html">validate_adg()</a></code> measures the ADG of the filled daily weights. <code><a href="../reference/validate_adfi.html">validate_adfi()</a></code> compares <code>"loess_lm"</code> and <code>"linear"</code>.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="documentation-1-0-0">Documentation<a class="anchor" aria-label="anchor" href="#documentation-1-0-0"></a></h3>
+<ul><li>New vignette “计算方法说明” (methods, step by step, with sources); it replaces the presets vignette. The parameter, output, validation and main Chinese vignettes are updated.</li>
+</ul></div>
+</div>
+    <div class="section level2">
 <h2 class="page-header" data-toc-text="0.9.1" id="tidypptsda-091">tidypptsda 0.9.1<a class="anchor" aria-label="anchor" href="#tidypptsda-091"></a></h2>
 <ul><li>
-<code><a href="../reference/plot_cfi.html">plot_cfi()</a></code> plots the cumulative feed intake of the national method against body weight, one plot per station: kept stage days, removed weight classes shaded, and the line whose slope is the FCR (dashed where extended by the regression). The national <code><a href="../reference/calc_fcr.html">calc_fcr()</a></code> result gains <code>$cfi</code> (every stage day with its class, whether it is kept and the cumulative intake).</li>
+<code>plot_cfi()</code> plots the cumulative feed intake of the national method against body weight, one plot per station: kept stage days, removed weight classes shaded, and the line whose slope is the FCR (dashed where extended by the regression). The national <code><a href="../reference/calc_fcr.html">calc_fcr()</a></code> result gains <code>$cfi</code> (every stage day with its class, whether it is kept and the cumulative intake).</li>
 <li>Fixed: with <code>impute_method = "national"</code>, imputed days could get the wrong <code>state</code> (<code>iii</code> / <code>elrp</code>); the imputed values were right.</li>
 </ul></div>
     <div class="section level2">

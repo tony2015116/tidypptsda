@@ -18,7 +18,7 @@ pig whether its weight data are good enough for growth analysis."><meta property
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.9.1</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.0.0</span>
       </span>
     </div>
 
@@ -47,10 +47,10 @@ pig whether its weight data are good enough for growth analysis."><meta property
       <a href="../articles/qc-parameters-zh.html">质控参数详解：qc_config()</a>
     </li>
     <li>
-      <a href="../articles/qc-presets-zh.html">质控预设说明：casey、national、legacy</a>
+      <a href="../articles/methods-zh.html">计算方法说明：从原始记录到料肉比</a>
     </li>
     <li>
-      <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线与采食插补</a>
+      <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线、体重填充与采食插补</a>
     </li>
     <li>
       <a href="../articles/output-zh.html">输出结果说明</a>
@@ -98,10 +98,10 @@ pig whether its weight data are good enough for growth analysis.</p>
 
 <dt id="arg-qc">qc<a class="anchor" aria-label="anchor" href="#arg-qc"></a></dt>
 <dd><p>QC settings from <code><a href="qc_config.html">qc_config()</a></code>. Used here: <code>weight_range</code>,
-<code>weight_outlier</code>, <code>outlier_combine</code>, <code>rlm_cutoff</code>, <code>sd_max</code>,
-<code>loess_span</code>, <code>rel_dev_max</code>, <code>daily_drop_min</code>, <code>min_records</code>,
-<code>min_test_days</code>, <code>max_missing_rate</code>, <code>entry_weight_max</code>,
-<code>exit_weight_min</code>, <code>curve_r2_min</code>.</p></dd>
+<code>adapt_days</code>, <code>weight_track</code>, <code>track_tol</code>, <code>weight_outlier</code>,
+<code>outlier_combine</code>, <code>rlm_cutoff</code>, <code>sd_max</code>, <code>loess_span</code>,
+<code>min_records</code>, <code>min_test_days</code>, <code>max_missing_rate</code>, <code>entry_weight_max</code>,
+<code>exit_weight_min</code>, <code>track_flag_share</code>, <code>smooth_r2_min</code>.</p></dd>
 
 
 <dt id="arg-verbose">verbose<a class="anchor" aria-label="anchor" href="#arg-verbose"></a></dt>
@@ -116,10 +116,11 @@ pig whether its weight data are good enough for growth analysis.</p>
     <h2>Value</h2>
     <p>An object of class <code>ppt_weight</code> (a list):</p><ul><li><p><code>per_pig</code>: one row per pig with <code>n_records</code>, <code>n_valid</code>,
 <code>n_outliers</code>, <code>first_date</code>, <code>last_date</code>, <code>test_days</code>,
-<code>missing_rate</code>, <code>entry_weight</code>, <code>exit_weight</code> (kg, from the fitted
-curve), <code>r2</code>, <code>track_removed</code> (share of the records removed by the
+<code>missing_rate</code>, <code>entry_weight</code>, <code>exit_weight</code> (kg, from the LOESS
+smooth of the valid weights), <code>r2</code> (R<c2><b2> of that smooth),
+<code>track_removed</code> (share of the records removed by the
 tracking, <code>NA</code> when not tracked), <code>status</code> (<code>"keep"</code>,
-<code>"low_confidence"</code> or <code>"removed"</code>) and <code>reason</code>;</p></li>
+<code>"low_confidence"</code> or <code>"removed"</code>) and <code>reason</code>;</b2></c2></p></li>
 <li><p><code>daily</code>: one row per pig and day for pigs not removed: median of the
 valid weights (<code>weight</code>, kg), <code>n_records</code>, <code>n_outliers</code>;</p></li>
 <li><p><code>records</code>: every weight record with <code>fitted</code>, <code>outlier</code> and
@@ -135,11 +136,8 @@ tracking);</p></li>
 <code>missing_rate &gt; max_missing_rate</code> (share of test days without a valid
 weight) remove the pig;</p></li>
 <li><p><code>entry_weight &gt; entry_weight_max</code>, <code>exit_weight &lt; exit_weight_min</code>,
-<code>r2 &lt; curve_r2_min</code>, <code>max_daily_jump &gt; max_daily_jump_kg</code> (the
-largest change of the daily median weight between consecutive recorded
-days, kg/d), or a tracking that removes more than <code>track_flag_share</code>
-of the records mark the pig <code>"low_confidence"</code>
-but keep it: its
+a tracking that removes more than <code>track_flag_share</code> of the records,
+or <code>r2 &lt; smooth_r2_min</code> mark the pig <code>"low_confidence"</code> but keep it: its
 growth can still be estimated by extrapolation in <code><a href="calc_adg.html">calc_adg()</a></code>, with a
 flag.</p></li>
 </ul></div>
@@ -154,11 +152,11 @@ settings.</p></div>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">visits</span> <span class="op">&lt;-</span> <span class="fu"><a href="prep_visits.html">prep_visits</a></span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">w</span> <span class="op">&lt;-</span> <span class="fu">clean_weight</span><span class="op">(</span><span class="va">visits</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Cleaning body weight (</span><span style="color: #00BB00; font-weight: bold;">rlm</span><span style="font-weight: bold;">)</span> <span style="color: #00BBBB;">──────────────────────────────────────────────────</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Cleaning body weight (</span><span style="color: #00BB00; font-weight: bold;">rlm + loess</span><span style="font-weight: bold;">)</span> <span style="color: #00BBBB;">──────────────────────────────────────────</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Weight records: <span style="font-weight: bold;">31,472</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Outside weight range: <span style="font-weight: bold;">0</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Adaptation after entry (not used): <span style="font-weight: bold;">3,404</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Outliers: <span style="font-weight: bold;">4,947</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Outliers: <span style="font-weight: bold;">5,667</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span>  of which removed by tracking: <span style="font-weight: bold;">1,543</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #BBBB00;">!</span> Pigs kept: 28, low confidence: 1, removed: 1</span>
 <span class="r-in"><span><span class="va">w</span></span></span>
@@ -166,11 +164,10 @@ settings.</p></div>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> ── <span style="color: #0000BB; font-weight: bold;">&lt;ppt_weight&gt;</span> ──</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Pigs: 30 (keep 28, low confidence 1, removed 1)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">$per_pig</span>: 30 rows x 18 columns</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">$per_pig</span>: 30 rows x 15 columns</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">$daily</span>: 2789 rows x 7 columns</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">$removed</span>: 1 row x 4 columns</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">$records</span>: 31472 rows x 10 columns</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> QC profile: <span style="color: #0000BB;">"casey"</span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Why pigs were removed</span></span></span>
 <span class="r-in"><span><span class="va">w</span><span class="op">$</span><span class="va">removed</span></span></span>
@@ -197,12 +194,12 @@ settings.</p></div>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 5:    NA    TRUE adaptation</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6:    NA    TRUE adaptation</span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Another QC preset</span></span></span>
-<span class="r-in"><span><span class="va">w_national</span> <span class="op">&lt;-</span> <span class="fu">clean_weight</span><span class="op">(</span><span class="va">visits</span>, qc <span class="op">=</span> <span class="fu"><a href="qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"national"</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">w_national</span><span class="op">$</span><span class="va">per_pig</span><span class="op">$</span><span class="va">status</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># Other outlier methods</span></span></span>
+<span class="r-in"><span><span class="va">w_sd</span> <span class="op">&lt;-</span> <span class="fu">clean_weight</span><span class="op">(</span><span class="va">visits</span>, qc <span class="op">=</span> <span class="fu"><a href="qc_config.html">qc_config</a></span><span class="op">(</span>weight_outlier <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"rlm"</span>, <span class="st">"sd"</span><span class="op">)</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">w_sd</span><span class="op">$</span><span class="va">per_pig</span><span class="op">$</span><span class="va">status</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    keep removed </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>      28       2 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>           keep low_confidence        removed </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>             28              1              1 </span>
 </code></pre></div>
     </div>
   </div>

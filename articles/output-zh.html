@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.9.1</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.0.0</span>
       </span>
     </div>
 
@@ -67,10 +67,10 @@
       <a href="../articles/qc-parameters-zh.html">质控参数详解：qc_config()</a>
     </li>
     <li>
-      <a href="../articles/qc-presets-zh.html">质控预设说明：casey、national、legacy</a>
+      <a href="../articles/methods-zh.html">计算方法说明：从原始记录到料肉比</a>
     </li>
     <li>
-      <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线与采食插补</a>
+      <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线、体重填充与采食插补</a>
     </li>
     <li>
       <a href="../articles/output-zh.html">输出结果说明</a>
@@ -181,12 +181,12 @@ g/d，日期为 <code>Date</code> 类型。</p>
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">res</span><span class="op">$</span><span class="va">fcr</span><span class="op">$</span><span class="va">per_pig</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">location</span>, <span class="va">adg</span>, <span class="va">adfi</span>, <span class="va">fcr</span>, <span class="va">fcr_flag</span>, <span class="va">fcr_note</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    responder location      adg     adfi      fcr       fcr_flag</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;   &lt;char&gt;    &lt;num&gt;    &lt;num&gt;    &lt;num&gt;         &lt;char&gt;</span></span>
-<span><span class="co">#&gt; 1:     13913      101 1208.605 2642.669 2.186545             ok</span></span>
-<span><span class="co">#&gt; 2:     13918      101 1165.052 2580.142 2.214615             ok</span></span>
-<span><span class="co">#&gt; 3:     13954      101 1116.762 2680.792 2.400504 low_confidence</span></span>
-<span><span class="co">#&gt; 4:     13996      101 1328.523 2860.400 2.153067             ok</span></span>
-<span><span class="co">#&gt; 5:     14962      101 1272.878 2830.415 2.223633             ok</span></span>
-<span><span class="co">#&gt; 6:     15006      101 1314.881 3121.408 2.373909             ok</span></span>
+<span><span class="co">#&gt; 1:     13913      101 1209.897 2642.642 2.184187             ok</span></span>
+<span><span class="co">#&gt; 2:     13918      101 1162.966 2566.360 2.206737             ok</span></span>
+<span><span class="co">#&gt; 3:     13954      101 1124.224 2681.416 2.385125 low_confidence</span></span>
+<span><span class="co">#&gt; 4:     13996      101 1334.979 2860.269 2.142557             ok</span></span>
+<span><span class="co">#&gt; 5:     14962      101 1278.746 2830.564 2.213547             ok</span></span>
+<span><span class="co">#&gt; 6:     15006      101 1317.472 3121.557 2.369353             ok</span></span>
 <span><span class="co">#&gt;                                   fcr_note</span></span>
 <span><span class="co">#&gt;                                     &lt;char&gt;</span></span>
 <span><span class="co">#&gt; 1:                                        </span></span>
@@ -304,36 +304,25 @@ g/d，日期为 <code>Date</code> 类型。</p>
 </tr>
 <tr class="even">
 <td><code>r2</code></td>
-<td>有效体重拟合曲线的 R²</td>
+<td>有效体重对其 LOESS 平滑曲线的 R²（低于 <code>smooth_r2_min</code>
+时降级）</td>
 </tr>
 <tr class="odd">
 <td>
 <code>entry_weight</code>、<code>exit_weight</code>
 </td>
-<td>拟合曲线在首条、末条有效记录处的体重</td>
+<td>LOESS 平滑曲线在首条、末条有效记录处的体重</td>
 </tr>
 <tr class="even">
 <td><code>track_removed</code></td>
 <td>逐日回溯追踪剔除的记录比例（未追踪时为 <code>NA</code>）</td>
 </tr>
 <tr class="odd">
-<td><code>r2_daily</code></td>
-<td>日体重拟合二次曲线的 R²（national 方法用来剔除）</td>
-</tr>
-<tr class="even">
-<td><code>feed_missing</code></td>
-<td>测定期内没有任何采食记录的天数占比（national 方法用来剔除）</td>
-</tr>
-<tr class="odd">
-<td><code>max_daily_jump</code></td>
-<td>相邻两个有记录日子之间，日体重的最大变化（kg/天）</td>
-</tr>
-<tr class="even">
 <td><code>status</code></td>
 <td>
 <code>keep</code>（通过）、<code>low_confidence</code>（保留但需注意）、<code>removed</code>（剔除）</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>reason</code></td>
 <td>降级或剔除的原因</td>
 </tr>
@@ -362,7 +351,8 @@ g/d，日期为 <code>Date</code> 类型。</p>
 </tr>
 <tr class="even">
 <td><code>fitted</code></td>
-<td>拟合曲线在该时刻的值</td>
+<td>
+<code>weight_outlier</code> 中第一种方法的拟合曲线在该时刻的值</td>
 </tr>
 <tr class="odd">
 <td><code>rlm_w</code></td>
@@ -384,8 +374,11 @@ g/d，日期为 <code>Date</code> 类型。</p>
 <span><span class="co">#&gt;       qc_flag     N</span></span>
 <span><span class="co">#&gt;        &lt;char&gt; &lt;int&gt;</span></span>
 <span><span class="co">#&gt; 1: adaptation  3404</span></span>
-<span><span class="co">#&gt; 2:            26525</span></span>
-<span><span class="co">#&gt; 3:      track  1543</span></span></code></pre></div>
+<span><span class="co">#&gt; 2:            25805</span></span>
+<span><span class="co">#&gt; 3:      track  1543</span></span>
+<span><span class="co">#&gt; 4:  rlm;loess   328</span></span>
+<span><span class="co">#&gt; 5:        rlm   310</span></span>
+<span><span class="co">#&gt; 6:      loess    82</span></span></code></pre></div>
 <table class="table">
 <colgroup>
 <col width="50%">
@@ -419,17 +412,6 @@ g/d，日期为 <code>Date</code> 类型。</p>
 </td>
 <td>被相应的异常值方法判为异常（多种方法时用 <code>;</code> 连接）</td>
 </tr>
-<tr class="even">
-<td><code>day_weight</code></td>
-<td>整天的记录都偏离曲线（<code>day_weight_min</code>）</td>
-</tr>
-<tr class="odd">
-<td>
-<code>rel_dev</code>、<code>daily_drop</code>
-</td>
-<td>可选规则 <code>rel_dev_max</code>、<code>daily_drop_min</code>
-</td>
-</tr>
 </tbody>
 </table>
 </div>
@@ -438,8 +420,7 @@ g/d，日期为 <code>Date</code> 类型。</p>
 <code>daily</code>：每头猪每天的体重<a class="anchor" aria-label="anchor" href="#daily%E6%AF%8F%E5%A4%B4%E7%8C%AA%E6%AF%8F%E5%A4%A9%E7%9A%84%E4%BD%93%E9%87%8D"></a>
 </h3>
 <p><code>weight</code>
-为当天的体重代表值（默认为有效记录的中位数，national
-方法为加权平均），<code>n_records</code>、<code>n_outliers</code>
+为当天有效记录的中位数，<code>n_records</code>、<code>n_outliers</code>
 为当天的记录数和异常记录数。</p>
 </div>
 </div>
@@ -467,41 +448,28 @@ g/d，日期为 <code>Date</code> 类型。</p>
 </tr>
 <tr class="even">
 <td><code>adg</code></td>
-<td>日增重（g/d），算法由 <code>adg_method</code> 决定</td>
+<td>日增重（g/d）：区间内每天的体重（实测 +
+填充）对日期直线回归的斜率</td>
 </tr>
 <tr class="odd">
-<td><code>adg_source</code></td>
-<td>实际采用的算法：<code>lm</code>（直线回归斜率）或
-<code>curve</code>（曲线法）</td>
+<td><code>r_squared</code></td>
+<td>这个回归的 R²</td>
 </tr>
 <tr class="even">
 <td>
-<code>lm_slope</code>、<code>r_squared</code>
+<code>n_observed_days</code>、<code>n_interpolated_days</code>、<code>n_curve_days</code>
 </td>
-<td>区间起止时间之间全部有效体重的直线回归斜率（g/d）及其 R²</td>
+<td>区间内日体重为实测、线性插值、生长曲线填充的天数</td>
 </tr>
 <tr class="odd">
-<td>
-<code>lm_weight_from</code>、<code>lm_weight_to</code>
-</td>
-<td>回归线覆盖的体重范围（kg）；测定未到区间上限的猪，斜率只代表到这里为止的一段</td>
-</tr>
-<tr class="even">
 <td><code>adg_curve</code></td>
-<td>曲线法日增重：区间体重差 ÷ 曲线从起点到终点所需天数</td>
+<td>对照用：生长曲线在区间两端的体重差 ÷ 天数</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>
 <code>curve_used</code>、<code>curve_r2</code>
 </td>
 <td>实际使用的生长曲线和它的 R²</td>
-</tr>
-<tr class="even">
-<td>
-<code>curve_start</code>、<code>curve_end</code>
-</td>
-<td>拟合曲线所用记录的首末日期（<code>curve_margin_kg</code>
-时会截取）</td>
 </tr>
 <tr class="odd">
 <td><code>adg_type</code></td>
@@ -530,7 +498,7 @@ g/d，日期为 <code>Date</code> 类型。</p>
 <td>
 <code>extrap_days_start</code>、<code>extrap_days_end</code>
 </td>
-<td>起点在首条记录之前、终点在末条记录之后外推的天数</td>
+<td>起点在首条记录之前、终点在末条记录之后，由生长曲线外推的天数</td>
 </tr>
 <tr class="even">
 <td>
@@ -545,11 +513,47 @@ g/d，日期为 <code>Date</code> 类型。</p>
 <h3 id="daily">
 <code>daily</code><a class="anchor" aria-label="anchor" href="#daily"></a>
 </h3>
-<p>区间内的每一天和有体重记录的每一天：<code>weight</code>（实测日体重，没有记录时为
-<code>NA</code>）、<code>predicted</code>（曲线预测体重）、<code>lower</code>、<code>upper</code>（预测的
-95% 范围）、<code>source</code>（<code>observed</code> 实测 /
-<code>predicted</code>
-预测）、<code>in_stage</code>（是否在区间内）。</p>
+<p>区间内的每一天和有体重记录的每一天：</p>
+<table class="table">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<thead><tr class="header">
+<th>列</th>
+<th>含义</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><code>weight</code></td>
+<td>实测日体重（当天有效记录的中位数），没有有效记录时为
+<code>NA</code>
+</td>
+</tr>
+<tr class="even">
+<td><code>weight_filled</code></td>
+<td>补齐后的日体重：实测、线性插值或生长曲线的值；ADG
+的回归和采食的体重都用它</td>
+</tr>
+<tr class="odd">
+<td><code>source</code></td>
+<td>
+<code>weight_filled</code> 的来源：<code>observed</code> 实测 /
+<code>interpolated</code> 两个有记录日之间线性插值 / <code>curve</code>
+首个有记录日之前或末个有记录日之后，用生长曲线</td>
+</tr>
+<tr class="even">
+<td>
+<code>predicted</code>、<code>lower</code>、<code>upper</code>
+</td>
+<td>生长曲线的值及其 95% 范围</td>
+</tr>
+<tr class="odd">
+<td><code>in_stage</code></td>
+<td>是否在区间内</td>
+</tr>
+</tbody>
+</table>
 </div>
 </div>
 <div class="section level2">
@@ -567,7 +571,8 @@ g/d，日期为 <code>Date</code> 类型。</p>
 <tbody>
 <tr class="odd">
 <td><code>bw</code></td>
-<td>当天体重（曲线预测值）</td>
+<td>当天体重（<code>$adg$daily</code> 中补齐后的
+<code>weight_filled</code>）</td>
 </tr>
 <tr class="even">
 <td><code>in_stage</code></td>
@@ -602,6 +607,10 @@ g/d，日期为 <code>Date</code> 类型。</p>
 </tbody>
 </table>
 <table class="table">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
 <thead><tr class="header">
 <th><code>state</code></th>
 <th>含义</th>
@@ -617,11 +626,12 @@ g/d，日期为 <code>Date</code> 类型。</p>
 </tr>
 <tr class="odd">
 <td><code>iii</code></td>
-<td>区间内部缺失，插补得到</td>
+<td>两个有记录的日子之间缺失：≤ 3 天用 LOESS，&gt; 3 天用”日采食 ~
+体重”回归（<code>impute_method = "linear"</code> 时为线性插值）</td>
 </tr>
 <tr class="even">
 <td><code>elrp</code></td>
-<td>区间两端缺失，外推得到</td>
+<td>区间两端缺失，用”日采食 ~ 体重”回归</td>
 </tr>
 <tr class="odd">
 <td><code>missing</code></td>
@@ -672,7 +682,7 @@ g/d，日期为 <code>Date</code> 类型。</p>
 <td>
 <code>n_extrap_start</code>、<code>n_extrap_end</code>
 </td>
-<td>区间开头、结尾连续外推的天数</td>
+<td>区间开头、结尾连续用回归填充的天数</td>
 </tr>
 <tr class="even">
 <td><code>coverage</code></td>
@@ -693,8 +703,8 @@ g/d，日期为 <code>Date</code> 类型。</p>
 <h2 id="fcr料肉比与最终结果">6. <code>$fcr</code>：料肉比与最终结果<a class="anchor" aria-label="anchor" href="#fcr%E6%96%99%E8%82%89%E6%AF%94%E4%B8%8E%E6%9C%80%E7%BB%88%E7%BB%93%E6%9E%9C"></a>
 </h2>
 <div class="section level3">
-<h3 id="per_pig默认方法">
-<code>per_pig</code>（默认方法）<a class="anchor" aria-label="anchor" href="#per_pig%E9%BB%98%E8%AE%A4%E6%96%B9%E6%B3%95"></a>
+<h3 id="per_pig-3">
+<code>per_pig</code><a class="anchor" aria-label="anchor" href="#per_pig-3"></a>
 </h3>
 <table class="table">
 <colgroup>
@@ -732,7 +742,7 @@ g/d，日期为 <code>Date</code> 类型。</p>
 <td>
 <code>extrap_days_start</code>、<code>extrap_days_end</code>、<code>n_extrap_start</code>、<code>n_extrap_end</code>
 </td>
-<td>体重曲线、采食量在区间两端的外推天数</td>
+<td>体重、采食量在区间两端的填充天数</td>
 </tr>
 <tr class="even">
 <td><code>fcr_flag</code></td>
@@ -742,58 +752,6 @@ g/d，日期为 <code>Date</code> 类型。</p>
 <tr class="odd">
 <td><code>fcr_note</code></td>
 <td>低可信度的原因，例如外推天数过多、采食实测比例不足、某体重段记录断档等</td>
-</tr>
-</tbody>
-</table>
-</div>
-<div class="section level3">
-<h3 id="per_pignational-方法另有的列">
-<code>per_pig</code>（national 方法另有的列）<a class="anchor" aria-label="anchor" href="#per_pignational-%E6%96%B9%E6%B3%95%E5%8F%A6%E6%9C%89%E7%9A%84%E5%88%97"></a>
-</h3>
-<table class="table">
-<colgroup>
-<col width="50%">
-<col width="50%">
-</colgroup>
-<thead><tr class="header">
-<th>列</th>
-<th>含义</th>
-</tr></thead>
-<tbody>
-<tr class="odd">
-<td><code>fcr</code></td>
-<td>(区间上限处累计采食 − 下限处累计采食) ÷ 区间宽度</td>
-</tr>
-<tr class="even">
-<td>
-<code>cfi_start</code>、<code>cfi_end</code>
-</td>
-<td>区间下限、上限处的累计采食量（kg）</td>
-</tr>
-<tr class="odd">
-<td>
-<code>cfi_r2</code>、<code>cfi_slope</code>
-</td>
-<td>累计采食对体重线性回归的 R² 和斜率</td>
-</tr>
-<tr class="even">
-<td>
-<code>weight_first</code>、<code>weight_last</code>
-</td>
-<td>保留天中首日、末日的体重</td>
-</tr>
-<tr class="odd">
-<td>
-<code>extrap_kg_start</code>、<code>extrap_kg_end</code>
-</td>
-<td>用回归斜率外推的体重范围（kg）；超过一个体重段宽度时
-<code>fcr_flag</code> 为低可信度</td>
-</tr>
-<tr class="even">
-<td>
-<code>n_classes</code>、<code>n_classes_removed</code>
-</td>
-<td>保留的体重段数、被删除的体重段数</td>
 </tr>
 </tbody>
 </table>
@@ -830,13 +788,13 @@ g/d，日期为 <code>Date</code> 类型。</p>
 </tr>
 <tr class="even">
 <td><code>n_observed_feed</code></td>
-<td>段内有实测采食的天数（默认方法）</td>
+<td>段内有实测采食的天数</td>
 </tr>
 <tr class="odd">
 <td>
 <code>weight_coverage_kg</code>、<code>inner</code>、<code>low_coverage</code>
 </td>
-<td>段内实测体重覆盖的范围；是否为中间段；中间段覆盖不足（默认方法）</td>
+<td>段内实测体重覆盖的范围；是否为中间段；中间段覆盖不足</td>
 </tr>
 <tr class="even">
 <td>
@@ -844,21 +802,8 @@ g/d，日期为 <code>Date</code> 类型。</p>
 </td>
 <td>段料肉比的合理范围（<code>bin_fcr_limits</code>）及是否超出</td>
 </tr>
-<tr class="odd">
-<td><code>removed</code></td>
-<td>national 方法：该段被删除的原因，<code>NA</code> 表示保留</td>
-</tr>
 </tbody>
 </table>
-</div>
-<div class="section level3">
-<h3 id="cfi累计采食量仅-national-方法">
-<code>cfi</code>：累计采食量（仅 national 方法）<a class="anchor" aria-label="anchor" href="#cfi%E7%B4%AF%E8%AE%A1%E9%87%87%E9%A3%9F%E9%87%8F%E4%BB%85-national-%E6%96%B9%E6%B3%95"></a>
-</h3>
-<p>区间内的每一天一行：<code>weight</code>（日体重）、<code>dfi</code>（日采食）、<code>weight_from</code>（所属体重段）、<code>kept</code>（该段是否保留）、<code>cfi</code>（保留天上累加的采食量，kg）。用
-<code>plot_cfi(res$fcr)</code>
-作图：横轴为体重，纵轴为累计采食量；被删除的体重段用阴影标出；绿线从区间下限处的累计采食连到上限处，斜率就是
-FCR，虚线部分是用回归斜率外推的。</p>
 </div>
 <div class="section level3">
 <h3 id="summary汇总统计">
@@ -891,8 +836,7 @@ FCR，虚线部分是用回归斜率外推的。</p>
 </tr>
 <tr class="even">
 <td><code>step</code></td>
-<td>在哪一步被剔除：<code>prep_visits</code>（读卡误读）、<code>clean_weight</code>（体重质控）、<code>calc_adg</code>（没有日增重）、<code>calc_adfi</code>（没有日采食）、<code>calc_fcr</code>（national
-方法的分段和累计采食检查）</td>
+<td>在哪一步被剔除：<code>prep_visits</code>（读卡误读）、<code>clean_weight</code>（体重质控）、<code>calc_adg</code>（没有日增重）、<code>calc_adfi</code>（没有日采食）</td>
 </tr>
 <tr class="odd">
 <td><code>reason</code></td>

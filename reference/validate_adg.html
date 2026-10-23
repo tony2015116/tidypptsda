@@ -26,7 +26,7 @@ all records of the same model.
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.9.1</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.0.0</span>
       </span>
     </div>
 
@@ -55,10 +55,10 @@ all records of the same model.
       <a href="../articles/qc-parameters-zh.html">质控参数详解：qc_config()</a>
     </li>
     <li>
-      <a href="../articles/qc-presets-zh.html">质控预设说明：casey、national、legacy</a>
+      <a href="../articles/methods-zh.html">计算方法说明：从原始记录到料肉比</a>
     </li>
     <li>
-      <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线与采食插补</a>
+      <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线、体重填充与采食插补</a>
     </li>
     <li>
       <a href="../articles/output-zh.html">输出结果说明</a>
@@ -100,7 +100,7 @@ all records of the same model.</p></li>
     <div id="ref-usage">
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">validate_adg</span><span class="op">(</span></span>
 <span>  <span class="va">weight</span>,</span>
-<span>  models <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"poly1"</span>, <span class="st">"poly2"</span>, <span class="st">"poly3"</span>, <span class="st">"loess"</span>, <span class="st">"gompertz"</span><span class="op">)</span>,</span>
+<span>  models <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"poly1"</span>, <span class="st">"poly2"</span>, <span class="st">"poly3"</span>, <span class="st">"gompertz"</span><span class="op">)</span>,</span>
 <span>  k <span class="op">=</span> <span class="fl">5</span>,</span>
 <span>  trim_days <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">10</span>, <span class="fl">20</span><span class="op">)</span>,</span>
 <span>  qc <span class="op">=</span> <span class="va">weight</span><span class="op">$</span><span class="va">settings</span>,</span>
@@ -157,7 +157,7 @@ Default <code>c(10, 20)</code>.</p></dd>
     <h2>Value</h2>
     <p>A list of class <code>ppt_validation</code> with</p><ul><li><p><code>summary</code>: one row per model: <code>cv_rmse</code> and <code>cv_mae</code> (kg, weight of the
 left-out records), and for each truncation (<code>late10</code>, <code>early10</code>, ...)
-the growth-curve ADG (<code>adg_curve</code>) <code>bias</code>, <code>rmse</code> (g/d) and Spearman rank correlation <code>spearman</code>
+the ADG <code>bias</code>, <code>rmse</code> (g/d) and Spearman rank correlation <code>spearman</code>
 with the full-data ADG, and how many pigs still get an ADG (<code>n</code>);</p></li>
 <li><p><code>cv</code>: cross-validation error of every pig and model;</p></li>
 <li><p><code>truncation</code>: ADG of every pig, model and truncation;</p></li>
