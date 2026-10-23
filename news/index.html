@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.9.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.9.1</span>
       </span>
     </div>
 
@@ -77,6 +77,12 @@
       <small>Source: <a href="https://github.com/tony2015116/tidypptsda/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="page-header" data-toc-text="0.9.1" id="tidypptsda-091">tidypptsda 0.9.1<a class="anchor" aria-label="anchor" href="#tidypptsda-091"></a></h2>
+<ul><li>
+<code><a href="../reference/plot_cfi.html">plot_cfi()</a></code> plots the cumulative feed intake of the national method against body weight, one plot per station: kept stage days, removed weight classes shaded, and the line whose slope is the FCR (dashed where extended by the regression). The national <code><a href="../reference/calc_fcr.html">calc_fcr()</a></code> result gains <code>$cfi</code> (every stage day with its class, whether it is kept and the cumulative intake).</li>
+<li>Fixed: with <code>impute_method = "national"</code>, imputed days could get the wrong <code>state</code> (<code>iii</code> / <code>elrp</code>); the imputed values were right.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="page-header" data-toc-text="0.9.0" id="tidypptsda-090">tidypptsda 0.9.0<a class="anchor" aria-label="anchor" href="#tidypptsda-090"></a></h2>
 <div class="section level3">

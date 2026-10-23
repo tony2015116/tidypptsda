@@ -19,7 +19,7 @@ the traits."><meta property="og:image" content="https://tony2015116.github.io/ti
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.9.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.9.1</span>
       </span>
     </div>
 
@@ -149,7 +149,9 @@ stage width.</p></li>
 weight), <code>extrap_kg_start</code>, <code>extrap_kg_end</code> (kg extended by the
 regression; more than <code>bin_width</code> gives <code>fcr_flag = "low_confidence"</code>),
 <code>n_classes</code> and <code>n_classes_removed</code>; <code>by_bin</code> gives <code>removed</code> (reason or
-<code>NA</code>) for each class. ADG and ADFI are those of <code><a href="calc_adg.html">calc_adg()</a></code> and
+<code>NA</code>) for each class; <code>cfi</code> gives every stage day: <code>weight</code>, <code>dfi</code>,
+<code>weight_from</code> (class), <code>kept</code> and the cumulative intake <code>cfi</code> (kg, kept
+days only). Plot it with <code><a href="plot_cfi.html">plot_cfi()</a></code>. ADG and ADFI are those of <code><a href="calc_adg.html">calc_adg()</a></code> and
 <code><a href="calc_adfi.html">calc_adfi()</a></code>.</p>
     </div>
     <div id="see-also">

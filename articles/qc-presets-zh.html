@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.9.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.9.1</span>
       </span>
     </div>
 
@@ -321,7 +321,9 @@ rlm 处理。这类读数多时，日体重的二次曲线 R² 会低于
 <code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">data</span>, qc <span class="op">=</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="st">"national"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">res</span><span class="op">$</span><span class="va">fcr</span><span class="op">$</span><span class="va">per_pig</span>      <span class="co"># FCR 以及累计采食的起止值、回归 R² 等</span></span>
 <span><span class="va">res</span><span class="op">$</span><span class="va">fcr</span><span class="op">$</span><span class="va">by_bin</span>       <span class="co"># 每头猪每个 10 kg 段，及删除原因</span></span>
-<span><span class="va">res</span><span class="op">$</span><span class="va">removed</span>          <span class="co"># 被剔除的猪和原因</span></span></code></pre></div>
+<span><span class="va">res</span><span class="op">$</span><span class="va">removed</span>          <span class="co"># 被剔除的猪和原因</span></span>
+<span><span class="va">g</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/plot_cfi.html">plot_cfi</a></span><span class="op">(</span><span class="va">res</span><span class="op">$</span><span class="va">fcr</span><span class="op">)</span>   <span class="co"># 累计采食量图：每个测定站一张，每头猪一个分面</span></span>
+<span><span class="va">g</span><span class="op">$</span><span class="va">plot</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span></span></code></pre></div>
 </div>
 </div>
 <div class="section level2">
