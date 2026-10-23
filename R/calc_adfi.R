@@ -337,7 +337,8 @@ impute_dfi_one_pig <- function(d, qc) {
         d[long, dfi := pmax(0, stats::predict(f, newdata = d[long]))]
       }
     }
-    d[need & !is.na(dfi), state := data.table::fifelse(inside[need & !is.na(dfi)], "iii", "elrp")]
+    done <- need & !is.na(d$dfi)
+    d[done, state := data.table::fifelse(inside[done], "iii", "elrp")]
   } else {
     pred <- loess_extend(x[ok], d$dfi_check[ok], qc$loess_span)
     d[inside, `:=`(dfi = pmax(0, pred(x[inside])), state = "iii")]

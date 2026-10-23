@@ -108,6 +108,96 @@ plot_adfi <- function(adfi, responders = NULL, locations = NULL, ncol = 3,
   out
 }
 
+#' Plot Cumulative Feed Intake (National Method)
+#'
+#' @description
+#' For the national method ([qc_config()] preset `"national"`), plot the
+#' cumulative feed intake of each pig against body weight, one plot per
+#' station. Points are the kept stage days; the weight classes removed by
+#' the class checks are shaded. The line runs from the cumulative intake at
+#' the lower stage limit to that at the upper limit; its slope is the FCR
+#' (dashed where it is extended by the regression beyond the kept days).
+#'
+#' @param fcr Result of [calc_fcr()] (or `$fcr` of [run_pipeline()]) with
+#'   `method = "national"`.
+#' @inheritParams plot_adg
+#'
+#' @return A `data.table` with `location`, `n_pigs` and `plot`; save with
+#'   [save_plots()].
+#' @export
+plot_cfi <- function(fcr, responders = NULL, locations = NULL, ncol = 3, verbose = 1) {
+  local_verbose(verbose)
+  if (!inherits(fcr, "ppt_fcr") || is.null(fcr$cfi)) {
+    cli::cli_abort("{.arg fcr} must be the result of {.fn calc_fcr} with {.code method = \"national\"}.")
+  }
+  d <- filter_pigs(fcr$cfi, responders, locations)
+  qc <- fcr$settings
+  info <- fcr$per_pig[responder %in% d$responder]
+  rm <- fcr$removed[step == "calc_fcr"]
+  plots <- lapply(split(d, by = "location", sorted = TRUE), function(x) {
+    lv <- natural_order(unique(x$responder))
+    cfi_station_plot(x, info[responder %in% lv], rm[responder %in% lv],
+                     fcr$by_bin[responder %in% lv], lv, qc, ncol)
+  })
+  out <- data.table::data.table(location = names(plots),
+                                n_pigs = vapply(plots, function(p) data.table::uniqueN(p$data$responder), integer(1)),
+                                plot = unname(plots))
+  ppt_msg("Created {nrow(out)} cumulative feed intake plot{?s}", "success")
+  out
+}
+
+cfi_station_plot <- function(d, info, rm, bins, lv, qc, ncol) {
+  loc <- d$location[1L]
+  lo <- qc$stage_range[1L]
+  hi <- qc$stage_range[2L]
+  d <- data.table::copy(d)[, responder := factor(responder, levels = lv)]
+  kept <- d[kept == TRUE & !is.na(cfi)]
+  # FCR line and its extensions
+  ln <- info[!is.na(fcr), .(responder = factor(responder, levels = lv), cfi_start, cfi_end,
+                           weight_first, weight_last, fcr, cfi_r2)]
+  ln[, `:=`(y_first = cfi_start + fcr * (weight_first - lo), y_last = cfi_start + fcr * (weight_last - lo))]
+  shade <- bins[!is.na(removed), .(responder = factor(responder, levels = lv), weight_from, weight_to)]
+  lab <- data.table::data.table(responder = factor(lv, levels = lv))
+  lab[ln, on = "responder", txt := sprintf("FCR %.2f (R2 %.3f)", i.fcr, i.cfi_r2)]
+  rmm <- rm[, .(responder = factor(responder, levels = lv), reason)]
+  lab[rmm, on = "responder", txt := paste("removed:", i.reason)]
+  lab[is.na(txt), txt := ""]
+  p <- ggplot2::ggplot(kept, ggplot2::aes(x = weight, y = cfi))
+  if (nrow(shade) > 0L) {
+    p <- p + ggplot2::geom_rect(data = shade, ggplot2::aes(xmin = weight_from, xmax = weight_to),
+                                ymin = -Inf, ymax = Inf, fill = "#D55E00", alpha = 0.12,
+                                inherit.aes = FALSE)
+  }
+  p <- p +
+    ggplot2::geom_vline(xintercept = seq(lo, hi, by = qc$bin_width), colour = "#999999",
+                        linewidth = 0.2, alpha = 0.6) +
+    ggplot2::geom_vline(xintercept = c(lo, hi), linetype = "dashed", colour = "#000000", alpha = 0.4) +
+    ggplot2::geom_point(colour = "#0072B2", size = 0.8)
+  if (nrow(ln) > 0L) {
+    p <- p +
+      ggplot2::geom_segment(data = ln, ggplot2::aes(x = weight_first, xend = weight_last,
+                                                    y = y_first, yend = y_last),
+                            colour = "#009E73", linewidth = 0.7, inherit.aes = FALSE) +
+      ggplot2::geom_segment(data = ln, ggplot2::aes(x = lo, xend = weight_first, y = cfi_start, yend = y_first),
+                            colour = "#009E73", linetype = "dashed", inherit.aes = FALSE) +
+      ggplot2::geom_segment(data = ln, ggplot2::aes(x = weight_last, xend = hi, y = y_last, yend = cfi_end),
+                            colour = "#009E73", linetype = "dashed", inherit.aes = FALSE) +
+      ggplot2::geom_point(data = ln, ggplot2::aes(x = lo, y = cfi_start), colour = "#009E73",
+                          size = 2, inherit.aes = FALSE) +
+      ggplot2::geom_point(data = ln, ggplot2::aes(x = hi, y = cfi_end), colour = "#009E73",
+                          size = 2, inherit.aes = FALSE)
+  }
+  p +
+    ggplot2::geom_text(data = lab, ggplot2::aes(label = txt), x = -Inf, y = Inf,
+                       hjust = -0.05, vjust = 1.3, size = 2.8, inherit.aes = FALSE) +
+    ggplot2::facet_wrap(~responder, ncol = min(ncol, length(lv)), drop = FALSE) +
+    ggplot2::scale_x_continuous(limits = c(lo - 2, hi + 2)) +
+    ggplot2::labs(title = paste("Station", loc), x = "Body weight (kg)",
+                  y = "Cumulative feed intake (kg)") +
+    ppt_theme() +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 0, hjust = 0.5))
+}
+
 #' Save Plots to Files
 #'
 #' @param plots Result of [plot_adg()] or [plot_adfi()].

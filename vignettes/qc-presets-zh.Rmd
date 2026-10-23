@@ -117,6 +117,8 @@ res <- run_pipeline(data, qc = qc_config("national"))
 res$fcr$per_pig      # FCR 以及累计采食的起止值、回归 R² 等
 res$fcr$by_bin       # 每头猪每个 10 kg 段，及删除原因
 res$removed          # 被剔除的猪和原因
+g <- plot_cfi(res$fcr)   # 累计采食量图：每个测定站一张，每头猪一个分面
+g$plot[[1]]
 ```
 
 ## 5. legacy

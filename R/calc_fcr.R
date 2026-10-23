@@ -51,7 +51,9 @@
 #' weight), `extrap_kg_start`, `extrap_kg_end` (kg extended by the
 #' regression; more than `bin_width` gives `fcr_flag = "low_confidence"`),
 #' `n_classes` and `n_classes_removed`; `by_bin` gives `removed` (reason or
-#' `NA`) for each class. ADG and ADFI are those of [calc_adg()] and
+#' `NA`) for each class; `cfi` gives every stage day: `weight`, `dfi`,
+#' `weight_from` (class), `kept` and the cumulative intake `cfi` (kg, kept
+#' days only). Plot it with [plot_cfi()]. ADG and ADFI are those of [calc_adg()] and
 #' [calc_adfi()].
 #'
 #' @seealso [calc_adg()], [calc_adfi()].
@@ -226,15 +228,21 @@ calc_fcr_national <- function(adg, adfi) {
     data.table::setorder(bins, weight_from)
     kept_bins <- bins[is.na(removed), weight_from]
     out_bins <- data.table::copy(bins)[, responder := id]
+    # daily cumulative intake over the kept classes (for plot_cfi())
+    data.table::setorder(st, date)
+    days_tab <- st[, .(responder = id, date, weight = w, dfi, weight_from,
+                       kept = weight_from %in% kept_bins)]
+    days_tab[, cfi := NA_real_]
+    days_tab[kept == TRUE, cfi := cumsum(dfi) / 1000]
     if (length(kept_bins) == 0L) {
-      return(list(error = "every weight class removed", bins = out_bins))
+      return(list(error = "every weight class removed", bins = out_bins, cfi = days_tab))
     }
     expected <- seq(min(kept_bins), max(kept_bins), by = width)
     if (!all(expected %in% kept_bins)) {
       gapb <- setdiff(expected, kept_bins)
       return(list(error = sprintf("weight class %s kg removed or missing between kept classes",
                                   paste0(gapb, "-", gapb + width, collapse = ", ")),
-                  bins = out_bins))
+                  bins = out_bins, cfi = days_tab))
     }
     k <- st[weight_from %in% kept_bins]
     data.table::setorder(k, date)
@@ -243,7 +251,7 @@ calc_fcr_national <- function(adg, adfi) {
     r2 <- summary(cf)$r.squared
     if (!is.finite(r2) || r2 <= qc$cfi_r2_min) {
       return(list(error = sprintf("R2 of cumulative feed on weight %.3f <= %s", r2, qc$cfi_r2_min),
-                  bins = out_bins))
+                  bins = out_bins, cfi = days_tab))
     }
     b <- unname(stats::coef(cf)[2L])
     first <- k[1L]
@@ -256,7 +264,7 @@ calc_fcr_national <- function(adg, adfi) {
       weight_first = first$w, weight_last = last$w,
       extrap_kg_start = max(0, first$w - lo), extrap_kg_end = max(0, hi - last$w),
       n_classes = length(kept_bins), n_classes_removed = sum(!is.na(bins$removed))),
-      bins = out_bins)
+      bins = out_bins, cfi = days_tab)
   }
   res <- lapply(pigs, one)
   ok <- vapply(res, function(r) is.null(r$error), logical(1))
@@ -268,6 +276,7 @@ calc_fcr_national <- function(adg, adfi) {
   }
   bad <- data.table::data.table(responder = pigs[!ok],
                                 reason = vapply(res[!ok], `[[`, "", "error"))
+  cfi <- data.table::rbindlist(lapply(res, `[[`, "cfi"), fill = TRUE)
 
   a <- adg$per_pig[, intersect(c("responder", "location", "breed", "stage", "adg", "adg_type",
                                 "stage_days", "start_weight", "end_weight"), names(adg$per_pig)),
@@ -303,9 +312,13 @@ calc_fcr_national <- function(adg, adfi) {
   if (nrow(s) == 1L && s$n > 0) {
     ppt_msg("Mean FCR {sprintf('%.2f', s$mean)} (SD {sprintf('%.2f', s$sd)})", "success")
   }
+  if (nrow(cfi) > 0L) {
+    cfi <- merge(loc, cfi, by = "responder")
+    data.table::setorder(cfi, location, responder, date)
+  }
   new_ppt_result(per_pig = per_pig, daily = adfi$daily, removed = removed,
                  settings = qc, class = "ppt_fcr") |>
-    add_element(summary = summary, by_bin = by_bin)
+    add_element(summary = summary, by_bin = by_bin, cfi = cfi)
 }
 
 fcr_by_bin <- function(adg, adfi, qc) {
