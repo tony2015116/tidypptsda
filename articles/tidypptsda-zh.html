@@ -634,7 +634,132 @@ LOESS 平滑插补，超过 3 天的用每头猪的”日采食 ~
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Created 1 feed intake plot</span></span>
 <span><span class="va">h</span><span class="op">$</span><span class="va">plot</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span></span></code></pre></div>
 <p><img src="tidypptsda-zh_files/figure-html/plot-adfi-1.png" class="r-plt" alt="" width="100%"></p>
-<p>生长曲线图中，蓝色点是实测日体重，橙色点是线性插值的日体重，紫色点是用生长曲线填充的日体重；绿色曲线是生长曲线，黑色虚线是日增重的回归线。每个测定站输出一张图，每头猪一个分面。保存为图片：</p>
+<div class="section level3">
+<h3 id="生长曲线图怎么看">生长曲线图怎么看<a class="anchor" aria-label="anchor" href="#%E7%94%9F%E9%95%BF%E6%9B%B2%E7%BA%BF%E5%9B%BE%E6%80%8E%E4%B9%88%E7%9C%8B"></a>
+</h3>
+<p>每个测定站一张图，每头猪一个分面：</p>
+<table class="table">
+<colgroup>
+<col width="33%">
+<col width="33%">
+<col width="33%">
+</colgroup>
+<thead><tr class="header">
+<th>图中元素</th>
+<th>图例</th>
+<th>含义</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td>浅灰色小点</td>
+<td>weight record</td>
+<td>有效的原始体重记录（传入 <code>weight = w</code> 时才画）</td>
+</tr>
+<tr class="even">
+<td>深灰色小叉</td>
+<td>outlier</td>
+<td>被剔除的原始记录：适应期、超出体重范围、追踪剔除、rlm 或 LOESS
+判为异常，原因见 <code>w$records$qc_flag</code>
+</td>
+</tr>
+<tr class="odd">
+<td>蓝色点</td>
+<td>daily weight (observed)</td>
+<td>实测日体重：当天有效记录的中位数</td>
+</tr>
+<tr class="even">
+<td>橙黄色点</td>
+<td>daily weight (interpolated)</td>
+<td>两个有记录的日子之间缺失的日子，线性插值</td>
+</tr>
+<tr class="odd">
+<td>紫红色点</td>
+<td>daily weight (growth curve)</td>
+<td>首个有记录日之前、末个有记录日之后缺失的日子，用生长曲线填充</td>
+</tr>
+<tr class="even">
+<td>绿色实线和浅绿色带</td>
+<td>growth curve</td>
+<td>生长曲线及其约 95% 范围（±1.96 倍残差标准差）</td>
+</tr>
+<tr class="odd">
+<td>黑色长虚线</td>
+<td>ADG regression line</td>
+<td>区间内全部日体重（蓝、橙黄、紫红点）对日期的回归线，斜率就是
+ADG</td>
+</tr>
+<tr class="even">
+<td>灰色水平虚线</td>
+<td>—</td>
+<td>分析区间的上下限（<code>stage_range</code>）</td>
+</tr>
+</tbody>
+</table>
+<p>左上角的文字是日增重、回归
+R²、<code>adg_type</code>，以及区间从下限长到上限用了多少天。看图时重点看：紫红色点多（区间两端靠曲线填充）、橙黄色点成段出现（中间长时间缺记录）、深灰色叉成片出现（追踪剔除较多，可能是几头猪同时上秤或秤的问题）。</p>
+</div>
+<div class="section level3">
+<h3 id="采食量图怎么看">采食量图怎么看<a class="anchor" aria-label="anchor" href="#%E9%87%87%E9%A3%9F%E9%87%8F%E5%9B%BE%E6%80%8E%E4%B9%88%E7%9C%8B"></a>
+</h3>
+<p>只画区间内的日子：</p>
+<table class="table">
+<colgroup>
+<col width="33%">
+<col width="33%">
+<col width="33%">
+</colgroup>
+<thead><tr class="header">
+<th>图中元素</th>
+<th>图例</th>
+<th>含义</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td>浅灰色点</td>
+<td>recorded</td>
+<td>记录的日采食量（全部访问相加，未校正）</td>
+</tr>
+<tr class="even">
+<td>蓝色点</td>
+<td>error-free</td>
+<td>当天没有错误访问，直接使用记录值（<code>state = "org"</code>）</td>
+</tr>
+<tr class="odd">
+<td>橙色点</td>
+<td>corrected</td>
+<td>当天有错误访问，用混合模型校正后的值（<code>corr</code>）</td>
+</tr>
+<tr class="even">
+<td>绿色点</td>
+<td>filled (between records)</td>
+<td>两个有记录的日子之间缺失：≤ 3 天 LOESS，&gt; 3 天用”日采食 ~
+体重”回归（<code>iii</code>）</td>
+</tr>
+<tr class="odd">
+<td>紫红色点</td>
+<td>filled (stage ends)</td>
+<td>区间两端缺失，用”日采食 ~ 体重”回归（<code>elrp</code>）</td>
+</tr>
+<tr class="even">
+<td>细灰线</td>
+<td>—</td>
+<td>把最终使用的日采食量（彩色点）按日期连起来</td>
+</tr>
+<tr class="odd">
+<td>灰色水平虚线</td>
+<td>—</td>
+<td>这头猪的 ADFI（区间内日采食量的平均值）</td>
+</tr>
+</tbody>
+</table>
+<p>左上角的文字是
+ADFI，以及区间内有实测（含校正）采食的天数比例。灰色点和彩色点离得远的日子，说明当天的错误访问多、校正幅度大；紫红色点连成一长段，说明进站晚或出栏早，ADFI
+有一部分是推算的。</p>
+</div>
+<div class="section level3">
+<h3 id="保存图片">保存图片<a class="anchor" aria-label="anchor" href="#%E4%BF%9D%E5%AD%98%E5%9B%BE%E7%89%87"></a>
+</h3>
+<p>每个测定站输出一张图，每头猪一个分面。保存为图片：</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/save_plots.html">save_plots</a></span><span class="op">(</span><span class="va">g</span>, path <span class="op">=</span> <span class="st">"结果/生长曲线"</span>, prefix <span class="op">=</span> <span class="st">"站"</span>, suffix <span class="op">=</span> <span class="st">"growth"</span>, device <span class="op">=</span> <span class="st">"png"</span><span class="op">)</span></span></code></pre></div>
 <p>保存图片的时间几乎都花在 ggplot2 绘图上：每个测定站（15 头猪左右）约
@@ -647,6 +772,7 @@ LOESS 平滑插补，超过 3 天的用每头猪的”日采食 ~
 <li>用 <code>locations</code> 或 <code>responders</code>
 只画需要核查的测定站或猪。</li>
 </ul>
+</div>
 </div>
 <div class="section level2">
 <h2 id="导出结果与并行计算">6. 导出结果与并行计算<a class="anchor" aria-label="anchor" href="#%E5%AF%BC%E5%87%BA%E7%BB%93%E6%9E%9C%E4%B8%8E%E5%B9%B6%E8%A1%8C%E8%AE%A1%E7%AE%97"></a>

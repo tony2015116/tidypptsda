@@ -884,7 +884,7 @@ colour-blind safe palette (Okabe-Ito) without extra packages.</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span></span>
 <span><span class="va">out</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/save_plots.html">save_plots</a></span><span class="op">(</span><span class="va">g</span>, path <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, prefix <span class="op">=</span> <span class="st">"loc"</span>, suffix <span class="op">=</span> <span class="st">"growth"</span>, device <span class="op">=</span> <span class="st">"pdf"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Saved 1 of 1 plot to <span style="color: #0000BB;">/tmp/RtmpP62YZs</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Saved 1 of 1 plot to <span style="color: #0000BB;">/tmp/RtmpAOjIol</span></span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.exists</a></span><span class="op">(</span><span class="va">out</span><span class="op">$</span><span class="va">file</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] TRUE</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">out</span><span class="op">$</span><span class="va">file</span><span class="op">)</span></span></code></pre></div>
@@ -936,19 +936,19 @@ mark so that Excel shows Chinese text correctly.</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="va">out</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/write_results.html">write_results</a></span><span class="op">(</span><span class="va">res</span>, dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"results"</span><span class="op">)</span>, farm <span class="op">=</span> <span class="st">"demo"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Wrote 9 files to <span style="color: #0000BB;">/tmp/RtmpP62YZs/results</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Wrote 9 files to <span style="color: #0000BB;">/tmp/RtmpAOjIol/results</span></span></span>
 <span><span class="va">out</span></span>
 <span><span class="co">#&gt;           table                                                   file  rows</span></span>
 <span><span class="co">#&gt;          &lt;char&gt;                                                 &lt;char&gt; &lt;int&gt;</span></span>
-<span><span class="co">#&gt; 1:          fcr          /tmp/RtmpP62YZs/results/demo_fcr_20261023.csv    29</span></span>
-<span><span class="co">#&gt; 2:       by_bin       /tmp/RtmpP62YZs/results/demo_by_bin_20261023.csv   257</span></span>
-<span><span class="co">#&gt; 3:   daily_feed   /tmp/RtmpP62YZs/results/demo_daily_feed_20261023.csv  2820</span></span>
-<span><span class="co">#&gt; 4: daily_weight /tmp/RtmpP62YZs/results/demo_daily_weight_20261023.csv  2605</span></span>
-<span><span class="co">#&gt; 5:  weight_pigs  /tmp/RtmpP62YZs/results/demo_weight_pigs_20261023.csv    30</span></span>
-<span><span class="co">#&gt; 6:   feed_model   /tmp/RtmpP62YZs/results/demo_feed_model_20261023.csv    14</span></span>
-<span><span class="co">#&gt; 7:      summary      /tmp/RtmpP62YZs/results/demo_summary_20261023.csv    14</span></span>
-<span><span class="co">#&gt; 8:      removed      /tmp/RtmpP62YZs/results/demo_removed_20261023.csv     1</span></span>
-<span><span class="co">#&gt; 9:     settings     /tmp/RtmpP62YZs/results/demo_settings_20261023.csv    42</span></span>
+<span><span class="co">#&gt; 1:          fcr          /tmp/RtmpAOjIol/results/demo_fcr_20261023.csv    29</span></span>
+<span><span class="co">#&gt; 2:       by_bin       /tmp/RtmpAOjIol/results/demo_by_bin_20261023.csv   257</span></span>
+<span><span class="co">#&gt; 3:   daily_feed   /tmp/RtmpAOjIol/results/demo_daily_feed_20261023.csv  2820</span></span>
+<span><span class="co">#&gt; 4: daily_weight /tmp/RtmpAOjIol/results/demo_daily_weight_20261023.csv  2605</span></span>
+<span><span class="co">#&gt; 5:  weight_pigs  /tmp/RtmpAOjIol/results/demo_weight_pigs_20261023.csv    30</span></span>
+<span><span class="co">#&gt; 6:   feed_model   /tmp/RtmpAOjIol/results/demo_feed_model_20261023.csv    14</span></span>
+<span><span class="co">#&gt; 7:      summary      /tmp/RtmpAOjIol/results/demo_summary_20261023.csv    14</span></span>
+<span><span class="co">#&gt; 8:      removed      /tmp/RtmpAOjIol/results/demo_removed_20261023.csv     1</span></span>
+<span><span class="co">#&gt; 9:     settings     /tmp/RtmpAOjIol/results/demo_settings_20261023.csv    42</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"results"</span><span class="op">)</span>, recursive <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
@@ -984,7 +984,8 @@ value.</li>
 <span><span class="va">vo</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_outliers.html">validate_outliers</a></span><span class="op">(</span><span class="va">visits</span>, reps <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Validating weight outlier methods (1 repetition, 5% artificial errors)</span> <span style="color: #00BBBB;">──────</span></span></span>
-<span><span class="co">#&gt; Validating outlier methods <span style="color: #00BB00;">■■■■■■■■■■■■                    </span>  38% | ETA:  2s</span></span>
+<span><span class="co">#&gt; Validating outlier methods <span style="color: #00BB00;">■■■■■■■■■                       </span>  25% | ETA:  4s</span></span>
+<span><span class="co">#&gt; Validating outlier methods <span style="color: #00BB00;">■■■■■■■■■■■■■■■■■■■■■■■         </span>  75% | ETA:  1s</span></span>
 <span><span class="co">#&gt; Validating outlier methods <span style="color: #00BB00;">■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■ </span> 100% | ETA:  0s</span></span>
 <span><span class="co">#&gt; track+rlm+loess: 93% of errors found, 0.4% of good records removed, ADG error</span></span>
 <span><span class="co">#&gt; 1.7 g/d</span></span>
@@ -1020,6 +1021,8 @@ value.</li>
 <span><span class="va">va</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_adg.html">validate_adg</a></span><span class="op">(</span><span class="va">w</span>, models <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"poly1"</span>, <span class="st">"poly2"</span>, <span class="st">"poly3"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Validating growth curves: 5-fold cross-validation and truncation</span> <span style="color: #00BBBB;">────────────</span></span></span>
+<span><span class="co">#&gt; validate_adg: fitting pigs <span style="color: #00BB00;">■■■■■■■■■■■■■■■■■■■■■■■■■■      </span>  83% | ETA:  0s</span></span>
+<span><span class="co">#&gt; validate_adg: fitting pigs <span style="color: #00BB00;">■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■ </span> 100% | ETA:  0s</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Lowest cross-validation error: <span style="color: #0000BB;">"poly3"</span> (1.39 kg)</span></span>
 <span><span class="va">va</span><span class="op">$</span><span class="va">summary</span></span>
 <span><span class="co">#&gt; Key: &lt;model&gt;</span></span>
