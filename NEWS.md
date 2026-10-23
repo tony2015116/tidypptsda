@@ -1,3 +1,74 @@
+# tidypptsda 1.0.0
+
+A simpler, single method from the weight records to FCR. Breaking changes
+are marked with **(breaking)**.
+
+## Settings
+
+* **(breaking)** The presets `"casey"`, `"national"` and `"legacy"` are
+  removed: `qc_config()` takes only named parameters (`qc_config("national")`
+  gives an error that says what to do instead). Removed parameters:
+  `method`, `day_weight_min`, `daily_weight`, `rel_dev_max`,
+  `daily_drop_min`, `daily_r2_min`, `max_feed_missing`, `curve_r2_min`,
+  `max_daily_jump_kg`, `adg_method`, `curve_margin_kg`, `bin_min_gain_kg`,
+  `cfi_r2_min`; `curve_model = "loess"` is removed.
+
+## Body weight
+
+* `weight_outlier` defaults to `c("rlm", "loess")`: after the tracking
+  from the end of the test, the remaining records are checked by quadratic
+  robust regression (bisquare weight < 0.5) and by a robust LOESS smooth
+  (more than 3 robust SDs away). Tracked records are no longer exempt from
+  these methods.
+* New pig-level flag `smooth_r2_min` (default 0.99): a pig whose valid
+  weights fit their LOESS smooth with a lower R² is flagged as low
+  confidence. `per_pig$r2`, `entry_weight` and `exit_weight` now come from
+  this smooth. `r2_daily`, `feed_missing` and `max_daily_jump` are removed.
+
+## ADG
+
+* **(breaking)** Every day of the stage gets a body weight
+  (`daily$weight_filled`): the observed daily median; linear interpolation
+  between recorded days; the growth curve (`curve_model`: `"poly2"`,
+  `"poly1"`, `"poly3"` or `"gompertz"`) before the first and after the last
+  recorded day. `daily$source` is `"observed"`, `"interpolated"` or
+  `"curve"`.
+* **(breaking)** ADG is the slope of the linear regression of these daily
+  weights on the day over the stage, with `r_squared`. New columns
+  `n_observed_days`, `n_interpolated_days`, `n_curve_days`; `adg_curve`
+  stays for comparison. `adg_source`, `lm_slope`, `lm_weight_from`,
+  `lm_weight_to`, `curve_start` and `curve_end` are removed.
+* `plot_adg()` colours the daily weights by source and draws the ADG
+  regression line.
+
+## Feed intake and FCR
+
+* **(breaking)** `impute_method` is `"loess_lm"` (default) or `"linear"`.
+  `"loess_lm"`: gaps of up to `long_gap_days` (now 3) days between recorded
+  days from a robust LOESS smooth, longer gaps and the stage ends from a
+  per-pig regression of daily intake on body weight. `"linear"`: linear
+  interpolation inside, the same regression at the ends. The body weight of
+  the regression, of the correction model and of `fiv_max_by_weight` is the
+  filled daily weight.
+* **(breaking)** FCR is always ADFI / ADG: the national cumulative feed
+  method, `$cfi` and `plot_cfi()` are removed.
+
+## Validation
+
+* New `validate_weight_fill()`: hides recorded daily weights of the stage
+  (random days, blocks, start, end), fills them with linear interpolation
+  or a growth curve and compares filled weights and ADG with the recorded
+  ones.
+* `validate_outliers()` compares method sets with or without the tracking
+  (`"track"` in a set). `validate_adg()` measures the ADG of the filled
+  daily weights. `validate_adfi()` compares `"loess_lm"` and `"linear"`.
+
+## Documentation
+
+* New vignette "计算方法说明" (methods, step by step, with sources); it
+  replaces the presets vignette. The parameter, output, validation and
+  main Chinese vignettes are updated.
+
 # tidypptsda 0.9.1
 
 * `plot_cfi()` plots the cumulative feed intake of the national method

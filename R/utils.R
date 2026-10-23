@@ -349,9 +349,9 @@ utils::globalVariables(c(
   "masks", "err_pct", "sq_err", "n_hidden", "adfi_est", "adfi_true", "scenario",
   "spearman", "track_removed", "tt", "first_day", "i.first_day", "adg_source",
   "adg_curve", "rlm_w", "i.rlm_w", "feed_missing", "r2_daily", "w_obs",
-  "i.weight", "i.dfi", "i.state", "in_band", "removed", "cfi", "w_first", "w_last", "extrap_kg_start", "extrap_kg_end",
-  "kept", "txt", "i.fcr", "i.cfi_r2", "i.reason", "cfi_start", "cfi_end", "weight_first",
-  "weight_last", "y_first", "y_last", "cfi_r2", "step"
+  "i.weight", "i.dfi", "i.state", "removed", "step", "weight_filled", "x",
+  "n_observed_days", "n_interpolated_days", "n_curve_days", "r_squared", "fill",
+  "info", "abs_err", "sum_err", "adg_spearman"
 ))
 
 #' @export
@@ -368,7 +368,6 @@ print.ppt_result <- function(x, ...) {
     el <- x[[nm]]
     if (is.data.frame(el)) cli::cli_text("{.field ${nm}}: {nrow(el)} row{?s} x {ncol(el)} column{?s}")
   }
-  cli::cli_text("QC profile: {.val {attr(x$settings, 'profile') %||% 'none'}}")
   invisible(x)
 }
 

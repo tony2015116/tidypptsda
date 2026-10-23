@@ -73,12 +73,9 @@ head(res$fcr$per_pig[, .(responder, location, adg, adfi, fcr, fcr_flag, fcr_note
 | `n_records`、`n_valid`、`n_outliers` | 体重记录数；有效记录数；判为异常（含适应期、范围外）的记录数 |
 | `first_date`、`last_date`、`test_days` | 首条、末条有效体重的日期；两者之间的天数 |
 | `missing_rate` | 测定期内没有有效体重的天数占比 |
-| `r2` | 有效体重拟合曲线的 R² |
-| `entry_weight`、`exit_weight` | 拟合曲线在首条、末条有效记录处的体重 |
+| `r2` | 有效体重对其 LOESS 平滑曲线的 R²（低于 `smooth_r2_min` 时降级） |
+| `entry_weight`、`exit_weight` | LOESS 平滑曲线在首条、末条有效记录处的体重 |
 | `track_removed` | 逐日回溯追踪剔除的记录比例（未追踪时为 `NA`） |
-| `r2_daily` | 日体重拟合二次曲线的 R²（national 方法用来剔除） |
-| `feed_missing` | 测定期内没有任何采食记录的天数占比（national 方法用来剔除） |
-| `max_daily_jump` | 相邻两个有记录日子之间，日体重的最大变化（kg/天） |
 | `status` | `keep`（通过）、`low_confidence`（保留但需注意）、`removed`（剔除） |
 | `reason` | 降级或剔除的原因 |
 
@@ -87,7 +84,7 @@ head(res$fcr$per_pig[, .(responder, location, adg, adfi, fcr, fcr_flag, fcr_note
 | 列 | 含义 |
 |---|---|
 | `entry_time`、`weight` | 访问时间和体重 |
-| `fitted` | 拟合曲线在该时刻的值 |
+| `fitted` | `weight_outlier` 中第一种方法的拟合曲线在该时刻的值 |
 | `rlm_w` | 稳健回归给这条记录的权重（0–1，越小越像异常值；未用 rlm 时为 `NA`） |
 | `outlier` | 是否判为异常（不参与后续计算） |
 | `qc_flag` | 判为异常的原因，空字符串表示正常，见下表 |
@@ -103,12 +100,10 @@ res$weight$records[, .N, by = qc_flag]
 | `weight_range` | 超出 `weight_range` |
 | `track` | 逐日回溯追踪时与预测体重不衔接 |
 | `rlm`、`loess`、`stl`、`sd` | 被相应的异常值方法判为异常（多种方法时用 `;` 连接） |
-| `day_weight` | 整天的记录都偏离曲线（`day_weight_min`） |
-| `rel_dev`、`daily_drop` | 可选规则 `rel_dev_max`、`daily_drop_min` |
 
 ### `daily`：每头猪每天的体重
 
-`weight` 为当天的体重代表值（默认为有效记录的中位数，national 方法为加权平均），`n_records`、`n_outliers` 为当天的记录数和异常记录数。
+`weight` 为当天有效记录的中位数，`n_records`、`n_outliers` 为当天的记录数和异常记录数。
 
 ## 4. `$adg`：日增重
 
@@ -117,23 +112,29 @@ res$weight$records[, .N, by = qc_flag]
 | 列 | 含义 |
 |---|---|
 | `stage` | 计算区间，如 `30-120` |
-| `adg` | 日增重（g/d），算法由 `adg_method` 决定 |
-| `adg_source` | 实际采用的算法：`lm`（直线回归斜率）或 `curve`（曲线法） |
-| `lm_slope`、`r_squared` | 区间起止时间之间全部有效体重的直线回归斜率（g/d）及其 R² |
-| `lm_weight_from`、`lm_weight_to` | 回归线覆盖的体重范围（kg）；测定未到区间上限的猪，斜率只代表到这里为止的一段 |
-| `adg_curve` | 曲线法日增重：区间体重差 ÷ 曲线从起点到终点所需天数 |
+| `adg` | 日增重（g/d）：区间内每天的体重（实测 + 填充）对日期直线回归的斜率 |
+| `r_squared` | 这个回归的 R² |
+| `n_observed_days`、`n_interpolated_days`、`n_curve_days` | 区间内日体重为实测、线性插值、生长曲线填充的天数 |
+| `adg_curve` | 对照用：生长曲线在区间两端的体重差 ÷ 天数 |
 | `curve_used`、`curve_r2` | 实际使用的生长曲线和它的 R² |
-| `curve_start`、`curve_end` | 拟合曲线所用记录的首末日期（`curve_margin_kg` 时会截取） |
 | `adg_type` | `observed`：区间两端都在测定期内；`extrapolated`：需要外推，但不超过 `max_extrap_days`；`partial`：外推后仍到不了端点，只算覆盖到的部分；`none`：覆盖不足 7 天，没有日增重 |
 | `start_date`、`end_date` | 曲线到达区间下限、上限的日期（区间的起止） |
 | `start_weight`、`end_weight` | 起止处的体重 |
 | `stage_days` | 区间天数 |
-| `extrap_days_start`、`extrap_days_end` | 起点在首条记录之前、终点在末条记录之后外推的天数 |
+| `extrap_days_start`、`extrap_days_end` | 起点在首条记录之前、终点在末条记录之后，由生长曲线外推的天数 |
 | `weight_status`、`weight_reason` | 体重质控的结论（来自 `$weight`） |
 
 ### `daily`
 
-区间内的每一天和有体重记录的每一天：`weight`（实测日体重，没有记录时为 `NA`）、`predicted`（曲线预测体重）、`lower`、`upper`（预测的 95% 范围）、`source`（`observed` 实测 / `predicted` 预测）、`in_stage`（是否在区间内）。
+区间内的每一天和有体重记录的每一天：
+
+| 列 | 含义 |
+|---|---|
+| `weight` | 实测日体重（当天有效记录的中位数），没有有效记录时为 `NA` |
+| `weight_filled` | 补齐后的日体重：实测、线性插值或生长曲线的值；ADG 的回归和采食的体重都用它 |
+| `source` | `weight_filled` 的来源：`observed` 实测 / `interpolated` 两个有记录日之间线性插值 / `curve` 首个有记录日之前或末个有记录日之后，用生长曲线 |
+| `predicted`、`lower`、`upper` | 生长曲线的值及其 95% 范围 |
+| `in_stage` | 是否在区间内 |
 
 ## 5. `$adfi`：日采食量
 
@@ -141,7 +142,7 @@ res$weight$records[, .N, by = qc_flag]
 
 | 列 | 含义 |
 |---|---|
-| `bw` | 当天体重（曲线预测值） |
+| `bw` | 当天体重（`$adg$daily` 中补齐后的 `weight_filled`） |
 | `in_stage` | 是否在区间内 |
 | `n_visits`、`n_error_visits` | 当天访问次数、有采食错误的访问次数 |
 | `dfi_raw` | 记录的日采食量（全部访问相加） |
@@ -154,8 +155,8 @@ res$weight$records[, .N, by = qc_flag]
 |---|---|
 | `org` | 实测，当天没有错误访问 |
 | `corr` | 当天有错误访问，用模型校正 |
-| `iii` | 区间内部缺失，插补得到 |
-| `elrp` | 区间两端缺失，外推得到 |
+| `iii` | 两个有记录的日子之间缺失：≤ 3 天用 LOESS，> 3 天用"日采食 ~ 体重"回归（`impute_method = "linear"` 时为线性插值） |
+| `elrp` | 区间两端缺失，用"日采食 ~ 体重"回归 |
 | `missing` | 无法估计 |
 | `NA` | 区间外的日子，不需要插补 |
 
@@ -167,7 +168,7 @@ res$weight$records[, .N, by = qc_flag]
 | `adfi_raw`、`adfi_error_free` | 未校正、仅无错误访问的平均日采食，供对照 |
 | `n_stage_days` | 区间天数 |
 | `n_observed`、`n_corrected`、`n_interpolated`、`n_extrapolated`、`n_missing` | 各来源的天数 |
-| `n_extrap_start`、`n_extrap_end` | 区间开头、结尾连续外推的天数 |
+| `n_extrap_start`、`n_extrap_end` | 区间开头、结尾连续用回归填充的天数 |
 | `coverage` | 有实测（含校正）采食的天数占区间天数的比例 |
 
 ### `model`：校正模型的系数
@@ -176,7 +177,7 @@ res$weight$records[, .N, by = qc_flag]
 
 ## 6. `$fcr`：料肉比与最终结果
 
-### `per_pig`（默认方法）
+### `per_pig`
 
 | 列 | 含义 |
 |---|---|
@@ -184,20 +185,9 @@ res$weight$records[, .N, by = qc_flag]
 | `fcr` | 料肉比 = `adfi` ÷ `adg` |
 | `gf` | 饲料效率 = `adg` ÷ `adfi` |
 | `adg_type`、`coverage`、`stage_days`、`start_weight`、`end_weight` | 同上文 |
-| `extrap_days_start`、`extrap_days_end`、`n_extrap_start`、`n_extrap_end` | 体重曲线、采食量在区间两端的外推天数 |
+| `extrap_days_start`、`extrap_days_end`、`n_extrap_start`、`n_extrap_end` | 体重、采食量在区间两端的填充天数 |
 | `fcr_flag` | `ok`（可信）、`low_confidence`（低可信度）、`NA`（没有料肉比） |
 | `fcr_note` | 低可信度的原因，例如外推天数过多、采食实测比例不足、某体重段记录断档等 |
-
-### `per_pig`（national 方法另有的列）
-
-| 列 | 含义 |
-|---|---|
-| `fcr` | (区间上限处累计采食 − 下限处累计采食) ÷ 区间宽度 |
-| `cfi_start`、`cfi_end` | 区间下限、上限处的累计采食量（kg） |
-| `cfi_r2`、`cfi_slope` | 累计采食对体重线性回归的 R² 和斜率 |
-| `weight_first`、`weight_last` | 保留天中首日、末日的体重 |
-| `extrap_kg_start`、`extrap_kg_end` | 用回归斜率外推的体重范围（kg）；超过一个体重段宽度时 `fcr_flag` 为低可信度 |
-| `n_classes`、`n_classes_removed` | 保留的体重段数、被删除的体重段数 |
 
 ### `by_bin`：每头猪每个体重段
 
@@ -206,14 +196,9 @@ res$weight$records[, .N, by = qc_flag]
 | `weight_from`、`weight_to` | 体重段（从区间下限起每 `bin_width` kg 一段） |
 | `n_days` | 段内天数 |
 | `feed_kg`、`gain_kg`、`fcr` | 段内采食量、增重和段料肉比 |
-| `n_observed_feed` | 段内有实测采食的天数（默认方法） |
-| `weight_coverage_kg`、`inner`、`low_coverage` | 段内实测体重覆盖的范围；是否为中间段；中间段覆盖不足（默认方法） |
+| `n_observed_feed` | 段内有实测采食的天数 |
+| `weight_coverage_kg`、`inner`、`low_coverage` | 段内实测体重覆盖的范围；是否为中间段；中间段覆盖不足 |
 | `fcr_min`、`fcr_max`、`fcr_out` | 段料肉比的合理范围（`bin_fcr_limits`）及是否超出 |
-| `removed` | national 方法：该段被删除的原因，`NA` 表示保留 |
-
-### `cfi`：累计采食量（仅 national 方法）
-
-区间内的每一天一行：`weight`（日体重）、`dfi`（日采食）、`weight_from`（所属体重段）、`kept`（该段是否保留）、`cfi`（保留天上累加的采食量，kg）。用 `plot_cfi(res$fcr)` 作图：横轴为体重，纵轴为累计采食量；被删除的体重段用阴影标出；绿线从区间下限处的累计采食连到上限处，斜率就是 FCR，虚线部分是用回归斜率外推的。
 
 ### `summary`：汇总统计
 
@@ -224,7 +209,7 @@ res$weight$records[, .N, by = qc_flag]
 | 列 | 含义 |
 |---|---|
 | `responder`、`location` | 耳标号、测定站 |
-| `step` | 在哪一步被剔除：`prep_visits`（读卡误读）、`clean_weight`（体重质控）、`calc_adg`（没有日增重）、`calc_adfi`（没有日采食）、`calc_fcr`（national 方法的分段和累计采食检查） |
+| `step` | 在哪一步被剔除：`prep_visits`（读卡误读）、`clean_weight`（体重质控）、`calc_adg`（没有日增重）、`calc_adfi`（没有日采食） |
 | `reason` | 原因 |
 
 ```{r removed}

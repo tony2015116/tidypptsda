@@ -19,18 +19,17 @@ make_pig <- function(id = "p1", days = 70, start = 30, adg = 0.9,
   )
 }
 
-test_that("clean_weight runs on NEDAP and FIRE with every preset", {
+test_that("clean_weight runs on NEDAP and FIRE with several method sets", {
   for (data in list(nedap, fire)) {
     v <- prep_visits(data, verbose = 0)
     before <- data.table::copy(v)
-    for (p in c("casey", "national", "legacy")) {
-      w <- clean_weight(v, qc = qc_config(p), verbose = 0)
+    for (m in list(c("rlm", "loess"), "rlm", c("stl", "sd"))) {
+      w <- clean_weight(v, qc = qc_config(weight_outlier = m), verbose = 0)
       expect_s3_class(w, c("ppt_weight", "ppt_result"))
       expect_named(w, c("per_pig", "daily", "removed", "settings", "records"))
       expect_equal(nrow(w$per_pig), length(unique(v$responder[v$identified])))
       expect_true(all(w$per_pig$status %in% c("keep", "low_confidence", "removed")))
       expect_true(all(w$daily$responder %in% w$per_pig[status != "removed", responder]))
-      expect_equal(attr(w$settings, "profile"), p)
     }
     expect_identical(v, before)
   }
@@ -81,18 +80,6 @@ test_that("weight range and optional rules flag records", {
   pig$weight[c(5, 50)] <- c(5, 200)
   w <- clean_weight(pig, verbose = 0)
   expect_equal(w$records[qc_flag == "weight_range", .N], 2L)
-  # daily drop: one day 20% lighter
-  pig2 <- make_pig()
-  d <- pig2$date[pig2$date == pig2$date[300]]
-  pig2[date == d[1], weight := weight * 0.8]
-  # (tracking off: it would already remove a whole day 20% lighter)
-  w2 <- clean_weight(pig2, qc = qc_config(daily_drop_min = 0.9, weight_outlier = "rlm", rlm_cutoff = 0,
-                                          weight_track = FALSE), verbose = 0)
-  expect_true(all(w2$records[date == d[1], outlier]))
-  expect_true(all(grepl("daily_drop", w2$records[date == d[1], qc_flag])))
-  # relative deviation
-  w3 <- clean_weight(pig, qc = qc_config(rel_dev_max = 0.25), verbose = 0)
-  expect_false(any(grepl("rel_dev", w3$records$qc_flag)))
 })
 
 test_that("tracking from the end removes readings of several pigs on the scale", {
@@ -105,11 +92,17 @@ test_that("tracking from the end removes readings of several pigs on the scale",
   set.seed(3)
   multi <- t < 35 & stats::runif(nrow(pig)) < 0.5
   pig[multi, weight := weight * stats::runif(.N, 1.25, 2.2)]
-  w <- clean_weight(pig, qc_config(adapt_days = 0), verbose = 0)
+  # tracking alone (rlm with cutoff 0 flags nothing)
+  w <- clean_weight(pig, qc_config(adapt_days = 0, weight_outlier = "rlm", rlm_cutoff = 0), verbose = 0)
   r <- w$records
   expect_gt(mean(r$outlier[multi]), 0.95)
   expect_lt(mean(r$outlier[!multi]), 0.05)        # also the slow early growth
   expect_true(all(r[multi & outlier == TRUE, qc_flag] %in% c("track", "weight_range")))
+  # default: rlm and loess then also flag part of the slow early growth (a
+  # smooth curve cannot follow the kink), below the stage, so ADG holds
+  wd <- clean_weight(pig, qc_config(adapt_days = 0), verbose = 0)
+  expect_gt(mean(wd$records$outlier[multi]), 0.95)
+  expect_equal(calc_adg(wd, verbose = 0)$per_pig$adg, 900, tolerance = 0.05)
   expect_equal(w$per_pig$track_removed, mean(r$qc_flag == "track"))
   off <- clean_weight(pig, qc_config(weight_track = FALSE), verbose = 0)
   expect_true(is.na(off$per_pig$track_removed))
@@ -152,27 +145,6 @@ test_that("weights of the adaptation days are not used", {
   expect_false(any(w0$records$qc_flag == "adaptation"))
 })
 
-test_that("national weight rules: whole days off the curve, weighted daily means", {
-  pig <- make_pig(per_day = 12)
-  d5 <- sort(unique(pig$date))[30]
-  pig[date == d5, weight := weight + 1.7]        # a whole day 1.7 kg too heavy
-  q <- qc_config(adapt_days = 0, weight_track = FALSE, rlm_cutoff = 0.01,
-                 day_weight_min = 0.9, daily_weight = "weighted_mean")
-  w <- clean_weight(pig, q, verbose = 0)
-  expect_true(all(w$records[date == d5, outlier]))
-  expect_true(all(w$records[date == d5, qc_flag] %in% c("day_weight", "rlm")))
-  expect_true(any(w$records[date == d5, qc_flag] == "day_weight"))
-  expect_equal(daily_weight_value(c(10, 20), c(1, 3), "weighted_mean"), 17.5)
-  expect_equal(daily_weight_value(c(10, 20, 90), c(1, 1, 1), "median"), 20)
-  expect_equal(daily_r2(1:10, 30 + 1:10), 1)
-  expect_true(w$per_pig$r2_daily > 0.99)
-  # feed missing and daily R2 remove pigs in the national method
-  short_feed <- clean_weight(pig, qc_set(q, list(max_feed_missing = 0, daily_r2_min = 0.99999)),
-                             verbose = 0)
-  expect_equal(short_feed$per_pig$status, "removed")
-  expect_match(short_feed$per_pig$reason, "R2 of the daily weights")
-})
-
 test_that("length rules remove pigs, entry/exit rules only flag them", {
   heavy <- make_pig("heavy", start = 80)          # entry weight too high
   light <- make_pig("light", start = 20, adg = 0.5, seed = 2)  # exit too low
@@ -192,12 +164,14 @@ test_that("length rules remove pigs, entry/exit rules only flag them", {
   expect_true(all(c("heavy", "light") %in% w$daily$responder))
 })
 
-test_that("curve R2 only lowers confidence", {
+test_that("a low R2 of the LOESS smooth only lowers confidence", {
   pig <- make_pig()
   pig[, weight := weight + rnorm(.N, 0, 6)]
-  w <- clean_weight(pig, qc = qc_config(curve_r2_min = 0.99), verbose = 0)
+  w <- clean_weight(pig, qc = qc_config(weight_track = FALSE), verbose = 0)
   expect_equal(w$per_pig$status, "low_confidence")
-  expect_match(w$per_pig$reason, "R2")
+  expect_match(w$per_pig$reason, "R2 of the LOESS smooth")
+  w0 <- clean_weight(pig, qc = qc_config(weight_track = FALSE, smooth_r2_min = NULL), verbose = 0)
+  expect_equal(w0$per_pig$status, "keep")
   expect_equal(nrow(w$removed), 0L)
   expect_gt(nrow(w$daily), 0L)
 })
@@ -209,18 +183,6 @@ test_that("a pig whose fit fails is removed, others continue", {
   expect_equal(w$per_pig[responder == "tiny", status], "removed")
   expect_match(w$per_pig[responder == "tiny", reason], "fit failed")
   expect_equal(w$per_pig[responder == "p1", status], "keep")
-})
-
-test_that("daily weight jumps are measured and only flag pigs when asked", {
-  v <- prep_visits(nedap, verbose = 0)
-  w <- clean_weight(v, verbose = 0)
-  expect_true("max_daily_jump" %in% names(w$per_pig))
-  expect_false(any(grepl("day-to-day", w$per_pig$reason)))
-  w4 <- clean_weight(v, qc = qc_config(max_daily_jump_kg = 4), verbose = 0)
-  flagged <- w4$per_pig[grepl("day-to-day", reason)]
-  expect_gt(nrow(flagged), 0)
-  expect_true(all(flagged$status %in% c("low_confidence", "removed")))
-  expect_equal(w4$per_pig[status == "removed", .N], w$per_pig[status == "removed", .N])
 })
 
 test_that("parallel computing gives the same result", {

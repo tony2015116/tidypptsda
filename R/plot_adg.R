@@ -3,8 +3,12 @@
 #' Plot Growth Curves per Station
 #'
 #' @description
-#' Plot body weight and the fitted growth curve of each pig, one plot per
-#' station.
+#' Plot the daily body weights, the fitted growth curve and the ADG
+#' regression line of each pig, one plot per station. Point colours show
+#' where each daily weight comes from: observed (daily median), linear
+#' interpolation between recorded days, or the growth curve before the
+#' first / after the last recorded day. The straight line over the stage is
+#' the regression whose slope is the ADG.
 #'
 #' @param adg Result of [calc_adg()].
 #' @param weight Optional result of [clean_weight()] to also show every
@@ -47,9 +51,11 @@ plot_adg <- function(adg, weight = NULL, responders = NULL, locations = NULL,
   rec <- if (!is.null(weight)) weight$records[responder %in% daily$responder] else NULL
 
   cols <- c(record = "#BBBBBB", outlier = "#D55E00", observed = "#0072B2",
-            curve = "#009E73", stage = "#000000")
-  info[, label := sprintf("ADG %s g/d (%s)\n%s-%s kg in %s d",
-                          ifelse(is.na(adg), "NA", format(round(adg))), adg_type,
+            interpolated = "#E69F00", filled = "#CC79A7", curve = "#009E73",
+            slope = "#000000", stage = "#000000")
+  info[, label := sprintf("ADG %s g/d (R2 %s, %s)\n%s-%s kg in %s d",
+                          ifelse(is.na(adg), "NA", format(round(adg))),
+                          ifelse(is.na(r_squared), "NA", sprintf("%.3f", r_squared)), adg_type,
                           stage_rng[1L], stage_rng[2L],
                           ifelse(is.na(stage_days), "NA", sprintf("%.1f", stage_days)))]
 
@@ -106,96 +112,6 @@ plot_adfi <- function(adfi, responders = NULL, locations = NULL, ncol = 3,
                                 plot = unname(plots))
   ppt_msg("Created {nrow(out)} feed intake plot{?s}", "success")
   out
-}
-
-#' Plot Cumulative Feed Intake (National Method)
-#'
-#' @description
-#' For the national method ([qc_config()] preset `"national"`), plot the
-#' cumulative feed intake of each pig against body weight, one plot per
-#' station. Points are the kept stage days; the weight classes removed by
-#' the class checks are shaded. The line runs from the cumulative intake at
-#' the lower stage limit to that at the upper limit; its slope is the FCR
-#' (dashed where it is extended by the regression beyond the kept days).
-#'
-#' @param fcr Result of [calc_fcr()] (or `$fcr` of [run_pipeline()]) with
-#'   `method = "national"`.
-#' @inheritParams plot_adg
-#'
-#' @return A `data.table` with `location`, `n_pigs` and `plot`; save with
-#'   [save_plots()].
-#' @export
-plot_cfi <- function(fcr, responders = NULL, locations = NULL, ncol = 3, verbose = 1) {
-  local_verbose(verbose)
-  if (!inherits(fcr, "ppt_fcr") || is.null(fcr$cfi)) {
-    cli::cli_abort("{.arg fcr} must be the result of {.fn calc_fcr} with {.code method = \"national\"}.")
-  }
-  d <- filter_pigs(fcr$cfi, responders, locations)
-  qc <- fcr$settings
-  info <- fcr$per_pig[responder %in% d$responder]
-  rm <- fcr$removed[step == "calc_fcr"]
-  plots <- lapply(split(d, by = "location", sorted = TRUE), function(x) {
-    lv <- natural_order(unique(x$responder))
-    cfi_station_plot(x, info[responder %in% lv], rm[responder %in% lv],
-                     fcr$by_bin[responder %in% lv], lv, qc, ncol)
-  })
-  out <- data.table::data.table(location = names(plots),
-                                n_pigs = vapply(plots, function(p) data.table::uniqueN(p$data$responder), integer(1)),
-                                plot = unname(plots))
-  ppt_msg("Created {nrow(out)} cumulative feed intake plot{?s}", "success")
-  out
-}
-
-cfi_station_plot <- function(d, info, rm, bins, lv, qc, ncol) {
-  loc <- d$location[1L]
-  lo <- qc$stage_range[1L]
-  hi <- qc$stage_range[2L]
-  d <- data.table::copy(d)[, responder := factor(responder, levels = lv)]
-  kept <- d[kept == TRUE & !is.na(cfi)]
-  # FCR line and its extensions
-  ln <- info[!is.na(fcr), .(responder = factor(responder, levels = lv), cfi_start, cfi_end,
-                           weight_first, weight_last, fcr, cfi_r2)]
-  ln[, `:=`(y_first = cfi_start + fcr * (weight_first - lo), y_last = cfi_start + fcr * (weight_last - lo))]
-  shade <- bins[!is.na(removed), .(responder = factor(responder, levels = lv), weight_from, weight_to)]
-  lab <- data.table::data.table(responder = factor(lv, levels = lv))
-  lab[ln, on = "responder", txt := sprintf("FCR %.2f (R2 %.3f)", i.fcr, i.cfi_r2)]
-  rmm <- rm[, .(responder = factor(responder, levels = lv), reason)]
-  lab[rmm, on = "responder", txt := paste("removed:", i.reason)]
-  lab[is.na(txt), txt := ""]
-  p <- ggplot2::ggplot(kept, ggplot2::aes(x = weight, y = cfi))
-  if (nrow(shade) > 0L) {
-    p <- p + ggplot2::geom_rect(data = shade, ggplot2::aes(xmin = weight_from, xmax = weight_to),
-                                ymin = -Inf, ymax = Inf, fill = "#D55E00", alpha = 0.12,
-                                inherit.aes = FALSE)
-  }
-  p <- p +
-    ggplot2::geom_vline(xintercept = seq(lo, hi, by = qc$bin_width), colour = "#999999",
-                        linewidth = 0.2, alpha = 0.6) +
-    ggplot2::geom_vline(xintercept = c(lo, hi), linetype = "dashed", colour = "#000000", alpha = 0.4) +
-    ggplot2::geom_point(colour = "#0072B2", size = 0.8)
-  if (nrow(ln) > 0L) {
-    p <- p +
-      ggplot2::geom_segment(data = ln, ggplot2::aes(x = weight_first, xend = weight_last,
-                                                    y = y_first, yend = y_last),
-                            colour = "#009E73", linewidth = 0.7, inherit.aes = FALSE) +
-      ggplot2::geom_segment(data = ln, ggplot2::aes(x = lo, xend = weight_first, y = cfi_start, yend = y_first),
-                            colour = "#009E73", linetype = "dashed", inherit.aes = FALSE) +
-      ggplot2::geom_segment(data = ln, ggplot2::aes(x = weight_last, xend = hi, y = y_last, yend = cfi_end),
-                            colour = "#009E73", linetype = "dashed", inherit.aes = FALSE) +
-      ggplot2::geom_point(data = ln, ggplot2::aes(x = lo, y = cfi_start), colour = "#009E73",
-                          size = 2, inherit.aes = FALSE) +
-      ggplot2::geom_point(data = ln, ggplot2::aes(x = hi, y = cfi_end), colour = "#009E73",
-                          size = 2, inherit.aes = FALSE)
-  }
-  p +
-    ggplot2::geom_text(data = lab, ggplot2::aes(label = txt), x = -Inf, y = Inf,
-                       hjust = -0.05, vjust = 1.3, size = 2.8, inherit.aes = FALSE) +
-    ggplot2::facet_wrap(~responder, ncol = min(ncol, length(lv)), drop = FALSE) +
-    ggplot2::scale_x_continuous(limits = c(lo - 2, hi + 2)) +
-    ggplot2::labs(title = paste("Station", loc), x = "Body weight (kg)",
-                  y = "Cumulative feed intake (kg)") +
-    ppt_theme() +
-    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 0, hjust = 0.5))
 }
 
 #' Save Plots to Files
@@ -264,7 +180,8 @@ adg_station_plot <- function(d, rec, lab, lv, stage_rng, cols, ncol) {
   d <- data.table::copy(d)[, responder := factor(responder, levels = lv)]
   lab <- data.table::copy(lab)[, responder := factor(responder, levels = lv)]
   lab <- lab[!is.na(responder)]
-  y_rng <- range(c(d$lower, d$upper, d$weight, stage_rng, rec$weight), na.rm = TRUE)
+  d[, kind := data.table::fifelse(source == "curve", "filled", source)]
+  y_rng <- range(c(d$lower, d$upper, d$weight_filled, stage_rng, rec$weight), na.rm = TRUE)
   p <- ggplot2::ggplot(d, ggplot2::aes(x = date)) +
     ggplot2::geom_hline(yintercept = stage_rng, linetype = "dashed",
                         colour = cols[["stage"]], alpha = 0.4) +
@@ -277,11 +194,24 @@ adg_station_plot <- function(d, rec, lab, lv, stage_rng, cols, ncol) {
     p <- p + ggplot2::geom_point(data = r, ggplot2::aes(y = weight, colour = kind),
                                  size = 0.4, alpha = 0.6)
   }
-  brk <- c("observed", "curve", if (!is.null(rec)) c("record", "outlier"))
+  # ADG regression line over the stage days
+  sl <- d[in_stage == TRUE & !is.na(weight_filled),
+          if (.N >= 7L) {
+            f <- stats::lm(weight_filled ~ as.numeric(date))
+            data.table::data.table(x = range(date), y = stats::predict(f)[c(which.min(date), which.max(date))])
+          }, by = responder]
+  brk <- c("observed", "interpolated", "filled", "curve", "slope",
+           if (!is.null(rec)) c("record", "outlier"))
+  brk <- intersect(brk, c(unique(d$kind), "curve", if (nrow(sl) > 0L) "slope", if (!is.null(rec)) c("record", "outlier")))
+  p <- p +
+    ggplot2::geom_line(ggplot2::aes(y = predicted, colour = "curve"), linewidth = 0.6)
+  if (nrow(sl) > 0L) {
+    p <- p + ggplot2::geom_line(data = sl, ggplot2::aes(x = x, y = y, colour = "slope"),
+                                linewidth = 0.5, linetype = "longdash")
+  }
   p +
-    ggplot2::geom_point(data = d[!is.na(weight)],
-                        ggplot2::aes(y = weight, colour = "observed"), size = 0.9) +
-    ggplot2::geom_line(ggplot2::aes(y = predicted, colour = "curve"), linewidth = 0.6) +
+    ggplot2::geom_point(data = d[!is.na(weight_filled)],
+                        ggplot2::aes(y = weight_filled, colour = kind), size = 0.9) +
     ggplot2::geom_text(data = lab, ggplot2::aes(label = label),
                        x = -Inf, y = Inf, hjust = -0.05, vjust = 1.2,
                        size = 2.8, inherit.aes = FALSE) +
@@ -289,8 +219,13 @@ adg_station_plot <- function(d, rec, lab, lv, stage_rng, cols, ncol) {
     ggplot2::scale_y_continuous(limits = y_rng + c(-2, 12)) +
     ggplot2::scale_colour_manual(
       name = NULL, values = cols, breaks = brk,
-      labels = c(observed = "daily median weight", curve = "growth curve",
-                 record = "weight record", outlier = "outlier")[brk]
+      labels = c(observed = "daily weight (observed)", interpolated = "daily weight (interpolated)",
+                 filled = "daily weight (growth curve)", curve = "growth curve",
+                 slope = "ADG regression line", record = "weight record", outlier = "outlier")[brk],
+      guide = ggplot2::guide_legend(override.aes = list(
+        linetype = ifelse(brk %in% c("curve", "slope"), "solid", "blank"),
+        shape = ifelse(brk %in% c("curve", "slope"), NA, 16),
+        size = ifelse(brk %in% c("record", "outlier"), 1, 1.5)))
     ) +
     ggplot2::labs(title = paste("Station", loc), x = NULL, y = "Body weight (kg)") +
     ppt_theme()

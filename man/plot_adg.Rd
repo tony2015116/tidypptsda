@@ -31,8 +31,12 @@ and \code{plot} (a list of ggplot objects). Use \code{\link[=save_plots]{save_pl
 to files.
 }
 \description{
-Plot body weight and the fitted growth curve of each pig, one plot per
-station.
+Plot the daily body weights, the fitted growth curve and the ADG
+regression line of each pig, one plot per station. Point colours show
+where each daily weight comes from: observed (daily median), linear
+interpolation between recorded days, or the growth curve before the
+first / after the last recorded day. The straight line over the stage is
+the regression whose slope is the ADG.
 }
 \examples{
 visits <- prep_visits(nedap, verbose = 0)

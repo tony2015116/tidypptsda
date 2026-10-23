@@ -85,41 +85,60 @@ test_that("missing days are interpolated inside and extrapolated outside", {
   f <- calc_adfi(v2, a, verbose = 0)
   d <- f$daily[responder == pig & date %in% gap]
   expect_equal(d$state, rep("iii", 5))
-  around <- f$daily[responder == pig & date %in% days[c(39, 45)], dfi]
-  expect_true(all(d$dfi >= min(around) - 1 & d$dfi <= max(around) + 1))
+  # a 5-day gap (> long_gap_days) is filled by the regression on body weight
+  rec <- f$daily[responder == pig & state %in% c("org", "corr")]
+  fit <- stats::lm(dfi ~ bw, data = rec)
+  expect_equal(d$dfi, pmax(0, unname(stats::predict(fit, newdata = d))), tolerance = 1e-6)
   # FIRE pigs enter above 30 kg: the stage start is extrapolated
   ff <- run_adfi(fire)$adfi
   expect_gt(ff$daily[state == "elrp", .N], 0)
 })
 
-test_that("long gaps use LOESS, short gaps a straight line", {
-  v <- prep_visits(nedap, verbose = 0)
-  pig <- v[identified == TRUE, responder][1]
-  days <- sort(unique(v[responder == pig, date]))
-  gap <- days[30:41]                                   # 12-day gap
-  v2 <- v[!(responder %in% pig & date %in% gap)]
-  a <- calc_adg(clean_weight(v2, verbose = 0), verbose = 0)
-  lin <- calc_adfi(v2, a, qc = qc_config(long_gap_days = 100), verbose = 0)
-  lo <- calc_adfi(v2, a, qc = qc_config(long_gap_days = 7), verbose = 0)
-  dl <- lin$daily[responder == pig & date %in% gap]
-  dz <- lo$daily[responder == pig & date %in% gap]
-  expect_equal(dl$state, rep("iii", 12))
-  expect_equal(dz$state, rep("iii", 12))
-  # a straight line has constant steps, LOESS does not
-  expect_lt(stats::sd(diff(dl$dfi)), 1e-6)
-  expect_gt(stats::sd(diff(dz$dfi)), 1e-6)
+test_that("short gaps use LOESS, long gaps and the ends the regression on weight", {
+  set.seed(5)
+  n <- 60
+  d <- data.table::data.table(seq_days = 1:n, bw = 30 + 1:n, in_stage = TRUE,
+                              dfi_check = 1500 + 20 * (1:n) + stats::rnorm(n, 0, 50))
+  d[c(10, 11), dfi_check := NA]        # short gap
+  d[30:40, dfi_check := NA]            # long gap
+  d[1:3, dfi_check := NA]              # start
+  d[, state := data.table::fifelse(is.na(dfi_check), NA_character_, "org")]
+  q <- qc_config()
+  out <- impute_dfi_one_pig(d, q)
+  expect_false(anyNA(out$dfi))
+  truth <- 1500 + 20 * (1:n)
+  miss <- c(1:3, 10, 11, 30:40)
+  expect_lt(max(abs(out$dfi[miss] - truth[miss])), 150)
+  expect_true(all(out$state[c(10, 11, 30:40)] == "iii"))
+  expect_true(all(out$state[1:3] == "elrp"))
+  # the long gap follows the regression on body weight: a straight line in bw
+  f <- stats::lm(dfi_check ~ bw, data = d[!is.na(dfi_check)])
+  expect_equal(out$dfi[30:40], unname(stats::predict(f, newdata = d[30:40])))
+  expect_equal(out$dfi[1:3], unname(stats::predict(f, newdata = d[1:3])))
+  # linear interpolation: a straight line between the neighbours
+  lin <- impute_dfi_one_pig(d, qc_config(impute_method = "linear"))
+  expect_equal(lin$dfi[30:40], stats::approx(c(29, 41), d$dfi_check[c(29, 41)], xout = 30:40)$y)
+  expect_equal(lin$dfi[1:3], out$dfi[1:3])
   expect_equal(run_length(c(TRUE, TRUE, FALSE, TRUE)), c(2L, 2L, 0L, 1L))
 })
 
-test_that("loess imputation and edge counts work", {
+test_that("edge counts work", {
   r <- run_adfi(fire)
-  f <- calc_adfi(r$visits, r$adg, qc = qc_config(impute_method = "loess"), verbose = 0)
+  f <- calc_adfi(r$visits, r$adg, qc = qc_config(impute_method = "linear"), verbose = 0)
   expect_gt(f$daily[state %in% c("iii", "elrp"), .N], 0)
   expect_false(anyNA(f$per_pig$adfi))
   p <- r$adfi$per_pig
   expect_true(all(p$n_extrap_start + p$n_extrap_end <= p$n_extrapolated))
   expect_gt(max(p$n_extrap_start), 15)                 # FIRE pigs enter late
   expect_equal(edge_run(c("elrp", "elrp", "org", "elrp")), 2L)
+})
+
+test_that("body weight comes from the filled daily weights", {
+  r <- run_adfi(nedap)
+  bw <- adg_bw(r$adg)
+  m <- merge(r$adfi$daily[, .(responder, date, bw)], r$adg$daily[, .(responder, date, weight_filled)],
+             by = c("responder", "date"))
+  expect_equal(m$bw, m$weight_filled)
 })
 
 test_that("dfi range and quantile limits set values to missing", {

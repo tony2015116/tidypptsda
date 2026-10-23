@@ -18,6 +18,9 @@ render_ok <- function(p) {
 test_that("plot_adg gives one plot per station and renders without warnings", {
   r <- plot_inputs()
   g <- plot_adg(r$adg, weight = r$w, verbose = 0)
+  layers <- vapply(g$plot[[1]]$layers, function(l) class(l$geom)[1L], "")
+  expect_gte(sum(layers == "GeomLine"), 2L)          # growth curve and ADG line
+  expect_true(all(c("observed", "filled") %in% g$plot[[1]]$data$kind))
   expect_equal(g$location, c("101", "102"))
   expect_true(all(vapply(g$plot, ggplot2::is.ggplot, logical(1))))
   expect_equal(sum(g$n_pigs), nrow(r$adg$per_pig))

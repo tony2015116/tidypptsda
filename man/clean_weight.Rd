@@ -10,10 +10,10 @@ clean_weight(visits, qc = qc_config(), verbose = 1, cores = 1)
 \item{visits}{Visit table from \code{\link[=prep_visits]{prep_visits()}}.}
 
 \item{qc}{QC settings from \code{\link[=qc_config]{qc_config()}}. Used here: \code{weight_range},
-\code{weight_outlier}, \code{outlier_combine}, \code{rlm_cutoff}, \code{sd_max},
-\code{loess_span}, \code{rel_dev_max}, \code{daily_drop_min}, \code{min_records},
-\code{min_test_days}, \code{max_missing_rate}, \code{entry_weight_max},
-\code{exit_weight_min}, \code{curve_r2_min}.}
+\code{adapt_days}, \code{weight_track}, \code{track_tol}, \code{weight_outlier},
+\code{outlier_combine}, \code{rlm_cutoff}, \code{sd_max}, \code{loess_span},
+\code{min_records}, \code{min_test_days}, \code{max_missing_rate}, \code{entry_weight_max},
+\code{exit_weight_min}, \code{track_flag_share}, \code{smooth_r2_min}.}
 
 \item{verbose}{0 (silent), 1 (summary, default) or 2 (details).}
 
@@ -24,8 +24,9 @@ An object of class \code{ppt_weight} (a list):
 \itemize{
 \item \code{per_pig}: one row per pig with \code{n_records}, \code{n_valid},
 \code{n_outliers}, \code{first_date}, \code{last_date}, \code{test_days},
-\code{missing_rate}, \code{entry_weight}, \code{exit_weight} (kg, from the fitted
-curve), \code{r2}, \code{track_removed} (share of the records removed by the
+\code{missing_rate}, \code{entry_weight}, \code{exit_weight} (kg, from the LOESS
+smooth of the valid weights), \code{r2} (R\if{html}{\out{<c2>}}\if{html}{\out{<b2>}} of that smooth),
+\code{track_removed} (share of the records removed by the
 tracking, \code{NA} when not tracked), \code{status} (\code{"keep"},
 \code{"low_confidence"} or \code{"removed"}) and \code{reason};
 \item \code{daily}: one row per pig and day for pigs not removed: median of the
@@ -49,11 +50,8 @@ Pig checks use the valid (non-outlier) records only:
 \code{missing_rate > max_missing_rate} (share of test days without a valid
 weight) remove the pig;
 \item \code{entry_weight > entry_weight_max}, \code{exit_weight < exit_weight_min},
-\code{r2 < curve_r2_min}, \code{max_daily_jump > max_daily_jump_kg} (the
-largest change of the daily median weight between consecutive recorded
-days, kg/d), or a tracking that removes more than \code{track_flag_share}
-of the records mark the pig \code{"low_confidence"}
-but keep it: its
+a tracking that removes more than \code{track_flag_share} of the records,
+or \code{r2 < smooth_r2_min} mark the pig \code{"low_confidence"} but keep it: its
 growth can still be estimated by extrapolation in \code{\link[=calc_adg]{calc_adg()}}, with a
 flag.
 }
@@ -69,9 +67,9 @@ w$removed
 # Records flagged as outliers
 head(w$records[outlier == TRUE])
 
-# Another QC preset
-w_national <- clean_weight(visits, qc = qc_config("national"), verbose = 0)
-table(w_national$per_pig$status)
+# Other outlier methods
+w_sd <- clean_weight(visits, qc = qc_config(weight_outlier = c("rlm", "sd")), verbose = 0)
+table(w_sd$per_pig$status)
 }
 \seealso{
 \code{\link[=prep_visits]{prep_visits()}} for the previous step, \code{\link[=qc_config]{qc_config()}} for the

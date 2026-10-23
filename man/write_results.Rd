@@ -41,7 +41,7 @@ For a \code{\link[=run_pipeline]{run_pipeline()}} result the files are:
 \item \code{fcr}: one row per pig with ADG, ADFI, FCR and confidence flags;
 \item \code{by_bin}: feed, gain and FCR per body weight class;
 \item \code{daily_feed}: daily feed intake (recorded, corrected, imputed);
-\item \code{daily_weight}: daily body weight (recorded and fitted);
+\item \code{daily_weight}: daily body weight (observed, filled and fitted);
 \item \code{weight_pigs}: weight checks of every pig;
 \item \code{feed_model}: coefficients of the feed intake correction model;
 \item \code{removed}: removed pigs with step and reason;

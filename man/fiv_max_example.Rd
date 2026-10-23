@@ -32,14 +32,10 @@ before use.
 fiv_max_example()
 qc <- qc_config(fiv_max_by_weight = fiv_max_example(),
                 bin_fcr_limits = bin_fcr_example())
-# Default preset
+# Default settings
 qc <- qc_config()
 qc$duration_max
 
-# Another preset with one parameter overridden
-qc_national <- qc_config("national", min_test_days = 50)
-qc_national
-
-# Optional rules are off (NULL) unless switched on
-qc_config("casey", daily_drop_min = 0.90)$daily_drop_min
+# Override single parameters
+qc_config(stage_range = c(40, 110), weight_outlier = c("rlm", "loess", "sd"))
 }

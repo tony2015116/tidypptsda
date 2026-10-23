@@ -2,17 +2,20 @@
 
 test_that("validate_outliers finds artificial errors", {
   v <- prep_visits(nedap, verbose = 0)
-  res <- validate_outliers(v, methods = list(rlm = "rlm", sd = "sd"), rate = 0.05,
+  res <- validate_outliers(v, methods = list(rlm = "rlm", sd = "sd", track = "track"), rate = 0.05,
                            size = c(10, 20), reps = 1, verbose = 0)
   expect_s3_class(res, "ppt_validation")
-  expect_equal(res$summary$method, c("none", "rlm", "sd"))
+  expect_equal(res$summary$method, c("none", "rlm", "sd", "track"))
+  expect_true(outlier_qc(qc_config(), "track")$weight_track)
+  expect_false(outlier_qc(qc_config(), "rlm")$weight_track)
+  expect_equal(outlier_qc(qc_config(), c("track", "sd"))$weight_outlier, "sd")
   s <- res$summary
   expect_lt(s[method == "none", sensitivity], 0.1)   # weight_range only
   expect_gt(s[method == "rlm", sensitivity], 0.8)
   expect_lt(s[method == "rlm", false_positive_rate], 0.1)
   expect_true(all(abs(s$adg_bias) < 20))
   # reproducible
-  again <- validate_outliers(v, methods = list(rlm = "rlm", sd = "sd"), rate = 0.05,
+  again <- validate_outliers(v, methods = list(rlm = "rlm", sd = "sd", track = "track"), rate = 0.05,
                              size = c(10, 20), reps = 1, verbose = 0)
   expect_equal(again$summary, res$summary, check.attributes = FALSE)
   down <- validate_outliers(v, methods = list(rlm = "rlm"), direction = "down",
@@ -37,6 +40,21 @@ test_that("validate_adg compares curve models", {
   expect_error(validate_adg(w, models = "nope"), "curve_model")
 })
 
+test_that("validate_weight_fill compares weight fill methods", {
+  w <- clean_weight(prep_visits(nedap, verbose = 0), verbose = 0)
+  res <- validate_weight_fill(w, methods = c("linear", "poly2"),
+                              scenarios = c("random30", "blocks3", "late20"), reps = 1, verbose = 0)
+  s <- res$summary
+  expect_equal(nrow(s), 6L)
+  expect_true(all(c("daily_rmse", "daily_mae", "adg_bias", "adg_rmse", "adg_spearman") %in% names(s)))
+  expect_true(all(s$daily_rmse > 0 & s$daily_rmse < 10))
+  # linear interpolation is close to the recorded weight for random gaps
+  expect_lt(s[scenario == "random30" & method == "linear", daily_rmse], 2)
+  expect_true(all(is.finite(s$adg_rmse)))
+  expect_error(validate_weight_fill(w, methods = "loess"), "methods")
+  expect_error(validate_weight_fill(list()), "clean_weight")
+})
+
 test_that("validate_adfi measures imputation error", {
   v <- prep_visits(nedap, verbose = 0)
   a <- calc_adg(clean_weight(v, verbose = 0), verbose = 0)
@@ -48,8 +66,9 @@ test_that("validate_adfi measures imputation error", {
   expect_true(all(s$n_pigs >= 3L))
   expect_true(all(s$mean_abs_error_pct < 15))
   # random gaps cost less than a long gap at the start
-  expect_lt(s[scenario == "random30" & method == "linear", p95_abs_error_pct],
-            s[scenario == "late20" & method == "linear", p95_abs_error_pct])
+  expect_lt(s[scenario == "random30" & method == "loess_lm", p95_abs_error_pct],
+            s[scenario == "late20" & method == "loess_lm", p95_abs_error_pct])
+  expect_setequal(unique(s$method), c("loess_lm", "linear"))
   expect_error(validate_adfi(f, scenarios = "rand"), "scenario")
   expect_error(validate_adfi(f, min_coverage = 1.01), "coverage")
 })

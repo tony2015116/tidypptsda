@@ -6,7 +6,7 @@
 \usage{
 validate_adg(
   weight,
-  models = c("poly1", "poly2", "poly3", "loess", "gompertz"),
+  models = c("poly1", "poly2", "poly3", "gompertz"),
   k = 5,
   trim_days = c(10, 20),
   qc = weight$settings,
@@ -42,7 +42,7 @@ A list of class \code{ppt_validation} with
 \itemize{
 \item \code{summary}: one row per model: \code{cv_rmse} and \code{cv_mae} (kg, weight of the
 left-out records), and for each truncation (\code{late10}, \code{early10}, ...)
-the growth-curve ADG (\code{adg_curve}) \code{bias}, \code{rmse} (g/d) and Spearman rank correlation \code{spearman}
+the ADG \code{bias}, \code{rmse} (g/d) and Spearman rank correlation \code{spearman}
 with the full-data ADG, and how many pigs still get an ADG (\code{n});
 \item \code{cv}: cross-validation error of every pig and model;
 \item \code{truncation}: ADG of every pig, model and truncation;

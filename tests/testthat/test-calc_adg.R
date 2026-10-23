@@ -18,13 +18,14 @@ no_checks <- function(...) {
 }
 
 test_that("a perfectly linear pig gives the exact ADG", {
-  for (m in c("poly1", "poly2", "poly3", "loess")) {
+  for (m in c("poly1", "poly2", "poly3")) {
     w <- clean_weight(line_pig(), qc = no_checks(curve_model = m), verbose = 0)
     a <- calc_adg(w, verbose = 0)$per_pig
     expect_equal(a$adg, 1000, tolerance = 0.01, info = m)
+    expect_equal(a$adg_curve, 1000, tolerance = 0.01, info = m)
     expect_equal(a$adg_type, "observed", info = m)
     expect_equal(a$stage_days, 90, tolerance = 0.02, info = m)
-    expect_equal(a$lm_slope, 1000, tolerance = 0.01, info = m)
+    expect_gt(a$r_squared, 0.999)
   }
 })
 
@@ -51,17 +52,22 @@ test_that("daily table covers the stage and the records", {
   a <- calc_adg(w, verbose = 0)
   d <- a$daily
   expect_setequal(names(d), c("responder", "location", "date", "seq_days", "weight",
-                              "predicted", "lower", "upper", "source", "in_stage"))
+                              "weight_filled", "source", "predicted", "lower", "upper",
+                              "in_stage"))
   expect_true(all(d[in_stage == TRUE, predicted] >= 29 & d[in_stage == TRUE, predicted] <= 121))
   expect_equal(sum(d$in_stage), 90, tolerance = 1)
-  expect_true(all(d[source == "predicted", is.na(weight)]))
+  expect_true(all(d[source != "observed", is.na(weight)]))
+  expect_equal(d[source == "observed", weight_filled], d[source == "observed", weight])
+  expect_equal(d[source == "curve", weight_filled], d[source == "curve", predicted])
+  expect_false(anyNA(d[in_stage == TRUE, weight_filled]))
   expect_lt(min(d$date), min(w$records$date))     # extrapolated backwards
+  expect_true(all(d[date < min(w$records$date), source] == "curve"))
 })
 
 test_that("calc_adg works on both datasets and every curve", {
   for (data in list(nedap, fire)) {
     w <- clean_weight(prep_visits(data, verbose = 0), verbose = 0)
-    for (m in c("poly2", "loess", "gompertz")) {
+    for (m in c("poly2", "poly3", "gompertz")) {
       a <- suppressWarnings(calc_adg(w, qc = qc_config(curve_model = m), verbose = 0))
       expect_s3_class(a, c("ppt_adg", "ppt_result"))
       expect_equal(nrow(a$per_pig), w$per_pig[status != "removed", .N])
@@ -83,46 +89,35 @@ test_that("the stage starts at the last rise through the lower limit", {
   expect_true(is.na(last_up_cross(function(x) 50 + x, 30, 0, 10)))
 })
 
-test_that("lm_slope uses the records between the stage start and end times", {
+test_that("gaps between recorded days are interpolated linearly", {
   pig <- line_pig(start = 25, rate = 1, days = 100, noise = 0.3)
-  q <- no_checks(curve_model = "poly1")
-  a <- calc_adg(clean_weight(pig, q, verbose = 0), verbose = 0)$per_pig
-  expect_equal(a$lm_slope, a$adg, tolerance = 0.02)
-})
-
-test_that("curve_margin_kg fits the curve around the stage only", {
-  # slow growth for 4 weeks after entry at 20 kg, then 1 kg/d
-  pig <- line_pig(start = 20, rate = 1, days = 140, noise = 0.3)
-  tt <- as.numeric(pig$entry_time - min(pig$entry_time), units = "days")
-  pig[, weight := 20 + ifelse(tt < 28, 0.1 * tt, 2.8 + (tt - 28)) + stats::rnorm(.N, 0, 0.3)]
-  q <- no_checks(curve_model = "poly2", weight_track = FALSE)
-  w <- clean_weight(pig, q, verbose = 0)
-  all <- calc_adg(w, verbose = 0)$per_pig
-  cut <- calc_adg(w, qc = qc_set(q, list(curve_margin_kg = 5)), verbose = 0)$per_pig
-  expect_lt(abs(cut$adg_curve - 1000), abs(all$adg_curve - 1000))
-  expect_equal(cut$adg_curve, 1000, tolerance = 0.02)
-  expect_gt(cut$curve_start, all$curve_start)
-  expect_lt(cut$curve_end, all$curve_end)
-  # too few records left: all records are used
-  expect_true(all(curve_window(as.Date("2024-01-01") + 0:5, 10 + 0:5, qc_set(q, list(curve_margin_kg = 5)))))
-})
-
-test_that("adg_method chooses between the regression slope and the curve", {
-  pig <- line_pig(start = 25, rate = 1, days = 100, noise = 0.3)
-  w <- clean_weight(pig, no_checks(), verbose = 0)
-  a_lm <- calc_adg(w, verbose = 0)$per_pig
-  a_cv <- calc_adg(w, qc = qc_set(no_checks(), list(adg_method = "curve")), verbose = 0)$per_pig
-  expect_equal(a_lm$adg, a_lm$lm_slope)
-  expect_equal(a_lm$adg_source, "lm")
-  expect_equal(a_cv$adg, a_cv$adg_curve)
-  expect_equal(a_cv$adg_source, "curve")
-  expect_equal(a_lm$adg_curve, a_cv$adg_curve)
-  expect_true(a_lm$lm_weight_from >= 29 && a_lm$lm_weight_to <= 121)
+  gap <- pig$date >= as.Date("2024-02-01") & pig$date <= as.Date("2024-02-10")
+  w <- clean_weight(pig[!gap], no_checks(), verbose = 0)
+  a <- calc_adg(w, verbose = 0)
+  d <- a$daily[date >= as.Date("2024-02-01") & date <= as.Date("2024-02-10")]
+  expect_equal(d$source, rep("interpolated", 10))
+  expect_equal(a$per_pig$n_interpolated_days, 10L)
+  expect_lt(max(abs(diff(diff(d$weight_filled)))), 1e-8)   # a straight line
+  expect_equal(a$per_pig$adg, 1000, tolerance = 0.01)
   # another stage moves everything with it
   a2 <- calc_adg(w, qc = qc_set(no_checks(), list(stage_range = c(40, 100))), verbose = 0)$per_pig
   expect_equal(a2$stage, "40-100")
   expect_equal(a2$start_weight, 40, tolerance = 1e-6)
-  expect_true(a2$lm_weight_from >= 39 && a2$lm_weight_to <= 101)
+  expect_equal(a2$stage_days, 60, tolerance = 0.02)
+})
+
+test_that("the ends of the stage are filled by the growth curve", {
+  # records from 45 to 115 kg: the curve fills both ends of 30-120 kg
+  w <- clean_weight(line_pig(start = 45, days = 70), no_checks(), verbose = 0)
+  for (m in c("poly1", "poly2", "poly3")) {
+    a <- calc_adg(w, qc = qc_set(no_checks(), list(curve_model = m)), verbose = 0)
+    p <- a$per_pig
+    expect_equal(p$adg_type, "extrapolated")
+    expect_gt(p$n_curve_days, 15L)
+    expect_equal(p$n_curve_days + p$n_observed_days + p$n_interpolated_days,
+                 a$daily[in_stage == TRUE, .N])
+    expect_equal(p$adg, 1000, tolerance = 0.02, info = m)
+  }
 })
 
 test_that("calc_adg explains when no pig is left", {

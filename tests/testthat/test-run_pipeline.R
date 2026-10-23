@@ -2,8 +2,8 @@
 
 test_that("every pig is either analysed or listed with a reason", {
   for (data in list(nedap, fire)) {
-    for (p in c("casey", "national", "legacy")) {
-      res <- suppressWarnings(run_pipeline(data, qc = qc_config(p), verbose = 0))
+    for (q in list(qc_config(), qc_config(impute_method = "linear", curve_model = "poly3"))) {
+      res <- suppressWarnings(run_pipeline(data, qc = q, verbose = 0))
       expect_s3_class(res, "ppt_pipeline")
       ids <- unique(stats::na.omit(res$visits$responder))
       with_fcr <- res$fcr$per_pig[!is.na(fcr), responder]

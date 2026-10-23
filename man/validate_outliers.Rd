@@ -7,8 +7,8 @@
 validate_outliers(
   visits,
   qc = qc_config(),
-  methods = list(track = "track", rlm = "rlm", loess = "loess", stl = "stl", sd = "sd",
-    `stl+rlm+sd` = c("stl", "rlm", "sd")),
+  methods = list(`track+rlm+loess` = c("track", "rlm", "loess"), track = "track", rlm =
+    "rlm", loess = "loess", `rlm+loess` = c("rlm", "loess"), stl = "stl", sd = "sd"),
   rate = 0.05,
   size = c(3, 15),
   direction = c("both", "down", "up"),
@@ -25,9 +25,11 @@ validate_outliers(
 \item{qc}{QC settings from \code{\link[=qc_config]{qc_config()}}. They define the clean records
 (records kept by \code{qc}) and every setting except \code{weight_outlier}.}
 
-\item{methods}{Named list of outlier method sets to compare; each element
-is a value for \code{weight_outlier} (run without tracking), or \code{"track"}
-for the tracking from the end of the test (\code{weight_track = TRUE}).}
+\item{methods}{Named list of outlier method sets to compare. Each element
+holds values of \code{weight_outlier}, plus \code{"track"} to track the weight
+back from the end of the test first (\code{weight_track = TRUE}); sets
+without \code{"track"} run without tracking. \code{"track"} alone is the tracking
+without any other method.}
 
 \item{rate}{Share of clean records that receive an artificial error.
 Default 0.05.}
@@ -87,10 +89,14 @@ vo <- validate_outliers(visits, reps = 1)
 vo$summary
 
 # 2. growth curve models
-va <- validate_adg(w, models = c("poly1", "poly2", "loess"))
+va <- validate_adg(w, models = c("poly1", "poly2", "poly3"))
 va$summary
 
-# 3. feed intake imputation
+# 3. weight fill methods
+vw <- validate_weight_fill(w, methods = c("linear", "poly2"), scenarios = c("blocks3", "late20"), reps = 1)
+vw$summary
+
+# 4. feed intake imputation
 adfi <- calc_adfi(visits, calc_adg(w, verbose = 0), verbose = 0)
 vf <- validate_adfi(adfi, scenarios = c("random30", "late20"), reps = 2)
 vf$summary
