@@ -81,6 +81,14 @@ g <- plot_adg(res$adg, weight = res$weight, responders = c("13913", "13954", "15
 g$plot[[1]]
 ```
 
+Daily feed intake over the stage: recorded, error-free, corrected and filled
+days, with the ADFI as a dashed line:
+
+```{r plot-adfi, echo = FALSE, fig.height = 4}
+h <- plot_adfi(res$adfi, responders = c("13913", "13954", "15967"), verbose = 0)
+h$plot[[1]]
+```
+
 ## References
 
 Casey, D. S., Stern, H. S., & Dekkers, J. C. M. (2005). Identification of
