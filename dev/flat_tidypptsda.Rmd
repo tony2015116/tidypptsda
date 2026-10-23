@@ -47,7 +47,7 @@ fusen::fill_description(
   ),
   overwrite = TRUE
 )
-desc::desc_set_version("0.9.0")
+desc::desc_set_version("0.9.1")
 usethis::use_mit_license("Meng Guo")
 # Use markdown in roxygen comments
 desc::desc_set("Roxygen", "list(markdown = TRUE)")
@@ -487,7 +487,9 @@ utils::globalVariables(c(
   "masks", "err_pct", "sq_err", "n_hidden", "adfi_est", "adfi_true", "scenario",
   "spearman", "track_removed", "tt", "first_day", "i.first_day", "adg_source",
   "adg_curve", "rlm_w", "i.rlm_w", "feed_missing", "r2_daily", "w_obs",
-  "i.weight", "i.dfi", "i.state", "in_band", "removed", "cfi", "w_first", "w_last", "extrap_kg_start", "extrap_kg_end"
+  "i.weight", "i.dfi", "i.state", "in_band", "removed", "cfi", "w_first", "w_last", "extrap_kg_start", "extrap_kg_end",
+  "kept", "txt", "i.fcr", "i.cfi_r2", "i.reason", "cfi_start", "cfi_end", "weight_first",
+  "weight_last", "y_first", "y_last", "cfi_r2", "step"
 ))
 
 #' @export
@@ -4235,7 +4237,8 @@ impute_dfi_one_pig <- function(d, qc) {
         d[long, dfi := pmax(0, stats::predict(f, newdata = d[long]))]
       }
     }
-    d[need & !is.na(dfi), state := data.table::fifelse(inside[need & !is.na(dfi)], "iii", "elrp")]
+    done <- need & !is.na(d$dfi)
+    d[done, state := data.table::fifelse(inside[done], "iii", "elrp")]
   } else {
     pred <- loess_extend(x[ok], d$dfi_check[ok], qc$loess_span)
     d[inside, `:=`(dfi = pmax(0, pred(x[inside])), state = "iii")]
@@ -4523,7 +4526,9 @@ the stage with recorded feed intake, or weight data flagged by
 #' weight), `extrap_kg_start`, `extrap_kg_end` (kg extended by the
 #' regression; more than `bin_width` gives `fcr_flag = "low_confidence"`),
 #' `n_classes` and `n_classes_removed`; `by_bin` gives `removed` (reason or
-#' `NA`) for each class. ADG and ADFI are those of [calc_adg()] and
+#' `NA`) for each class; `cfi` gives every stage day: `weight`, `dfi`,
+#' `weight_from` (class), `kept` and the cumulative intake `cfi` (kg, kept
+#' days only). Plot it with [plot_cfi()]. ADG and ADFI are those of [calc_adg()] and
 #' [calc_adfi()].
 #'
 #' @seealso [calc_adg()], [calc_adfi()].
@@ -4691,15 +4696,21 @@ calc_fcr_national <- function(adg, adfi) {
     data.table::setorder(bins, weight_from)
     kept_bins <- bins[is.na(removed), weight_from]
     out_bins <- data.table::copy(bins)[, responder := id]
+    # daily cumulative intake over the kept classes (for plot_cfi())
+    data.table::setorder(st, date)
+    days_tab <- st[, .(responder = id, date, weight = w, dfi, weight_from,
+                       kept = weight_from %in% kept_bins)]
+    days_tab[, cfi := NA_real_]
+    days_tab[kept == TRUE, cfi := cumsum(dfi) / 1000]
     if (length(kept_bins) == 0L) {
-      return(list(error = "every weight class removed", bins = out_bins))
+      return(list(error = "every weight class removed", bins = out_bins, cfi = days_tab))
     }
     expected <- seq(min(kept_bins), max(kept_bins), by = width)
     if (!all(expected %in% kept_bins)) {
       gapb <- setdiff(expected, kept_bins)
       return(list(error = sprintf("weight class %s kg removed or missing between kept classes",
                                   paste0(gapb, "-", gapb + width, collapse = ", ")),
-                  bins = out_bins))
+                  bins = out_bins, cfi = days_tab))
     }
     k <- st[weight_from %in% kept_bins]
     data.table::setorder(k, date)
@@ -4708,7 +4719,7 @@ calc_fcr_national <- function(adg, adfi) {
     r2 <- summary(cf)$r.squared
     if (!is.finite(r2) || r2 <= qc$cfi_r2_min) {
       return(list(error = sprintf("R2 of cumulative feed on weight %.3f <= %s", r2, qc$cfi_r2_min),
-                  bins = out_bins))
+                  bins = out_bins, cfi = days_tab))
     }
     b <- unname(stats::coef(cf)[2L])
     first <- k[1L]
@@ -4721,7 +4732,7 @@ calc_fcr_national <- function(adg, adfi) {
       weight_first = first$w, weight_last = last$w,
       extrap_kg_start = max(0, first$w - lo), extrap_kg_end = max(0, hi - last$w),
       n_classes = length(kept_bins), n_classes_removed = sum(!is.na(bins$removed))),
-      bins = out_bins)
+      bins = out_bins, cfi = days_tab)
   }
   res <- lapply(pigs, one)
   ok <- vapply(res, function(r) is.null(r$error), logical(1))
@@ -4733,6 +4744,7 @@ calc_fcr_national <- function(adg, adfi) {
   }
   bad <- data.table::data.table(responder = pigs[!ok],
                                 reason = vapply(res[!ok], `[[`, "", "error"))
+  cfi <- data.table::rbindlist(lapply(res, `[[`, "cfi"), fill = TRUE)
 
   a <- adg$per_pig[, intersect(c("responder", "location", "breed", "stage", "adg", "adg_type",
                                 "stage_days", "start_weight", "end_weight"), names(adg$per_pig)),
@@ -4768,9 +4780,13 @@ calc_fcr_national <- function(adg, adfi) {
   if (nrow(s) == 1L && s$n > 0) {
     ppt_msg("Mean FCR {sprintf('%.2f', s$mean)} (SD {sprintf('%.2f', s$sd)})", "success")
   }
+  if (nrow(cfi) > 0L) {
+    cfi <- merge(loc, cfi, by = "responder")
+    data.table::setorder(cfi, location, responder, date)
+  }
   new_ppt_result(per_pig = per_pig, daily = adfi$daily, removed = removed,
                  settings = qc, class = "ppt_fcr") |>
-    add_element(summary = summary, by_bin = by_bin)
+    add_element(summary = summary, by_bin = by_bin, cfi = cfi)
 }
 
 fcr_by_bin <- function(adg, adfi, qc) {
@@ -4970,6 +4986,22 @@ test_that("the national method computes FCR from cumulative feed intake", {
   expect_equal(ok2$fcr, (ok2$cfi_end - ok2$cfi_start) / 60)
 })
 
+test_that("plot_cfi draws the cumulative feed intake of the national method", {
+  r <- run_pipeline(fire, qc = qc_config("national", stage_range = c(60, 120)), verbose = 0)
+  cf <- r$fcr$cfi
+  expect_true(all(c("responder", "location", "date", "weight", "dfi", "weight_from", "kept", "cfi") %in% names(cf)))
+  expect_true(all(is.na(cf[kept == FALSE, cfi])))
+  g <- plot_cfi(r$fcr, verbose = 0)
+  expect_equal(g$location, c("101", "102"))
+  f <- tempfile(fileext = ".pdf")
+  grDevices::pdf(f)
+  expect_no_warning(print(g$plot[[1]]))
+  grDevices::dev.off()
+  unlink(f)
+  std <- run_pipeline(fire, qc = qc_config(stage_range = c(60, 120)), verbose = 0)
+  expect_error(plot_cfi(std$fcr), "national")
+})
+
 test_that("national imputation: LOESS for short gaps, regression on weight for long ones", {
   set.seed(5)
   n <- 60
@@ -4983,6 +5015,7 @@ test_that("national imputation: LOESS for short gaps, regression on weight for l
   expect_false(anyNA(out$dfi))
   truth <- 1500 + 20 * (1:n)
   expect_lt(max(abs(out$dfi[c(10, 11, 30:40)] - truth[c(10, 11, 30:40)])), 150)
+  expect_true(all(out$state[c(10, 11, 30:40)] == "iii"))
 })
 
 test_that("feed of the adaptation days counts only inside the stage", {
@@ -5122,6 +5155,96 @@ plot_adfi <- function(adfi, responders = NULL, locations = NULL, ncol = 3,
                                 plot = unname(plots))
   ppt_msg("Created {nrow(out)} feed intake plot{?s}", "success")
   out
+}
+
+#' Plot Cumulative Feed Intake (National Method)
+#'
+#' @description
+#' For the national method ([qc_config()] preset `"national"`), plot the
+#' cumulative feed intake of each pig against body weight, one plot per
+#' station. Points are the kept stage days; the weight classes removed by
+#' the class checks are shaded. The line runs from the cumulative intake at
+#' the lower stage limit to that at the upper limit; its slope is the FCR
+#' (dashed where it is extended by the regression beyond the kept days).
+#'
+#' @param fcr Result of [calc_fcr()] (or `$fcr` of [run_pipeline()]) with
+#'   `method = "national"`.
+#' @inheritParams plot_adg
+#'
+#' @return A `data.table` with `location`, `n_pigs` and `plot`; save with
+#'   [save_plots()].
+#' @export
+plot_cfi <- function(fcr, responders = NULL, locations = NULL, ncol = 3, verbose = 1) {
+  local_verbose(verbose)
+  if (!inherits(fcr, "ppt_fcr") || is.null(fcr$cfi)) {
+    cli::cli_abort("{.arg fcr} must be the result of {.fn calc_fcr} with {.code method = \"national\"}.")
+  }
+  d <- filter_pigs(fcr$cfi, responders, locations)
+  qc <- fcr$settings
+  info <- fcr$per_pig[responder %in% d$responder]
+  rm <- fcr$removed[step == "calc_fcr"]
+  plots <- lapply(split(d, by = "location", sorted = TRUE), function(x) {
+    lv <- natural_order(unique(x$responder))
+    cfi_station_plot(x, info[responder %in% lv], rm[responder %in% lv],
+                     fcr$by_bin[responder %in% lv], lv, qc, ncol)
+  })
+  out <- data.table::data.table(location = names(plots),
+                                n_pigs = vapply(plots, function(p) data.table::uniqueN(p$data$responder), integer(1)),
+                                plot = unname(plots))
+  ppt_msg("Created {nrow(out)} cumulative feed intake plot{?s}", "success")
+  out
+}
+
+cfi_station_plot <- function(d, info, rm, bins, lv, qc, ncol) {
+  loc <- d$location[1L]
+  lo <- qc$stage_range[1L]
+  hi <- qc$stage_range[2L]
+  d <- data.table::copy(d)[, responder := factor(responder, levels = lv)]
+  kept <- d[kept == TRUE & !is.na(cfi)]
+  # FCR line and its extensions
+  ln <- info[!is.na(fcr), .(responder = factor(responder, levels = lv), cfi_start, cfi_end,
+                           weight_first, weight_last, fcr, cfi_r2)]
+  ln[, `:=`(y_first = cfi_start + fcr * (weight_first - lo), y_last = cfi_start + fcr * (weight_last - lo))]
+  shade <- bins[!is.na(removed), .(responder = factor(responder, levels = lv), weight_from, weight_to)]
+  lab <- data.table::data.table(responder = factor(lv, levels = lv))
+  lab[ln, on = "responder", txt := sprintf("FCR %.2f (R2 %.3f)", i.fcr, i.cfi_r2)]
+  rmm <- rm[, .(responder = factor(responder, levels = lv), reason)]
+  lab[rmm, on = "responder", txt := paste("removed:", i.reason)]
+  lab[is.na(txt), txt := ""]
+  p <- ggplot2::ggplot(kept, ggplot2::aes(x = weight, y = cfi))
+  if (nrow(shade) > 0L) {
+    p <- p + ggplot2::geom_rect(data = shade, ggplot2::aes(xmin = weight_from, xmax = weight_to),
+                                ymin = -Inf, ymax = Inf, fill = "#D55E00", alpha = 0.12,
+                                inherit.aes = FALSE)
+  }
+  p <- p +
+    ggplot2::geom_vline(xintercept = seq(lo, hi, by = qc$bin_width), colour = "#999999",
+                        linewidth = 0.2, alpha = 0.6) +
+    ggplot2::geom_vline(xintercept = c(lo, hi), linetype = "dashed", colour = "#000000", alpha = 0.4) +
+    ggplot2::geom_point(colour = "#0072B2", size = 0.8)
+  if (nrow(ln) > 0L) {
+    p <- p +
+      ggplot2::geom_segment(data = ln, ggplot2::aes(x = weight_first, xend = weight_last,
+                                                    y = y_first, yend = y_last),
+                            colour = "#009E73", linewidth = 0.7, inherit.aes = FALSE) +
+      ggplot2::geom_segment(data = ln, ggplot2::aes(x = lo, xend = weight_first, y = cfi_start, yend = y_first),
+                            colour = "#009E73", linetype = "dashed", inherit.aes = FALSE) +
+      ggplot2::geom_segment(data = ln, ggplot2::aes(x = weight_last, xend = hi, y = y_last, yend = cfi_end),
+                            colour = "#009E73", linetype = "dashed", inherit.aes = FALSE) +
+      ggplot2::geom_point(data = ln, ggplot2::aes(x = lo, y = cfi_start), colour = "#009E73",
+                          size = 2, inherit.aes = FALSE) +
+      ggplot2::geom_point(data = ln, ggplot2::aes(x = hi, y = cfi_end), colour = "#009E73",
+                          size = 2, inherit.aes = FALSE)
+  }
+  p +
+    ggplot2::geom_text(data = lab, ggplot2::aes(label = txt), x = -Inf, y = Inf,
+                       hjust = -0.05, vjust = 1.3, size = 2.8, inherit.aes = FALSE) +
+    ggplot2::facet_wrap(~responder, ncol = min(ncol, length(lv)), drop = FALSE) +
+    ggplot2::scale_x_continuous(limits = c(lo - 2, hi + 2)) +
+    ggplot2::labs(title = paste("Station", loc), x = "Body weight (kg)",
+                  y = "Cumulative feed intake (kg)") +
+    ppt_theme() +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 0, hjust = 0.5))
 }
 
 #' Save Plots to Files

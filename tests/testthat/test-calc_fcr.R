@@ -115,6 +115,22 @@ test_that("the national method computes FCR from cumulative feed intake", {
   expect_equal(ok2$fcr, (ok2$cfi_end - ok2$cfi_start) / 60)
 })
 
+test_that("plot_cfi draws the cumulative feed intake of the national method", {
+  r <- run_pipeline(fire, qc = qc_config("national", stage_range = c(60, 120)), verbose = 0)
+  cf <- r$fcr$cfi
+  expect_true(all(c("responder", "location", "date", "weight", "dfi", "weight_from", "kept", "cfi") %in% names(cf)))
+  expect_true(all(is.na(cf[kept == FALSE, cfi])))
+  g <- plot_cfi(r$fcr, verbose = 0)
+  expect_equal(g$location, c("101", "102"))
+  f <- tempfile(fileext = ".pdf")
+  grDevices::pdf(f)
+  expect_no_warning(print(g$plot[[1]]))
+  grDevices::dev.off()
+  unlink(f)
+  std <- run_pipeline(fire, qc = qc_config(stage_range = c(60, 120)), verbose = 0)
+  expect_error(plot_cfi(std$fcr), "national")
+})
+
 test_that("national imputation: LOESS for short gaps, regression on weight for long ones", {
   set.seed(5)
   n <- 60
@@ -128,6 +144,7 @@ test_that("national imputation: LOESS for short gaps, regression on weight for l
   expect_false(anyNA(out$dfi))
   truth <- 1500 + 20 * (1:n)
   expect_lt(max(abs(out$dfi[c(10, 11, 30:40)] - truth[c(10, 11, 30:40)])), 150)
+  expect_true(all(out$state[c(10, 11, 30:40)] == "iii"))
 })
 
 test_that("feed of the adaptation days counts only inside the stage", {

@@ -63,6 +63,7 @@ reference:
   contents:
   - plot_adg
   - plot_adfi
+  - plot_cfi
   - save_plots
 - title: Example data
   desc: Raw exports from NEDAP and FIRE stations, used in every example.

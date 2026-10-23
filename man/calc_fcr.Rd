@@ -64,7 +64,9 @@ stage width.
 weight), \code{extrap_kg_start}, \code{extrap_kg_end} (kg extended by the
 regression; more than \code{bin_width} gives \code{fcr_flag = "low_confidence"}),
 \code{n_classes} and \code{n_classes_removed}; \code{by_bin} gives \code{removed} (reason or
-\code{NA}) for each class. ADG and ADFI are those of \code{\link[=calc_adg]{calc_adg()}} and
+\code{NA}) for each class; \code{cfi} gives every stage day: \code{weight}, \code{dfi},
+\code{weight_from} (class), \code{kept} and the cumulative intake \code{cfi} (kg, kept
+days only). Plot it with \code{\link[=plot_cfi]{plot_cfi()}}. ADG and ADFI are those of \code{\link[=calc_adg]{calc_adg()}} and
 \code{\link[=calc_adfi]{calc_adfi()}}.
 }
 \examples{

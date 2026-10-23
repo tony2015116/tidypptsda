@@ -349,7 +349,9 @@ utils::globalVariables(c(
   "masks", "err_pct", "sq_err", "n_hidden", "adfi_est", "adfi_true", "scenario",
   "spearman", "track_removed", "tt", "first_day", "i.first_day", "adg_source",
   "adg_curve", "rlm_w", "i.rlm_w", "feed_missing", "r2_daily", "w_obs",
-  "i.weight", "i.dfi", "i.state", "in_band", "removed", "cfi", "w_first", "w_last", "extrap_kg_start", "extrap_kg_end"
+  "i.weight", "i.dfi", "i.state", "in_band", "removed", "cfi", "w_first", "w_last", "extrap_kg_start", "extrap_kg_end",
+  "kept", "txt", "i.fcr", "i.cfi_r2", "i.reason", "cfi_start", "cfi_end", "weight_first",
+  "weight_last", "y_first", "y_last", "cfi_r2", "step"
 ))
 
 #' @export

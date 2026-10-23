@@ -211,6 +211,10 @@ res$weight$records[, .N, by = qc_flag]
 | `fcr_min`、`fcr_max`、`fcr_out` | 段料肉比的合理范围（`bin_fcr_limits`）及是否超出 |
 | `removed` | national 方法：该段被删除的原因，`NA` 表示保留 |
 
+### `cfi`：累计采食量（仅 national 方法）
+
+区间内的每一天一行：`weight`（日体重）、`dfi`（日采食）、`weight_from`（所属体重段）、`kept`（该段是否保留）、`cfi`（保留天上累加的采食量，kg）。用 `plot_cfi(res$fcr)` 作图：横轴为体重，纵轴为累计采食量；被删除的体重段用阴影标出；绿线从区间下限处的累计采食连到上限处，斜率就是 FCR，虚线部分是用回归斜率外推的。
+
 ### `summary`：汇总统计
 
 `group`（`all` 为全部猪，`ok` 为可信的猪，`breed X` 为各品种）、`trait`（`adg`、`adfi`、`fcr`、`gf`、`stage_days`、`start_weight`、`end_weight`）以及 `n`、`min`、`max`、`median`、`mean`、`sd`、`cv`。

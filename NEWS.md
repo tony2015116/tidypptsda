@@ -1,3 +1,14 @@
+# tidypptsda 0.9.1
+
+* `plot_cfi()` plots the cumulative feed intake of the national method
+  against body weight, one plot per station: kept stage days, removed
+  weight classes shaded, and the line whose slope is the FCR (dashed where
+  extended by the regression). The national `calc_fcr()` result gains `$cfi`
+  (every stage day with its class, whether it is kept and the cumulative
+  intake).
+* Fixed: with `impute_method = "national"`, imputed days could get the wrong
+  `state` (`iii` / `elrp`); the imputed values were right.
+
 # tidypptsda 0.9.0
 
 ## National method
