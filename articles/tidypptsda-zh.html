@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.0.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.1.0</span>
       </span>
     </div>
 
@@ -209,35 +209,203 @@
 <h2 id="数据要求">2. 数据要求<a class="anchor" aria-label="anchor" href="#%E6%95%B0%E6%8D%AE%E8%A6%81%E6%B1%82"></a>
 </h2>
 <div class="section level3">
-<h3 id="nedap">NEDAP<a class="anchor" aria-label="anchor" href="#nedap"></a>
+<h3 id="读取文件read_station">读取文件：<code>read_station()</code><a class="anchor" aria-label="anchor" href="#%E8%AF%BB%E5%8F%96%E6%96%87%E4%BB%B6read_station"></a>
 </h3>
-<p>至少需要以下列：<code>responder</code>（耳标号）、<code>location</code>（站号）、<code>visit_time</code>（进站时间）、<code>duration</code>（停留秒数）、<code>weight</code>（体重，g）、<code>feed_intake</code>（采食量，g）。</p>
-</div>
-<div class="section level3">
-<h3 id="fire">FIRE<a class="anchor" aria-label="anchor" href="#fire"></a>
-</h3>
-<p>至少需要以下列：<code>Location</code>、<code>Tag</code>、<code>Date</code>、<code>Entry</code>、<code>Exit</code>、<code>Ent Wt</code>、<code>Ext Wt</code>、<code>Consumed</code>、<code>Weight</code>。料槽重和采食量的单位是
-kg，<code>Topup Amount</code>（下料量）为可选列。</p>
-<p>包内自带两份示例数据 <code>nedap</code> 和
-<code>fire</code>，都是测定站的原始导出格式。</p>
-</div>
-<div class="section level3">
-<h3 id="读取文件">读取文件<a class="anchor" aria-label="anchor" href="#%E8%AF%BB%E5%8F%96%E6%96%87%E4%BB%B6"></a>
-</h3>
+<p><code><a href="../reference/read_station.html">read_station()</a></code> 读取测定站导出的文件（CSV、TXT 或
+Excel，一个、多个或整个文件夹），把各列对应到<strong>标准字段</strong>，统一类型和单位后合并成一张表，直接交给
+<code><a href="../reference/prep_visits.html">prep_visits()</a></code>：</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">raw</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/read_station.html">read_station</a></span><span class="op">(</span><span class="st">"D:/测定站导出/2024批次"</span><span class="op">)</span>      <span class="co"># 读取文件夹下所有 csv</span></span>
-<span><span class="va">raw</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/read_station.html">read_station</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"101.csv"</span>, <span class="st">"102.csv"</span><span class="op">)</span>, station <span class="op">=</span> <span class="st">"fire"</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="va">raw</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/read_station.html">read_station</a></span><span class="op">(</span><span class="st">"D:/测定站导出/2024批次"</span><span class="op">)</span>                  <span class="co"># 文件夹下所有 csv/txt/xlsx</span></span>
+<span><span class="va">raw</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/read_station.html">read_station</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"101.csv"</span>, <span class="st">"102.csv"</span><span class="op">)</span>, station <span class="op">=</span> <span class="st">"fire"</span><span class="op">)</span></span>
+<span><span class="va">visits</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/prep_visits.html">prep_visits</a></span><span class="op">(</span><span class="va">raw</span><span class="op">)</span></span></code></pre></div>
 <ul>
+<li>
+<code>station</code> 取 <code>"nedap"</code> 或
+<code>"fire"</code>，决定用哪一套标准字段和后续处理方式；不写时按列名自动判断。</li>
+<li>CSV、TXT 用 <code><a href="https://rdrr.io/pkg/data.table/man/fread.html" class="external-link">data.table::fread()</a></code>
+读取，分隔符（逗号、制表符、分号）自动识别；Excel 需要安装 readxl
+包。</li>
 <li>耳标号一律按文本读入，前导零不会丢失。</li>
-<li>多个文件的列名不一致时会报错，并指出每个文件缺哪些列；如需用 NA
-补齐缺失列，设<code>fill = TRUE</code>。</li>
+<li>输出的列名、类型和单位对两种测定站都一样：时间为
+POSIXct（按钟点时间存为 UTC），停留时长为秒，体重为
+kg，采食量、料槽重和下料量为
+g。原始文件中没有对应到标准字段的列不会保留。</li>
+</ul>
+</div>
+<div class="section level3">
+<h3 id="标准字段">标准字段<a class="anchor" aria-label="anchor" href="#%E6%A0%87%E5%87%86%E5%AD%97%E6%AE%B5"></a>
+</h3>
+<table class="table">
+<thead><tr class="header">
+<th>字段</th>
+<th>含义</th>
+<th>单位</th>
+<th>NEDAP</th>
+<th>FIRE</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><code>responder</code></td>
+<td>耳标号</td>
+<td>文本</td>
+<td>必需</td>
+<td>必需</td>
+</tr>
+<tr class="even">
+<td><code>location</code></td>
+<td>站号</td>
+<td>文本</td>
+<td>必需</td>
+<td>必需</td>
+</tr>
+<tr class="odd">
+<td><code>entry_time</code></td>
+<td>进站时间</td>
+<td>时间</td>
+<td>必需</td>
+<td>必需</td>
+</tr>
+<tr class="even">
+<td><code>exit_time</code></td>
+<td>离站时间</td>
+<td>时间</td>
+<td>可选</td>
+<td>必需</td>
+</tr>
+<tr class="odd">
+<td><code>duration</code></td>
+<td>停留时长</td>
+<td>秒</td>
+<td>必需*</td>
+<td>—</td>
+</tr>
+<tr class="even">
+<td><code>feed_intake</code></td>
+<td>本次采食量</td>
+<td>g</td>
+<td>必需</td>
+<td>必需</td>
+</tr>
+<tr class="odd">
+<td><code>weight</code></td>
+<td>体重</td>
+<td>kg</td>
+<td>必需</td>
+<td>必需</td>
+</tr>
+<tr class="even">
+<td>
+<code>trough_in</code>、<code>trough_out</code>
+</td>
+<td>进站、离站料槽重</td>
+<td>g</td>
+<td>—</td>
+<td>必需</td>
+</tr>
+<tr class="odd">
+<td><code>topup</code></td>
+<td>本次下料量</td>
+<td>g</td>
+<td>—</td>
+<td>可选</td>
+</tr>
+<tr class="even">
+<td><code>breed</code></td>
+<td>品种</td>
+<td>文本</td>
+<td>可选</td>
+<td>可选</td>
+</tr>
+</tbody>
+</table>
+<p>* NEDAP 需要 <code>duration</code> 或 <code>exit_time</code>
+二者之一。FIRE
+由进站、离站时间计算停留时长，离站早于进站时视为跨零点访问。</p>
+</div>
+<div class="section level3">
+<h3 id="内置格式">内置格式<a class="anchor" aria-label="anchor" href="#%E5%86%85%E7%BD%AE%E6%A0%BC%E5%BC%8F"></a>
+</h3>
+<p>包里内置了两种测定站常见导出格式的对应关系，一般不需要任何设置：</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/station_format.html">station_format</a></span><span class="op">(</span><span class="st">"nedap"</span><span class="op">)</span></span>
+<span><span class="co">#&gt;          field      column   unit required              description</span></span>
+<span><span class="co">#&gt;         &lt;char&gt;      &lt;char&gt; &lt;char&gt;   &lt;lgcl&gt;                   &lt;char&gt;</span></span>
+<span><span class="co">#&gt; 1:   responder   responder      -     TRUE       Transponder number</span></span>
+<span><span class="co">#&gt; 2:    location    location      -     TRUE      Station (feeder) ID</span></span>
+<span><span class="co">#&gt; 3:  entry_time  visit_time      -     TRUE            Entrance time</span></span>
+<span><span class="co">#&gt; 4:   exit_time           -      -    FALSE                Exit time</span></span>
+<span><span class="co">#&gt; 5:    duration    duration      s    FALSE          Occupation time</span></span>
+<span><span class="co">#&gt; 6: feed_intake feed_intake      g     TRUE Feed intake of the visit</span></span>
+<span><span class="co">#&gt; 7:      weight      weight   auto     TRUE              Body weight</span></span>
+<span><span class="co">#&gt; 8:       breed       breed      -    FALSE                    Breed</span></span>
+<span><span class="fu"><a href="../reference/station_format.html">station_format</a></span><span class="op">(</span><span class="st">"fire"</span><span class="op">)</span></span>
+<span><span class="co">#&gt;           field       column   unit required                     description</span></span>
+<span><span class="co">#&gt;          &lt;char&gt;       &lt;char&gt; &lt;char&gt;   &lt;lgcl&gt;                          &lt;char&gt;</span></span>
+<span><span class="co">#&gt;  1:   responder          Tag      -     TRUE              Transponder number</span></span>
+<span><span class="co">#&gt;  2:    location     Location      -     TRUE             Station (feeder) ID</span></span>
+<span><span class="co">#&gt;  3:  entry_time   Date,Entry      -     TRUE                   Entrance time</span></span>
+<span><span class="co">#&gt;  4:   exit_time    Date,Exit      -     TRUE                       Exit time</span></span>
+<span><span class="co">#&gt;  5: feed_intake     Consumed     kg     TRUE        Feed intake of the visit</span></span>
+<span><span class="co">#&gt;  6:      weight       Weight     kg     TRUE                     Body weight</span></span>
+<span><span class="co">#&gt;  7:   trough_in       Ent Wt     kg     TRUE       Trough weight at entrance</span></span>
+<span><span class="co">#&gt;  8:  trough_out       Ext Wt     kg     TRUE           Trough weight at exit</span></span>
+<span><span class="co">#&gt;  9:       topup Topup Amount     kg    FALSE Feed dispensed during the visit</span></span>
+<span><span class="co">#&gt; 10:       breed        breed      -    FALSE                           Breed</span></span></code></pre></div>
+<ul>
+<li>NEDAP：<code>responder</code>、<code>location</code>、<code>visit_time</code>、<code>duration</code>、<code>weight</code>（g，按数值大小自动判断
+g 或 kg）、<code>feed_intake</code>（g）。</li>
+<li>FIRE：<code>Tag</code>、<code>Location</code>、<code>Date</code> +
+<code>Entry</code>/<code>Exit</code>、<code>Ent Wt</code>、<code>Ext Wt</code>、<code>Consumed</code>、<code>Weight</code>（kg），<code>Topup Amount</code>
+可选。</li>
+</ul>
+<p>包内自带的示例数据 <code>nedap</code> 和 <code>fire</code>
+是这两种原始导出格式，<code><a href="../reference/prep_visits.html">prep_visits()</a></code>
+会用同一套内置格式把它们转成标准字段，所以示例数据和自己读入的文件走的是同一条处理路径。</p>
+</div>
+<div class="section level3">
+<h3 id="自定义格式文件">自定义格式文件<a class="anchor" aria-label="anchor" href="#%E8%87%AA%E5%AE%9A%E4%B9%89%E6%A0%BC%E5%BC%8F%E6%96%87%E4%BB%B6"></a>
+</h3>
+<p>导出软件版本不同、表头是中文，或者换了一家设备时，把对应关系写成一个制表符分隔的格式文件即可。先导出内置格式作为模板，再按自己的导出修改：</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/station_format.html">station_format</a></span><span class="op">(</span><span class="st">"fire"</span>, file <span class="op">=</span> <span class="st">"fire_format.txt"</span><span class="op">)</span></span></code></pre></div>
+<pre><code>field        column      unit
+responder    耳标号      -
+location     站号        -
+entry_time   日期,进站   -
+exit_time    日期,出站   -
+trough_in    进站料重    kg
+trough_out   出站料重    kg
+feed_intake  采食量      kg
+weight       体重        kg</code></pre>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">raw</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/read_station.html">read_station</a></span><span class="op">(</span><span class="st">"D:/测定站导出/2024批次"</span>, station <span class="op">=</span> <span class="st">"fire"</span>,</span>
+<span>                    format <span class="op">=</span> <span class="st">"fire_format.txt"</span><span class="op">)</span></span></code></pre></div>
+<ul>
+<li>
+<code>column</code> 写列名，也可以写列号（如
+<code>6</code>）。<strong>优先写列名</strong>：导出软件增加一列后，按列号对应会整体错位而且不报错，算出的结果是错的。</li>
+<li>同一字段有几种可能的列名时用 <code>|</code> 分隔（如
+<code>Tag|耳标号</code>），按顺序取第一个找到的。</li>
+<li>日期和钟点时间分在两列时，用 <code>,</code> 连接（如
+<code>日期,进站</code>），读取时合并为一列。</li>
+<li>
+<code>unit</code>：质量类字段写 <code>kg</code>、<code>g</code> 或
+<code>auto</code>；停留时长写 <code>s</code> 或
+<code>min</code>；时间字段写 <code>-</code>（自动识别
+<code>年-月-日 时:分:秒</code> 和 <code>年/月/日 时:分:秒</code>），或写
+<code><a href="https://rdrr.io/r/base/strptime.html" class="external-link">strptime()</a></code> 格式，如 <code>%d/%m/%Y %H:%M</code>。</li>
+<li>以 <code>#</code> 开头的行是注释；<code>-</code>
+或空白表示导出中没有这个字段（只适用于可选字段）。</li>
+<li>字段名写错、缺少必需字段、单位不认识、列找不到、数值或时间读不出来时，都会报错并指出是哪个字段、哪个文件。</li>
+<li>已经在 R
+里的原始数据（例如从数据库读出的表）也可以用同样的格式：<code>prep_visits(data, station = "fire", format = "fire_format.txt")</code>。</li>
 </ul>
 </div>
 <div class="section level3">
 <h3 id="添加品种信息">添加品种信息<a class="anchor" aria-label="anchor" href="#%E6%B7%BB%E5%8A%A0%E5%93%81%E7%A7%8D%E4%BF%A1%E6%81%AF"></a>
 </h3>
 <p>测定站导出的数据一般不含品种，耳标号前缀也不一定能对应品种，所以需要你<strong>手动准备一张品种表</strong>（每头猪一行：耳标号、品种），再合并进访问表：</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">visits_b</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/prep_visits.html">prep_visits</a></span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="va">pigs</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">visits_b</span><span class="op">[</span><span class="va">identified</span> <span class="op">==</span> <span class="cn">TRUE</span>, <span class="va">responder</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="co"># 实际使用时从种猪档案读取，例如 breeds &lt;- read.csv("品种表.csv")</span></span>
@@ -271,7 +439,7 @@ LOESS
 Casey 等（2005）判定、按 Jiao 等（2014）校正，缺失的采食短缺口用
 LOESS、长缺口和两端用”日采食 ~ 体重”回归；FCR = ADFI ÷
 ADG。任意参数都可以覆盖：</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">qc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>, <span class="fl">115</span><span class="op">)</span>, min_test_days <span class="op">=</span> <span class="fl">40</span><span class="op">)</span></span>
 <span><span class="va">qc</span><span class="op">$</span><span class="va">stage_range</span></span>
 <span><span class="co">#&gt; [1]  30 115</span></span></code></pre></div>
@@ -353,14 +521,14 @@ ADG。任意参数都可以覆盖：</p>
 </h3>
 <p>FIRE 示例数据中的猪在 45–60 kg 才进站，因此这里按第 7 节的建议，以
 60–120 kg 作为计算区间：</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">qc_fire</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">60</span>, <span class="fl">120</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">visits</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/prep_visits.html">prep_visits</a></span><span class="op">(</span><span class="va">fire</span>, qc <span class="op">=</span> <span class="va">qc_fire</span>, verbose <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Preparing FIRE visits</span> <span style="color: #00BBBB;">───────────────────────────────────────────────────────</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Visits read: <span style="font-weight: bold;">9,794</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Unidentified visits (kept, identified = FALSE): <span style="font-weight: bold;">51</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> FIRE visits crossing midnight (exit time corrected): <span style="font-weight: bold;">68</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Visits crossing midnight (exit time corrected): <span style="font-weight: bold;">68</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Body weights of 0 set to NA: <span style="font-weight: bold;">478</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Rows without entry time (dropped): <span style="font-weight: bold;">0</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Duplicated rows (dropped): <span style="font-weight: bold;">0</span></span></span>
@@ -385,7 +553,7 @@ ADG。任意参数都可以覆盖：</p>
 <div class="section level3">
 <h3 id="体重质控">4.2 体重质控<a class="anchor" aria-label="anchor" href="#%E4%BD%93%E9%87%8D%E8%B4%A8%E6%8E%A7"></a>
 </h3>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">w</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/clean_weight.html">clean_weight</a></span><span class="op">(</span><span class="va">visits</span>, qc <span class="op">=</span> <span class="va">qc_fire</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Cleaning body weight (</span><span style="color: #00BB00; font-weight: bold;">rlm + loess</span><span style="font-weight: bold;">)</span> <span style="color: #00BBBB;">──────────────────────────────────────────</span></span></span>
@@ -429,7 +597,7 @@ LOESS 平滑曲线的 R² 低于 0.99 的猪也降级。详见《质控参数详
 <div class="section level3">
 <h3 id="日增重">4.3 日增重<a class="anchor" aria-label="anchor" href="#%E6%97%A5%E5%A2%9E%E9%87%8D"></a>
 </h3>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">adg</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calc_adg.html">calc_adg</a></span><span class="op">(</span><span class="va">w</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">ADG over 60-120 kg (</span><span style="color: #00BB00; font-weight: bold;">poly2</span><span style="font-weight: bold;"> curve)</span> <span style="color: #00BBBB;">────────────────────────────────────────────</span></span></span>
@@ -495,7 +663,7 @@ LOESS 平滑曲线的 R² 低于 0.99 的猪也降级。详见《质控参数详
 <div class="section level3">
 <h3 id="采食错误与日采食校正">4.4 采食错误与日采食校正<a class="anchor" aria-label="anchor" href="#%E9%87%87%E9%A3%9F%E9%94%99%E8%AF%AF%E4%B8%8E%E6%97%A5%E9%87%87%E9%A3%9F%E6%A0%A1%E6%AD%A3"></a>
 </h3>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">adfi</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calc_adfi.html">calc_adfi</a></span><span class="op">(</span><span class="va">visits</span>, <span class="va">adg</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Flagging feeder errors (Casey et al. 2005)</span> <span style="color: #00BBBB;">──────────────────────────────────</span></span></span>
@@ -542,7 +710,7 @@ LOESS 平滑插补，超过 3 天的用每头猪的”日采食 ~
 </ul>
 <p>校正模型的系数保存在 <code>adfi$model</code>
 中；各类错误的发生率可以这样查看：</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">f</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flag_feed_errors.html">flag_feed_errors</a></span><span class="op">(</span><span class="va">visits</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">f</span>, <span class="st">"error_rates"</span><span class="op">)</span><span class="op">[</span><span class="va">n</span> <span class="op">&gt;</span> <span class="fl">0</span>, <span class="fu">.</span><span class="op">(</span><span class="va">label</span>, <span class="va">n</span>, rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fl">100</span> <span class="op">*</span> <span class="va">rate</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span><span class="op">]</span></span>
 <span><span class="co">#&gt;             label     n  rate</span></span>
@@ -561,7 +729,7 @@ LOESS 平滑插补，超过 3 天的用每头猪的”日采食 ~
 <div class="section level3">
 <h3 id="料肉比">4.5 料肉比<a class="anchor" aria-label="anchor" href="#%E6%96%99%E8%82%89%E6%AF%94"></a>
 </h3>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fcr</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calc_fcr.html">calc_fcr</a></span><span class="op">(</span><span class="va">adg</span>, <span class="va">adfi</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">FCR over 60-120 kg</span> <span style="color: #00BBBB;">──────────────────────────────────────────────────────────</span></span></span>
@@ -607,7 +775,7 @@ LOESS 平滑插补，超过 3 天的用每头猪的”日采食 ~
 </ul>
 <p>每头猪每个 10 kg 体重段的采食量、增重和分段料肉比保存在
 <code>fcr$by_bin</code> 中，可以用来定位问题出在哪一段：</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">fcr</span><span class="op">$</span><span class="va">by_bin</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">weight_from</span>, <span class="va">weight_to</span>, feed_kg <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">feed_kg</span>, <span class="fl">1</span><span class="op">)</span>,</span>
 <span>                    gain_kg <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">gain_kg</span>, <span class="fl">1</span><span class="op">)</span>, fcr <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">fcr</span>, <span class="fl">2</span><span class="op">)</span>, weight_coverage_kg <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">weight_coverage_kg</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Key: &lt;responder&gt;</span></span>
@@ -624,12 +792,12 @@ LOESS 平滑插补，超过 3 天的用每头猪的”日采食 ~
 <div class="section level2">
 <h2 id="作图与保存">5. 作图与保存<a class="anchor" aria-label="anchor" href="#%E4%BD%9C%E5%9B%BE%E4%B8%8E%E4%BF%9D%E5%AD%98"></a>
 </h2>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">g</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/plot_adg.html">plot_adg</a></span><span class="op">(</span><span class="va">adg</span>, weight <span class="op">=</span> <span class="va">w</span>, responders <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"35853"</span>, <span class="st">"35855"</span>, <span class="st">"35877"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Created 1 growth plot</span></span>
 <span><span class="va">g</span><span class="op">$</span><span class="va">plot</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span></span></code></pre></div>
 <p><img src="tidypptsda-zh_files/figure-html/plots-1.png" class="r-plt" alt="" width="100%"></p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">h</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/plot_adfi.html">plot_adfi</a></span><span class="op">(</span><span class="va">adfi</span>, responders <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"35853"</span>, <span class="st">"35855"</span>, <span class="st">"35877"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Created 1 feed intake plot</span></span>
 <span><span class="va">h</span><span class="op">$</span><span class="va">plot</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span></span></code></pre></div>
@@ -760,7 +928,7 @@ ADFI，以及区间内有实测（含校正）采食的天数比例。灰色点�
 <h3 id="保存图片">保存图片<a class="anchor" aria-label="anchor" href="#%E4%BF%9D%E5%AD%98%E5%9B%BE%E7%89%87"></a>
 </h3>
 <p>每个测定站输出一张图，每头猪一个分面。保存为图片：</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/save_plots.html">save_plots</a></span><span class="op">(</span><span class="va">g</span>, path <span class="op">=</span> <span class="st">"结果/生长曲线"</span>, prefix <span class="op">=</span> <span class="st">"站"</span>, suffix <span class="op">=</span> <span class="st">"growth"</span>, device <span class="op">=</span> <span class="st">"png"</span><span class="op">)</span></span></code></pre></div>
 <p>保存图片的时间几乎都花在 ggplot2 绘图上：每个测定站（15 头猪左右）约
 1–1.5 秒，与图片格式关系不大。测定站多时可以：</p>
@@ -780,7 +948,7 @@ ADFI，以及区间内有实测（含校正）采食的天数比例。灰色点�
 <div class="section level3">
 <h3 id="导出为-csv">导出为 csv<a class="anchor" aria-label="anchor" href="#%E5%AF%BC%E5%87%BA%E4%B8%BA-csv"></a>
 </h3>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">fire</span>, qc <span class="op">=</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">60</span>, <span class="fl">120</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/write_results.html">write_results</a></span><span class="op">(</span><span class="va">res</span>, dir <span class="op">=</span> <span class="st">"结果"</span>, farm <span class="op">=</span> <span class="st">"A01"</span><span class="op">)</span></span></code></pre></div>
 <p>文件按”场名_内容_日期.csv”命名，例如
@@ -836,7 +1004,7 @@ ADFI，以及区间内有实测（含校正）采食的天数比例。灰色点�
 </h3>
 <p>猪的头数很多时，逐头猪拟合曲线是最耗时的步骤。<code><a href="../reference/clean_weight.html">clean_weight()</a></code>、<code><a href="../reference/calc_adg.html">calc_adg()</a></code>、<code><a href="../reference/calc_adfi.html">calc_adfi()</a></code>
 和 <code><a href="../reference/run_pipeline.html">run_pipeline()</a></code> 都有 <code>cores</code> 参数：</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">nedap</span>, cores <span class="op">=</span> <span class="fl">4</span><span class="op">)</span>          <span class="co"># 用 4 个 CPU 核心</span></span>
 <span><span class="fu">parallel</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/parallel/detectCores.html" class="external-link">detectCores</a></span><span class="op">(</span><span class="op">)</span>                         <span class="co"># 查看电脑有几个核心</span></span></code></pre></div>
 <p>并行使用 R 自带的 parallel 包，不增加依赖，结果与

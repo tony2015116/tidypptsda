@@ -18,7 +18,7 @@ the same columns and units for both station types."><meta property="og:image" co
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.0.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.1.0</span>
       </span>
     </div>
 
@@ -85,7 +85,7 @@ the same columns and units for both station types.</p>
     </div>
 
     <div id="ref-usage">
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">prep_visits</span><span class="op">(</span><span class="va">data</span>, station <span class="op">=</span> <span class="cn">NULL</span>, qc <span class="op">=</span> <span class="fu"><a href="qc_config.html">qc_config</a></span><span class="op">(</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">prep_visits</span><span class="op">(</span><span class="va">data</span>, station <span class="op">=</span> <span class="cn">NULL</span>, format <span class="op">=</span> <span class="cn">NULL</span>, qc <span class="op">=</span> <span class="fu"><a href="qc_config.html">qc_config</a></span><span class="op">(</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div id="arguments">
@@ -93,14 +93,23 @@ the same columns and units for both station types.</p>
 
 
 <dl><dt id="arg-data">data<a class="anchor" aria-label="anchor" href="#arg-data"></a></dt>
-<dd><p>Raw station data, e.g. from <code><a href="read_station.html">read_station()</a></code> or the example
-datasets <a href="nedap.html">nedap</a> and <a href="fire.html">fire</a>.</p></dd>
+<dd><p>Station data: the standard table from <code><a href="read_station.html">read_station()</a></code>, or
+a raw export already in R, e.g. the example datasets <a href="nedap.html">nedap</a> and
+<a href="fire.html">fire</a> or a table read from a database. Raw data is mapped to the
+standard fields with <code>format</code>.</p></dd>
 
 
 <dt id="arg-station">station<a class="anchor" aria-label="anchor" href="#arg-station"></a></dt>
 <dd><p><code>"nedap"</code>, <code>"fire"</code> or <code>NULL</code> (default): taken from the
 <code>"station"</code> attribute set by <code><a href="read_station.html">read_station()</a></code>, or detected from the
 column names.</p></dd>
+
+
+<dt id="arg-format">format<a class="anchor" aria-label="anchor" href="#arg-format"></a></dt>
+<dd><p>Station format for raw <code>data</code> whose columns differ from
+the usual export, as in <code><a href="read_station.html">read_station()</a></code>. <code>NULL</code> (default) uses the
+built-in format. Ignored for the output of <code><a href="read_station.html">read_station()</a></code>, which is
+already standard.</p></dd>
 
 
 <dt id="arg-qc">qc<a class="anchor" aria-label="anchor" href="#arg-qc"></a></dt>
@@ -163,7 +172,7 @@ return looks like an overlap and is treated as misreads.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Preparing FIRE visits</span> <span style="color: #00BBBB;">───────────────────────────────────────────────────────</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Visits read: <span style="font-weight: bold;">9,794</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Unidentified visits (kept, identified = FALSE): <span style="font-weight: bold;">51</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> FIRE visits crossing midnight (exit time corrected): <span style="font-weight: bold;">68</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Visits crossing midnight (exit time corrected): <span style="font-weight: bold;">68</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Body weights of 0 set to NA: <span style="font-weight: bold;">478</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Rows without entry time (dropped): <span style="font-weight: bold;">0</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Duplicated rows (dropped): <span style="font-weight: bold;">0</span></span>

@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.0.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.1.0</span>
       </span>
     </div>
 
@@ -77,6 +77,20 @@
       <small>Source: <a href="https://github.com/tony2015116/tidypptsda/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="page-header" data-toc-text="1.1.0" id="tidypptsda-110">tidypptsda 1.1.0<a class="anchor" aria-label="anchor" href="#tidypptsda-110"></a></h2>
+<div class="section level3">
+<h3 id="reading-station-data-1-1-0">Reading station data<a class="anchor" aria-label="anchor" href="#reading-station-data-1-1-0"></a></h3>
+<ul><li>
+<code><a href="../reference/read_station.html">read_station()</a></code> now returns a <strong>standard table</strong>: the same field names, types and units for NEDAP and FIRE (<code>responder</code>, <code>location</code>, <code>entry_time</code>, <code>exit_time</code>, <code>duration</code>, <code>feed_intake</code> and <code>trough_*</code> in g, <code>weight</code> in kg, <code>topup</code>, <code>breed</code>, <code>source_file</code>), ready for <code><a href="../reference/prep_visits.html">prep_visits()</a></code>.</li>
+<li>New <code>format</code> argument and <code><a href="../reference/station_format.html">station_format()</a></code>: a station format maps the columns of an export (by name, alternatives with <code>|</code>, or by position) to the standard fields, with units (<code>kg</code>/<code>g</code>/<code>auto</code>, <code>s</code>/<code>min</code>) and time formats. Date and clock time in two columns are joined (<code>Date,Entry</code>). <code>station_format("fire", file = )</code> writes the built-in format as a tab-separated template to edit for other exports.</li>
+<li>Excel files (<code>.xlsx</code>, <code>.xls</code>) are read with readxl (in Suggests); the default <code>pattern</code> now matches CSV, TXT and Excel files.</li>
+<li>
+<code><a href="../reference/prep_visits.html">prep_visits()</a></code> gains <code>format</code> for raw data already in R (e.g. from a database). Raw data such as the example datasets <code>nedap</code> and <code>fire</code> is mapped with the same built-in formats, so both routes give the same visits.</li>
+<li>
+<strong>(breaking)</strong> <code><a href="../reference/read_station.html">read_station()</a></code> keeps only the mapped fields, not all columns of the export, and <code>fill</code> is removed: optional fields missing in a file (e.g. <code>Topup Amount</code>) are filled with <code>NA</code>, required fields must be present in every file.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="page-header" data-toc-text="1.0.0" id="tidypptsda-100">tidypptsda 1.0.0<a class="anchor" aria-label="anchor" href="#tidypptsda-100"></a></h2>
 <p>A simpler, single method from the weight records to FCR. Breaking changes are marked with <strong>(breaking)</strong>.</p>
