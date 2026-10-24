@@ -32,7 +32,8 @@ Suggests:
     readxl,
     rmarkdown,
     testthat,
-    withr
+    withr,
+    writexl
 VignetteBuilder: 
     knitr
 Config/fusen/version: 0.7.2
