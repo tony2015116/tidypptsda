@@ -78,7 +78,7 @@ its records (default 0.4) is flagged as low confidence: the scale
 probably did not weigh it correctly for a long time (e.g. a faulty load
 cell).
 \item \code{smooth_r2_min}: a pig whose valid weights fit their LOESS smooth with
-an R\if{html}{\out{<c2>}}\if{html}{\out{<b2>}} below this (default 0.99) is flagged as low confidence.
+an R² below this (default 0.99) is flagged as low confidence.
 }
 
 \strong{Growth, filled weights and ADG} (used by \code{\link[=calc_adg]{calc_adg()}})

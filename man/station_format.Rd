@@ -41,7 +41,7 @@ weight       体重        kg
 }\if{html}{\out{</div>}}
 \itemize{
 \item \code{column}: the column name, or its position (\code{6}). Several
-alternatives are separated by \code{|} (\verb{Tag|耳标号}); the first one found
+alternatives are separated by \code{|} (\code{Tag|耳标号}); the first one found
 is used. Two columns separated by \verb{,} are joined for a time field:
 date and clock time (\verb{Date,Entry}). \code{-} or empty means the export
 does not have the field (only allowed for optional fields).

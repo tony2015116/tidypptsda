@@ -30,7 +30,7 @@
 #'     days without valid weight), `weight_filled` (observed, interpolated
 #'     or curve weight, kg), `source` (`"observed"`, `"interpolated"` or
 #'     `"curve"`), `predicted` weight of the growth curve with `lower` /
-#'     `upper` limits (<c2><b1> 1.96 residual SD) and `in_stage`;
+#'     `upper` limits (± 1.96 residual SD) and `in_stage`;
 #'   - `removed`: pigs removed so far, plus pigs without ADG;
 #'   - `settings`: QC settings.
 #'

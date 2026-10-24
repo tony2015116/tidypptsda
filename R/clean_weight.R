@@ -19,7 +19,7 @@
 #'   - `per_pig`: one row per pig with `n_records`, `n_valid`,
 #'     `n_outliers`, `first_date`, `last_date`, `test_days`,
 #'     `missing_rate`, `entry_weight`, `exit_weight` (kg, from the LOESS
-#'     smooth of the valid weights), `r2` (R<c2><b2> of that smooth),
+#'     smooth of the valid weights), `r2` (R² of that smooth),
 #'     `track_removed` (share of the records removed by the
 #'     tracking, `NA` when not tracked), `status` (`"keep"`,
 #'     `"low_confidence"` or `"removed"`) and `reason`;

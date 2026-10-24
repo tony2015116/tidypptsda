@@ -47,7 +47,9 @@ fusen::fill_description(
   ),
   overwrite = TRUE
 )
-desc::desc_set_version("1.0.0")
+desc::desc_set_version("1.1.0")
+# Excel files: readxl reads them, writexl writes them in the tests
+desc::desc_set_dep("writexl", "Suggests")
 usethis::use_mit_license("Meng Guo")
 # Use markdown in roxygen comments
 desc::desc_set("Roxygen", "list(markdown = TRUE)")
@@ -6414,4 +6416,8 @@ test_that("make_masks hides only recorded days", {
 # Execute in the console directly
 fusen::inflate(flat_file = "dev/flat_tidypptsda.Rmd",
                vignette_name = "Get started")
+# readxl is optional (only for Excel files): inflate() puts it in Imports
+# because the code calls readxl::, so move it back to Suggests
+desc::desc_del_dep("readxl", "Imports")
+desc::desc_set_dep("readxl", "Suggests")
 ```

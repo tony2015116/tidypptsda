@@ -64,7 +64,7 @@
 #'   probably did not weigh it correctly for a long time (e.g. a faulty load
 #'   cell).
 #' - `smooth_r2_min`: a pig whose valid weights fit their LOESS smooth with
-#'   an R<c2><b2> below this (default 0.99) is flagged as low confidence.
+#'   an R² below this (default 0.99) is flagged as low confidence.
 #'
 #' **Growth, filled weights and ADG** (used by [calc_adg()])
 #' - `stage_range`: body weight interval for ADG, ADFI and FCR, kg. Default

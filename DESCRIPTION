@@ -17,11 +17,11 @@ BugReports: https://github.com/tony2015116/tidypptsda/issues
 Depends: 
     R (>= 4.1.0)
 Imports: 
-    MASS,
     cli,
     data.table,
     ggplot2,
     grDevices,
+    MASS,
     parallel,
     stats,
     tools,

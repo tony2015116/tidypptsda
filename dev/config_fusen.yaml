@@ -13,8 +13,8 @@ flat_tidypptsda.Rmd:
   - R/prep_visits.R
   - R/qc_config.R
   - R/read_station.R
-  - R/station_format.R
   - R/run_pipeline.R
+  - R/station_format.R
   - R/validate.R
   - R/write_results.R
   - R/example-datasets.R

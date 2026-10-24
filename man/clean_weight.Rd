@@ -25,7 +25,7 @@ An object of class \code{ppt_weight} (a list):
 \item \code{per_pig}: one row per pig with \code{n_records}, \code{n_valid},
 \code{n_outliers}, \code{first_date}, \code{last_date}, \code{test_days},
 \code{missing_rate}, \code{entry_weight}, \code{exit_weight} (kg, from the LOESS
-smooth of the valid weights), \code{r2} (R\if{html}{\out{<c2>}}\if{html}{\out{<b2>}} of that smooth),
+smooth of the valid weights), \code{r2} (R² of that smooth),
 \code{track_removed} (share of the records removed by the
 tracking, \code{NA} when not tracked), \code{status} (\code{"keep"},
 \code{"low_confidence"} or \code{"removed"}) and \code{reason};
