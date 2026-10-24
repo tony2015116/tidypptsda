@@ -43,25 +43,84 @@ res
 
 ## 2. 数据要求
 
-### NEDAP
+### 读取文件：`read_station()`
 
-至少需要以下列：`responder`（耳标号）、`location`（站号）、`visit_time`（进站时间）、`duration`（停留秒数）、`weight`（体重，g）、`feed_intake`（采食量，g）。
-
-### FIRE
-
-至少需要以下列：`Location`、`Tag`、`Date`、`Entry`、`Exit`、`Ent Wt`、`Ext Wt`、`Consumed`、`Weight`。料槽重和采食量的单位是 kg，`Topup Amount`（下料量）为可选列。
-
-包内自带两份示例数据 `nedap` 和 `fire`，都是测定站的原始导出格式。
-
-### 读取文件
+`read_station()` 读取测定站导出的文件（CSV、TXT 或 Excel，一个、多个或整个文件夹），把各列对应到**标准字段**，统一类型和单位后合并成一张表，直接交给 `prep_visits()`：
 
 ```{r read, eval = FALSE}
-raw <- read_station("D:/测定站导出/2024批次")      # 读取文件夹下所有 csv
+raw <- read_station("D:/测定站导出/2024批次")                  # 文件夹下所有 csv/txt/xlsx
 raw <- read_station(c("101.csv", "102.csv"), station = "fire")
+visits <- prep_visits(raw)
 ```
 
+- `station` 取 `"nedap"` 或 `"fire"`，决定用哪一套标准字段和后续处理方式；不写时按列名自动判断。
+- CSV、TXT 用 `data.table::fread()` 读取，分隔符（逗号、制表符、分号）自动识别；Excel 需要安装 readxl 包。
 - 耳标号一律按文本读入，前导零不会丢失。
-- 多个文件的列名不一致时会报错，并指出每个文件缺哪些列；如需用 NA 补齐缺失列，设`fill = TRUE`。
+- 输出的列名、类型和单位对两种测定站都一样：时间为 POSIXct（按钟点时间存为 UTC），停留时长为秒，体重为 kg，采食量、料槽重和下料量为 g。原始文件中没有对应到标准字段的列不会保留。
+
+### 标准字段
+
+| 字段 | 含义 | 单位 | NEDAP | FIRE |
+|---|---|---|---|---|
+| `responder` | 耳标号 | 文本 | 必需 | 必需 |
+| `location` | 站号 | 文本 | 必需 | 必需 |
+| `entry_time` | 进站时间 | 时间 | 必需 | 必需 |
+| `exit_time` | 离站时间 | 时间 | 可选 | 必需 |
+| `duration` | 停留时长 | 秒 | 必需* | — |
+| `feed_intake` | 本次采食量 | g | 必需 | 必需 |
+| `weight` | 体重 | kg | 必需 | 必需 |
+| `trough_in`、`trough_out` | 进站、离站料槽重 | g | — | 必需 |
+| `topup` | 本次下料量 | g | — | 可选 |
+| `breed` | 品种 | 文本 | 可选 | 可选 |
+
+\* NEDAP 需要 `duration` 或 `exit_time` 二者之一。FIRE 由进站、离站时间计算停留时长，离站早于进站时视为跨零点访问。
+
+### 内置格式
+
+包里内置了两种测定站常见导出格式的对应关系，一般不需要任何设置：
+
+```{r formats}
+station_format("nedap")
+station_format("fire")
+```
+
+- NEDAP：`responder`、`location`、`visit_time`、`duration`、`weight`（g，按数值大小自动判断 g 或 kg）、`feed_intake`（g）。
+- FIRE：`Tag`、`Location`、`Date` + `Entry`/`Exit`、`Ent Wt`、`Ext Wt`、`Consumed`、`Weight`（kg），`Topup Amount` 可选。
+
+包内自带的示例数据 `nedap` 和 `fire` 是这两种原始导出格式，`prep_visits()` 会用同一套内置格式把它们转成标准字段，所以示例数据和自己读入的文件走的是同一条处理路径。
+
+### 自定义格式文件
+
+导出软件版本不同、表头是中文，或者换了一家设备时，把对应关系写成一个制表符分隔的格式文件即可。先导出内置格式作为模板，再按自己的导出修改：
+
+```{r format-template, eval = FALSE}
+station_format("fire", file = "fire_format.txt")
+```
+
+```
+field        column      unit
+responder    耳标号      -
+location     站号        -
+entry_time   日期,进站   -
+exit_time    日期,出站   -
+trough_in    进站料重    kg
+trough_out   出站料重    kg
+feed_intake  采食量      kg
+weight       体重        kg
+```
+
+```{r format-use, eval = FALSE}
+raw <- read_station("D:/测定站导出/2024批次", station = "fire",
+                    format = "fire_format.txt")
+```
+
+- `column` 写列名，也可以写列号（如 `6`）。**优先写列名**：导出软件增加一列后，按列号对应会整体错位而且不报错，算出的结果是错的。
+- 同一字段有几种可能的列名时用 `|` 分隔（如 `Tag|耳标号`），按顺序取第一个找到的。
+- 日期和钟点时间分在两列时，用 `,` 连接（如 `日期,进站`），读取时合并为一列。
+- `unit`：质量类字段写 `kg`、`g` 或 `auto`；停留时长写 `s` 或 `min`；时间字段写 `-`（自动识别 `年-月-日 时:分:秒` 和 `年/月/日 时:分:秒`），或写 `strptime()` 格式，如 `%d/%m/%Y %H:%M`。
+- 以 `#` 开头的行是注释；`-` 或空白表示导出中没有这个字段（只适用于可选字段）。
+- 字段名写错、缺少必需字段、单位不认识、列找不到、数值或时间读不出来时，都会报错并指出是哪个字段、哪个文件。
+- 已经在 R 里的原始数据（例如从数据库读出的表）也可以用同样的格式：`prep_visits(data, station = "fire", format = "fire_format.txt")`。
 
 ### 添加品种信息
 

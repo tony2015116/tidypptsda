@@ -1,3 +1,29 @@
+# tidypptsda 1.1.0
+
+## Reading station data
+
+* `read_station()` now returns a **standard table**: the same field names,
+  types and units for NEDAP and FIRE (`responder`, `location`,
+  `entry_time`, `exit_time`, `duration`, `feed_intake` and `trough_*` in g,
+  `weight` in kg, `topup`, `breed`, `source_file`), ready for
+  `prep_visits()`.
+* New `format` argument and `station_format()`: a station format maps the
+  columns of an export (by name, alternatives with `|`, or by position)
+  to the standard fields, with units (`kg`/`g`/`auto`, `s`/`min`) and
+  time formats. Date and clock time in two columns are joined
+  (`Date,Entry`). `station_format("fire", file = )` writes the built-in
+  format as a tab-separated template to edit for other exports.
+* Excel files (`.xlsx`, `.xls`) are read with readxl (in Suggests); the
+  default `pattern` now matches CSV, TXT and Excel files.
+* `prep_visits()` gains `format` for raw data already in R (e.g. from a
+  database). Raw data such as the example datasets `nedap` and `fire` is
+  mapped with the same built-in formats, so both routes give the same
+  visits.
+* **(breaking)** `read_station()` keeps only the mapped fields, not all
+  columns of the export, and `fill` is removed: optional fields missing in
+  a file (e.g. `Topup Amount`) are filled with `NA`, required fields must
+  be present in every file.
+
 # tidypptsda 1.0.0
 
 A simpler, single method from the weight records to FCR. Breaking changes

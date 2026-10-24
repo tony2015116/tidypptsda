@@ -311,7 +311,8 @@ utils::globalVariables(c(
   "responder", "responder_raw", "identified", "location", "date", "seq_days",
   "seq_in_day", "seq_in_location", "entry_time", "exit_time", "duration",
   "feed_intake", "weight", "trough_in", "trough_out", "topup", "source_file",
-  "visit_time",
+  "visit_time", "field", "column", "unit", "required", "description",
+  "i.description", ".row",
   # station history
   "main_location", "transfer", "n", "n_loc", "row_id", "start", "N",
   # weight cleaning

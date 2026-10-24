@@ -4,15 +4,22 @@
 \alias{prep_visits}
 \title{Prepare a Standard Visit Table}
 \usage{
-prep_visits(data, station = NULL, qc = qc_config(), verbose = 1)
+prep_visits(data, station = NULL, format = NULL, qc = qc_config(), verbose = 1)
 }
 \arguments{
-\item{data}{Raw station data, e.g. from \code{\link[=read_station]{read_station()}} or the example
-datasets \link{nedap} and \link{fire}.}
+\item{data}{Station data: the standard table from \code{\link[=read_station]{read_station()}}, or
+a raw export already in R, e.g. the example datasets \link{nedap} and
+\link{fire} or a table read from a database. Raw data is mapped to the
+standard fields with \code{format}.}
 
 \item{station}{\code{"nedap"}, \code{"fire"} or \code{NULL} (default): taken from the
 \code{"station"} attribute set by \code{\link[=read_station]{read_station()}}, or detected from the
 column names.}
+
+\item{format}{Station format for raw \code{data} whose columns differ from
+the usual export, as in \code{\link[=read_station]{read_station()}}. \code{NULL} (default) uses the
+built-in format. Ignored for the output of \code{\link[=read_station]{read_station()}}, which is
+already standard.}
 
 \item{qc}{QC settings from \code{\link[=qc_config]{qc_config()}}. Used here: \code{duration_max} (to
 tell a FIRE midnight crossing from a recording error) and the station

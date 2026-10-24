@@ -13,6 +13,7 @@ flat_tidypptsda.Rmd:
   - R/prep_visits.R
   - R/qc_config.R
   - R/read_station.R
+  - R/station_format.R
   - R/run_pipeline.R
   - R/validate.R
   - R/write_results.R
@@ -22,6 +23,7 @@ flat_tidypptsda.Rmd:
   - tests/testthat/test-utils.R
   - tests/testthat/test-qc_config.R
   - tests/testthat/test-read_station.R
+  - tests/testthat/test-station_format.R
   - tests/testthat/test-prep_visits.R
   - tests/testthat/test-add_breed.R
   - tests/testthat/test-clean_weight.R

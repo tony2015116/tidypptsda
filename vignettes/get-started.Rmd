@@ -75,9 +75,18 @@ qc_config(stage_range = c(40, 110), weight_outlier = c("rlm", "loess", "sd"))
 # read_station
 
 `read_station()` reads one or many station export files (or a whole
-folder) and stacks them into one table. Columns are checked against the
-station type, transponder IDs are always read as text so leading zeros are
-kept, and a `source_file` column records where each row came from.
+folder) and returns **one standard table**: the same column names, types
+and units for NEDAP and FIRE, ready for [prep_visits()].
+
+Which column of the export holds which field is described by a **station
+format**. The package has a built-in format for each station type, so the
+usual exports need no setup. For an export with other column names or
+positions (another software version, Chinese headers, another device),
+write the format once as a small tab-separated file and pass it with
+`format`. `station_format("fire", file = "fire_format.txt")` writes the
+built-in format as a template to start from.
+
+
 
 ```{r example-read_station}
 # Write the example data to two CSV files, then read them back
@@ -87,18 +96,43 @@ data.table::fwrite(fire[fire$Location == 101, ], file.path(folder, "fire_101.csv
 data.table::fwrite(fire[fire$Location == 102, ], file.path(folder, "fire_102.csv"))
 
 raw <- read_station(folder)
-table(raw$source_file)
+head(raw)
 attr(raw, "station")
+
+# The built-in format, written as a template for other exports
+station_format("fire", file = file.path(folder, "fire_format.txt"))
 
 unlink(folder, recursive = TRUE)
 ```
 
 
 
+# station_format
+
+A station format says which column of an export holds which standard
+field, and in which unit. `station_format()` shows the built-in format of
+a station type and writes it as a template file for other exports.
+
+
+
+```{r example-station_format}
+station_format("nedap")
+station_format("fire")
+
+# Write a template, edit it, and use it
+f <- tempfile(fileext = ".txt")
+station_format("fire", file = f)
+cat(readLines(f), sep = "\n")
+unlink(f)
+```
+
+
+
 # prep_visits
 
-`prep_visits()` turns a raw NEDAP or FIRE export into one standard visit
-table that every later step uses:
+`prep_visits()` turns the output of `read_station()` (or a raw NEDAP or
+FIRE export already in R, such as the example datasets) into one standard
+visit table that every later step uses:
 
 - one row per visit, **including unidentified visits** (no transponder
   read), marked with `identified = FALSE`. They are needed to compute the

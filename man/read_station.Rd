@@ -7,8 +7,9 @@
 read_station(
   files,
   station = NULL,
-  pattern = "\\\\.csv$",
-  fill = FALSE,
+  format = NULL,
+  pattern = "\\\\.(csv|txt|xlsx|xls)$",
+  sheet = 1,
   verbose = 1,
   ...
 )
@@ -17,39 +18,61 @@ read_station(
 \item{files}{Character vector of file paths, or a single folder. For a
 folder, all files matching \code{pattern} are read.}
 
-\item{station}{\code{"nedap"}, \code{"fire"} or \code{NULL} (default) to detect the
-station type from the column names.}
+\item{station}{\code{"nedap"}, \code{"fire"} or \code{NULL} (default). With \code{NULL}, the
+station type is detected by trying the built-in formats on the column
+names. Required when \code{format} is given.}
+
+\item{format}{\code{NULL} (default) for the built-in format of \code{station}, or a
+station format: the path of a tab-separated format file, or a data
+frame with columns \code{field}, \code{column} and optionally \code{unit} (see
+\code{\link[=station_format]{station_format()}}).}
 
 \item{pattern}{Regular expression for file names when \code{files} is a
-folder. Default \code{"\\\\.csv$"} (case-insensitive).}
+folder. Default: CSV, TXT, XLSX and XLS files (case-insensitive).}
 
-\item{fill}{If \code{FALSE} (default), all files must have the same columns.
-If \code{TRUE}, missing columns are filled with \code{NA}.}
+\item{sheet}{Sheet name or number for Excel files. Default \code{1}.}
 
 \item{verbose}{0 (silent), 1 (summary, default) or 2 (details per file).}
 
-\item{...}{Further arguments passed to \code{\link[data.table:fread]{data.table::fread()}}.}
+\item{...}{Further arguments passed to \code{\link[data.table:fread]{data.table::fread()}} (CSV and
+TXT files).}
 }
 \value{
-A \code{data.table} with the original columns plus \code{source_file}
-(file name without folder). Its attribute \code{"station"} holds the station
-type.
-}
-\description{
-Read one or more CSV exports from NEDAP or FIRE feeding stations and
-combine them into one table.
-}
-\details{
-Required columns:
+A \code{data.table} with the standard fields of the station type
+(see \code{\link[=station_format]{station_format()}}) plus \code{source_file} (file name without
+folder):
 \itemize{
-\item NEDAP: \code{responder}, \code{location}, \code{visit_time}, \code{duration}, \code{weight},
-\code{feed_intake}.
-\item FIRE: \code{Location}, \code{Tag}, \code{Date}, \code{Entry}, \code{Exit}, \verb{Ent Wt}, \verb{Ext Wt},
-\code{Consumed}, \code{Weight}.
+\item \code{responder} (character, transponder number as recorded),
+\code{location} (character), \code{breed} (character, if mapped);
+\item \code{entry_time}, \code{exit_time}: POSIXct, clock time stored as UTC;
+\item \code{duration}: seconds; \code{feed_intake}, \code{trough_in}, \code{trough_out},
+\code{topup}: g; \code{weight}: kg.
 }
 
-Transponder and animal ID columns (\code{responder}, \code{animal_number},
-\code{lifenumber}, \code{Tag}) are read as character.
+Fields the station type does not have, or optional fields missing in
+the export, are \code{NA}. Columns of the export that are not mapped are
+dropped. Attribute \code{"station"} holds the station type and
+\code{"station_format"} the format used.
+}
+\description{
+Read one or more NEDAP or FIRE exports (CSV, TXT or Excel), map their
+columns to the standard fields with a station format, and combine them
+into one standard table for \code{\link[=prep_visits]{prep_visits()}}.
+}
+\details{
+CSV and TXT files are read with \code{\link[data.table:fread]{data.table::fread()}}, which detects the
+separator (comma, tab, semicolon). Excel files need the readxl package.
+The column mapped to \code{responder} is always read as text, so leading
+zeros are kept.
+
+Columns are matched by name first (exact, then ignoring case and
+surrounding spaces). A number in the format is a column position, used
+when the export has no usable header. Positions are fragile: if the
+export software adds a column, every later field shifts without an
+error. Use names where possible.
+
+Every file must contain all required fields of the station type. A
+missing optional field (\code{topup}, \code{breed}) is filled with \code{NA}.
 }
 \examples{
 # Write the example data to two CSV files, then read them back
@@ -59,8 +82,15 @@ data.table::fwrite(fire[fire$Location == 101, ], file.path(folder, "fire_101.csv
 data.table::fwrite(fire[fire$Location == 102, ], file.path(folder, "fire_102.csv"))
 
 raw <- read_station(folder)
-table(raw$source_file)
+head(raw)
 attr(raw, "station")
 
+# The built-in format, written as a template for other exports
+station_format("fire", file = file.path(folder, "fire_format.txt"))
+
 unlink(folder, recursive = TRUE)
+}
+\seealso{
+\code{\link[=station_format]{station_format()}} for the fields and the format file;
+\code{\link[=prep_visits]{prep_visits()}} for the next step.
 }

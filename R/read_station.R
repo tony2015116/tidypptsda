@@ -3,34 +3,57 @@
 #' Read Feeding Station Export Files
 #'
 #' @description
-#' Read one or more CSV exports from NEDAP or FIRE feeding stations and
-#' combine them into one table.
+#' Read one or more NEDAP or FIRE exports (CSV, TXT or Excel), map their
+#' columns to the standard fields with a station format, and combine them
+#' into one standard table for [prep_visits()].
 #'
 #' @param files Character vector of file paths, or a single folder. For a
 #'   folder, all files matching `pattern` are read.
-#' @param station `"nedap"`, `"fire"` or `NULL` (default) to detect the
-#'   station type from the column names.
+#' @param station `"nedap"`, `"fire"` or `NULL` (default). With `NULL`, the
+#'   station type is detected by trying the built-in formats on the column
+#'   names. Required when `format` is given.
+#' @param format `NULL` (default) for the built-in format of `station`, or a
+#'   station format: the path of a tab-separated format file, or a data
+#'   frame with columns `field`, `column` and optionally `unit` (see
+#'   [station_format()]).
 #' @param pattern Regular expression for file names when `files` is a
-#'   folder. Default `"\\.csv$"` (case-insensitive).
-#' @param fill If `FALSE` (default), all files must have the same columns.
-#'   If `TRUE`, missing columns are filled with `NA`.
+#'   folder. Default: CSV, TXT, XLSX and XLS files (case-insensitive).
+#' @param sheet Sheet name or number for Excel files. Default `1`.
 #' @param verbose 0 (silent), 1 (summary, default) or 2 (details per file).
-#' @param ... Further arguments passed to [data.table::fread()].
+#' @param ... Further arguments passed to [data.table::fread()] (CSV and
+#'   TXT files).
 #'
-#' @return A `data.table` with the original columns plus `source_file`
-#'   (file name without folder). Its attribute `"station"` holds the station
-#'   type.
+#' @return A `data.table` with the standard fields of the station type
+#'   (see [station_format()]) plus `source_file` (file name without
+#'   folder):
+#'   - `responder` (character, transponder number as recorded),
+#'     `location` (character), `breed` (character, if mapped);
+#'   - `entry_time`, `exit_time`: POSIXct, clock time stored as UTC;
+#'   - `duration`: seconds; `feed_intake`, `trough_in`, `trough_out`,
+#'     `topup`: g; `weight`: kg.
+#'
+#'   Fields the station type does not have, or optional fields missing in
+#'   the export, are `NA`. Columns of the export that are not mapped are
+#'   dropped. Attribute `"station"` holds the station type and
+#'   `"station_format"` the format used.
 #'
 #' @details
-#' Required columns:
-#' - NEDAP: `responder`, `location`, `visit_time`, `duration`, `weight`,
-#'   `feed_intake`.
-#' - FIRE: `Location`, `Tag`, `Date`, `Entry`, `Exit`, `Ent Wt`, `Ext Wt`,
-#'   `Consumed`, `Weight`.
+#' CSV and TXT files are read with [data.table::fread()], which detects the
+#' separator (comma, tab, semicolon). Excel files need the readxl package.
+#' The column mapped to `responder` is always read as text, so leading
+#' zeros are kept.
 #'
-#' Transponder and animal ID columns (`responder`, `animal_number`,
-#' `lifenumber`, `Tag`) are read as character.
+#' Columns are matched by name first (exact, then ignoring case and
+#' surrounding spaces). A number in the format is a column position, used
+#' when the export has no usable header. Positions are fragile: if the
+#' export software adds a column, every later field shifts without an
+#' error. Use names where possible.
 #'
+#' Every file must contain all required fields of the station type. A
+#' missing optional field (`topup`, `breed`) is filled with `NA`.
+#'
+#' @seealso [station_format()] for the fields and the format file;
+#'   [prep_visits()] for the next step.
 #' @export
 #' @examples
 #' # Write the example data to two CSV files, then read them back
@@ -40,27 +63,45 @@
 #' data.table::fwrite(fire[fire$Location == 102, ], file.path(folder, "fire_102.csv"))
 #'
 #' raw <- read_station(folder)
-#' table(raw$source_file)
+#' head(raw)
 #' attr(raw, "station")
+#'
+#' # The built-in format, written as a template for other exports
+#' station_format("fire", file = file.path(folder, "fire_format.txt"))
 #'
 #' unlink(folder, recursive = TRUE)
 read_station <- function(files,
                          station = NULL,
-                         pattern = "\\.csv$",
-                         fill = FALSE,
+                         format = NULL,
+                         pattern = "\\.(csv|txt|xlsx|xls)$",
+                         sheet = 1,
                          verbose = 1,
                          ...) {
   local_verbose(verbose)
   files <- resolve_files(files, pattern)
   if (!is.null(station)) station <- check_station(station)
+  if (!is.null(format)) {
+    if (is.null(station)) {
+      cli::cli_abort("Set {.arg station} when {.arg format} is given.")
+    }
+    fmt <- as_station_format(format, station)
+  }
 
   ppt_msg("Reading {length(files)} file{?s}", "h1")
 
+  # Columns read as text: the responder column(s) of the format, or of both
+  # built-in formats when the station type is still unknown.
+  id_specs <- if (!is.null(format)) {
+    fmt[field == "responder", column]
+  } else if (!is.null(station)) {
+    builtin_format(station)[field == "responder", column]
+  } else {
+    c(builtin_format("nedap")[field == "responder", column],
+      builtin_format("fire")[field == "responder", column])
+  }
+
   tables <- lapply(files, function(f) {
-    header <- names(data.table::fread(f, nrows = 0L, showProgress = FALSE, ...))
-    ids <- intersect(id_cols(), header)
-    cc <- if (length(ids) > 0L) list(character = ids) else NULL
-    dt <- data.table::fread(f, colClasses = cc, showProgress = FALSE, ...)
+    dt <- read_raw_file(f, id_specs, sheet, ...)
     ppt_msg("{.file {basename(f)}}: {nrow(dt)} rows, {ncol(dt)} columns",
             "info", level = 2)
     dt
@@ -72,49 +113,214 @@ read_station <- function(files,
     station <- detect_station(tables[[1L]])
     ppt_msg("Detected station type {.val {station}}", "info")
   }
-  required <- station_cols(station)
-  for (nm in names(tables)) {
-    check_cols(tables[[nm]], required, arg = nm,
-               hint = paste0("Is station = \"", station, "\" correct?"))
-  }
+  if (is.null(format)) fmt <- builtin_format(station)
 
-  # Same columns in every file, unless fill = TRUE.
-  col_sets <- lapply(tables, names)
-  all_cols <- unique(unlist(col_sets))
-  differ <- vapply(col_sets, function(x) !setequal(x, all_cols), logical(1))
-  if (any(differ) && !fill) {
-    details <- vapply(names(tables)[differ], function(nm) {
-      paste0(nm, " lacks: ", paste(setdiff(all_cols, col_sets[[nm]]), collapse = ", "))
-    }, character(1))
-    cli::cli_abort(c(
-      "Files do not have the same columns.",
-      stats::setNames(details, rep("x", length(details))),
-      "i" = "Use {.code fill = TRUE} to fill missing columns with {.val NA}."
-    ))
-  }
-
-  out <- data.table::rbindlist(tables, use.names = TRUE, fill = fill,
-                               idcol = "source_file")
+  std <- lapply(names(tables), function(nm) {
+    apply_format(tables[[nm]], fmt, station, arg = nm)
+  })
+  names(std) <- names(tables)
+  out <- data.table::rbindlist(std, use.names = TRUE, idcol = "source_file")
   data.table::setcolorder(out, setdiff(names(out), "source_file"))
   data.table::setattr(out, "station", station)
+  data.table::setattr(out, "station_format", fmt)
+  data.table::setattr(out, "ppt_standard", TRUE)
 
   ppt_msg("Read {nrow(out)} rows from {length(files)} file{?s} ({toupper(station)})",
           "success")
   out
 }
 
-# Columns read as character so that leading zeros in IDs are kept.
-id_cols <- function() {
-  c("responder", "animal_number", "lifenumber", "Tag")
+# ---- standard fields --------------------------------------------------------
+
+format_fields <- function() {
+  data.table::data.table(
+    field = c("responder", "location", "entry_time", "exit_time", "duration",
+              "feed_intake", "weight", "trough_in", "trough_out", "topup",
+              "breed"),
+    type = c("text", "text", "time", "time", "duration",
+             "mass_g", "mass_kg", "mass_g", "mass_g", "mass_g", "text"),
+    description = c(
+      "Transponder number", "Station (feeder) ID", "Entrance time",
+      "Exit time", "Occupation time", "Feed intake of the visit",
+      "Body weight", "Trough weight at entrance", "Trough weight at exit",
+      "Feed dispensed during the visit", "Breed"
+    )
+  )
 }
 
-station_cols <- function(station) {
+station_fields <- function(station) {
   switch(station,
-    nedap = c("responder", "location", "visit_time", "duration",
-              "weight", "feed_intake"),
-    fire = c("Location", "Tag", "Date", "Entry", "Exit",
-             "Ent Wt", "Ext Wt", "Consumed", "Weight")
+    nedap = c("responder", "location", "entry_time", "exit_time", "duration",
+              "feed_intake", "weight", "breed"),
+    fire = c("responder", "location", "entry_time", "exit_time",
+             "feed_intake", "weight", "trough_in", "trough_out", "topup",
+             "breed")
   )
+}
+
+station_required <- function(station) {
+  switch(station,
+    nedap = c("responder", "location", "entry_time", "feed_intake", "weight"),
+    fire = c("responder", "location", "entry_time", "exit_time",
+             "feed_intake", "weight", "trough_in", "trough_out")
+  )
+}
+
+builtin_format <- function(station) {
+  switch(station,
+    nedap = data.table::data.table(
+      field = c("responder", "location", "entry_time", "exit_time",
+                "duration", "feed_intake", "weight", "breed"),
+      column = c("responder", "location", "visit_time", "-", "duration",
+                 "feed_intake", "weight", "breed"),
+      unit = c("-", "-", "-", "-", "s", "g", "auto", "-")
+    ),
+    fire = data.table::data.table(
+      field = c("responder", "location", "entry_time", "exit_time",
+                "feed_intake", "weight", "trough_in", "trough_out", "topup",
+                "breed"),
+      column = c("Tag", "Location", "Date,Entry", "Date,Exit", "Consumed",
+                 "Weight", "Ent Wt", "Ext Wt", "Topup Amount", "breed"),
+      unit = c("-", "-", "-", "-", "kg", "kg", "kg", "kg", "kg", "-")
+    )
+  )
+}
+
+# Read and check a user format: a file path, a data frame or a named
+# character vector (field = column).
+as_station_format <- function(format, station) {
+  if (is.character(format) && length(format) == 1L && is.null(names(format))) {
+    if (!file.exists(format)) cli::cli_abort("Format file not found: {.path {format}}.")
+    lines <- readLines(format, encoding = "UTF-8", warn = FALSE)
+    lines <- sub("^﻿", "", lines)
+    lines <- lines[nzchar(trimws(lines)) & !startsWith(trimws(lines), "#")]
+    if (length(lines) < 2L) cli::cli_abort("Format file {.path {format}} has no fields.")
+    fmt <- data.table::fread(text = paste(lines, collapse = "\n"), sep = "\t",
+                             colClasses = "character", header = TRUE,
+                             fill = TRUE, encoding = "UTF-8")
+    src <- format
+  } else if (is.character(format) && !is.null(names(format))) {
+    fmt <- data.table::data.table(field = names(format), column = unname(format))
+    src <- "format"
+  } else if (is.data.frame(format)) {
+    fmt <- data.table::as.data.table(format)
+    src <- "format"
+  } else {
+    cli::cli_abort("{.arg format} must be a file path, a data frame or a named character vector.")
+  }
+  data.table::setnames(fmt, tolower(trimws(names(fmt))))
+  if (!all(c("field", "column") %in% names(fmt))) {
+    cli::cli_abort(c("{.arg format} must have columns {.val field} and {.val column}.",
+                     "i" = "Columns found: {.val {names(fmt)}}."))
+  }
+  if (!"unit" %in% names(fmt)) fmt[, unit := "-"]
+  fmt <- fmt[, .(field = trimws(as.character(field)),
+                 column = trimws(as.character(column)),
+                 unit = trimws(as.character(unit)))]
+  fmt[is.na(column) | column == "", column := "-"]
+  fmt[is.na(unit) | unit == "", unit := "-"]
+
+  allowed <- station_fields(station)
+  bad <- setdiff(fmt$field, allowed)
+  if (length(bad) > 0L) {
+    hints <- vapply(bad, function(b) {
+      m <- agrep(b, allowed, max.distance = 0.3, value = TRUE)
+      if (length(m) > 0L) paste0(b, ": did you mean ", m[1L], "?") else b
+    }, character(1))
+    cli::cli_abort(c(
+      "Unknown field(s) for {toupper(station)} in {.path {src}}: {.val {bad}}.",
+      stats::setNames(hints, rep("x", length(hints))),
+      "i" = "Fields for {toupper(station)}: {.val {allowed}}."
+    ))
+  }
+  if (anyDuplicated(fmt$field)) {
+    cli::cli_abort("Field(s) given twice in {.path {src}}: {.val {unique(fmt$field[duplicated(fmt$field)])}}.")
+  }
+  missing_req <- setdiff(station_required(station), fmt[column != "-", field])
+  if (length(missing_req) > 0L) {
+    cli::cli_abort(c(
+      "{.path {src}} has no column for required field(s) {.val {missing_req}}.",
+      "i" = "See {.code station_format(\"{station}\")}."
+    ))
+  }
+  if (station == "nedap" && !any(fmt[column != "-", field] %in% c("duration", "exit_time"))) {
+    cli::cli_abort("A NEDAP format needs {.val duration} or {.val exit_time}.")
+  }
+  ff <- format_fields()
+  types <- ff$type[match(fmt$field, ff$field)]
+  ok_unit <- ifelse(
+    startsWith(types, "mass"), fmt$unit %in% c("-", "kg", "g", "auto"),
+    ifelse(types == "duration", fmt$unit %in% c("-", "s", "min"),
+           types == "time" | fmt$unit == "-")
+  )
+  if (!all(ok_unit)) {
+    cli::cli_abort(c(
+      "Unknown unit(s) in {.path {src}}: {.val {paste(fmt$field[!ok_unit], fmt$unit[!ok_unit], sep = ' = ')}}.",
+      "i" = "Masses: kg, g or auto; duration: s or min; times: - or a strptime format."
+    ))
+  }
+  # Fields of the station not listed are absent.
+  extra <- setdiff(allowed, fmt$field)
+  if (length(extra) > 0L) {
+    fmt <- rbind(fmt, data.table::data.table(field = extra, column = "-", unit = "-"))
+  }
+  out <- fmt[match(allowed, field)]
+  data.table::setindex(out, NULL)
+  out[]
+}
+
+# ---- reading ----------------------------------------------------------------
+
+read_raw_file <- function(f, id_specs, sheet = 1, ...) {
+  ext <- tolower(tools::file_ext(f))
+  if (ext %in% c("xlsx", "xls")) {
+    if (!requireNamespace("readxl", quietly = TRUE)) {
+      cli::cli_abort(c("Reading Excel files needs the {.pkg readxl} package.",
+                       "i" = "Install it with {.code install.packages(\"readxl\")}, or save the file as CSV."))
+    }
+    header <- names(readxl::read_excel(f, sheet = sheet, n_max = 0L))
+    ids <- spec_columns(id_specs, header)
+    types <- rep("guess", length(header))
+    types[match(ids, header)] <- "text"
+    dt <- data.table::as.data.table(
+      readxl::read_excel(f, sheet = sheet, col_types = types, .name_repair = "minimal")
+    )
+    return(dt)
+  }
+  header <- names(data.table::fread(f, nrows = 0L, showProgress = FALSE, ...))
+  ids <- spec_columns(id_specs, header)
+  cc <- if (length(ids) > 0L) list(character = ids) else NULL
+  data.table::fread(f, colClasses = cc, showProgress = FALSE, ...)
+}
+
+# Resolve one column spec ("Tag|耳标号", "6", "Date,Entry") against the
+# column names. Returns the matched names, or NULL if any part is missing.
+resolve_spec <- function(spec, header) {
+  if (is.na(spec) || spec %in% c("", "-")) return(NULL)
+  parts <- trimws(strsplit(spec, ",", fixed = TRUE)[[1L]])
+  out <- character(length(parts))
+  key <- tolower(trimws(header))
+  for (i in seq_along(parts)) {
+    hit <- NA_character_
+    for (alt in trimws(strsplit(parts[i], "|", fixed = TRUE)[[1L]])) {
+      if (alt %in% header) {
+        hit <- alt
+      } else if (tolower(alt) %in% key) {
+        hit <- header[match(tolower(alt), key)]
+      } else if (grepl("^[0-9]+$", alt) && as.integer(alt) >= 1L &&
+                 as.integer(alt) <= length(header)) {
+        hit <- header[as.integer(alt)]
+      }
+      if (!is.na(hit)) break
+    }
+    if (is.na(hit)) return(NULL)
+    out[i] <- hit
+  }
+  out
+}
+
+spec_columns <- function(specs, header) {
+  unique(unlist(lapply(specs, resolve_spec, header = header)))
 }
 
 check_station <- function(station) {
@@ -125,17 +331,145 @@ check_station <- function(station) {
   tolower(station)
 }
 
+format_fits <- function(fmt, header, station) {
+  found <- fmt[, !vapply(column, function(s) is.null(resolve_spec(s, header)), logical(1))]
+  ok <- all(station_required(station) %in% fmt$field[found])
+  if (station == "nedap") ok <- ok && any(c("duration", "exit_time") %in% fmt$field[found])
+  ok
+}
+
 detect_station <- function(data) {
-  is_nedap <- all(station_cols("nedap") %in% names(data))
-  is_fire <- all(station_cols("fire") %in% names(data))
+  is_nedap <- format_fits(builtin_format("nedap"), names(data), "nedap")
+  is_fire <- format_fits(builtin_format("fire"), names(data), "fire")
   if (is_nedap && !is_fire) return("nedap")
   if (is_fire && !is_nedap) return("fire")
   cli::cli_abort(c(
     "Cannot detect the station type from the column names.",
-    "i" = "NEDAP needs: {.val {station_cols('nedap')}}.",
-    "i" = "FIRE needs: {.val {station_cols('fire')}}.",
-    "i" = "Set {.arg station} explicitly."
+    "i" = "NEDAP export columns: {.val {c('responder', 'location', 'visit_time', 'duration', 'feed_intake', 'weight')}}.",
+    "i" = "FIRE export columns: {.val {c('Tag', 'Location', 'Date', 'Entry', 'Exit', 'Ent Wt', 'Ext Wt', 'Consumed', 'Weight')}}.",
+    "i" = "Set {.arg station}, and {.arg format} if the columns have other names (see {.fn station_format})."
   ))
+}
+
+# ---- mapping to the standard table -----------------------------------------
+
+apply_format <- function(dt, fmt, station, arg = "data") {
+  header <- names(dt)
+  n <- nrow(dt)
+  ff <- format_fields()
+  out <- data.table::data.table(.row = seq_len(n))
+  missing_req <- character()
+  for (i in seq_len(nrow(fmt))) {
+    fld <- fmt$field[i]
+    cols <- resolve_spec(fmt$column[i], header)
+    if (is.null(cols)) {
+      if (fmt$column[i] != "-" && fld %in% station_required(station)) {
+        missing_req <- c(missing_req, paste0(fld, " (", fmt$column[i], ")"))
+      }
+      next
+    }
+    type <- ff$type[ff$field == fld]
+    val <- switch(type,
+      text = trim_text(dt[[cols[1L]]]),
+      time = parse_time(dt[, cols, with = FALSE], fmt$unit[i], fld, arg),
+      duration = as_number(dt[[cols[1L]]], fld, arg) * if (fmt$unit[i] == "min") 60 else 1,
+      mass_g = to_unit(as_number(dt[[cols[1L]]], fld, arg), fmt$unit[i], "g"),
+      mass_kg = to_unit(as_number(dt[[cols[1L]]], fld, arg), fmt$unit[i], "kg")
+    )
+    data.table::set(out, j = fld, value = val)
+  }
+  if (station == "nedap" && !any(c("duration", "exit_time") %in% names(out))) {
+    missing_req <- c(missing_req, "duration or exit_time")
+  }
+  if (length(missing_req) > 0L) {
+    cli::cli_abort(c(
+      "{.arg {arg}} has no column for required field(s): {.val {missing_req}}.",
+      "i" = "Columns in the file: {.val {header}}.",
+      "i" = "Is {.code station = \"{station}\"} correct? For other column names, give a {.arg format} (see {.fn station_format})."
+    ))
+  }
+  out[, .row := NULL]
+  std_cols <- c("responder", "location", "entry_time", "exit_time", "duration",
+                "feed_intake", "weight", "trough_in", "trough_out", "topup")
+  for (col in setdiff(std_cols, names(out))) {
+    data.table::set(out, j = col, value = if (col %in% c("entry_time", "exit_time")) {
+      as.POSIXct(rep(NA_real_, n), origin = "1970-01-01", tz = "UTC")
+    } else if (col %in% c("responder", "location")) {
+      rep(NA_character_, n)
+    } else {
+      rep(NA_real_, n)
+    })
+  }
+  data.table::setcolorder(out, intersect(c(std_cols, "breed"), names(out)))
+  out
+}
+
+trim_text <- function(x) {
+  x <- trimws(as.character(x))
+  x[!is.na(x) & x == ""] <- NA_character_
+  x
+}
+
+as_number <- function(x, fld, arg) {
+  if (is.numeric(x)) return(as.numeric(x))
+  y <- suppressWarnings(as.numeric(trimws(as.character(x))))
+  bad <- !is.na(x) & trimws(as.character(x)) != "" & is.na(y)
+  if (any(bad)) {
+    cli::cli_abort(c(
+      "Field {.field {fld}} in {.arg {arg}} has values that are not numbers: {.val {utils::head(unique(as.character(x[bad])), 3)}}.",
+      "i" = "Check the column in the format (see {.fn station_format})."
+    ))
+  }
+  y
+}
+
+to_unit <- function(x, unit, target) {
+  if (unit %in% c("-", "auto")) {
+    pos <- x[!is.na(x) & x > 0]
+    unit <- if (unit == "-") target else if (length(pos) > 0L && stats::median(pos) < 1000) "kg" else "g"
+  }
+  if (unit == target) x else if (unit == "kg") x * 1000 else x / 1000
+}
+
+# Times: one column (date-time) or several (date, clock time) joined. The
+# result is the clock time stored as UTC, as everywhere in the package.
+parse_time <- function(cols, unit, fld, arg) {
+  if (ncol(cols) == 1L && inherits(cols[[1L]], "POSIXct")) {
+    return(clock_as_utc(cols[[1L]]))
+  }
+  piece <- function(x, part) {
+    if (inherits(x, "POSIXct")) {
+      format(x, if (part == 1L) "%Y-%m-%d" else "%H:%M:%S")
+    } else if (inherits(x, "Date")) {
+      format(x, "%Y-%m-%d")
+    } else {
+      trimws(as.character(x))
+    }
+  }
+  txt <- if (ncol(cols) == 1L) {
+    piece(cols[[1L]], 1L)
+  } else {
+    do.call(paste, lapply(seq_along(cols), function(k) piece(cols[[k]], k)))
+  }
+  txt[!is.na(txt) & grepl("(^|\\s)NA(\\s|$)", txt)] <- NA_character_
+  out <- if (unit != "-") {
+    as.POSIXct(strptime(txt, unit, tz = "UTC"))
+  } else {
+    tryCatch(
+      as.POSIXct(txt, tz = "UTC", tryFormats = c(
+        "%Y-%m-%d %H:%M:%OS", "%Y/%m/%d %H:%M:%OS", "%Y-%m-%d %H:%M",
+        "%Y/%m/%d %H:%M", "%Y-%m-%d", "%Y/%m/%d")),
+      error = function(e) NULL
+    )
+  }
+  bad <- if (is.null(out)) !is.na(txt) else !is.na(txt) & is.na(out)
+  if (any(bad)) {
+    cli::cli_abort(c(
+      "Field {.field {fld}} in {.arg {arg}}: cannot read {sum(bad)} value(s) as time, e.g. {.val {utils::head(txt[bad], 2)}}.",
+      "i" = "Give the time format as {.field unit} in the station format, e.g. {.val %d/%m/%Y %H:%M:%S}."
+    ))
+  }
+  out
 }
 
 resolve_files <- function(files, pattern) {
