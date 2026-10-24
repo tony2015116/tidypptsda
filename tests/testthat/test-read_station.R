@@ -8,14 +8,21 @@ write_split <- function(data, by, folder) {
   sort(list.files(folder, full.names = TRUE))
 }
 
-test_that("multiple FIRE files are combined and the station is detected", {
+test_that("multiple FIRE files are combined into the standard table", {
   folder <- withr::local_tempdir()
   files <- write_split(fire, "Location", folder)
   out <- read_station(files, verbose = 0)
   expect_equal(nrow(out), nrow(fire))
   expect_equal(attr(out, "station"), "fire")
   expect_equal(sort(unique(out$source_file)), c("part_101.csv", "part_102.csv"))
-  expect_type(out$Tag, "character")
+  expect_type(out$responder, "character")
+  expect_s3_class(out$entry_time, "POSIXct")
+  expect_named(out, c("responder", "location", "entry_time", "exit_time",
+                      "duration", "feed_intake", "weight", "trough_in",
+                      "trough_out", "topup", "source_file"))
+  # units: feed and trough in g, weight in kg
+  expect_equal(sort(out$feed_intake), sort(fire$Consumed * 1000))
+  expect_equal(sort(out$weight), sort(as.numeric(fire$Weight)))
   # a folder gives the same result
   expect_equal(nrow(read_station(folder, verbose = 0)), nrow(fire))
 })
@@ -30,16 +37,81 @@ test_that("NEDAP files keep IDs as text, including leading zeros", {
   expect_type(out$responder, "character")
   expect_true(all(nchar(out$responder) == 6L))
   expect_true(all(startsWith(out$responder, "0")))
+  expect_equal(median(out$weight[out$weight > 0]), median(nd$weight[nd$weight > 0]) / 1000)
 })
 
-test_that("column mismatches are reported, or filled when asked", {
+test_that("read_station and prep_visits give the same visits as the raw data", {
+  folder <- withr::local_tempdir()
+  data.table::fwrite(nedap, file.path(folder, "n.csv"))
+  data.table::fwrite(fire, file.path(folder, "f.csv"))
+  vn <- prep_visits(read_station(file.path(folder, "n.csv"), verbose = 0), verbose = 0)
+  vf <- prep_visits(read_station(file.path(folder, "f.csv"), verbose = 0), verbose = 0)
+  cols <- c("responder", "location", "entry_time", "exit_time", "duration",
+            "feed_intake", "weight", "trough_in", "trough_out")
+  same <- function(a, b) expect_equal(as.list(a)[cols], as.list(b)[cols])
+  same(vn, prep_visits(nedap, verbose = 0))
+  same(vf, prep_visits(fire, verbose = 0))
+  expect_equal(attr(vf, "stations"), attr(prep_visits(fire, verbose = 0), "stations"))
+})
+
+test_that("a format file maps other column names, positions and units", {
+  folder <- withr::local_tempdir()
+  d <- data.table::as.data.table(fire)
+  d[, `:=`(Consumed = Consumed * 1000, when = paste(Date, Entry))]
+  data.table::setnames(d, c("Tag", "Location", "Weight"), c("耳标号", "站号", "体重"))
+  data.table::fwrite(d, file.path(folder, "cn.csv"))
+  fmt_file <- file.path(folder, "fmt.txt")
+  writeLines(c(
+    "# Chinese export",
+    "field\tcolumn\tunit",
+    "responder\t耳标号\t-",
+    "location\t站号",
+    "entry_time\twhen\t%Y-%m-%d %H:%M:%S",
+    "exit_time\tDate,Exit\t-",
+    paste0("feed_intake\t", match("Consumed", names(d)), "\tg"),
+    "weight\tWeight|体重\tkg",
+    "trough_in\tEnt Wt\tkg",
+    "trough_out\tEXT WT\tkg"
+  ), fmt_file)
+  out <- read_station(file.path(folder, "cn.csv"), station = "fire",
+                      format = fmt_file, verbose = 0)
+  ref <- read_station({
+    f <- file.path(folder, "ref.csv"); data.table::fwrite(fire, f); f
+  }, verbose = 0)
+  cols <- c("responder", "location", "entry_time", "exit_time", "feed_intake",
+            "weight", "trough_in", "trough_out")
+  expect_equal(as.list(out)[cols], as.list(ref)[cols])
+  expect_true(all(is.na(out$topup)))
+  # the same format as a data frame or a template file
+  suppressMessages(station_format("fire", file = file.path(folder, "t.txt")))
+  expect_equal(as_station_format(file.path(folder, "t.txt"), "fire")$column,
+               builtin_format("fire")$column)
+})
+
+test_that("format errors are clear", {
+  folder <- withr::local_tempdir()
+  data.table::fwrite(fire[1:5, ], file.path(folder, "a.csv"))
+  f <- file.path(folder, "a.csv")
+  expect_error(read_station(f, format = station_format("fire"), verbose = 0), "station")
+  expect_error(read_station(f, station = "fire", verbose = 0,
+                            format = data.frame(field = c("responder", "wieght"), column = "x")),
+               "did you mean weight")
+  bad <- data.table::copy(builtin_format("fire"))[field == "weight", column := "-"]
+  expect_error(read_station(f, station = "fire", format = bad, verbose = 0), "weight")
+  bad <- data.table::copy(builtin_format("fire"))[field == "weight", column := "body_wt"]
+  expect_error(read_station(f, station = "fire", format = bad, verbose = 0), "body_wt")
+  bad <- data.table::copy(builtin_format("fire"))[field == "weight", unit := "lb"]
+  expect_error(read_station(f, station = "fire", format = bad, verbose = 0), "lb")
+})
+
+test_that("missing optional fields are filled with NA", {
   folder <- withr::local_tempdir()
   data.table::fwrite(fire[1:5, ], file.path(folder, "a.csv"))
   data.table::fwrite(fire[6:10, setdiff(names(fire), "Topup Amount")], file.path(folder, "b.csv"))
-  expect_error(read_station(folder, verbose = 0), "Topup Amount")
-  out <- read_station(folder, fill = TRUE, verbose = 0)
+  out <- read_station(folder, verbose = 0)
   expect_equal(nrow(out), 10L)
-  expect_true(all(is.na(out[source_file == "b.csv"]$`Topup Amount`)))
+  expect_true(all(is.na(out[source_file == "b.csv"]$topup)))
+  expect_false(anyNA(out[source_file == "a.csv"]$topup))
 })
 
 test_that("wrong inputs give clear errors", {
@@ -52,4 +124,14 @@ test_that("wrong inputs give clear errors", {
   bad <- file.path(withr::local_tempdir(), "b.csv")
   data.table::fwrite(data.frame(x = 1), bad)
   expect_error(read_station(bad, verbose = 0), "detect")
+})
+
+test_that("Excel files are read when readxl is installed", {
+  skip_if_not_installed("readxl")
+  skip_if_not_installed("writexl")
+  f <- file.path(withr::local_tempdir(), "fire.xlsx")
+  writexl::write_xlsx(as.data.frame(fire[1:50, ]), f)
+  out <- read_station(f, verbose = 0)
+  expect_equal(nrow(out), 50L)
+  expect_type(out$responder, "character")
 })

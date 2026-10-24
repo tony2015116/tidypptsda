@@ -6,11 +6,17 @@
 #' Convert raw NEDAP or FIRE station data into a standard visit table with
 #' the same columns and units for both station types.
 #'
-#' @param data Raw station data, e.g. from [read_station()] or the example
-#'   datasets [nedap] and [fire].
+#' @param data Station data: the standard table from [read_station()], or
+#'   a raw export already in R, e.g. the example datasets [nedap] and
+#'   [fire] or a table read from a database. Raw data is mapped to the
+#'   standard fields with `format`.
 #' @param station `"nedap"`, `"fire"` or `NULL` (default): taken from the
 #'   `"station"` attribute set by [read_station()], or detected from the
 #'   column names.
+#' @param format Station format for raw `data` whose columns differ from
+#'   the usual export, as in [read_station()]. `NULL` (default) uses the
+#'   built-in format. Ignored for the output of [read_station()], which is
+#'   already standard.
 #' @param qc QC settings from [qc_config()]. Used here: `duration_max` (to
 #'   tell a FIRE midnight crossing from a recording error) and the station
 #'   transfer parameters `max_gap_days`, `max_overlap_days`, `max_jump_kg`.
@@ -69,23 +75,38 @@
 #' # NEDAP data gets the same columns and units
 #' nedap_visits <- prep_visits(nedap, verbose = 0)
 #' summary(nedap_visits$weight)
-prep_visits <- function(data, station = NULL, qc = qc_config(), verbose = 1) {
+prep_visits <- function(data, station = NULL, format = NULL, qc = qc_config(),
+                        verbose = 1) {
   local_verbose(verbose)
   if (!inherits(qc, "ppt_qc")) {
     cli::cli_abort("{.arg qc} must be created with {.fn qc_config}.")
   }
+  standard <- isTRUE(attr(data, "ppt_standard", exact = TRUE))
   if (is.null(station)) station <- attr(data, "station", exact = TRUE)
   dt <- as_dt(data)
-  station <- if (is.null(station)) detect_station(dt) else check_station(station)
-  check_cols(dt, station_cols(station))
+  if (standard) {
+    if (is.null(station)) cli::cli_abort("{.arg data} has no {.val station} attribute; set {.arg station}.")
+    station <- check_station(station)
+    check_cols(dt, station_required(station),
+               hint = "Read the files with {.fn read_station}.")
+  } else {
+    if (!is.null(format)) {
+      if (is.null(station)) cli::cli_abort("Set {.arg station} when {.arg format} is given.")
+      station <- check_station(station)
+      fmt <- as_station_format(format, station)
+    } else {
+      station <- if (is.null(station)) detect_station(dt) else check_station(station)
+      fmt <- builtin_format(station)
+    }
+    src <- if ("source_file" %in% names(dt)) dt$source_file else NULL
+    dt <- apply_format(dt, fmt, station)
+    if (!is.null(src)) dt[, source_file := src]
+  }
 
   ppt_msg("Preparing {toupper(station)} visits", "h1")
   n_raw <- nrow(dt)
 
-  dt <- switch(station,
-    nedap = standardise_nedap(dt),
-    fire = standardise_fire(dt, qc$duration_max)
-  )
+  dt <- finish_standard(dt, qc$duration_max)
   n_cross <- attr(dt, "n_midnight")
 
   # Body weight of 0 (or below) means no weight was recorded.
@@ -104,7 +125,7 @@ prep_visits <- function(data, station = NULL, qc = qc_config(), verbose = 1) {
   ppt_bullets_counts(c(
     "Visits read" = n_raw,
     "Unidentified visits (kept, identified = FALSE)" = dt[identified == FALSE, .N],
-    "FIRE visits crossing midnight (exit time corrected)" = if (station == "fire") n_cross else NA,
+    "Visits crossing midnight (exit time corrected)" = if (station == "fire" || n_cross > 0L) n_cross else NA,
     "Body weights of 0 set to NA" = n_zero_weight,
     "Rows without entry time (dropped)" = n_no_time,
     "Duplicated rows (dropped)" = n_dup
@@ -144,31 +165,33 @@ prep_visits <- function(data, station = NULL, qc = qc_config(), verbose = 1) {
   dt
 }
 
-standardise_nedap <- function(dt) {
-  if (!inherits(dt$visit_time, "POSIXct")) {
-    dt[, visit_time := as.POSIXct(as.character(visit_time), tz = "UTC")]
-  } else {
-    dt[, visit_time := clock_as_utc(visit_time)]
+# Standard table (from read_station() or apply_format()) -> visit columns.
+# Exit time or duration is completed from the other. Clock-only exports
+# (FIRE) give an exit before the entry when a visit crosses midnight: that
+# is corrected when the corrected duration is plausible; otherwise it stays
+# negative and is caught later as error OTV-lo.
+finish_standard <- function(dt, duration_max) {
+  out <- data.table::copy(dt)
+  data.table::setnames(out, "responder", "responder_raw")
+  for (col in c("responder_raw", "location")) {
+    data.table::set(out, j = col, value = as.character(out[[col]]))
   }
-  # NEDAP exports body weight in g; accept kg if the values are clearly kg.
-  w <- dt$weight[!is.na(dt$weight) & dt$weight > 0]
-  weight_div <- if (length(w) > 0L && stats::median(w) < 1000) 1 else 1000
-  out <- dt[, .(
-    responder_raw = as.character(responder),
-    location = as.character(location),
-    entry_time = visit_time,
-    duration = as.numeric(duration),
-    feed_intake = as.numeric(feed_intake),
-    weight = as.numeric(weight) / weight_div,
-    trough_in = NA_real_,
-    trough_out = NA_real_,
-    topup = NA_real_
-  )]
-  if ("source_file" %in% names(dt)) out[, source_file := dt$source_file]
-  if ("breed" %in% names(dt)) out[, breed := as.character(dt$breed)]
-  out[, exit_time := entry_time + duration]
+  n_cross <- 0L
+  if (all(is.na(out$duration))) {
+    entry <- out$entry_time
+    exit <- out$exit_time
+    crossing <- !is.na(exit) & !is.na(entry) & exit < entry &
+      as.numeric(difftime(exit + 86400, entry, units = "secs")) <= duration_max
+    exit[crossing] <- exit[crossing] + 86400
+    out[, exit_time := exit]
+    out[, duration := as.numeric(difftime(exit_time, entry_time, units = "secs"))]
+    n_cross <- sum(crossing)
+  } else {
+    out[, duration := as.numeric(duration)]
+    out[is.na(exit_time), exit_time := entry_time + duration]
+  }
   finish_ids(out)
-  data.table::setattr(out, "n_midnight", 0L)
+  data.table::setattr(out, "n_midnight", n_cross)
   out
 }
 
@@ -188,36 +211,6 @@ clock_as_utc <- function(x) {
     as.POSIXct(format(x, "%Y-%m-%d %H:%M:%OS6"), tz = "UTC")
   }
   ppt_msg("Visit times converted from time zone {.val {if (is.null(tz) || !nzchar(tz[1])) 'local' else tz[1]}} to UTC with the same clock time", "info", level = 2L)
-  out
-}
-
-standardise_fire <- function(dt, duration_max) {
-  day <- as.character(dt$Date)
-  entry <- as.POSIXct(paste(day, dt$Entry), tz = "UTC")
-  exit <- as.POSIXct(paste(day, dt$Exit), tz = "UTC")
-  # FIRE stores clock times only. An exit before the entry is a midnight
-  # crossing when the corrected duration is plausible; otherwise it stays
-  # negative and is caught later as error OTV-lo.
-  crossing <- !is.na(exit) & !is.na(entry) & exit < entry &
-    as.numeric(difftime(exit + 86400, entry, units = "secs")) <= duration_max
-  exit[crossing] <- exit[crossing] + 86400
-
-  out <- data.table::data.table(
-    responder_raw = as.character(dt$Tag),
-    location = as.character(dt$Location),
-    entry_time = entry,
-    exit_time = exit,
-    duration = as.numeric(difftime(exit, entry, units = "secs")),
-    feed_intake = as.numeric(dt$Consumed) * 1000,
-    weight = as.numeric(dt$Weight),
-    trough_in = as.numeric(dt$`Ent Wt`) * 1000,
-    trough_out = as.numeric(dt$`Ext Wt`) * 1000,
-    topup = if ("Topup Amount" %in% names(dt)) as.numeric(dt$`Topup Amount`) * 1000 else NA_real_
-  )
-  if ("source_file" %in% names(dt)) out[, source_file := dt$source_file]
-  if ("breed" %in% names(dt)) out[, breed := as.character(dt$breed)]
-  finish_ids(out)
-  data.table::setattr(out, "n_midnight", sum(crossing))
   out
 }
 

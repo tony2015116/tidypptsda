@@ -1,6 +1,6 @@
 Package: tidypptsda
 Title: Process and Analyse Pig Performance Testing Station Data
-Version: 1.0.0
+Version: 1.1.0
 Authors@R: 
     person("Meng", "Guo", , "tony2015116@163.com", role = c("aut", "cre", "cph"))
 Description: Tools to clean and analyse visit records from automatic pig
@@ -29,9 +29,11 @@ Imports:
 Suggests: 
     knitr,
     nlme,
+    readxl,
     rmarkdown,
     testthat,
-    withr
+    withr,
+    writexl
 VignetteBuilder: 
     knitr
 Config/fusen/version: 0.7.2

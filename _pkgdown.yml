@@ -31,6 +31,7 @@ reference:
   desc: Read NEDAP or FIRE exports (many files or a folder), turn them into one standard visit table and add breed information.
   contents:
   - read_station
+  - station_format
   - prep_visits
   - add_breed
 - title: Body weight and daily gain
