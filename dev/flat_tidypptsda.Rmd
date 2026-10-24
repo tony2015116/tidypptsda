@@ -1320,7 +1320,7 @@ as_station_format <- function(format, station) {
   if (is.character(format) && length(format) == 1L && is.null(names(format))) {
     if (!file.exists(format)) cli::cli_abort("Format file not found: {.path {format}}.")
     lines <- readLines(format, encoding = "UTF-8", warn = FALSE)
-    lines <- sub("^﻿", "", lines)
+    lines <- sub("^\ufeff", "", lines)
     lines <- lines[nzchar(trimws(lines)) & !startsWith(trimws(lines), "#")]
     if (length(lines) < 2L) cli::cli_abort("Format file {.path {format}} has no fields.")
     fmt <- data.table::fread(text = paste(lines, collapse = "\n"), sep = "\t",
