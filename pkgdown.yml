@@ -2,13 +2,14 @@ pandoc: 3.8.3
 pkgdown: 2.2.1
 pkgdown_sha: ~
 articles:
+  design-zh: design-zh.html
   get-started: get-started.html
   methods-zh: methods-zh.html
   output-zh: output-zh.html
   qc-parameters-zh: qc-parameters-zh.html
   tidypptsda-zh: tidypptsda-zh.html
   validation-zh: validation-zh.html
-last_built: 2026-10-24T15:12Z
+last_built: 2026-10-25T14:45Z
 urls:
   reference: https://tony2015116.github.io/tidypptsda/reference
   article: https://tony2015116.github.io/tidypptsda/articles

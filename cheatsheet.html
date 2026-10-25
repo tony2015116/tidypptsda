@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tidypptsda 速查表</title>
+<style>
+  :root {
+    --ink: #1f2933;
+    --muted: #5f6b7a;
+    --line: #d9dee5;
+    --paper: #ffffff;
+    --bg: #f4f6f8;
+    --accent: #2780e3;
+    --c-read: #2780e3;
+    --c-weight: #0f8a5f;
+    --c-feed: #c46a00;
+    --c-fcr: #8e44ad;
+    --c-out: #475569;
+    --c-check: #b42318;
+    --code-bg: #f1f4f8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #e6e9ee; --muted: #a3adba; --line: #3a4350; --paper: #1c2128;
+      --bg: #13171c; --code-bg: #262d36; --accent: #5aa2f0;
+      --c-read: #5aa2f0; --c-weight: #3cc08f; --c-feed: #f0a347;
+      --c-fcr: #c08ae0; --c-out: #a3adba; --c-check: #f07a70;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 13px/1.5 -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+          "Noto Sans CJK SC", "Source Han Sans SC", "Segoe UI", sans-serif;
+  }
+  code, pre { font-family: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace; }
+  code { background: var(--code-bg); padding: 0 3px; border-radius: 3px; font-size: 0.92em; }
+  pre {
+    background: var(--code-bg); margin: 6px 0; padding: 7px 9px; border-radius: 5px;
+    font-size: 11.5px; line-height: 1.45; overflow-x: auto; white-space: pre;
+  }
+  pre code { background: none; padding: 0; }
+  .c { color: var(--muted); }
+  a { color: var(--accent); }
+
+  header {
+    max-width: 1400px; margin: 0 auto; padding: 18px 16px 6px;
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px;
+  }
+  header h1 { margin: 0; font-size: 26px; letter-spacing: 0.5px; }
+  header h1 span { color: var(--accent); }
+  header p { margin: 0; color: var(--muted); }
+  header nav { margin-left: auto; display: flex; gap: 14px; }
+
+  .flow {
+    max-width: 1400px; margin: 6px auto 4px; padding: 0 16px;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+  }
+  .flow .step {
+    background: var(--paper); border: 1px solid var(--line); border-top: 3px solid var(--k);
+    border-radius: 6px; padding: 4px 9px; font-size: 12px;
+  }
+  .flow .step b { display: block; font-family: Menlo, Consolas, monospace; font-size: 12px; }
+  .flow .arrow { color: var(--muted); font-size: 15px; }
+  .flow .note { color: var(--muted); font-size: 12px; margin-left: 6px; }
+
+  main {
+    max-width: 1400px; margin: 0 auto; padding: 8px 16px 24px;
+    columns: 3 340px; column-gap: 14px;
+  }
+  section {
+    break-inside: avoid; background: var(--paper); border: 1px solid var(--line);
+    border-radius: 8px; margin: 0 0 14px; padding: 10px 12px 8px;
+    border-left: 5px solid var(--k);
+  }
+  section h2 {
+    margin: 0 0 6px; font-size: 15px; color: var(--k);
+    display: flex; align-items: baseline; gap: 8px;
+  }
+  section h2 small { color: var(--muted); font-weight: normal; font-size: 12px; }
+  section h3 { margin: 8px 0 3px; font-size: 12.5px; }
+  section p { margin: 4px 0; }
+  ul { margin: 3px 0; padding-left: 17px; }
+  li { margin: 1px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 4px 0; font-size: 12px; }
+  th, td { text-align: left; padding: 2px 5px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  td:first-child { white-space: nowrap; }
+  .swatch { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: 0; }
+  .x { display: inline-block; width: 10px; text-align: center; color: #666; font-weight: bold; margin-right: 3px; }
+  .dash { display: inline-block; width: 16px; border-top: 2px dashed; vertical-align: 3px; margin-right: 3px; }
+  .solid { display: inline-block; width: 16px; border-top: 2px solid; vertical-align: 3px; margin-right: 3px; }
+  .tag { display: inline-block; padding: 0 5px; border-radius: 3px; font-size: 11px; border: 1px solid var(--line); }
+  .k-read { --k: var(--c-read); } .k-weight { --k: var(--c-weight); } .k-feed { --k: var(--c-feed); }
+  .k-fcr { --k: var(--c-fcr); } .k-out { --k: var(--c-out); } .k-check { --k: var(--c-check); }
+  footer { max-width: 1400px; margin: 0 auto; padding: 0 16px 24px; color: var(--muted); font-size: 12px; }
+
+  @media (max-width: 600px) {
+    header h1 { font-size: 22px; }
+    header nav { margin-left: 0; }
+    .flow .arrow { display: none; }
+  }
+  @media print {
+    @page { size: A4 landscape; margin: 8mm; }
+    body { background: #fff; font-size: 10.5px; }
+    header nav, .noprint { display: none; }
+    main { columns: 3; column-gap: 8px; padding: 4px 0; max-width: none; }
+    header, .flow, footer { max-width: none; padding-left: 0; padding-right: 0; }
+    section { margin-bottom: 8px; padding: 6px 8px; }
+    pre { font-size: 9.5px; padding: 4px 6px; }
+    table { font-size: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span>tidypptsda</span> 速查表</h1>
+  <p>种猪性能测定站（NEDAP / FIRE）数据：体重清洗 → 日增重 ADG → 日采食 ADFI → 料肉比 FCR</p>
+  <nav class="noprint">
+    <a href="index.html">网站首页</a>
+    <a href="articles/tidypptsda-zh.html">中文使用说明</a>
+    <a href="reference/index.html">函数文档</a>
+    <a href="javascript:window.print()">打印 / 存为 PDF</a>
+  </nav>
+</header>
+
+<div class="flow" aria-label="分析流程">
+  <div class="step" style="--k: var(--c-read)"><b>read_station()</b>读取导出文件</div><span class="arrow">→</span>
+  <div class="step" style="--k: var(--c-read)"><b>prep_visits()</b>标准访问表</div><span class="arrow">→</span>
+  <div class="step" style="--k: var(--c-weight)"><b>clean_weight()</b>体重质控</div><span class="arrow">→</span>
+  <div class="step" style="--k: var(--c-weight)"><b>calc_adg()</b>补齐体重 + ADG</div><span class="arrow">→</span>
+  <div class="step" style="--k: var(--c-feed)"><b>calc_adfi()</b>校正、补齐采食</div><span class="arrow">→</span>
+  <div class="step" style="--k: var(--c-fcr)"><b>calc_fcr()</b>FCR + 可信度</div><span class="arrow">→</span>
+  <div class="step" style="--k: var(--c-out)"><b>plot_* / write_results()</b>出图、导出</div>
+  <span class="note">一步到位：<code>run_pipeline()</code>；全部阈值：<code>qc_config()</code></span>
+</div>
+
+<main>
+
+<section class="k-read">
+  <h2>安装与一次跑完</h2>
+<pre><code><span class="c"># install.packages("pak")</span>
+pak::pak("tony2015116/tidypptsda")
+library(tidypptsda)
+
+raw <- read_station("导出/", station = "nedap")
+res <- run_pipeline(raw)            <span class="c"># 或 run_pipeline(nedap)</span>
+res$fcr$per_pig                     <span class="c"># 最终结果表</span>
+res$removed                         <span class="c"># 被剔除的猪及原因</span>
+write_results(res, dir = "结果", farm = "A01")</code></pre>
+  <p>示例数据：<code>nedap</code>、<code>fire</code>（测定站原始导出格式）。</p>
+</section>
+
+<section class="k-read">
+  <h2>读取数据 <small>read_station() / station_format()</small></h2>
+<pre><code><span class="c"># 整个文件夹；不写 station 时自动判断类型</span>
+read_station("导出/", station = "nedap")
+read_station(c("101.xlsx", "102.xlsx"), station = "fire")
+<span class="c"># 列名对不上时：导出模板，改 column 列后再读</span>
+station_format("fire", file = "fire_format.txt")
+read_station("导出/", station = "fire",
+             format = "fire_format.txt")</code></pre>
+  <ul>
+    <li>支持 CSV、TXT（分隔符自动识别）和 Excel（需 readxl）。</li>
+    <li>列名和内置格式一致时<b>不需要</b>格式文件；对不上时会报错并列出缺哪些列。</li>
+    <li>格式文件每行一个字段：<code>field</code>、<code>column</code>（列名或位置，<code>日期,时间</code> 合并两列，<code>-</code> 表示没有）、<code>unit</code>（kg / g / auto，s / min）。</li>
+    <li>读出来是统一的标准表：耳标、站号为文本；时间为 POSIXct；采食、料槽重为 g，体重为 kg，停留时间为 s。</li>
+  </ul>
+  <table>
+    <tr><th>类型</th><th>必需字段</th></tr>
+    <tr><td>NEDAP</td><td>responder, location, entry_time, feed_intake, weight</td></tr>
+    <tr><td>FIRE</td><td>同上 + exit_time, trough_in, trough_out</td></tr>
+  </table>
+</section>
+
+<section class="k-read">
+  <h2>访问表与品种 <small>prep_visits() / add_breed()</small></h2>
+<pre><code>visits <- prep_visits(raw)
+visits <- add_breed(visits, read.csv("品种表.csv"),
+                    id = "耳标", breed = "品种")</code></pre>
+  <ul>
+    <li>未识别耳标的访问保留为 <code>identified = FALSE</code>（采食错误判定要用）。</li>
+    <li>跨站的猪：转栏保留；间隔过长拆成 <code>耳标_站号</code>；时间交错视为误读。见 <code>attr(visits, "stations")</code>。</li>
+    <li>有品种列后：校正模型加品种效应，<code>fcr$summary</code> 按品种分组。</li>
+  </ul>
+</section>
+
+<section class="k-check">
+  <h2>质控参数 <small>qc_config()</small></h2>
+<pre><code>qc <- qc_config(stage_range = c(60, 120),
+                curve_model = "poly1")
+qc                          <span class="c"># 按组打印全部 42 个参数</span>
+run_pipeline(raw, qc = qc)</code></pre>
+  <table>
+    <tr><th>参数</th><th>默认</th><th>作用</th></tr>
+    <tr><td><code>stage_range</code></td><td>30–120</td><td>ADG / ADFI / FCR 的体重区间</td></tr>
+    <tr><td><code>weight_range</code></td><td>15–150</td><td>单条体重有效范围</td></tr>
+    <tr><td><code>adapt_days</code></td><td>7</td><td>进站适应期，体重不用</td></tr>
+    <tr><td><code>weight_outlier</code></td><td>rlm, loess</td><td>追踪后的异常值方法</td></tr>
+    <tr><td><code>min_test_days</code></td><td>35</td><td>最短测定期（剔除）</td></tr>
+    <tr><td><code>curve_model</code></td><td>poly2</td><td>区间两端体重的填充曲线</td></tr>
+    <tr><td><code>impute_method</code></td><td>loess_lm</td><td>采食填充：或 linear</td></tr>
+    <tr><td><code>max_edge_extrap_days</code></td><td>15</td><td>两端填充超过即低可信度</td></tr>
+    <tr><td><code>duration_max</code></td><td>3600</td><td>单次访问时长上限（s）</td></tr>
+  </table>
+  <p>参数名写错会提示最接近的名字；结果的 <code>$settings</code> 保存所用设置。</p>
+</section>
+
+<section class="k-weight">
+  <h2>体重清洗 <small>clean_weight()</small></h2>
+  <p>按顺序：体重范围 → 适应期 → <b>逐日回溯追踪</b>（从末期往前，只留衔接的读数）→ 二次稳健回归 rlm（权重 &lt; 0.5）+ LOESS（偏离 &gt; 3 MAD）。</p>
+  <table>
+    <tr><th><code>qc_flag</code></th><th>含义</th></tr>
+    <tr><td><code>""</code></td><td>正常</td></tr>
+    <tr><td><code>weight_range</code></td><td>超出 15–150 kg</td></tr>
+    <tr><td><code>adaptation</code></td><td>进站后 7 天内</td></tr>
+    <tr><td><code>track</code></td><td>追踪时不衔接（多为几头小猪同时上秤）</td></tr>
+    <tr><td><code>rlm</code> / <code>loess</code></td><td>被相应方法判为异常</td></tr>
+  </table>
+  <table>
+    <tr><th><code>status</code></th><th>条件</th></tr>
+    <tr><td><span class="tag">removed</span></td><td>有效记录 &lt; 20、测定期 &lt; 35 天、缺失率 &gt; 30%</td></tr>
+    <tr><td><span class="tag">low_confidence</span></td><td>进站 &gt; 65 kg、出栏 &lt; 85 kg、追踪剔除 &gt; 40%、LOESS R² &lt; 0.99</td></tr>
+    <tr><td><span class="tag">keep</span></td><td>通过</td></tr>
+  </table>
+  <p>看结果：<code>w$per_pig</code>（每头猪）、<code>w$records</code>（每条记录）。</p>
+</section>
+
+<section class="k-weight">
+  <h2>日增重 <small>calc_adg()</small></h2>
+  <ol style="margin:3px 0; padding-left:17px">
+    <li>生长曲线定区间：首次到达上限为终点，此前最后一次越过下限为起点。</li>
+    <li>补齐区间每天的体重 <code>weight_filled</code>：</li>
+  </ol>
+  <table>
+    <tr><th><code>source</code></th><th>来源</th></tr>
+    <tr><td><code>observed</code></td><td>当天有效体重的中位数</td></tr>
+    <tr><td><code>interpolated</code></td><td>两个有记录日之间：线性插值</td></tr>
+    <tr><td><code>curve</code></td><td>首个记录前 / 末个记录后：生长曲线</td></tr>
+  </table>
+  <p>3. <b>ADG = 区间内全部日体重对日期回归的斜率</b>（g/d），附 <code>r_squared</code>。</p>
+  <table>
+    <tr><th><code>adg_type</code></th><th>含义</th></tr>
+    <tr><td><code>observed</code></td><td>区间两端都在测定期内</td></tr>
+    <tr><td><code>extrapolated</code></td><td>需外推，不超过 30 天</td></tr>
+    <tr><td><code>partial</code></td><td>外推仍到不了端点，只算覆盖段</td></tr>
+    <tr><td><code>none</code></td><td>覆盖不足 7 天，无 ADG</td></tr>
+  </table>
+</section>
+
+<section class="k-feed">
+  <h2>日采食 <small>flag_feed_errors() / calc_adfi()</small></h2>
+  <ul>
+    <li><b>错误判定</b>：Casey 等（2005）16 条规则（单次采食量、停留时间、采食速度、料槽重差…），<code>calc_adfi()</code> 内部自动调用。</li>
+    <li><b>校正</b>：Jiao 等（2014）混合模型，扣除错误协变量的影响；无错误的日子不变。</li>
+    <li><b>补齐</b>：只在 ADG 的同一区间内；回归用补齐后的日体重。</li>
+  </ul>
+  <table>
+    <tr><th><code>state</code></th><th>这一天的采食来自</th></tr>
+    <tr><td><code>org</code></td><td>记录值，当天无错误访问</td></tr>
+    <tr><td><code>corr</code></td><td>模型校正值</td></tr>
+    <tr><td><code>iii</code></td><td>中间缺失：≤ 3 天 LOESS，&gt; 3 天"采食 ~ 体重"回归</td></tr>
+    <tr><td><code>elrp</code></td><td>区间两端缺失：同一回归</td></tr>
+    <tr><td><code>missing</code></td><td>无法估计</td></tr>
+  </table>
+  <p><b>ADFI</b> = 区间内日采食的平均值；<code>coverage</code> = 有实测（含校正）的天数比例。</p>
+</section>
+
+<section class="k-fcr">
+  <h2>料肉比 <small>calc_fcr()</small></h2>
+  <p><b>FCR = ADFI ÷ ADG</b>，<code>gf</code> = ADG ÷ ADFI。<code>fcr_flag</code> 为 <span class="tag">ok</span> 或 <span class="tag">low_confidence</span>，原因写在 <code>fcr_note</code>：</p>
+  <ul>
+    <li>体重或采食在区间两端填充超过 15 天；</li>
+    <li>有实测采食的天数不足 70%；</li>
+    <li>中间某个 10 kg 段实测体重覆盖不足 6 kg；</li>
+    <li>ADG 只覆盖区间一部分，或体重数据已降级；</li>
+    <li>可选：分段料肉比超出 <code>bin_fcr_limits</code>。</li>
+  </ul>
+  <p>分段明细：<code>fcr$by_bin</code>；汇总：<code>fcr$summary</code>（all / ok / 各品种）。育种评估优先用 <code>fcr_flag == "ok"</code> 的个体。</p>
+</section>
+
+<section class="k-out">
+  <h2>生长曲线图 <small>plot_adg(adg, weight = w)</small></h2>
+  <table>
+    <tr><td><span class="swatch" style="background:#BBBBBB"></span>浅灰小点</td><td>有效的原始体重记录</td></tr>
+    <tr><td><span class="x">×</span>深灰小叉</td><td>被剔除的记录（原因见 <code>qc_flag</code>）</td></tr>
+    <tr><td><span class="swatch" style="background:#0072B2"></span>蓝点</td><td>实测日体重</td></tr>
+    <tr><td><span class="swatch" style="background:#E69F00"></span>橙黄点</td><td>线性插值的日体重</td></tr>
+    <tr><td><span class="swatch" style="background:#CC79A7"></span>紫红点</td><td>生长曲线填充的日体重</td></tr>
+    <tr><td><span class="solid" style="color:#009E73"></span>绿线 + 浅绿带</td><td>生长曲线及约 95% 范围</td></tr>
+    <tr><td><span class="dash" style="color:#000"></span>黑色长虚线</td><td>ADG 回归线（斜率即 ADG）</td></tr>
+    <tr><td><span class="dash" style="color:#999"></span>灰色水平虚线</td><td>区间上下限</td></tr>
+  </table>
+</section>
+
+<section class="k-out">
+  <h2>采食量图 <small>plot_adfi(adfi)</small></h2>
+  <table>
+    <tr><td><span class="swatch" style="background:#BBBBBB"></span>浅灰点</td><td>记录的日采食（未校正）</td></tr>
+    <tr><td><span class="swatch" style="background:#0072B2"></span>蓝点</td><td>无错误，直接使用（org）</td></tr>
+    <tr><td><span class="swatch" style="background:#E69F00"></span>橙点</td><td>校正值（corr）</td></tr>
+    <tr><td><span class="swatch" style="background:#009E73"></span>绿点</td><td>中间填充（iii）</td></tr>
+    <tr><td><span class="swatch" style="background:#CC79A7"></span>紫红点</td><td>两端填充（elrp）</td></tr>
+    <tr><td><span class="dash" style="color:#666"></span>灰色水平虚线</td><td>这头猪的 ADFI</td></tr>
+  </table>
+<pre><code>g <- plot_adg(res$adg, weight = res$weight,
+              locations = "101")
+g$plot[[1]]                     <span class="c"># 第一个测定站</span>
+h <- plot_adfi(res$adfi)
+save_plots(g, "图", suffix = "growth")</code></pre>
+</section>
+
+<section class="k-out">
+  <h2>导出 <small>write_results()</small></h2>
+  <p>文件名为 <code>场名_内容_日期.csv</code>，UTF-8 带 BOM（Excel 直接打开不乱码）。</p>
+  <table>
+    <tr><th>文件</th><th>内容</th></tr>
+    <tr><td><code>fcr</code></td><td>每头猪 ADG、ADFI、FCR 和可信度</td></tr>
+    <tr><td><code>by_bin</code></td><td>每个体重段的采食、增重、分段料肉比</td></tr>
+    <tr><td><code>daily_weight</code></td><td>每天的体重（实测、填充、曲线）</td></tr>
+    <tr><td><code>daily_feed</code></td><td>每天的采食（记录、校正、填充）</td></tr>
+    <tr><td><code>weight_pigs</code></td><td>每头猪的体重质控结果</td></tr>
+    <tr><td><code>feed_model</code> / <code>summary</code></td><td>校正模型系数 / 汇总统计</td></tr>
+    <tr><td><code>removed</code> / <code>settings</code></td><td>剔除的猪及原因 / 所用参数</td></tr>
+  </table>
+</section>
+
+<section class="k-check">
+  <h2>方法验证 <small>在自己的数据上检验</small></h2>
+  <table>
+    <tr><th>函数</th><th>检验</th></tr>
+    <tr><td><code>validate_outliers()</code></td><td>加入人为误差，比较异常值方法的检出率、误删率和 ADG 误差</td></tr>
+    <tr><td><code>validate_adg()</code></td><td>生长曲线的交叉验证与截断（晚进站、早出栏）</td></tr>
+    <tr><td><code>validate_weight_fill()</code></td><td>隐藏日体重，比较线性插值与各曲线的填充误差</td></tr>
+    <tr><td><code>validate_adfi()</code></td><td>隐藏日采食，比较 loess_lm 与 linear</td></tr>
+  </table>
+<pre><code>vw <- validate_weight_fill(w, max_pigs = 300, cores = 4)
+vw$summary
+<span class="c"># 场景：random30 / blocks3 / late20 / early15</span></code></pre>
+</section>
+
+<section class="k-check">
+  <h2>常见情景</h2>
+<pre><code><span class="c"># 晚进站（45–60 kg 进站）</span>
+qc_config(stage_range = c(60, 120), curve_model = "poly1")
+<span class="c"># 115 kg 左右出栏</span>
+qc_config(stage_range = c(30, 110))
+<span class="c"># 计划测定 50 天</span>
+qc_config(min_test_days = 30)
+<span class="c"># 单次采食上限随体重变化 + 分段料肉比检查</span>
+qc_config(fiv_max_by_weight = fiv_max_example(),
+          bin_fcr_limits = bin_fcr_example())
+<span class="c"># 上千头猪：并行</span>
+run_pipeline(raw, cores = 4)
+<span class="c"># 只看某站、某几头猪</span>
+plot_adg(res$adg, locations = "101", responders = c("13913"))</code></pre>
+  <ul>
+    <li>区间下限宜比典型进站体重高 5–10 kg，上限宜比典型出栏体重低约 5 kg。</li>
+    <li>同一育种群体固定使用同一套参数，年度之间才可比。</li>
+  </ul>
+</section>
+
+</main>
+
+<footer>
+  方法出处：Casey 等（2005）采食错误；Jiao 等（2014）稳健回归与采食校正；Cleveland（1979）LOESS。
+  详细说明见 <a href="articles/methods-zh.html">计算方法说明</a>、<a href="articles/qc-parameters-zh.html">质控参数详解</a>、<a href="articles/output-zh.html">输出结果说明</a>。
+</footer>
+
+</body>
+</html>

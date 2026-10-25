@@ -55,13 +55,13 @@
     <span class="caret"></span>
   </a>
   <ul class="dropdown-menu" role="menu">
-<li>
-      <a href="../articles/get-started.html">Get started</a>
-    </li>
-    <li class="divider"></li>
+<li class="divider"></li>
     <li class="dropdown-header">中文文档</li>
     <li>
       <a href="../articles/tidypptsda-zh.html">中文使用说明</a>
+    </li>
+    <li>
+      <a href="../articles/design-zh.html">设计思路</a>
     </li>
     <li>
       <a href="../articles/qc-parameters-zh.html">质控参数详解：qc_config()</a>
@@ -75,7 +75,14 @@
     <li>
       <a href="../articles/output-zh.html">输出结果说明</a>
     </li>
+    <li class="divider"></li>
+    <li>
+      <a href="../articles/index.html">More articles...</a>
+    </li>
   </ul>
+</li>
+<li>
+  <a href="../cheatsheet.html">速查表</a>
 </li>
 <li>
   <a href="../news/index.html">Changelog</a>
@@ -112,7 +119,7 @@
     
     
 <p>tidypptsda
-用于处理种猪性能测定站（NEDAP、FIRE）导出的访问记录，计算日增重（ADG）、日采食量（ADFI）和料肉比（FCR）。本说明按实际分析的顺序介绍每一步：做什么、输出什么，以及结果怎么读。</p>
+用于处理种猪性能测定站（NEDAP、FIRE）导出的访问记录，计算日增重（ADG）、日采食量（ADFI）和料肉比（FCR）。本说明按实际分析的顺序介绍每一步：做什么、输出什么，以及结果怎么读。常用函数和参数都汇总在一页<a href="../cheatsheet.html">速查表</a>上，可以打印出来放在手边；这个包为什么这样设计，见《设计思路》。</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://tony2015116.github.io/tidypptsda/">tidypptsda</a></span><span class="op">)</span></span></code></pre></div>
 <div class="section level2">
