@@ -12,7 +12,7 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 9,
                       fig.height = 6, out.width = "100%")
 ```
 
-tidypptsda 用于处理种猪性能测定站（NEDAP、FIRE）导出的访问记录，计算日增重（ADG）、日采食量（ADFI）和料肉比（FCR）。本说明按实际分析的顺序介绍每一步：做什么、输出什么，以及结果怎么读。
+tidypptsda 用于处理种猪性能测定站（NEDAP、FIRE）导出的访问记录，计算日增重（ADG）、日采食量（ADFI）和料肉比（FCR）。本说明按实际分析的顺序介绍每一步：做什么、输出什么，以及结果怎么读。常用函数和参数都汇总在一页[速查表](../cheatsheet.html)上，可以打印出来放在手边；这个包为什么这样设计，见《设计思路》。
 
 ```{r setup, message = FALSE}
 library(tidypptsda)
