@@ -28,6 +28,11 @@ stations (NEDAP and FIRE): body weight cleaning, average daily gain
 - Few dependencies: cli, data.table, ggplot2, and MASS / nlme which ship
   with R.
 
+Documentation (in Chinese): [速查表
+(cheatsheet)](https://tony2015116.github.io/tidypptsda/cheatsheet.html),
+[中文使用说明](https://tony2015116.github.io/tidypptsda/articles/tidypptsda-zh.html),
+[设计思路](https://tony2015116.github.io/tidypptsda/articles/design-zh.html).
+
 ## Installation
 
 ``` r

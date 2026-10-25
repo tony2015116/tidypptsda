@@ -9,13 +9,16 @@ template:
 navbar:
   bg: light
   structure:
-    left:  [getstarted, reference, articles, news]
+    left:  [getstarted, reference, articles, cheatsheet, news]
     right: [github, lightswitch]
 
   components:
     getstarted:
       text: Get started
       href: articles/get-started.html
+    cheatsheet:
+      text: 速查表
+      href: cheatsheet.html
     github:
       icon: fab fa-github fa-lg
       href: https://github.com/tony2015116/tidypptsda
@@ -73,18 +76,18 @@ reference:
   - fire
 
 articles:
-- title: Get started
-  navbar: ~
-  contents:
-  - get-started
 - title: 中文文档
   navbar: 中文文档
   contents:
   - tidypptsda-zh
+  - design-zh
   - qc-parameters-zh
   - methods-zh
   - validation-zh
   - output-zh
+- title: internal
+  contents:
+  - get-started
 
 news:
   one_page: true
