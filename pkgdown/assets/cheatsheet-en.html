@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tidypptsda cheatsheet</title>
+<style>
+  :root {
+    --ink: #1f2933;
+    --muted: #5f6b7a;
+    --line: #d9dee5;
+    --paper: #ffffff;
+    --bg: #f4f6f8;
+    --accent: #2780e3;
+    --c-read: #2780e3;
+    --c-weight: #0f8a5f;
+    --c-feed: #c46a00;
+    --c-fcr: #8e44ad;
+    --c-out: #475569;
+    --c-check: #b42318;
+    --code-bg: #f1f4f8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #e6e9ee; --muted: #a3adba; --line: #3a4350; --paper: #1c2128;
+      --bg: #13171c; --code-bg: #262d36; --accent: #5aa2f0;
+      --c-read: #5aa2f0; --c-weight: #3cc08f; --c-feed: #f0a347;
+      --c-fcr: #c08ae0; --c-out: #a3adba; --c-check: #f07a70;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 13px/1.5 -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+          "Noto Sans CJK SC", "Source Han Sans SC", "Segoe UI", sans-serif;
+  }
+  code, pre { font-family: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace; }
+  code { background: var(--code-bg); padding: 0 3px; border-radius: 3px; font-size: 0.92em; }
+  pre {
+    background: var(--code-bg); margin: 6px 0; padding: 7px 9px; border-radius: 5px;
+    font-size: 11.5px; line-height: 1.45; overflow-x: auto; white-space: pre;
+  }
+  pre code { background: none; padding: 0; }
+  .c { color: var(--muted); }
+  a { color: var(--accent); }
+
+  header {
+    max-width: 1400px; margin: 0 auto; padding: 18px 16px 6px;
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px;
+  }
+  header h1 { margin: 0; font-size: 26px; letter-spacing: 0.5px; }
+  header h1 span { color: var(--accent); }
+  header p { margin: 0; color: var(--muted); }
+  header nav { margin-left: auto; display: flex; gap: 14px; }
+
+  .flow {
+    max-width: 1400px; margin: 6px auto 4px; padding: 0 16px;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+  }
+  .flow .step {
+    background: var(--paper); border: 1px solid var(--line); border-top: 3px solid var(--k);
+    border-radius: 6px; padding: 4px 9px; font-size: 12px;
+  }
+  .flow .step b { display: block; font-family: Menlo, Consolas, monospace; font-size: 12px; }
+  .flow .arrow { color: var(--muted); font-size: 15px; }
+  .flow .note { color: var(--muted); font-size: 12px; margin-left: 6px; }
+
+  main {
+    max-width: 1400px; margin: 0 auto; padding: 8px 16px 24px;
+    columns: 3 340px; column-gap: 14px;
+  }
+  section {
+    break-inside: avoid; background: var(--paper); border: 1px solid var(--line);
+    border-radius: 8px; margin: 0 0 14px; padding: 10px 12px 8px;
+    border-left: 5px solid var(--k);
+  }
+  section h2 {
+    margin: 0 0 6px; font-size: 15px; color: var(--k);
+    display: flex; align-items: baseline; gap: 8px;
+  }
+  section h2 small { color: var(--muted); font-weight: normal; font-size: 12px; }
+  section h3 { margin: 8px 0 3px; font-size: 12.5px; }
+  section p { margin: 4px 0; }
+  ul { margin: 3px 0; padding-left: 17px; }
+  li { margin: 1px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 4px 0; font-size: 12px; }
+  th, td { text-align: left; padding: 2px 5px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  td:first-child { white-space: nowrap; }
+  .swatch { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: 0; }
+  .x { display: inline-block; width: 10px; text-align: center; color: #666; font-weight: bold; margin-right: 3px; }
+  .dash { display: inline-block; width: 16px; border-top: 2px dashed; vertical-align: 3px; margin-right: 3px; }
+  .solid { display: inline-block; width: 16px; border-top: 2px solid; vertical-align: 3px; margin-right: 3px; }
+  .tag { display: inline-block; padding: 0 5px; border-radius: 3px; font-size: 11px; border: 1px solid var(--line); }
+  .k-read { --k: var(--c-read); } .k-weight { --k: var(--c-weight); } .k-feed { --k: var(--c-feed); }
+  .k-fcr { --k: var(--c-fcr); } .k-out { --k: var(--c-out); } .k-check { --k: var(--c-check); }
+  footer { max-width: 1400px; margin: 0 auto; padding: 0 16px 24px; color: var(--muted); font-size: 12px; }
+
+  @media (max-width: 600px) {
+    header h1 { font-size: 22px; }
+    header nav { margin-left: 0; }
+    .flow .arrow { display: none; }
+  }
+  @media print {
+    @page { size: A4 landscape; margin: 8mm; }
+    body { background: #fff; font-size: 10.5px; }
+    header nav, .noprint { display: none; }
+    main { columns: 3; column-gap: 8px; padding: 4px 0; max-width: none; }
+    header, .flow, footer { max-width: none; padding-left: 0; padding-right: 0; }
+    section { margin-bottom: 8px; padding: 6px 8px; }
+    pre { font-size: 9.5px; padding: 4px 6px; }
+    table { font-size: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span>tidypptsda</span> cheatsheet</h1>
+  <p>Pig performance-testing station data (NEDAP / FIRE): body weight cleaning → ADG → ADFI → FCR</p>
+  <nav class="noprint">
+    <a href="index.html">Home</a>
+    <a href="articles/get-started.html">Get started</a>
+    <a href="reference/index.html">Reference</a>
+    <a href="cheatsheet.html" lang="zh-CN">中文版</a>
+    <a href="javascript:window.print()">Print / save as PDF</a>
+  </nav>
+</header>
+
+<div class="flow" aria-label="Workflow">
+  <div class="step" style="--k: var(--c-read)"><b>read_station()</b>read export files</div><span class="arrow">→</span>
+  <div class="step" style="--k: var(--c-read)"><b>prep_visits()</b>standard visit table</div><span class="arrow">→</span>
+  <div class="step" style="--k: var(--c-weight)"><b>clean_weight()</b>weight QC</div><span class="arrow">→</span>
+  <div class="step" style="--k: var(--c-weight)"><b>calc_adg()</b>fill weights + ADG</div><span class="arrow">→</span>
+  <div class="step" style="--k: var(--c-feed)"><b>calc_adfi()</b>correct, fill feed</div><span class="arrow">→</span>
+  <div class="step" style="--k: var(--c-fcr)"><b>calc_fcr()</b>FCR + confidence</div><span class="arrow">→</span>
+  <div class="step" style="--k: var(--c-out)"><b>plot_* / write_results()</b>plots, export</div>
+  <span class="note">All in one: <code>run_pipeline()</code>; all thresholds: <code>qc_config()</code></span>
+</div>
+
+<main>
+
+<section class="k-read">
+  <h2>Install and run everything</h2>
+<pre><code><span class="c"># install.packages("pak")</span>
+pak::pak("tony2015116/tidypptsda")
+library(tidypptsda)
+
+raw <- read_station("export/", station = "nedap")
+res <- run_pipeline(raw)            <span class="c"># or run_pipeline(nedap)</span>
+res$fcr$per_pig                     <span class="c"># final results</span>
+res$removed                         <span class="c"># removed pigs, with reasons</span>
+write_results(res, dir = "results", farm = "A01")</code></pre>
+  <p>Example data: <code>nedap</code>, <code>fire</code> (raw station exports).</p>
+</section>
+
+<section class="k-read">
+  <h2>Read data <small>read_station() / station_format()</small></h2>
+<pre><code><span class="c"># a whole folder; without station the type is detected</span>
+read_station("export/", station = "nedap")
+read_station(c("101.xlsx", "102.xlsx"), station = "fire")
+<span class="c"># other column names: write a template, edit column</span>
+station_format("fire", file = "fire_format.txt")
+read_station("export/", station = "fire",
+             format = "fire_format.txt")</code></pre>
+  <ul>
+    <li>CSV, TXT (separator detected) and Excel (needs readxl).</li>
+    <li>No format file is <b>needed</b> when the columns match the built-in format; otherwise an error lists the missing columns.</li>
+    <li>Format file, one line per field: <code>field</code>, <code>column</code> (name or position; <code>Date,Entry</code> joins two columns; <code>-</code> if absent), <code>unit</code> (kg / g / auto, s / min).</li>
+    <li>Result is one standard table: IDs and stations as text; times as POSIXct; feed and trough weights in g, body weight in kg, duration in s.</li>
+  </ul>
+  <table>
+    <tr><th>Type</th><th>Required fields</th></tr>
+    <tr><td>NEDAP</td><td>responder, location, entry_time, feed_intake, weight</td></tr>
+    <tr><td>FIRE</td><td>same + exit_time, trough_in, trough_out</td></tr>
+  </table>
+</section>
+
+<section class="k-read">
+  <h2>Visits and breed <small>prep_visits() / add_breed()</small></h2>
+<pre><code>visits <- prep_visits(raw)
+visits <- add_breed(visits, read.csv("breeds.csv"),
+                    id = "tag", breed = "breed")</code></pre>
+  <ul>
+    <li>Visits of unidentified transponders are kept as <code>identified = FALSE</code> (needed for the feeder error rules).</li>
+    <li>Pigs at several stations: transfers kept; long gaps split into <code>id_station</code>; overlaps treated as misreads. See <code>attr(visits, "stations")</code>.</li>
+    <li>With a breed column, the correction model gets a breed effect and <code>fcr$summary</code> is split by breed.</li>
+  </ul>
+</section>
+
+<section class="k-check">
+  <h2>QC settings <small>qc_config()</small></h2>
+<pre><code>qc <- qc_config(stage_range = c(60, 120),
+                curve_model = "poly1")
+qc                          <span class="c"># all 42 parameters, by group</span>
+run_pipeline(raw, qc = qc)</code></pre>
+  <table>
+    <tr><th>Parameter</th><th>Default</th><th>Meaning</th></tr>
+    <tr><td><code>stage_range</code></td><td>30–120</td><td>weight stage of ADG / ADFI / FCR</td></tr>
+    <tr><td><code>weight_range</code></td><td>15–150</td><td>valid single weight</td></tr>
+    <tr><td><code>adapt_days</code></td><td>7</td><td>adaptation after entry, weights unused</td></tr>
+    <tr><td><code>weight_outlier</code></td><td>rlm, loess</td><td>outlier methods after tracking</td></tr>
+    <tr><td><code>min_test_days</code></td><td>35</td><td>shortest test (removes)</td></tr>
+    <tr><td><code>curve_model</code></td><td>poly2</td><td>curve that fills the stage ends</td></tr>
+    <tr><td><code>impute_method</code></td><td>loess_lm</td><td>feed filling, or linear</td></tr>
+    <tr><td><code>max_edge_extrap_days</code></td><td>15</td><td>more filling at the ends: low confidence</td></tr>
+    <tr><td><code>duration_max</code></td><td>3600</td><td>longest visit (s)</td></tr>
+  </table>
+  <p>Misspelt names get a suggestion; <code>$settings</code> of every result keeps the settings used.</p>
+</section>
+
+<section class="k-weight">
+  <h2>Weight cleaning <small>clean_weight()</small></h2>
+  <p>In order: weight range → adaptation → <b>tracking back from the end of the test</b> (keep readings that connect) → quadratic robust regression rlm (weight &lt; 0.5) + LOESS (&gt; 3 MAD off).</p>
+  <table>
+    <tr><th><code>qc_flag</code></th><th>Meaning</th></tr>
+    <tr><td><code>""</code></td><td>valid</td></tr>
+    <tr><td><code>weight_range</code></td><td>outside 15–150 kg</td></tr>
+    <tr><td><code>adaptation</code></td><td>first 7 days after entry</td></tr>
+    <tr><td><code>track</code></td><td>does not connect (mostly small pigs on the scale together)</td></tr>
+    <tr><td><code>rlm</code> / <code>loess</code></td><td>flagged by that method</td></tr>
+  </table>
+  <table>
+    <tr><th><code>status</code></th><th>When</th></tr>
+    <tr><td><span class="tag">removed</span></td><td>&lt; 20 valid weights, test &lt; 35 d, &gt; 30% days missing</td></tr>
+    <tr><td><span class="tag">low_confidence</span></td><td>entry &gt; 65 kg, exit &lt; 85 kg, tracking removed &gt; 40%, LOESS R² &lt; 0.99</td></tr>
+    <tr><td><span class="tag">keep</span></td><td>passed</td></tr>
+  </table>
+  <p>Results: <code>w$per_pig</code> (per pig), <code>w$records</code> (per record).</p>
+</section>
+
+<section class="k-weight">
+  <h2>Daily gain <small>calc_adg()</small></h2>
+  <ol style="margin:3px 0; padding-left:17px">
+    <li>The growth curve sets the stage: end = first time at the upper limit, start = last rise through the lower limit before it.</li>
+    <li>Every stage day gets a weight, <code>weight_filled</code>:</li>
+  </ol>
+  <table>
+    <tr><th><code>source</code></th><th>From</th></tr>
+    <tr><td><code>observed</code></td><td>median of the day's valid weights</td></tr>
+    <tr><td><code>interpolated</code></td><td>between recorded days: linear interpolation</td></tr>
+    <tr><td><code>curve</code></td><td>before the first / after the last record: growth curve</td></tr>
+  </table>
+  <p>3. <b>ADG = slope of the daily weights on the day over the stage</b> (g/d), with <code>r_squared</code>.</p>
+  <table>
+    <tr><th><code>adg_type</code></th><th>Meaning</th></tr>
+    <tr><td><code>observed</code></td><td>both stage limits inside the test</td></tr>
+    <tr><td><code>extrapolated</code></td><td>extrapolated, at most 30 days</td></tr>
+    <tr><td><code>partial</code></td><td>a limit is never reached: covered part only</td></tr>
+    <tr><td><code>none</code></td><td>less than 7 days covered, no ADG</td></tr>
+  </table>
+</section>
+
+<section class="k-feed">
+  <h2>Feed intake <small>flag_feed_errors() / calc_adfi()</small></h2>
+  <ul>
+    <li><b>Errors</b>: the 16 rules of Casey et al. (2005) (feed per visit, duration, feeding rate, trough weight differences…); run inside <code>calc_adfi()</code>.</li>
+    <li><b>Correction</b>: mixed model of Jiao et al. (2014), removes the effect of the error covariates; days without errors unchanged.</li>
+    <li><b>Filling</b>: on the ADG stage days only; the regression uses the filled daily weights.</li>
+  </ul>
+  <table>
+    <tr><th><code>state</code></th><th>The day's intake is</th></tr>
+    <tr><td><code>org</code></td><td>recorded, no error visit that day</td></tr>
+    <tr><td><code>corr</code></td><td>corrected by the model</td></tr>
+    <tr><td><code>iii</code></td><td>gap between records: ≤ 3 d LOESS, &gt; 3 d regression on body weight</td></tr>
+    <tr><td><code>elrp</code></td><td>missing at the stage ends: same regression</td></tr>
+    <tr><td><code>missing</code></td><td>cannot be estimated</td></tr>
+  </table>
+  <p><b>ADFI</b> = mean daily intake over the stage; <code>coverage</code> = share of days recorded (incl. corrected).</p>
+</section>
+
+<section class="k-fcr">
+  <h2>Feed conversion <small>calc_fcr()</small></h2>
+  <p><b>FCR = ADFI ÷ ADG</b>, <code>gf</code> = ADG ÷ ADFI. <code>fcr_flag</code> is <span class="tag">ok</span> or <span class="tag">low_confidence</span>; why is in <code>fcr_note</code>:</p>
+  <ul>
+    <li>weights or feed filled for more than 15 days at a stage end;</li>
+    <li>feed recorded on less than 70% of the stage;</li>
+    <li>an inner 10 kg class covered by less than 6 kg of recorded weights;</li>
+    <li>ADG on part of the stage, or weight data flagged;</li>
+    <li>optional: class FCR outside <code>bin_fcr_limits</code>.</li>
+  </ul>
+  <p>Per class: <code>fcr$by_bin</code>; summary: <code>fcr$summary</code> (all / ok / per breed). For breeding values prefer pigs with <code>fcr_flag == "ok"</code>.</p>
+</section>
+
+<section class="k-out">
+  <h2>Growth plot <small>plot_adg(adg, weight = w)</small></h2>
+  <table>
+    <tr><td><span class="swatch" style="background:#BBBBBB"></span>light grey dots</td><td>valid raw weight records</td></tr>
+    <tr><td><span class="x">×</span>dark grey crosses</td><td>removed records (see <code>qc_flag</code>)</td></tr>
+    <tr><td><span class="swatch" style="background:#0072B2"></span>blue</td><td>observed daily weight</td></tr>
+    <tr><td><span class="swatch" style="background:#E69F00"></span>orange</td><td>interpolated daily weight</td></tr>
+    <tr><td><span class="swatch" style="background:#CC79A7"></span>reddish purple</td><td>daily weight from the growth curve</td></tr>
+    <tr><td><span class="solid" style="color:#009E73"></span>green line + band</td><td>growth curve, about 95% range</td></tr>
+    <tr><td><span class="dash" style="color:#000"></span>black long dashes</td><td>ADG regression line (slope = ADG)</td></tr>
+    <tr><td><span class="dash" style="color:#999"></span>grey horizontal dashes</td><td>stage limits</td></tr>
+  </table>
+</section>
+
+<section class="k-out">
+  <h2>Feed intake plot <small>plot_adfi(adfi)</small></h2>
+  <table>
+    <tr><td><span class="swatch" style="background:#BBBBBB"></span>light grey</td><td>recorded daily intake (uncorrected)</td></tr>
+    <tr><td><span class="swatch" style="background:#0072B2"></span>blue</td><td>error-free, used as recorded (org)</td></tr>
+    <tr><td><span class="swatch" style="background:#E69F00"></span>orange</td><td>corrected (corr)</td></tr>
+    <tr><td><span class="swatch" style="background:#009E73"></span>green</td><td>filled between records (iii)</td></tr>
+    <tr><td><span class="swatch" style="background:#CC79A7"></span>reddish purple</td><td>filled at the stage ends (elrp)</td></tr>
+    <tr><td><span class="dash" style="color:#666"></span>grey horizontal dashes</td><td>the pig's ADFI</td></tr>
+  </table>
+<pre><code>g <- plot_adg(res$adg, weight = res$weight,
+              locations = "101")
+g$plot[[1]]                     <span class="c"># first station</span>
+h <- plot_adfi(res$adfi)
+save_plots(g, "plots", suffix = "growth")</code></pre>
+</section>
+
+<section class="k-out">
+  <h2>Export <small>write_results()</small></h2>
+  <p>Files are <code>farm_table_date.csv</code>, UTF-8 with BOM (opens in Excel without garbled Chinese).</p>
+  <table>
+    <tr><th>File</th><th>Content</th></tr>
+    <tr><td><code>fcr</code></td><td>ADG, ADFI, FCR and flags per pig</td></tr>
+    <tr><td><code>by_bin</code></td><td>feed, gain, FCR per weight class</td></tr>
+    <tr><td><code>daily_weight</code></td><td>daily weights (observed, filled, curve)</td></tr>
+    <tr><td><code>daily_feed</code></td><td>daily intake (recorded, corrected, filled)</td></tr>
+    <tr><td><code>weight_pigs</code></td><td>weight QC per pig</td></tr>
+    <tr><td><code>feed_model</code> / <code>summary</code></td><td>correction model / trait summary</td></tr>
+    <tr><td><code>removed</code> / <code>settings</code></td><td>removed pigs and reasons / settings used</td></tr>
+  </table>
+</section>
+
+<section class="k-check">
+  <h2>Validation <small>test the methods on your data</small></h2>
+  <table>
+    <tr><th>Function</th><th>Tests</th></tr>
+    <tr><td><code>validate_outliers()</code></td><td>artificial errors: detection, false removals and ADG error of outlier methods</td></tr>
+    <tr><td><code>validate_adg()</code></td><td>growth curves: cross-validation and truncation (late entry, early exit)</td></tr>
+    <tr><td><code>validate_weight_fill()</code></td><td>hide daily weights: linear interpolation vs each curve</td></tr>
+    <tr><td><code>validate_adfi()</code></td><td>hide daily intake: loess_lm vs linear</td></tr>
+  </table>
+<pre><code>vw <- validate_weight_fill(w, max_pigs = 300, cores = 4)
+vw$summary
+<span class="c"># scenarios: random30 / blocks3 / late20 / early15</span></code></pre>
+</section>
+
+<section class="k-check">
+  <h2>Common settings</h2>
+<pre><code><span class="c"># late entry (45-60 kg)</span>
+qc_config(stage_range = c(60, 120), curve_model = "poly1")
+<span class="c"># slaughter at about 115 kg</span>
+qc_config(stage_range = c(30, 110))
+<span class="c"># planned test of 50 days</span>
+qc_config(min_test_days = 30)
+<span class="c"># FIV limit by body weight + class FCR check</span>
+qc_config(fiv_max_by_weight = fiv_max_example(),
+          bin_fcr_limits = bin_fcr_example())
+<span class="c"># thousands of pigs: parallel</span>
+run_pipeline(raw, cores = 4)
+<span class="c"># one station, a few pigs</span>
+plot_adg(res$adg, locations = "101", responders = c("13913"))</code></pre>
+  <ul>
+    <li>Lower stage limit 5–10 kg above typical entry weight, upper limit about 5 kg below typical exit weight.</li>
+    <li>Keep one set of settings for a breeding herd, so that years stay comparable.</li>
+  </ul>
+</section>
+
+</main>
+
+<footer>
+  Methods: Casey et al. (2005) feeder errors; Jiao et al. (2014) robust regression and feed correction; Cleveland (1979) LOESS.
+  Details (in Chinese): <a href="articles/methods-zh.html">methods</a>, <a href="articles/qc-parameters-zh.html">QC parameters</a>, <a href="articles/output-zh.html">output tables</a>.
+</footer>
+
+</body>
+</html>

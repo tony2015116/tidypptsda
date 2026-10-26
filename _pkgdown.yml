@@ -17,8 +17,12 @@ navbar:
       text: Get started
       href: articles/get-started.html
     cheatsheet:
-      text: 速查表
-      href: cheatsheet.html
+      text: 速查表 / Cheatsheet
+      menu:
+      - text: 中文
+        href: cheatsheet.html
+      - text: English
+        href: cheatsheet-en.html
     github:
       icon: fab fa-github fa-lg
       href: https://github.com/tony2015116/tidypptsda
