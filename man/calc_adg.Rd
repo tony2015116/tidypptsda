@@ -36,7 +36,7 @@ over the recorded days: observed \code{weight} (daily median, kg, \code{NA} on
 days without valid weight), \code{weight_filled} (observed, interpolated
 or curve weight, kg), \code{source} (\code{"observed"}, \code{"interpolated"} or
 \code{"curve"}), \code{predicted} weight of the growth curve with \code{lower} /
-\code{upper} limits (\if{html}{\out{<c2>}}\if{html}{\out{<b1>}} 1.96 residual SD) and \code{in_stage};
+\code{upper} limits (± 1.96 residual SD) and \code{in_stage};
 \item \code{removed}: pigs removed so far, plus pigs without ADG;
 \item \code{settings}: QC settings.
 }

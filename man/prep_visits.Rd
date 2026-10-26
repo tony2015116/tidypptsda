@@ -23,7 +23,7 @@ already standard.}
 
 \item{qc}{QC settings from \code{\link[=qc_config]{qc_config()}}. Used here: \code{duration_max} (to
 tell a FIRE midnight crossing from a recording error) and the station
-transfer parameters \code{max_gap_days}, \code{max_overlap_days}, \code{max_jump_kg}.}
+transfer parameters \code{misread_max_visits}, \code{max_jump_kg}.}
 
 \item{verbose}{0 (silent), 1 (summary, default) or 2 (details).}
 }
@@ -51,7 +51,8 @@ Attributes:
 \itemize{
 \item \code{"station"}: station type;
 \item \code{"stations"}: one row per pig with its station history (see below);
-\item \code{"removed"}: log of visits removed as transponder misreads;
+\item \code{"removed"}: log of visits turned into unidentified visits as
+transponder misreads;
 \item \code{"prep_summary"}: number of rows dropped at each step.
 }
 }
@@ -61,21 +62,45 @@ the same columns and units for both station types.
 }
 \section{Station transfer}{
 
-For each pig seen at several stations, the time span at each station is
-compared:
+A pig can be recorded at several stations because it was really moved:
+it escaped to another pen and stayed there, was found and put back, or
+was isolated for treatment and returned to the wrong pen. These visits
+are real and belong to the same pig. A transponder misread, in contrast,
+gives a few scattered visits at another station while the pig keeps
+visiting its own station.
+
+So the identified visits of each pig are put in time order and cut into
+runs of consecutive visits at the same station:
 \itemize{
-\item \strong{misread}: the span at a minor station overlaps the span at the main
-station (most visits) by more than \code{max_overlap_days}. Visits at the
-minor station inside the main span are removed as transponder misreads.
-\item \strong{transfer}: consecutive spans are separated by at most
-\code{max_gap_days}. All visits are kept, each with its real \code{location}. A
-body weight jump above \code{max_jump_kg} at the transfer gives a warning.
-\item \strong{split}: a gap longer than \code{max_gap_days}. The spans are treated as
-different animals and \code{responder} becomes \code{"<id>_<location>"}.
+\item \strong{misread}: a run of at most \code{misread_max_visits} visits. Shortest
+runs are dropped first, so that the runs around them join. The visits
+stay in the data as unidentified visits (\code{identified = FALSE},
+\code{responder = NA}, \code{responder_raw} kept): they did happen at that
+feeder and are needed for the feeder error checks and the
+unidentified feed of the feeder.
+\item \strong{transfer}: every remaining run is a real stay at a station. A pig
+can move any number of times, also back to a station it used before
+(\code{location_path} such as \code{"101>102>101"}). All visits are kept with
+their real \code{location}.
+\item at each transfer the body weight before and after (median of the 20
+valid weights next to it) is compared, allowing for growth over the
+gap. A jump above \code{max_jump_kg} gives a warning, and
+\code{\link[=clean_weight]{clean_weight()}} flags the pig as low confidence.
 }
 
-A pig that returns to a station it already used is not supported: the
-return looks like an overlap and is treated as misreads.
+A gap without visits (e.g. isolation for treatment) never splits a pig
+into two animals: the days are missing, and \code{\link[=clean_weight]{clean_weight()}} flags the
+pig as low confidence when the longest gap exceeds \code{max_gap_days}.
+
+The \code{"stations"} attribute has one row per pig: \code{location_path},
+\code{main_location} (station with most visits), \code{n_locations},
+\code{n_transfers}, \code{transfer}, \code{misreads} (visits turned unidentified),
+\code{longest_gap_days} and \code{weight_jump_kg} (largest jump beyond the
+expected growth, \code{NA} without transfer).
+
+All stations are assumed to be in separate pens. Stations in the same
+pen, which a pig visits in turn, look like many transfers; a warning is
+given when a pig moves more than 3 times.
 }
 
 \examples{

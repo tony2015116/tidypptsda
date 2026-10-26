@@ -184,7 +184,7 @@ visits <- add_breed(visits, read.csv("breeds.csv"),
                     id = "tag", breed = "breed")</code></pre>
   <ul>
     <li>Visits of unidentified transponders are kept as <code>identified = FALSE</code> (needed for the feeder error rules).</li>
-    <li>Pigs at several stations: transfers kept; long gaps split into <code>id_station</code>; overlaps treated as misreads. See <code>attr(visits, "stations")</code>.</li>
+    <li>Pigs at several stations: all stays kept (also back to a former station); runs of &le; 2 visits inside another station's visits are misreads, kept as unidentified; gaps &gt; 3 d or weight jumps &gt; 10 kg flag the pig. See <code>attr(visits, "stations")</code>.</li>
     <li>With a breed column, the correction model gets a breed effect and <code>fcr$summary</code> is split by breed.</li>
   </ul>
 </section>

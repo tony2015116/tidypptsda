@@ -1,3 +1,47 @@
+# tidypptsda 1.2.0
+
+## Station transfers (prep_visits)
+
+* **(breaking)** Pigs seen at several stations are now handled by runs of
+  consecutive visits instead of the first and last visit at each station.
+  Before, a single stray read could stretch a station's time span and
+  remove hundreds of real visits at the other station.
+  - A run of at most `misread_max_visits` (new, default 2) visits inside
+    the visits at another station is a transponder misread. Misreads are
+    **kept as unidentified visits** (`identified = FALSE`) instead of being
+    deleted, so the feeder error checks and the unidentified feed of the
+    feeder stay right.
+  - All other runs are real stays: a pig can move any number of times,
+    also back to a station it used before (`"101>102>101"`).
+  - A gap without visits (e.g. isolation for treatment) no longer splits a
+    pig into `<id>_<station>`. `max_gap_days` now flags pigs whose longest
+    gap is longer (`clean_weight()`: low confidence, "test interrupted").
+  - The weight jump at a transfer allows for growth over the gap; a jump
+    above `max_jump_kg` now also flags the pig as low confidence.
+  - `max_overlap_days` is removed (`qc_config()` says what to use instead).
+    The `"stations"` attribute has new columns `n_transfers`, `misreads`
+    and `longest_gap_days`; `split` and `misreads_removed` are gone.
+
+## Other fixes
+
+* `calc_adg()`: a pig whose growth curve never enters `stage_range` (all
+  weights above or below it) gets `adg_type = "none"` instead of a
+  "partial" ADG over its whole test. The end of the stage is the first
+  time the curve *rises* through the upper limit, so an extrapolated curve
+  that starts above it no longer hides the real crossing.
+* `calc_fcr()`: days are put into weight classes, and the class gain is
+  computed, from the growth curve. With the noisy daily weights, days near
+  a class limit fell into the neighbouring class and inflated the gain
+  (inner classes now 8.8-11.1 kg of 10 kg, before 4.5-11.4 kg).
+* `validate_outliers(cores > 1)` no longer runs parallel fits inside
+  parallel jobs (4 cores gave 16 processes), and matches records by unique
+  keys.
+* `prep_visits()`: a missing `duration` is computed from `exit_time` row
+  by row (with the midnight correction), not only when the whole column is
+  missing.
+* `cores > 1` on Windows stops with a clear message when the package is
+  loaded with `devtools::load_all()` or the workers cannot load it.
+
 # tidypptsda 1.1.0
 
 ## Reading station data

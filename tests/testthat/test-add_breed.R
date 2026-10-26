@@ -20,7 +20,7 @@ test_that("missing pigs warn and conflicting breeds stop", {
   expect_error(add_breed(v, data.frame(id = pigs)), "breed")
 })
 
-test_that("split pigs keep their breed and a breed column in raw data is kept", {
+test_that("transferred pigs keep their breed and a breed column in raw data is kept", {
   d <- data.table::as.data.table(nedap)[responder == 15497]
   d[, location := 101L]
   m <- d$visit_time[floor(nrow(d) / 2)]
@@ -28,8 +28,8 @@ test_that("split pigs keep their breed and a breed column in raw data is kept", 
   d[visit_time > m, location := 102L]
   v <- prep_visits(d, verbose = 0)
   out <- add_breed(v, data.frame(responder = "15497", breed = "DD"), verbose = 0)
-  expect_equal(unique(out$breed), "DD")
-  expect_setequal(unique(out$responder), c("15497_101", "15497_102"))
+  expect_equal(unique(out[identified == TRUE, breed]), "DD")
+  expect_equal(unique(out[identified == TRUE, responder]), "15497")
   d[, breed := "LL"]
   expect_equal(unique(prep_visits(d, verbose = 0)[identified == TRUE, breed]), "LL")
   expect_message(prep_visits(nedap), "add_breed")

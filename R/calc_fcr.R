@@ -22,8 +22,9 @@
 #'   - `summary`: numeric summary (`n`, `min`, `max`, `median`, `mean`,
 #'     `sd`, `cv`) of the main traits, for all pigs, for pigs with
 #'     `fcr_flag = "ok"` and, with a `breed` column, for each breed;
-#'   - `by_bin`: one row per pig and body weight class of `bin_width` kg:
-#'     feed (`feed_kg`), gain (`gain_kg`), segment `fcr`,
+#'   - `by_bin`: one row per pig and body weight class of `bin_width` kg
+#'     (days are put into classes by the growth curve): feed (`feed_kg`),
+#'     gain (`gain_kg`, from the growth curve), segment `fcr`,
 #'     `weight_coverage_kg` (span of recorded body weights in the class),
 #'     `low_coverage` (inner class covered by less than
 #'     `min_bin_coverage_kg`) and `fcr_out` (segment FCR outside
@@ -140,14 +141,21 @@ fcr_by_bin <- function(adg, adfi, qc) {
   hi <- qc$stage_range[2L]
   width <- qc$bin_width
   cls <- function(w) lo + floor((w - lo) / width) * width
-  st <- adfi$daily[in_stage == TRUE & !is.na(bw) & !is.na(dfi)]
-  st[, weight_from := cls(bw)]
+  # Days are put into weight classes by the growth curve, not by the daily
+  # weights: the daily weights are noisy, so near a class limit days would
+  # fall into the neighbouring class at random and inflate the weight range
+  # of the class. The gain of a class is the curve range scaled to its days
+  # (daily weights are mid-day values).
+  st <- adfi$daily[in_stage == TRUE & !is.na(dfi)]
+  st[adg$daily, on = c("responder", "date"), pw := i.predicted]
+  st[is.na(pw), pw := bw]
+  st <- st[!is.na(pw)]
+  st[, weight_from := cls(pw)]
   st <- st[weight_from >= lo & weight_from < hi]
   bins <- st[, .(n_days = .N, n_observed_feed = sum(state %in% c("org", "corr")),
-                 feed_kg = sum(dfi) / 1000, bw_min = min(bw), bw_max = max(bw)),
+                 feed_kg = sum(dfi) / 1000,
+                 gain_kg = if (.N > 1L) (max(pw) - min(pw)) * .N / (.N - 1L) else NA_real_),
              by = .(responder, weight_from)]
-  # gain over the days of the class (daily weights are mid-day values)
-  bins[, gain_kg := data.table::fifelse(n_days > 1L, (bw_max - bw_min) * n_days / (n_days - 1L), NA_real_)]
   bins[, fcr := feed_kg / gain_kg]
   bins[, weight_to := pmin(weight_from + width, hi)]
 
@@ -178,7 +186,7 @@ fcr_by_bin <- function(adg, adfi, qc) {
     bins[lim, on = "weight_from", `:=`(fcr_min = i.fcr_min, fcr_max = i.fcr_max)]
   }
   bins[, fcr_out := !is.na(fcr) & !is.na(fcr_min) & (fcr < fcr_min | fcr > fcr_max)]
-  bins[, c("bw_min", "bw_max", "first_bin", "last_bin") := NULL]
+  bins[, c("first_bin", "last_bin") := NULL]
   data.table::setcolorder(bins, c("responder", "weight_from", "weight_to", "n_days",
                                   "n_observed_feed", "feed_kg", "gain_kg", "fcr",
                                   "weight_coverage_kg", "inner", "low_coverage",

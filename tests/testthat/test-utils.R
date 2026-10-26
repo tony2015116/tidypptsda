@@ -87,3 +87,11 @@ test_that("ppt_palette returns n colours", {
   expect_length(ppt_palette(3), 3L)
   expect_length(ppt_palette(15), 15L)
 })
+
+test_that("PSOCK workers need the installed package", {
+  if (is.null(asNamespace("tidypptsda")[[".__DEVTOOLS__"]])) {
+    expect_true(check_psock())
+  } else {
+    expect_error(check_psock(), "load_all")
+  }
+})

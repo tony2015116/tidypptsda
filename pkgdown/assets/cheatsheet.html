@@ -184,7 +184,7 @@ visits <- add_breed(visits, read.csv("品种表.csv"),
                     id = "耳标", breed = "品种")</code></pre>
   <ul>
     <li>未识别耳标的访问保留为 <code>identified = FALSE</code>（采食错误判定要用）。</li>
-    <li>跨站的猪：转栏保留；间隔过长拆成 <code>耳标_站号</code>；时间交错视为误读。见 <code>attr(visits, "stations")</code>。</li>
+    <li>跨站的猪：各站记录都保留（可转回原站）；夹在另一站中间的 ≤ 2 次零星访问视为误读，转为未识别访问；中断 &gt; 3 天或转栏体重跳变 &gt; 10 kg 降级。见 <code>attr(visits, "stations")</code>。</li>
     <li>有品种列后：校正模型加品种效应，<code>fcr$summary</code> 按品种分组。</li>
   </ul>
 </section>

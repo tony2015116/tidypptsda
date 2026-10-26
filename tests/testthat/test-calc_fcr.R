@@ -129,3 +129,11 @@ test_that("inputs are checked and not modified", {
   other$settings <- qc_config(stage_range = c(40, 110))
   expect_error(calc_fcr(r$adg, other), "stage_range")
 })
+
+test_that("the gain of a weight class is not inflated by daily noise", {
+  r <- run_pipeline(nedap, verbose = 0)
+  b <- r$fcr$by_bin[inner == TRUE]
+  b[r$fcr$per_pig, on = "responder", adg := i.adg]
+  # whole days: the gain of a class is within one day of growth of 10 kg
+  expect_true(all(abs(b$gain_kg - 10) <= b$adg / 1000 + 0.2))
+})

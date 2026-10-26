@@ -202,8 +202,15 @@ run_with_progress <- function(x, fun, cores = 1L, label = "Working", ...) {
     run_forked(x, fun, cores, set_bar, ...)
   } else {
     if (cores > 1L) {
+      check_psock()
       cl <- parallel::makeCluster(cores)
       on.exit(parallel::stopCluster(cl), add = TRUE)
+      parallel::clusterCall(cl, function(p) invisible(.libPaths(p)), .libPaths())
+      ok <- unlist(parallel::clusterCall(cl, requireNamespace, "tidypptsda", quietly = TRUE))
+      if (!all(ok)) {
+        cli::cli_abort(c("The parallel workers cannot load {.pkg tidypptsda}.",
+                         "i" = "Install the package, or use {.code cores = 1}."))
+      }
       size <- max(cores, ceiling(n / 10 / cores) * cores)
       run_chunk <- function(idx) parallel::parLapply(cl, x[idx], fun, ...)
     } else {
@@ -219,6 +226,16 @@ run_with_progress <- function(x, fun, cores = 1L, label = "Working", ...) {
   }
   if (show) cli::cli_progress_done(id = bar, .envir = environment())
   out
+}
+
+# A PSOCK worker loads the installed package, not one loaded with
+# devtools::load_all(): stop instead of running other code.
+check_psock <- function() {
+  if (!is.null(asNamespace("tidypptsda")[[".__DEVTOOLS__"]])) {
+    cli::cli_abort(c("{.code cores > 1} on Windows needs the installed package; it is loaded with {.fn devtools::load_all}.",
+                     "i" = "Install it (e.g. {.code devtools::install()}), or use {.code cores = 1}."))
+  }
+  invisible(TRUE)
 }
 
 # Fork one process per core (interleaved shares for an even load) and poll
@@ -339,7 +356,7 @@ utils::globalVariables(c(
   "extrap_days_start", "extrap_days_end", "n_extrap_start", "n_extrap_end",
   # breed, jumps, FIV limits, weight classes
   "breed", "rate", "w", "max_daily_jump", "fiv_max", "day", "weight_from",
-  "weight_to", "feed_kg", "gain_kg", "bw_min", "bw_max", "n_days",
+  "weight_to", "feed_kg", "gain_kg", "bw_min", "bw_max", "n_days", "pw", "i.predicted",
   "n_observed_feed", "weight_coverage_kg", "first_bin", "last_bin", "inner",
   "low_coverage", "fcr_min", "fcr_max", "fcr_out", "i.fcr_min", "i.fcr_max",
   # plots

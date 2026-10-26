@@ -62,7 +62,7 @@ head(res$fcr$per_pig[, .(responder, location, adg, adfi, fcr, fcr_flag, fcr_note
 | `trough_in`、`trough_out`、`topup` | 进入、离开时的料槽重（g）和加料量（仅 FIRE 数据） |
 | `breed` | 品种（原始数据中有，或用 `add_breed()` 加入时才有） |
 
-`attr(res$visits, "stations")` 记录跨站猪的处理结果（转栏、拆分为两个个体或读卡误读）。
+`attr(res$visits, "stations")` 每头猪一行，记录跨站情况：`location_path`（如 `101>102>101`）、`main_location`（访问最多的站）、`n_locations`、`n_transfers`（转栏次数）、`transfer`、`misreads`（转为未识别访问的误读次数）、`longest_gap_days`（最长无访问天数）和 `weight_jump_kg`（转栏前后扣除正常生长后的体重差，没有转栏时为 `NA`）。
 
 ## 3. `$weight`：体重质控
 
@@ -76,6 +76,8 @@ head(res$fcr$per_pig[, .(responder, location, adg, adfi, fcr, fcr_flag, fcr_note
 | `r2` | 有效体重对其 LOESS 平滑曲线的 R²（低于 `smooth_r2_min` 时降级） |
 | `entry_weight`、`exit_weight` | LOESS 平滑曲线在首条、末条有效记录处的体重 |
 | `track_removed` | 逐日回溯追踪剔除的记录比例（未追踪时为 `NA`） |
+| `longest_gap_days` | 最长无访问天数；超过 `max_gap_days` 时降级（测定中断，例如隔离治疗） |
+| `weight_jump_kg` | 转栏前后的体重跳变（来自 `prep_visits()`）；绝对值超过 `max_jump_kg` 时降级 |
 | `status` | `keep`（通过）、`low_confidence`（保留但需注意）、`removed`（剔除） |
 | `reason` | 降级或剔除的原因 |
 
@@ -194,8 +196,8 @@ res$weight$records[, .N, by = qc_flag]
 | 列 | 含义 |
 |---|---|
 | `weight_from`、`weight_to` | 体重段（从区间下限起每 `bin_width` kg 一段） |
-| `n_days` | 段内天数 |
-| `feed_kg`、`gain_kg`、`fcr` | 段内采食量、增重和段料肉比 |
+| `n_days` | 段内天数（按生长曲线上的体重归段） |
+| `feed_kg`、`gain_kg`、`fcr` | 段内采食量、增重（按生长曲线计算）和段料肉比 |
 | `n_observed_feed` | 段内有实测采食的天数 |
 | `weight_coverage_kg`、`inner`、`low_coverage` | 段内实测体重覆盖的范围；是否为中间段；中间段覆盖不足 |
 | `fcr_min`、`fcr_max`、`fcr_out` | 段料肉比的合理范围（`bin_fcr_limits`）及是否超出 |
@@ -209,7 +211,7 @@ res$weight$records[, .N, by = qc_flag]
 | 列 | 含义 |
 |---|---|
 | `responder`、`location` | 耳标号、测定站 |
-| `step` | 在哪一步被剔除：`prep_visits`（读卡误读）、`clean_weight`（体重质控）、`calc_adg`（没有日增重）、`calc_adfi`（没有日采食） |
+| `step` | 在哪一步被剔除：`prep_visits`（读卡误读，访问已转为未识别访问，猪本身不剔除）、`clean_weight`（体重质控）、`calc_adg`（没有日增重）、`calc_adfi`（没有日采食） |
 | `reason` | 原因 |
 
 ```{r removed}

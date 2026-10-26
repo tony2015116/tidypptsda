@@ -63,3 +63,8 @@ test_that("cross-parameter checks work", {
 test_that("print method runs", {
   expect_message(print(qc_config()), "QC settings")
 })
+
+test_that("the removed max_overlap_days says what to use", {
+  expect_error(qc_config(max_overlap_days = 1), "misread_max_visits")
+  expect_equal(qc_config()$misread_max_visits, 2)
+})
