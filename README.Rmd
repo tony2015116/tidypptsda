@@ -38,7 +38,9 @@ feed intake correction (ADFI) and feed conversion ratio (FCR).
 - Few dependencies: cli, data.table, ggplot2, and MASS / nlme which ship
   with R.
 
-Documentation (in Chinese): [速查表 (cheatsheet)](https://tony2015116.github.io/tidypptsda/cheatsheet.html),
+Cheatsheet: [English](https://tony2015116.github.io/tidypptsda/cheatsheet-en.html),
+[中文](https://tony2015116.github.io/tidypptsda/cheatsheet.html).
+Documentation (in Chinese):
 [中文使用说明](https://tony2015116.github.io/tidypptsda/articles/tidypptsda-zh.html),
 [设计思路](https://tony2015116.github.io/tidypptsda/articles/design-zh.html).
 
