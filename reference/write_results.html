@@ -60,9 +60,19 @@ calc_fcr()) to CSV files."><meta property="og:image" content="https://tony201511
       <a href="../articles/index.html">More articles...</a>
     </li>
   </ul></li>
-<li>
-  <a href="../cheatsheet.html">速查表</a>
-</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+    速查表 / Cheatsheet
+
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu"><li>
+      <a href="../cheatsheet.html">中文</a>
+    </li>
+    <li>
+      <a href="../cheatsheet-en.html">English</a>
+    </li>
+  </ul></li>
 <li>
   <a href="../news/index.html">Changelog</a>
 </li>
@@ -154,19 +164,19 @@ directory.</p></dd>
     <h2>Examples</h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">out</span> <span class="op">&lt;-</span> <span class="fu">write_results</span><span class="op">(</span><span class="va">res</span>, dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"results"</span><span class="op">)</span>, farm <span class="op">=</span> <span class="st">"demo"</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Wrote 9 files to <span style="color: #0000BB;">/tmp/Rtmpmj0ATm/results</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Wrote 9 files to <span style="color: #0000BB;">/tmp/RtmpiAlXux/results</span></span>
 <span class="r-in"><span><span class="va">out</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           table                                                   file  rows</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>          &lt;char&gt;                                                 &lt;char&gt; &lt;int&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:          fcr          /tmp/Rtmpmj0ATm/results/demo_fcr_20261025.csv    29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:       by_bin       /tmp/Rtmpmj0ATm/results/demo_by_bin_20261025.csv   257</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:   daily_feed   /tmp/Rtmpmj0ATm/results/demo_daily_feed_20261025.csv  2820</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4: daily_weight /tmp/Rtmpmj0ATm/results/demo_daily_weight_20261025.csv  2605</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:  weight_pigs  /tmp/Rtmpmj0ATm/results/demo_weight_pigs_20261025.csv    30</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:   feed_model   /tmp/Rtmpmj0ATm/results/demo_feed_model_20261025.csv    14</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7:      summary      /tmp/Rtmpmj0ATm/results/demo_summary_20261025.csv    14</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 8:      removed      /tmp/Rtmpmj0ATm/results/demo_removed_20261025.csv     1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 9:     settings     /tmp/Rtmpmj0ATm/results/demo_settings_20261025.csv    42</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:          fcr          /tmp/RtmpiAlXux/results/demo_fcr_20261026.csv    29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:       by_bin       /tmp/RtmpiAlXux/results/demo_by_bin_20261026.csv   257</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:   daily_feed   /tmp/RtmpiAlXux/results/demo_daily_feed_20261026.csv  2820</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4: daily_weight /tmp/RtmpiAlXux/results/demo_daily_weight_20261026.csv  2605</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5:  weight_pigs  /tmp/RtmpiAlXux/results/demo_weight_pigs_20261026.csv    30</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6:   feed_model   /tmp/RtmpiAlXux/results/demo_feed_model_20261026.csv    14</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7:      summary      /tmp/RtmpiAlXux/results/demo_summary_20261026.csv    14</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8:      removed      /tmp/RtmpiAlXux/results/demo_removed_20261026.csv     1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9:     settings     /tmp/RtmpiAlXux/results/demo_settings_20261026.csv    42</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"results"</span><span class="op">)</span>, recursive <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 </code></pre></div>
     </div>
