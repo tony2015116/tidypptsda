@@ -10,7 +10,7 @@ test_that("the default settings are valid", {
   expect_equal(q$weight_outlier, c("rlm", "loess"))
   expect_equal(q$adapt_days, 7)
   expect_true(q$weight_track)
-  expect_equal(q$impute_method, "loess_lm")
+  expect_equal(q$impute_method, "loess_pop")
   expect_equal(q$long_gap_days, 3)
   expect_equal(q$max_edge_extrap_days, 15)
   expect_error(qc_config(impute_method = "national"), "impute_method")
@@ -67,4 +67,10 @@ test_that("print method runs", {
 test_that("the removed max_overlap_days says what to use", {
   expect_error(qc_config(max_overlap_days = 1), "misread_max_visits")
   expect_equal(qc_config()$misread_max_visits, 2)
+})
+
+test_that("curve_extrap defaults to the curve", {
+  expect_equal(qc_config()$curve_extrap, "curve")
+  expect_equal(qc_config(curve_extrap = "tangent")$curve_extrap, "tangent")
+  expect_error(qc_config(curve_extrap = "line"), "curve_extrap")
 })

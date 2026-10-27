@@ -62,13 +62,13 @@ test_that("validate_adfi measures imputation error", {
   res <- validate_adfi(f, scenarios = c("random30", "late20", "blocks3", "early10"),
                        reps = 2, verbose = 0)
   s <- res$summary
-  expect_equal(nrow(s), 8L)
+  expect_equal(nrow(s), 12L)
   expect_true(all(s$n_pigs >= 3L))
   expect_true(all(s$mean_abs_error_pct < 15))
   # random gaps cost less than a long gap at the start
   expect_lt(s[scenario == "random30" & method == "loess_lm", p95_abs_error_pct],
             s[scenario == "late20" & method == "loess_lm", p95_abs_error_pct])
-  expect_setequal(unique(s$method), c("loess_lm", "linear"))
+  expect_setequal(unique(s$method), c("loess_pop", "loess_lm", "linear"))
   expect_error(validate_adfi(f, scenarios = "rand"), "scenario")
   expect_error(validate_adfi(f, min_coverage = 1.01), "coverage")
 })
@@ -88,4 +88,17 @@ test_that("make_masks hides only recorded days", {
   for (x in m) expect_false(any(x$hide & !obs))
   expect_equal(which(m[[1]]$hide), c(1L, 2L, 4L, 5L))
   expect_equal(which(m[[2]]$hide), 26:30)
+})
+
+test_that("validate_adg and validate_weight_fill compare extrapolations", {
+  w <- clean_weight(prep_visits(nedap, verbose = 0), verbose = 0)
+  res <- validate_adg(w, models = "poly2", extrap = c("curve", "tangent"), trim_days = 20,
+                      max_pigs = 8, verbose = 0)
+  expect_equal(res$summary$model, c("poly2", "poly2+tangent"))
+  # cross-validation mostly predicts inside the records: nearly the same
+  expect_equal(res$summary$cv_rmse[1], res$summary$cv_rmse[2], tolerance = 0.05)
+  fill <- validate_weight_fill(w, methods = "linear", extrap = c("curve", "tangent"),
+                               scenarios = "late20", reps = 1, max_pigs = 8, verbose = 0)
+  expect_setequal(fill$summary$method, c("linear", "linear+tangent"))
+  expect_error(validate_adg(w, extrap = "line", verbose = 0), "curve_extrap")
 })

@@ -238,14 +238,17 @@ table(w_sd$per_pig$status)
    lower stage weight before that. A curve that dips back below 30 kg (for
    example after noisy early records) therefore starts the stage only once
    the pig has really entered it. The search runs up to `max_extrap_days`
-   before the first and after the last record;
+   before the first and after the last record. Beyond the records the
+   curve itself is used (`curve_extrap = "curve"`), or a straight tangent
+   line with the slope of the first / last 14 days of records
+   (`curve_extrap = "tangent"`);
 3. every day of the stage gets a body weight: the daily median of the valid
    records (`"observed"`); a day without valid weight between two recorded
    days is filled by linear interpolation (`"interpolated"`); a day before
    the first or after the last recorded day is filled by the growth curve
    (`"curve"`);
 4. ADG = slope of the linear regression of these daily weights on the day,
-   over the stage days. Its R<c2><b2> tells how straight the growth was.
+   over the stage days. Its R² tells how straight the growth was.
 
 Every pig gets an `adg_type`:
 
@@ -255,6 +258,8 @@ Every pig gets an `adg_type`:
 - `"partial"`: a limit is not reached even after extrapolation. ADG is then
   computed over the part of the stage that is covered;
 - `"none"`: less than 7 days of the stage are covered; ADG is `NA`.
+
+
 
 ```{r example-calc_adg}
 visits <- prep_visits(nedap, verbose = 0)
@@ -347,22 +352,40 @@ have no error-free intake and are imputed.
 
 - corrected intake below 0, outside `dfi_range`, or outside the optional
   `dfi_quantile` limits is set to missing;
-- `impute_method = "loess_lm"` (default): a gap of up to `long_gap_days`
-  (3) days between recorded days is filled from a robust LOESS smooth of
-  the daily intake over the days; a longer gap, and the days before the
-  first or after the last recorded day, are filled by a per-pig linear
-  regression of daily intake on body weight;
+- a gap of up to `long_gap_days` (3) days between recorded days is filled
+  from a robust LOESS smooth of the daily intake over the days;
+- `impute_method = "loess_pop"` (default): a longer gap, and the days
+  before the first or after the last recorded day, are filled from the
+  **population curve** of daily intake on body weight, scaled to the pig:
+  `dfi = r * f(bw)`. `f` is a quadratic regression of daily intake on body
+  weight over the recorded stage days of all pigs (of each breed with at
+  least 10 pigs when there is a `breed` column; other pigs use the curve
+  of all pigs), held constant beyond the weights it was fitted on. `r` is
+  the pig's intake level, its recorded intake divided by `f` over its
+  recorded stage days, shrunk towards 1 with weight `n / (n + 10)` for
+  `n` recorded days. A single pig rarely covers the whole stage, so its
+  own regression on weight is often flat or steep where it has data and
+  goes wrong far from it (a late entry gets the intake of 60 kg at 30
+  kg); the population curve gives the shape, the pig its level;
+- `impute_method = "loess_lm"`: the longer gaps and the ends by a
+  per-pig linear regression of daily intake on body weight (the method
+  before version 1.3.0);
 - `impute_method = "linear"`: linear interpolation between recorded days
-  (whatever the gap length), the same regression on body weight at the
-  ends.
+  (whatever the gap length), the per-pig regression on body weight at
+  the ends.
 
-Use [validate_adfi()] to compare both on your own data: precision depends
-mainly on how many days are missing at the stage ends, which is why such
-pigs are flagged by [calc_fcr()].
+Use [validate_adfi()] to compare the methods on your own data. On the
+example data, `"loess_pop"` halved the ADFI error when 10 to 30 days were
+hidden at the stage ends (e.g. 30 days at the start: 9.7% to 2.3%
+(NEDAP), 15.6% to 3.8% (FIRE)) and changed nothing when days were missing
+at random. Precision still depends mainly on how many days are missing at
+the stage ends, which is why such pigs are flagged by [calc_fcr()].
 
 Day states: `"org"` (no error, recorded value), `"corr"` (corrected),
 `"iii"` (filled between recorded days), `"elrp"` (filled before the first or
 after the last recorded day), `"missing"`.
+
+
 
 ```{r example-calc_adfi}
 visits <- prep_visits(nedap, verbose = 0)
@@ -465,14 +488,19 @@ result comes to what is known:
 - `validate_outliers()` adds artificial errors to clean weight records and
   measures how many each outlier method finds, how many good records it
   removes, and how much ADG is affected;
-- `validate_adg()` compares growth curve models by k-fold cross-validation on
-  recorded days, and by how much ADG changes when the first or last days of
-  the test are hidden (late entry, early exit);
+- `validate_adg()` compares growth curve models (and, with `extrap`, the
+  curve or tangent extrapolation) by k-fold cross-validation on recorded
+  days, and by how much ADG changes when the first or last days of the test
+  are hidden (late entry, early exit);
 - `validate_weight_fill()` hides recorded daily weights of the stage (random
   days, blocks, start or end), fills them again with each weight fill method
   and compares the filled weights and ADG with the recorded ones;
 - `validate_adfi()` hides recorded feed intake days in the same way, imputes
-  them again and compares ADFI with the recorded value.
+  them again with each method (`"loess_pop"` with leave-one-out population
+  curves, `"loess_lm"`, `"linear"`) and compares ADFI with the recorded
+  value.
+
+
 
 ```{r example-validate}
 visits <- prep_visits(nedap, verbose = 0)
@@ -498,7 +526,9 @@ vf$summary
 
 
 
-
 <!--
+
+
+
 # Inflate your package
 -->

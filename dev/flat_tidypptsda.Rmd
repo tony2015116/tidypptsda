@@ -507,7 +507,7 @@ utils::globalVariables(c(
   "adg_curve", "rlm_w", "i.rlm_w", "feed_missing", "r2_daily", "w_obs",
   "i.weight", "i.dfi", "i.state", "removed", "step", "weight_filled", "x",
   "n_observed_days", "n_interpolated_days", "n_curve_days", "r_squared", "fill",
-  "info", "abs_err", "sum_err", "adg_spearman"
+  "info", "abs_err", "sum_err", "adg_spearman", "pop_key", "i.pop_key", "label"
 ))
 
 #' @export
@@ -723,6 +723,13 @@ Any single parameter can be overridden.
 #'   to `"poly2"` when it does not converge). Missing days between recorded
 #'   days are always filled by linear interpolation.
 #' - `max_extrap_days`: maximum extrapolation of the curve, days. Default 30.
+#' - `curve_extrap`: how the curve continues before the first and after the
+#'   last record. `"curve"` (default): the fitted curve itself;
+#'   `"tangent"`: a straight line from the curve at the first / last
+#'   record, with the robust slope of the records of the first / last 14
+#'   days (limited to 0.2-1.5 kg/d). A polynomial bends away from the data
+#'   when it is extrapolated for weeks; the tangent does not. Compare both
+#'   on your data with `validate_adg(extrap = c("curve", "tangent"))`.
 #'
 #' **Feeder errors** (Casey et al. 2005, Table 3)
 #' - `fiv_range`: FIV-lo / FIV-hi, feed intake per visit, g.
@@ -749,13 +756,15 @@ Any single parameter can be overridden.
 #' - `dfi_quantile`: optional, lower and upper quantile cut-offs (e.g.
 #'   `c(0.025, 0.99)`). `NULL` = off.
 #' - `dfi_correct`: `"lmm"` (Jiao et al. 2014) or `"none"`.
-#' - `impute_method`: how missing stage days are filled.
-#'   `"loess_lm"` (default): gaps between recorded days of up to
-#'   `long_gap_days` days are filled from a robust LOESS smooth of the daily
-#'   intake, longer gaps and the days before the first / after the last
-#'   recorded day by a linear regression of daily intake on body weight;
-#'   `"linear"`: linear interpolation between recorded days, the same
-#'   regression at the ends.
+#' - `impute_method`: how missing stage days are filled. Gaps between
+#'   recorded days of up to `long_gap_days` days are filled from a robust
+#'   LOESS smooth of the daily intake (`"loess_pop"`, `"loess_lm"`); longer
+#'   gaps and the days before the first / after the last recorded day:
+#'   `"loess_pop"` (default): from the population curve of daily intake on
+#'   body weight (all pigs, or each breed), scaled to the intake level of
+#'   the pig; `"loess_lm"`: from a linear regression of the pig's own daily
+#'   intake on body weight; `"linear"`: linear interpolation between
+#'   recorded days whatever the gap, the per-pig regression at the ends.
 #' - `long_gap_days`: default 3.
 #'
 #' **Confidence flags** (used by [calc_fcr()])
@@ -917,6 +926,7 @@ qc_defaults <- function() {
     stage_range = c(30, 120),
     curve_model = "poly2",
     max_extrap_days = 30,
+    curve_extrap = "curve",
     # feeder errors, Casey et al. (2005) Table 3
     fiv_range = c(-20, 2000),
     fiv0_abs_max = 20,
@@ -932,7 +942,7 @@ qc_defaults <- function() {
     dfi_range = c(0, 6),
     dfi_quantile = NULL,
     dfi_correct = "lmm",
-    impute_method = "loess_lm",
+    impute_method = "loess_pop",
     long_gap_days = 3,
     # confidence flags
     max_edge_extrap_days = 15,
@@ -957,7 +967,7 @@ qc_groups <- function() {
     exit_weight_min = "Pig-level checks", track_flag_share = "Pig-level checks",
     smooth_r2_min = "Pig-level checks",
     stage_range = "Growth and ADG", curve_model = "Growth and ADG",
-    max_extrap_days = "Growth and ADG",
+    max_extrap_days = "Growth and ADG", curve_extrap = "Growth and ADG",
     fiv_range = "Feeder errors", fiv0_abs_max = "Feeder errors",
     duration_max = "Feeder errors", speed_fiv_lo_max = "Feeder errors",
     speed_strict_max = "Feeder errors", speed_range = "Feeder errors",
@@ -990,7 +1000,7 @@ qc_spec <- function() {
     entry_weight_max = num(0), exit_weight_min = num(0), track_flag_share = num(0, 1),
     smooth_r2_min = num(0, 1, null = TRUE),
     stage_range = rng(0), curve_model = chc(c("poly1", "poly2", "poly3", "gompertz")),
-    max_extrap_days = num(0),
+    max_extrap_days = num(0), curve_extrap = chc(c("curve", "tangent")),
     fiv_range = rng(), fiv0_abs_max = num(0), duration_max = num(0),
     speed_fiv_lo_max = num(0), speed_strict_max = num(0), speed_range = rng(0),
     idle_duration_max = num(0), trough_diff_range = rng(),
@@ -998,7 +1008,7 @@ qc_spec <- function() {
     fiv_max_by_weight = tbl(c("weight_from", "fiv_max"), optional = "breed"),
     dfi_range = rng(0), dfi_quantile = rng(0, 1, null = TRUE),
     dfi_correct = chc(c("lmm", "none")),
-    impute_method = chc(c("loess_lm", "linear")),
+    impute_method = chc(c("loess_pop", "loess_lm", "linear")),
     long_gap_days = num(1),
     max_edge_extrap_days = num(0), min_coverage = num(0, 1),
     bin_width = num(1), min_bin_coverage_kg = num(0),
@@ -1106,7 +1116,7 @@ test_that("the default settings are valid", {
   expect_equal(q$weight_outlier, c("rlm", "loess"))
   expect_equal(q$adapt_days, 7)
   expect_true(q$weight_track)
-  expect_equal(q$impute_method, "loess_lm")
+  expect_equal(q$impute_method, "loess_pop")
   expect_equal(q$long_gap_days, 3)
   expect_equal(q$max_edge_extrap_days, 15)
   expect_error(qc_config(impute_method = "national"), "impute_method")
@@ -1163,6 +1173,12 @@ test_that("print method runs", {
 test_that("the removed max_overlap_days says what to use", {
   expect_error(qc_config(max_overlap_days = 1), "misread_max_visits")
   expect_equal(qc_config()$misread_max_visits, 2)
+})
+
+test_that("curve_extrap defaults to the curve", {
+  expect_equal(qc_config()$curve_extrap, "curve")
+  expect_equal(qc_config(curve_extrap = "tangent")$curve_extrap, "tangent")
+  expect_error(qc_config(curve_extrap = "line"), "curve_extrap")
 })
 ```
 
@@ -3371,7 +3387,10 @@ test_that("verbose = 0 is silent and bad inputs are rejected", {
    lower stage weight before that. A curve that dips back below 30 kg (for
    example after noisy early records) therefore starts the stage only once
    the pig has really entered it. The search runs up to `max_extrap_days`
-   before the first and after the last record;
+   before the first and after the last record. Beyond the records the
+   curve itself is used (`curve_extrap = "curve"`), or a straight tangent
+   line with the slope of the first / last 14 days of records
+   (`curve_extrap = "tangent"`);
 3. every day of the stage gets a body weight: the daily median of the valid
    records (`"observed"`); a day without valid weight between two recorded
    days is filled by linear interpolation (`"interpolated"`); a day before
@@ -3398,7 +3417,8 @@ Every pig gets an `adg_type`:
 #'
 #' @param weight Result of [clean_weight()].
 #' @param qc QC settings; by default the ones used by [clean_weight()].
-#'   Used here: `stage_range`, `curve_model`, `max_extrap_days`.
+#'   Used here: `stage_range`, `curve_model`, `max_extrap_days`,
+#'   `curve_extrap`.
 #' @param verbose 0 (silent), 1 (summary, default) or 2 (details).
 #' @param cores Number of CPU cores for the per-pig computations. Default 1.
 #'
@@ -3494,7 +3514,7 @@ adg_one_pig <- function(d, qc, day0, fill = "linear") {
   t <- as.numeric(difftime(d$entry_time, as.POSIXct(first_day, tz = "UTC"),
                            units = "days"))
   y <- d$weight
-  curve <- fit_growth_curve(t, y, qc$curve_model)
+  curve <- fit_growth_curve(t, y, qc$curve_model, qc$curve_extrap %||% "curve")
 
   lo <- qc$stage_range[1L]
   hi <- qc$stage_range[2L]
@@ -3585,8 +3605,9 @@ adg_one_pig <- function(d, qc, day0, fill = "linear") {
 }
 
 # Fit a growth curve. Returns a prediction function, the fitted values,
-# the residual SD, R2 and the name of the model actually used.
-fit_growth_curve <- function(t, y, model) {
+# the residual SD, R2 and the name of the model actually used. With
+# extrap = "tangent", the prediction beyond the records is a straight line.
+fit_growth_curve <- function(t, y, model, extrap = "curve") {
   fit_poly <- function(k, name = paste0("poly", k)) {
     f <- stats::lm(y ~ poly(t, k, raw = TRUE))
     b <- stats::coef(f)
@@ -3613,6 +3634,39 @@ fit_growth_curve <- function(t, y, model) {
   res <- y - curve$fitted
   curve$sigma <- stats::sd(res)
   curve$r2 <- 1 - sum(res^2) / sum((y - mean(y))^2)
+  if (extrap == "tangent") curve <- tangent_ends(curve, t, y)
+  curve
+}
+
+# Continue the curve beyond the records by straight lines: from the curve at
+# the first / last record, with the robust slope of the records of the first
+# / last `window` days, limited to `slope_range` kg/d.
+tangent_ends <- function(curve, t, y, window = 14, slope_range = c(0.2, 1.5)) {
+  tmin <- min(t)
+  tmax <- max(t)
+  win <- min(window, (tmax - tmin) / 2)
+  slope <- function(sel) {
+    if (sum(sel) < 5L || diff(range(t[sel])) < 2) return(NA_real_)
+    g <- tryCatch(stats::coef(MASS::rlm(cbind(1, t[sel]), y[sel], psi = MASS::psi.bisquare,
+                                        maxit = 50))[2L],
+                  error = function(e) stats::coef(stats::lm(y[sel] ~ t[sel]))[2L])
+    min(slope_range[2L], max(slope_range[1L], unname(g)))
+  }
+  g_start <- slope(t <= tmin + win)
+  g_end <- slope(t >= tmax - win)
+  p <- curve$pred
+  p_start <- p(tmin)
+  p_end <- p(tmax)
+  curve$pred <- function(x) {
+    out <- p(x)
+    lo <- x < tmin & !is.na(g_start)
+    hi <- x > tmax & !is.na(g_end)
+    out[lo] <- p_start + g_start * (x[lo] - tmin)
+    out[hi] <- p_end + g_end * (x[hi] - tmax)
+    out
+  }
+  curve$name <- paste0(curve$name, " + tangent")
+  curve$tangent_slopes <- c(start = g_start, end = g_end)
   curve
 }
 
@@ -3850,6 +3904,41 @@ test_that("first_cross finds the rising crossing only", {
   expect_equal(first_cross(pred, 120, 0, 30, step = 0.01), 10 + sqrt(20), tolerance = 1e-3)
   expect_true(is.na(first_cross(function(t) t + 200, 120, 0, 30)))
   expect_equal(first_cross(function(t) 2 * t, 20, 0, 30), 10, tolerance = 1e-8)
+})
+
+test_that("curve_extrap = 'tangent' continues the curve by straight lines", {
+  # a growth that slows down: a parabola bends when extrapolated
+  set.seed(3)
+  t <- sort(runif(600, 0, 60))
+  y <- 50 + 1.2 * t - 0.006 * t^2 + rnorm(600, 0, 0.5)
+  cv <- fit_growth_curve(t, y, "poly2")
+  tg <- fit_growth_curve(t, y, "poly2", "tangent")
+  expect_equal(tg$name, "poly2 + tangent")
+  inside <- seq(min(t), max(t), length.out = 13)
+  expect_equal(tg$pred(inside), cv$pred(inside))          # same inside the records
+  expect_equal(tg$fitted, cv$fitted)
+  # beyond the last record: straight line with the slope of the last 14 days
+  g <- unname(tg$tangent_slopes["end"])
+  expect_equal(tg$pred(80) - tg$pred(70), 10 * g, tolerance = 1e-8)
+  expect_equal(g, 1.2 - 2 * 0.006 * 53, tolerance = 0.1)
+  expect_gt(tg$pred(90), cv$pred(90))                      # the parabola bends down
+  # slopes are limited to 0.2-1.5 kg/d
+  flat <- fit_growth_curve(t, rep(80, 600) + rnorm(600, 0, 0.3), "poly1", "tangent")
+  expect_equal(unname(flat$tangent_slopes), c(0.2, 0.2))
+})
+
+test_that("calc_adg uses the tangent only when asked", {
+  w <- clean_weight(prep_visits(fire, verbose = 0), verbose = 0)
+  q <- qc_config(stage_range = c(60, 120))
+  a <- calc_adg(w, q, verbose = 0)
+  b <- calc_adg(w, qc_set(q, list(curve_extrap = "tangent")), verbose = 0)
+  expect_true(all(grepl("tangent", b$per_pig[!is.na(curve_used), curve_used])))
+  expect_false(any(grepl("tangent", a$per_pig$curve_used)))
+  # pigs that need no extrapolation keep their ADG
+  same <- a$per_pig$adg_type == "observed" & b$per_pig$adg_type == "observed"
+  expect_equal(a$per_pig$adg[same], b$per_pig$adg[same])
+  expect_false(isTRUE(all.equal(a$per_pig$adg, b$per_pig$adg)))
+  expect_equal(b$settings$curve_extrap, "tangent")
 })
 ```
 
@@ -4334,18 +4423,34 @@ have no error-free intake and are imputed.
 
 - corrected intake below 0, outside `dfi_range`, or outside the optional
   `dfi_quantile` limits is set to missing;
-- `impute_method = "loess_lm"` (default): a gap of up to `long_gap_days`
-  (3) days between recorded days is filled from a robust LOESS smooth of
-  the daily intake over the days; a longer gap, and the days before the
-  first or after the last recorded day, are filled by a per-pig linear
-  regression of daily intake on body weight;
+- a gap of up to `long_gap_days` (3) days between recorded days is filled
+  from a robust LOESS smooth of the daily intake over the days;
+- `impute_method = "loess_pop"` (default): a longer gap, and the days
+  before the first or after the last recorded day, are filled from the
+  **population curve** of daily intake on body weight, scaled to the pig:
+  `dfi = r * f(bw)`. `f` is a quadratic regression of daily intake on body
+  weight over the recorded stage days of all pigs (of each breed with at
+  least 10 pigs when there is a `breed` column; other pigs use the curve
+  of all pigs), held constant beyond the weights it was fitted on. `r` is
+  the pig's intake level, its recorded intake divided by `f` over its
+  recorded stage days, shrunk towards 1 with weight `n / (n + 10)` for
+  `n` recorded days. A single pig rarely covers the whole stage, so its
+  own regression on weight is often flat or steep where it has data and
+  goes wrong far from it (a late entry gets the intake of 60 kg at 30
+  kg); the population curve gives the shape, the pig its level;
+- `impute_method = "loess_lm"`: the longer gaps and the ends by a
+  per-pig linear regression of daily intake on body weight (the method
+  before version 1.3.0);
 - `impute_method = "linear"`: linear interpolation between recorded days
-  (whatever the gap length), the same regression on body weight at the
-  ends.
+  (whatever the gap length), the per-pig regression on body weight at
+  the ends.
 
-Use [validate_adfi()] to compare both on your own data: precision depends
-mainly on how many days are missing at the stage ends, which is why such
-pigs are flagged by [calc_fcr()].
+Use [validate_adfi()] to compare the methods on your own data. On the
+example data, `"loess_pop"` halved the ADFI error when 10 to 30 days were
+hidden at the stage ends (e.g. 30 days at the start: 9.7% to 2.3%
+(NEDAP), 15.6% to 3.8% (FIRE)) and changed nothing when days were missing
+at random. Precision still depends mainly on how many days are missing at
+the stage ends, which is why such pigs are flagged by [calc_fcr()].
 
 Day states: `"org"` (no error, recorded value), `"corr"` (corrected),
 `"iii"` (filled between recorded days), `"elrp"` (filled before the first or
@@ -4380,6 +4485,10 @@ after the last recorded day), `"missing"`.
 #'     `n_visits`, `n_error_visits`, `dfi_raw`, `dfi_error_free`,
 #'     `dfi_corrected`, `dfi` (final value, g) and `state`;
 #'   - `model`: fixed-effect estimates of the correction model;
+#'   - `pop_curve`: the population curves of `impute_method = "loess_pop"`,
+#'     one row per group (`"all"` or a breed): `n_pigs`, `n_days`,
+#'     coefficients `b0`, `b1`, `b2` of `dfi = b0 + b1 bw + b2 bw^2` (g, kg)
+#'     and the weight range `bw_min`, `bw_max`; no rows for other methods;
 #'   - `removed`, `settings`.
 #'
 #' @references
@@ -4451,10 +4560,16 @@ calc_adfi <- function(visits, adg, qc = adg$settings, verbose = 1, cores = 1) {
   )]
   data.table::setorder(daily, responder, date)
 
-  imp <- fit_by_pig(daily, impute_dfi_one_pig, step = "calc_adfi", qc = qc)
+  pc <- if (qc$impute_method == "loess_pop") {
+    pop_curves(daily, if (has_breed) pigs[, .(responder, breed)] else NULL)
+  } else {
+    list(curves = NULL, key = NULL, table = pop_curve_table(list()))
+  }
+  if (!is.null(pc$key)) daily[pc$key, on = "responder", pop_key := i.pop_key]
+  imp <- fit_by_pig(daily, impute_dfi_one_pig, step = "calc_adfi", qc = qc, pop = pc$curves)
   daily <- imp$result
   data.table::setnames(daily, "y", "dfi_error_free")
-  daily[, c("dfi_check", "pig_location", "all_error") := NULL]
+  daily[, intersect(c("dfi_check", "pig_location", "all_error", "pop_key"), names(daily)) := NULL]
   data.table::setcolorder(daily, c("responder", "location", "date", "seq_days",
                                    "bw", "in_stage", "n_visits", "n_error_visits",
                                    "dfi_raw", "dfi_error_free", "dfi_corrected",
@@ -4490,10 +4605,10 @@ calc_adfi <- function(visits, adg, qc = adg$settings, verbose = 1, cores = 1) {
   removed <- rbind(adg$removed,
                    new_removed(no_adfi$responder, no_adfi$location, "calc_adfi", why))
 
-  report_adfi(per_pig, daily, corr, n_range, n_quant, qc)
+  report_adfi(per_pig, daily, corr, n_range, n_quant, qc, pc$table)
   new_ppt_result(per_pig = per_pig, daily = daily, removed = removed,
                  settings = qc, class = "ppt_adfi") |>
-    add_element(model = corr$coefficients)
+    add_element(model = corr$coefficients, pop_curve = pc$table)
 }
 
 # Fit the correction model and compute dfi_corrected.
@@ -4633,13 +4748,66 @@ adg_bw <- function(adg) {
                          bw = bw, in_stage = d$in_stage)
 }
 
+# Population curve of daily intake (g) on body weight (kg): quadratic
+# regression on recorded days. NULL when the data are too few.
+fit_pop_curve <- function(dfi, bw, n_pigs = NA_integer_) {
+  ok <- !is.na(dfi) & !is.na(bw)
+  if (sum(ok) < 30L || data.table::uniqueN(round(bw[ok])) < 10L) return(NULL)
+  x <- bw[ok]
+  b <- stats::coef(stats::lm(dfi[ok] ~ x + I(x^2)))
+  if (anyNA(b)) return(NULL)
+  list(coef = unname(b), range = range(x), n_pigs = n_pigs, n_days = sum(ok))
+}
+
+# Curve value, held constant beyond the weights it was fitted on.
+pop_predict <- function(curve, bw) {
+  x <- pmin(pmax(bw, curve$range[1L]), curve$range[2L])
+  pmax(0, curve$coef[1L] + curve$coef[2L] * x + curve$coef[3L] * x^2)
+}
+
+# Population curves on the recorded stage days: one for all pigs and one
+# for each breed with at least `min_pigs` pigs. `key` gives the curve of
+# each pig.
+pop_curves <- function(daily, breeds = NULL, min_pigs = 10L) {
+  rec <- daily[in_stage == TRUE & !is.na(dfi_check) & !is.na(bw), .(responder, dfi = dfi_check, bw)]
+  curves <- list(all = fit_pop_curve(rec$dfi, rec$bw, data.table::uniqueN(rec$responder)))
+  key <- data.table::data.table(responder = unique(daily$responder), pop_key = "all")
+  if (!is.null(breeds) && nrow(rec) > 0L) {
+    rec <- merge(rec, breeds, by = "responder")
+    nb <- rec[!is.na(breed), .(n = data.table::uniqueN(responder)), by = breed]
+    for (b in nb[n >= min_pigs, breed]) {
+      cv <- fit_pop_curve(rec[breed == b, dfi], rec[breed == b, bw], nb[breed == b, n])
+      if (is.null(cv)) next
+      curves[[paste0("breed ", b)]] <- cv
+      key[responder %in% breeds[breed == b, responder], pop_key := paste0("breed ", b)]
+    }
+  }
+  curves <- curves[!vapply(curves, is.null, logical(1))]
+  if (length(curves) == 0L) key <- NULL
+  list(curves = curves, key = key, table = pop_curve_table(curves))
+}
+
+pop_curve_table <- function(curves) {
+  if (length(curves) == 0L) {
+    return(data.table::data.table(group = character(), n_pigs = integer(), n_days = integer(),
+                                  b0 = numeric(), b1 = numeric(), b2 = numeric(),
+                                  bw_min = numeric(), bw_max = numeric()))
+  }
+  data.table::rbindlist(lapply(names(curves), function(g) {
+    cv <- curves[[g]]
+    data.table::data.table(group = g, n_pigs = as.integer(cv$n_pigs), n_days = as.integer(cv$n_days),
+                           b0 = cv$coef[1L], b1 = cv$coef[2L], b2 = cv$coef[3L],
+                           bw_min = cv$range[1L], bw_max = cv$range[2L])
+  }))
+}
+
 # Impute the stage days of one pig.
 # - inside the recorded period ("iii"): gaps of up to long_gap_days days by a
 #   robust LOESS of intake over the days, longer gaps by a regression of
 #   intake on body weight ("loess_lm"); or linear interpolation ("linear");
 # - before the first / after the last recorded day ("elrp"): regression of
 #   intake on body weight.
-impute_dfi_one_pig <- function(d, qc) {
+impute_dfi_one_pig <- function(d, qc, pop = NULL) {
   d <- data.table::copy(d)
   ok <- !is.na(d$dfi_check)
   d[, dfi := dfi_check]
@@ -4653,11 +4821,29 @@ impute_dfi_one_pig <- function(d, qc) {
   outside <- need & !inside
   okb <- ok & !is.na(d$bw)
   bw_fit <- if (sum(okb) >= 5L) stats::lm(dfi_check ~ bw, data = d[okb]) else NULL
-  by_bw <- function(rows) {
+  by_lm <- function(rows) {
     rows <- rows & !is.na(d$bw)
     if (!is.null(bw_fit) && any(rows)) {
       d[rows, dfi := pmax(0, stats::predict(bw_fit, newdata = d[rows]))]
     }
+  }
+  # population curve scaled to the intake level of the pig on its recorded
+  # stage days, shrunk towards 1 when the pig has few recorded days
+  curve <- NULL
+  if (qc$impute_method == "loess_pop" && length(pop) > 0L) {
+    k <- if ("pop_key" %in% names(d) && !is.na(d$pop_key[1L])) d$pop_key[1L] else "all"
+    curve <- pop[[k]] %||% pop[["all"]]
+  }
+  by_bw <- if (is.null(curve)) by_lm else function(rows) {
+    rows <- rows & !is.na(d$bw)
+    if (!any(rows)) return(invisible())
+    lev <- okb & d$in_stage
+    if (sum(lev) < 5L) lev <- okb
+    n <- sum(lev)
+    r <- sum(d$dfi_check[lev]) / sum(pop_predict(curve, d$bw[lev]))
+    if (!is.finite(r)) return(by_lm(rows))
+    r <- n / (n + 10) * r + 10 / (n + 10)
+    d[rows, dfi := r * pop_predict(curve, bw)]
   }
 
   if (any(inside)) {
@@ -4708,9 +4894,12 @@ loess_extend <- function(x, y, span) {
   }
 }
 
-report_adfi <- function(per_pig, daily, corr, n_range, n_quant, qc) {
+report_adfi <- function(per_pig, daily, corr, n_range, n_quant, qc, pop_table = NULL) {
   if (corr$status == "fitted") {
     ppt_msg("Correction model: {corr$n_obs} pig-days, {corr$n_terms} error covariate{?s}", "info")
+  }
+  if (!is.null(pop_table) && nrow(pop_table) > 0L) {
+    ppt_msg("Population curve{?s} of intake on body weight: {paste0(pop_table$group, ' (', pop_table$n_pigs, ' pigs)', collapse = ', ')}", "info")
   }
   st <- daily[in_stage == TRUE, .N, by = state]
   get_n <- function(s) st[state == s, sum(N)]
@@ -4832,10 +5021,10 @@ test_that("missing days are interpolated inside and extrapolated outside", {
   gap <- days[40:44]
   v2 <- v[!(responder %in% pig & date %in% gap)]
   a <- calc_adg(clean_weight(v2, verbose = 0), verbose = 0)
-  f <- calc_adfi(v2, a, verbose = 0)
+  f <- calc_adfi(v2, a, qc = qc_set(a$settings, list(impute_method = "loess_lm")), verbose = 0)
   d <- f$daily[responder == pig & date %in% gap]
   expect_equal(d$state, rep("iii", 5))
-  # a 5-day gap (> long_gap_days) is filled by the regression on body weight
+  # a 5-day gap (> long_gap_days) is filled by the per-pig regression on body weight
   rec <- f$daily[responder == pig & state %in% c("org", "corr")]
   fit <- stats::lm(dfi ~ bw, data = rec)
   expect_equal(d$dfi, pmax(0, unname(stats::predict(fit, newdata = d))), tolerance = 1e-6)
@@ -4853,8 +5042,10 @@ test_that("short gaps use LOESS, long gaps and the ends the regression on weight
   d[30:40, dfi_check := NA]            # long gap
   d[1:3, dfi_check := NA]              # start
   d[, state := data.table::fifelse(is.na(dfi_check), NA_character_, "org")]
-  q <- qc_config()
+  q <- qc_config(impute_method = "loess_lm")
   out <- impute_dfi_one_pig(d, q)
+  # without population curves, loess_pop falls back to the per-pig regression
+  expect_equal(impute_dfi_one_pig(d, qc_config())$dfi, out$dfi)
   expect_false(anyNA(out$dfi))
   truth <- 1500 + 20 * (1:n)
   miss <- c(1:3, 10, 11, 30:40)
@@ -4906,6 +5097,60 @@ test_that("inputs are not modified and bad inputs are rejected", {
   calc_adfi(r$visits, r$adg, verbose = 0)
   expect_equal(as.list(r$visits), as.list(before))
   expect_error(calc_adfi(r$visits, list()), "calc_adg")
+})
+
+test_that("loess_pop scales the population curve to the pig", {
+  curve <- list(coef = c(500, 40, -0.1), range = c(30, 120), n_pigs = 10L, n_days = 500L)
+  f <- function(bw) 500 + 40 * bw - 0.1 * bw^2
+  expect_equal(pop_predict(curve, c(20, 50, 130)), f(c(30, 50, 120)))   # held at the range ends
+  n <- 60
+  d <- data.table::data.table(seq_days = 1:n, bw = 30 + 1.2 * (1:n), in_stage = TRUE)
+  d[, dfi_check := 1.1 * f(bw)]                 # the pig eats 10% more than the population
+  d[c(1:10, 30:40), dfi_check := NA]            # start and a long gap
+  d[, state := data.table::fifelse(is.na(dfi_check), NA_character_, "org")]
+  out <- impute_dfi_one_pig(d, qc_config(), pop = list(all = curve))
+  nrec <- sum(!is.na(d$dfi_check))
+  r <- nrec / (nrec + 10) * 1.1 + 10 / (nrec + 10)
+  expect_equal(out$dfi[c(1:10, 30:40)], r * f(d$bw[c(1:10, 30:40)]))
+  expect_true(all(out$state[1:10] == "elrp"))
+  expect_true(all(out$state[30:40] == "iii"))
+  # the curve of the pig's group is used
+  d[, pop_key := "breed A"]
+  half <- list(coef = curve$coef / 2, range = curve$range)
+  out2 <- impute_dfi_one_pig(d, qc_config(), pop = list(all = curve, "breed A" = half))
+  expect_equal(out2$dfi[1:10], (nrec / (nrec + 10) * 2.2 + 10 / (nrec + 10)) * f(d$bw[1:10]) / 2)
+})
+
+test_that("calc_adfi fits population curves for all pigs and per breed", {
+  r <- run_adfi(nedap)
+  pc <- r$adfi$pop_curve
+  expect_equal(pc$group, "all")
+  expect_gt(pc$n_pigs, 20)
+  expect_true(all(c("b0", "b1", "b2", "bw_min", "bw_max") %in% names(pc)))
+  expect_false("pop_key" %in% names(r$adfi$daily))
+  # per breed: two breeds of 15 pigs each
+  pigs <- sort(unique(r$visits[identified == TRUE, responder]))
+  vb <- add_breed(r$visits, data.frame(responder = pigs, breed = rep(c("YY", "LL"), length.out = length(pigs))),
+                  verbose = 0)
+  ab <- calc_adg(clean_weight(vb, verbose = 0), verbose = 0)
+  fb <- calc_adfi(vb, ab, verbose = 0)
+  expect_setequal(fb$pop_curve$group, c("all", "breed LL", "breed YY"))
+  # other methods: no curve
+  fl <- calc_adfi(r$visits, r$adg, qc = qc_set(r$adg$settings, list(impute_method = "loess_lm")), verbose = 0)
+  expect_equal(nrow(fl$pop_curve), 0L)
+  expect_false(isTRUE(all.equal(fl$per_pig$adfi, r$adfi$per_pig$adfi)))
+})
+
+test_that("validate_adfi compares loess_pop with leave-one-out curves", {
+  r <- run_adfi(nedap)
+  res <- validate_adfi(r$adfi, scenarios = "late20", reps = 2, verbose = 0)
+  expect_setequal(res$summary$method, c("loess_pop", "loess_lm", "linear"))
+  s <- res$summary
+  expect_lt(s[method == "loess_pop", mean_abs_error_pct], s[method == "loess_lm", mean_abs_error_pct])
+  loo <- pop_curves_loo(data.table::data.table(responder = rep(c("a", "b"), each = 40),
+                                               dfi = 2000 + 1:80, bw = 30 + 1:80), c("a", "b"))
+  expect_equal(names(loo), c("a", "b"))
+  expect_equal(loo$a$range, c(71, 110))   # fitted on pig b only
 })
 ```
 
@@ -5903,14 +6148,17 @@ result comes to what is known:
 - `validate_outliers()` adds artificial errors to clean weight records and
   measures how many each outlier method finds, how many good records it
   removes, and how much ADG is affected;
-- `validate_adg()` compares growth curve models by k-fold cross-validation on
-  recorded days, and by how much ADG changes when the first or last days of
-  the test are hidden (late entry, early exit);
+- `validate_adg()` compares growth curve models (and, with `extrap`, the
+  curve or tangent extrapolation) by k-fold cross-validation on recorded
+  days, and by how much ADG changes when the first or last days of the test
+  are hidden (late entry, early exit);
 - `validate_weight_fill()` hides recorded daily weights of the stage (random
   days, blocks, start or end), fills them again with each weight fill method
   and compares the filled weights and ADG with the recorded ones;
 - `validate_adfi()` hides recorded feed intake days in the same way, imputes
-  them again and compares ADFI with the recorded value.
+  them again with each method (`"loess_pop"` with leave-one-out population
+  curves, `"loess_lm"`, `"linear"`) and compares ADFI with the recorded
+  value.
 
 ```{r function-validate}
 #' Validate Weight Outlier Methods with Artificial Errors
@@ -6092,6 +6340,11 @@ validate_outlier_job <- function(job, qc, methods, adg_true, job_cores = 1L) {
 #'
 #' @param weight Result of [clean_weight()].
 #' @param models Curve models to compare (values of `curve_model`).
+#' @param extrap Extrapolations to compare (values of `curve_extrap`):
+#'   `"curve"` (default), `"tangent"` or both. With `"tangent"`, a model is
+#'   labelled e.g. `"poly2+tangent"`. Mainly the truncation results differ:
+#'   cross-validation differs only for left-out days at the very ends of the
+#'   records.
 #' @param k Number of folds. Default 5.
 #' @param trim_days Days hidden at the start or the end of the test.
 #'   Default `c(10, 20)`.
@@ -6103,7 +6356,7 @@ validate_outlier_job <- function(job, qc, methods, adg_true, job_cores = 1L) {
 #' @param cores Number of CPU cores. Default 1.
 #'
 #' @return A list of class `ppt_validation` with
-#' - `summary`: one row per model: `cv_rmse` and `cv_mae` (kg, weight of the
+#' - `summary`: one row per model (and extrapolation): `cv_rmse` and `cv_mae` (kg, weight of the
 #'   left-out records), and for each truncation (`late10`, `early10`, ...)
 #'   the ADG `bias`, `rmse` (g/d) and Spearman rank correlation `spearman`
 #'   with the full-data ADG, and how many pigs still get an ADG (`n`);
@@ -6112,6 +6365,7 @@ validate_outlier_job <- function(job, qc, methods, adg_true, job_cores = 1L) {
 #' - `settings`.
 #' @export
 validate_adg <- function(weight, models = c("poly1", "poly2", "poly3", "gompertz"),
+                         extrap = "curve",
                          k = 5, trim_days = c(10, 20), qc = weight$settings,
                          max_pigs = NULL, seed = 1, verbose = 1, cores = 1) {
   local_verbose(verbose)
@@ -6121,6 +6375,8 @@ validate_adg <- function(weight, models = c("poly1", "poly2", "poly3", "gompertz
   }
   check_qc(qc)
   for (m in models) qc_validate(qc_set(qc, list(curve_model = m)))
+  for (e in extrap) qc_validate(qc_set(qc, list(curve_extrap = e)))
+  configs <- curve_configs(models, extrap)
   if (!is.numeric(k) || length(k) != 1L || k < 2) cli::cli_abort("{.arg k} must be at least 2.")
   ppt_msg("Validating growth curves: {k}-fold cross-validation and truncation", "h1")
 
@@ -6136,7 +6392,7 @@ validate_adg <- function(weight, models = c("poly1", "poly2", "poly3", "gompertz
   day0 <- weight$daily[, min(date - seq_days + 1L)]
 
   fits <- fit_by_pig(rec, validate_adg_one_pig, step = "validate_adg", qc = qc,
-                     models = models, trim_days = trim_days, day0 = day0)
+                     configs = configs, trim_days = trim_days, day0 = day0)
   out <- fits$result
   cv <- out[type == "cv", .(responder, model, rmse, mae)]
   tr <- out[type != "cv", .(responder, model, truncation = type, adg, adg_full)]
@@ -6154,40 +6410,50 @@ validate_adg <- function(weight, models = c("poly1", "poly2", "poly3", "gompertz
   summary <- merge(cv_sum, wide, by = "model", all = TRUE)
   ord <- unlist(lapply(unique(tr$truncation), function(t) paste0(c("bias_", "rmse_", "spearman_", "n_"), t)))
   data.table::setcolorder(summary, c("model", "cv_rmse", "cv_mae", intersect(ord, names(summary))))
-  summary <- summary[match(models, model)]
+  summary <- summary[match(configs$label, model)]
 
   if (ppt_verbose() >= 1L && nrow(summary) > 0L) {
     best <- summary[which.min(cv_rmse)]
     ppt_msg("Lowest cross-validation error: {.val {best$model}} ({round(best$cv_rmse, 2)} kg)", "success")
   }
   structure(list(summary = summary, cv = cv, truncation = tr, failed = fits$failed,
-                 settings = list(qc = qc, models = models, k = k,
+                 settings = list(qc = qc, models = models, extrap = extrap, k = k,
                                  trim_days = trim_days, seed = seed)),
             class = c("ppt_validation", "ppt_result"))
 }
 
+# Model x extrapolation combinations to compare, with their labels.
+curve_configs <- function(models, extrap) {
+  cfg <- data.table::CJ(model = models, extrap = extrap, sorted = FALSE)
+  cfg[, label := data.table::fifelse(extrap == "curve", model, paste0(model, "+", extrap))]
+  cfg[]
+}
+
 # Cross-validation and truncation of one pig for validate_adg().
-validate_adg_one_pig <- function(d, qc, models, trim_days, day0) {
+validate_adg_one_pig <- function(d, qc, configs, trim_days, day0) {
   first_day <- min(d$date)
   t <- as.numeric(difftime(d$entry_time, as.POSIXct(first_day, tz = "UTC"), units = "days"))
   y <- d$weight
   folds <- sort(unique(d$fold))
   rows <- list()
-  for (m in models) {
+  for (ci in seq_len(nrow(configs))) {
+    m <- configs$model[ci]
+    ex <- configs$extrap[ci]
+    lab <- configs$label[ci]
     # cross-validation: weight of the left-out days
     err <- rep(NA_real_, length(y))
     for (f in folds) {
       test <- d$fold == f
       if (sum(!test) < 10L) next
-      curve <- tryCatch(suppressWarnings(fit_growth_curve(t[!test], y[!test], m)),
+      curve <- tryCatch(suppressWarnings(fit_growth_curve(t[!test], y[!test], m, ex)),
                         error = function(e) NULL)
       if (!is.null(curve)) err[test] <- y[test] - curve$pred(t[test])
     }
     rows[[length(rows) + 1L]] <- data.table::data.table(
-      type = "cv", model = m, rmse = sqrt(mean(err^2, na.rm = TRUE)),
+      type = "cv", model = lab, rmse = sqrt(mean(err^2, na.rm = TRUE)),
       mae = mean(abs(err), na.rm = TRUE), adg = NA_real_, adg_full = NA_real_)
     # truncation: ADG with the first / last days hidden
-    q <- qc_set(qc, list(curve_model = m))
+    q <- qc_set(qc, list(curve_model = m, curve_extrap = ex))
     adg_of <- function(dd) {
       if (data.table::uniqueN(dd$date) < 10L) return(NA_real_)
       tryCatch(suppressWarnings(adg_one_pig(dd, q, day0)$adg), error = function(e) NA_real_)
@@ -6196,7 +6462,7 @@ validate_adg_one_pig <- function(d, qc, models, trim_days, day0) {
     last_day <- max(d$date)
     for (td in trim_days) {
       rows[[length(rows) + 1L]] <- data.table::data.table(
-        type = c(paste0("late", td), paste0("early", td)), model = m,
+        type = c(paste0("late", td), paste0("early", td)), model = lab,
         rmse = NA_real_, mae = NA_real_,
         adg = c(adg_of(d[date >= first_day + td]), adg_of(d[date <= last_day - td])),
         adg_full = full)
@@ -6220,6 +6486,10 @@ validate_adg_one_pig <- function(d, qc, models, trim_days, day0) {
 #'     last recorded day (the method of [calc_adg()]);
 #'   - `"poly1"`, `"poly2"`, `"poly3"`, `"gompertz"`: that growth curve,
 #'     fitted on the remaining records, for every missing day.
+#' @param extrap Extrapolations of the curve beyond the records to compare
+#'   (values of `curve_extrap`): `"curve"` (default), `"tangent"` or both.
+#'   With `"tangent"`, a method is labelled e.g. `"linear+tangent"`. It
+#'   matters for the days hidden at the ends (`"late<d>"`, `"early<d>"`).
 #' @param scenarios Patterns of hidden days, as in [validate_adfi()]:
 #'   `"random<p>"`, `"blocks<n>"`, `"late<d>"`, `"early<d>"`. Only recorded
 #'   stage days are hidden.
@@ -6239,6 +6509,7 @@ validate_adg_one_pig <- function(d, qc, models, trim_days, day0) {
 #' - `settings`.
 #' @export
 validate_weight_fill <- function(weight, methods = c("linear", "poly1", "poly2", "poly3", "gompertz"),
+                                 extrap = "curve",
                                  scenarios = c("random30", "blocks3", "late20", "early15"),
                                  reps = 3, max_pigs = NULL, seed = 1, verbose = 1, cores = 1) {
   local_verbose(verbose)
@@ -6251,6 +6522,8 @@ validate_weight_fill <- function(weight, methods = c("linear", "poly1", "poly2",
   if (!is.character(methods) || length(methods) == 0L || !all(methods %in% ok_methods)) {
     cli::cli_abort("{.arg methods} must be one or more of {.val {ok_methods}}.")
   }
+  for (e in extrap) qc_validate(qc_set(qc, list(curve_extrap = e)))
+  configs <- curve_configs(methods, extrap)
   sc <- parse_scenarios(scenarios)
   ppt_msg("Validating weight fill methods ({length(scenarios)} scenario{?s} x {reps} repetition{?s})", "h1")
 
@@ -6273,7 +6546,7 @@ validate_weight_fill <- function(weight, methods = c("linear", "poly1", "poly2",
   rec <- rec[!vapply(info, is.null, logical(1))]
   if (nrow(rec) == 0L) cli::cli_abort("No pig with an ADG to validate.")
   fits <- fit_by_pig(rec, validate_fill_one_pig, step = "validate_weight_fill", qc = qc,
-                     methods = methods, day0 = day0)
+                     configs = configs, day0 = day0)
   per_pig <- fits$result
   summary <- per_pig[, .(
     daily_rmse = sqrt(sum(sq_err, na.rm = TRUE) / sum(n_hidden)),
@@ -6289,18 +6562,18 @@ validate_weight_fill <- function(weight, methods = c("linear", "poly1", "poly2",
   summary <- rho[summary, on = c("scenario", "method")]
   data.table::setcolorder(summary, c("scenario", "method", "daily_rmse", "daily_mae", "daily_bias",
                                      "adg_bias", "adg_rmse", "adg_spearman", "n_pigs"))
-  summary <- summary[order(match(scenario, scenarios), match(method, methods))]
+  summary <- summary[order(match(scenario, scenarios), match(method, configs$label))]
   if (ppt_verbose() >= 1L) {
     ppt_msg("{data.table::uniqueN(per_pig$responder)} pig{?s} used", "info")
   }
   structure(list(summary = summary, per_pig = per_pig, failed = fits$failed,
-                 settings = list(qc = qc, methods = methods, scenarios = scenarios,
-                                 reps = reps, seed = seed)),
+                 settings = list(qc = qc, methods = methods, extrap = extrap,
+                                 scenarios = scenarios, reps = reps, seed = seed)),
             class = c("ppt_validation", "ppt_result"))
 }
 
 # Fill of one pig under every mask and method for validate_weight_fill().
-validate_fill_one_pig <- function(d, qc, methods, day0) {
+validate_fill_one_pig <- function(d, qc, configs, day0) {
   info <- d$info[[1L]]
   d <- d[, .(date, entry_time, weight)]
   rows <- list()
@@ -6308,8 +6581,10 @@ validate_fill_one_pig <- function(d, qc, methods, day0) {
     hidden_days <- info$days[mk$hide]
     dd <- d[!date %in% hidden_days]
     truth <- info$truth[mk$hide]
-    for (m in methods) {
-      q <- if (m == "linear") qc else qc_set(qc, list(curve_model = m))
+    for (ci in seq_len(nrow(configs))) {
+      m <- configs$model[ci]
+      q <- qc_set(qc, if (m == "linear") list(curve_extrap = configs$extrap[ci])
+                      else list(curve_model = m, curve_extrap = configs$extrap[ci]))
       res <- tryCatch(suppressWarnings(adg_one_pig(dd, q, day0, fill = if (m == "linear") "linear" else "curve")),
                       error = function(e) NULL)
       err <- rep(NA_real_, length(truth))
@@ -6327,7 +6602,7 @@ validate_fill_one_pig <- function(d, qc, methods, day0) {
       }
       ok <- !is.na(err)
       rows[[length(rows) + 1L]] <- data.table::data.table(
-        scenario = mk$scenario, rep = mk$rep, method = m,
+        scenario = mk$scenario, rep = mk$rep, method = configs$label[ci],
         adg = adg, adg_full = info$adg_full,
         sq_err = sum(err[ok]^2), abs_err = sum(abs(err[ok])), sum_err = sum(err[ok]),
         n_hidden = sum(ok))
@@ -6345,6 +6620,8 @@ validate_fill_one_pig <- function(d, qc, methods, day0) {
 #'
 #' @param adfi Result of [calc_adfi()].
 #' @param methods Imputation methods to compare (values of `impute_method`).
+#'   For `"loess_pop"`, the population curve of each pig is fitted without
+#'   that pig (leave-one-out), so its hidden days do not inform the curve.
 #' @param scenarios Patterns of hidden days:
 #'   - `"random<p>"`: `p`% of the recorded days at random, e.g. `"random30"`;
 #'   - `"blocks<n>"`: `n` blocks of 3-10 consecutive days, e.g. `"blocks3"`;
@@ -6367,7 +6644,7 @@ validate_fill_one_pig <- function(d, qc, methods, day0) {
 #' - `per_pig`: the error of every pig, scenario, repetition and method;
 #' - `settings`.
 #' @export
-validate_adfi <- function(adfi, methods = c("loess_lm", "linear"),
+validate_adfi <- function(adfi, methods = c("loess_pop", "loess_lm", "linear"),
                           scenarios = c("random30", "blocks3", "late20", "early15"),
                           reps = 5, min_coverage = 0.8, max_pigs = NULL, seed = 1,
                           verbose = 1, cores = 1) {
@@ -6392,11 +6669,19 @@ validate_adfi <- function(adfi, methods = c("loess_lm", "linear"),
   d[, observed := state %in% c("org", "corr")]
   d[, dfi_true := data.table::fifelse(observed, dfi, NA_real_)]
   data.table::setorder(d, responder, date)
+  # leave-one-out population curves, keyed by pig
+  pop <- NULL
+  if ("loess_pop" %in% methods) {
+    breeds <- if ("breed" %in% names(adfi$per_pig)) adfi$per_pig[, .(responder, breed)] else NULL
+    pop <- pop_curves_loo(d[observed == TRUE & !is.na(bw), .(responder, dfi = dfi_true, bw)],
+                          pigs, breeds)
+    d[, pop_key := responder]
+  }
 
   # hidden days, drawn once so that results do not depend on `cores`
   d[, masks := list(list(make_masks(observed, sc, reps))), by = responder]
   fits <- fit_by_pig(d, validate_adfi_one_pig, step = "validate_adfi", qc = qc,
-                     methods = methods)
+                     methods = methods, pop = pop)
   per_pig <- fits$result
   summary <- per_pig[!is.na(err_pct), .(
     mean_abs_error_pct = mean(abs(err_pct)),
@@ -6420,6 +6705,23 @@ validate_adfi <- function(adfi, methods = c("loess_lm", "linear"),
                  settings = list(qc = qc, methods = methods, scenarios = scenarios,
                                  reps = reps, min_coverage = min_coverage, seed = seed)),
             class = c("ppt_validation", "ppt_result"))
+}
+
+# Population curve of each pig fitted on the other pigs (of its breed when
+# the breed has at least `min_pigs` other pigs), named by pig.
+pop_curves_loo <- function(rec, pigs, breeds = NULL, min_pigs = 10L) {
+  if (!is.null(breeds)) rec <- merge(rec, breeds, by = "responder", all.x = TRUE)
+  out <- lapply(pigs, function(p) {
+    o <- rec[responder != p]
+    if (!is.null(breeds)) {
+      b <- breeds[responder == p, breed][1L]
+      ob <- o[breed %in% b]
+      if (!is.na(b) && data.table::uniqueN(ob$responder) >= min_pigs) o <- ob
+    }
+    fit_pop_curve(o$dfi, o$bw, data.table::uniqueN(o$responder))
+  })
+  names(out) <- pigs
+  out[!vapply(out, is.null, logical(1))]
 }
 
 # A random sample of at most `max_pigs` pig IDs (all when NULL).
@@ -6471,19 +6773,19 @@ make_masks <- function(observed, sc, reps) {
 }
 
 # Imputation of one pig under every mask and method for validate_adfi().
-validate_adfi_one_pig <- function(d, qc, methods) {
+validate_adfi_one_pig <- function(d, qc, methods, pop = NULL) {
   masks <- d$masks[[1L]]
   truth <- mean(d$dfi_true, na.rm = TRUE)
   rows <- vector("list", length(masks) * length(methods))
   i <- 0L
   for (mk in masks) {
-    dd <- d[, .(date, seq_days, bw, in_stage, dfi_true, observed)]
+    dd <- d[, intersect(c("date", "seq_days", "bw", "in_stage", "dfi_true", "observed", "pop_key"), names(d)), with = FALSE]
     dd[, dfi_check := data.table::fifelse(mk$hide, NA_real_, dfi_true)]
     dd[, state := data.table::fifelse(is.na(dfi_check), NA_character_, "org")]
     for (m in methods) {
       i <- i + 1L
       q <- qc_set(qc, list(impute_method = m))
-      im <- tryCatch(impute_dfi_one_pig(dd, q), error = function(e) NULL)
+      im <- tryCatch(impute_dfi_one_pig(dd, q, pop = pop), error = function(e) NULL)
       est <- if (is.null(im)) NA_real_ else im$dfi
       hidden <- mk$hide & !is.na(est)
       adfi_est <- if (is.null(im) || any(is.na(est[dd$observed]))) NA_real_ else mean(est[dd$observed])
@@ -6595,13 +6897,13 @@ test_that("validate_adfi measures imputation error", {
   res <- validate_adfi(f, scenarios = c("random30", "late20", "blocks3", "early10"),
                        reps = 2, verbose = 0)
   s <- res$summary
-  expect_equal(nrow(s), 8L)
+  expect_equal(nrow(s), 12L)
   expect_true(all(s$n_pigs >= 3L))
   expect_true(all(s$mean_abs_error_pct < 15))
   # random gaps cost less than a long gap at the start
   expect_lt(s[scenario == "random30" & method == "loess_lm", p95_abs_error_pct],
             s[scenario == "late20" & method == "loess_lm", p95_abs_error_pct])
-  expect_setequal(unique(s$method), c("loess_lm", "linear"))
+  expect_setequal(unique(s$method), c("loess_pop", "loess_lm", "linear"))
   expect_error(validate_adfi(f, scenarios = "rand"), "scenario")
   expect_error(validate_adfi(f, min_coverage = 1.01), "coverage")
 })
@@ -6621,6 +6923,19 @@ test_that("make_masks hides only recorded days", {
   for (x in m) expect_false(any(x$hide & !obs))
   expect_equal(which(m[[1]]$hide), c(1L, 2L, 4L, 5L))
   expect_equal(which(m[[2]]$hide), 26:30)
+})
+
+test_that("validate_adg and validate_weight_fill compare extrapolations", {
+  w <- clean_weight(prep_visits(nedap, verbose = 0), verbose = 0)
+  res <- validate_adg(w, models = "poly2", extrap = c("curve", "tangent"), trim_days = 20,
+                      max_pigs = 8, verbose = 0)
+  expect_equal(res$summary$model, c("poly2", "poly2+tangent"))
+  # cross-validation mostly predicts inside the records: nearly the same
+  expect_equal(res$summary$cv_rmse[1], res$summary$cv_rmse[2], tolerance = 0.05)
+  fill <- validate_weight_fill(w, methods = "linear", extrap = c("curve", "tangent"),
+                               scenarios = "late20", reps = 1, max_pigs = 8, verbose = 0)
+  expect_setequal(fill$summary$method, c("linear", "linear+tangent"))
+  expect_error(validate_adg(w, extrap = "line", verbose = 0), "curve_extrap")
 })
 ```
 

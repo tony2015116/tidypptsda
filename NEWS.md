@@ -1,3 +1,40 @@
+# tidypptsda 1.3.0
+
+## Feed intake imputation
+
+* New default `impute_method = "loess_pop"`: long gaps (more than
+  `long_gap_days`) and the days before the first / after the last recorded
+  day are filled from the **population curve** of daily intake on body
+  weight, scaled to the intake level of the pig: `dfi = r * f(bw)`. `f` is
+  a quadratic regression over the recorded stage days of all pigs (of each
+  breed with at least 10 pigs when there is a `breed` column), held
+  constant beyond the weights it was fitted on; `r` is the pig's recorded
+  intake divided by `f` over its recorded days, shrunk towards 1 with
+  weight `n / (n + 10)`. Short gaps still use LOESS.
+  - On the example data, with 30 days hidden at the stage start, the ADFI
+    error fell from 9.7% to 2.3% (NEDAP) and from 15.6% to 3.8% (FIRE);
+    random gaps are unchanged. Curves per station were not better than one
+    curve for all pigs.
+  - The per-pig regression of 1.2.0 stays available as
+    `impute_method = "loess_lm"`; `"linear"` is unchanged.
+  - `calc_adfi()` returns the curves in `$pop_curve`.
+* `validate_adfi()` compares `"loess_pop"`, `"loess_lm"` and `"linear"` by
+  default; the population curve of each pig is fitted without that pig
+  (leave-one-out).
+
+## Growth curve extrapolation
+
+* New `curve_extrap` (default `"curve"`, unchanged results): with
+  `"tangent"`, the growth curve is continued beyond the first / last record
+  by a straight line with the robust slope of the records of the first /
+  last 14 days (limited to 0.2-1.5 kg/d), instead of the polynomial itself.
+  `curve_used` then reads e.g. `"poly2 + tangent"`.
+* `validate_adg()` and `validate_weight_fill()` gain `extrap` to compare
+  both, e.g. `validate_adg(w, extrap = c("curve", "tangent"))`. On the
+  example data the tangent lowered the truncation error of poly2 in most
+  scenarios (30 days hidden at the start: 53 to 38 g/d NEDAP, 344 to 173 g/d
+  FIRE) but not in all (FIRE, 20 days at the start: 123 to 129 g/d).
+
 # tidypptsda 1.2.0
 
 ## Station transfers (prep_visits)

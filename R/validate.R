@@ -199,6 +199,11 @@ validate_outlier_job <- function(job, qc, methods, adg_true, job_cores = 1L) {
 #'
 #' @param weight Result of [clean_weight()].
 #' @param models Curve models to compare (values of `curve_model`).
+#' @param extrap Extrapolations to compare (values of `curve_extrap`):
+#'   `"curve"` (default), `"tangent"` or both. With `"tangent"`, a model is
+#'   labelled e.g. `"poly2+tangent"`. Mainly the truncation results differ:
+#'   cross-validation differs only for left-out days at the very ends of the
+#'   records.
 #' @param k Number of folds. Default 5.
 #' @param trim_days Days hidden at the start or the end of the test.
 #'   Default `c(10, 20)`.
@@ -210,7 +215,7 @@ validate_outlier_job <- function(job, qc, methods, adg_true, job_cores = 1L) {
 #' @param cores Number of CPU cores. Default 1.
 #'
 #' @return A list of class `ppt_validation` with
-#' - `summary`: one row per model: `cv_rmse` and `cv_mae` (kg, weight of the
+#' - `summary`: one row per model (and extrapolation): `cv_rmse` and `cv_mae` (kg, weight of the
 #'   left-out records), and for each truncation (`late10`, `early10`, ...)
 #'   the ADG `bias`, `rmse` (g/d) and Spearman rank correlation `spearman`
 #'   with the full-data ADG, and how many pigs still get an ADG (`n`);
@@ -219,6 +224,7 @@ validate_outlier_job <- function(job, qc, methods, adg_true, job_cores = 1L) {
 #' - `settings`.
 #' @export
 validate_adg <- function(weight, models = c("poly1", "poly2", "poly3", "gompertz"),
+                         extrap = "curve",
                          k = 5, trim_days = c(10, 20), qc = weight$settings,
                          max_pigs = NULL, seed = 1, verbose = 1, cores = 1) {
   local_verbose(verbose)
@@ -228,6 +234,8 @@ validate_adg <- function(weight, models = c("poly1", "poly2", "poly3", "gompertz
   }
   check_qc(qc)
   for (m in models) qc_validate(qc_set(qc, list(curve_model = m)))
+  for (e in extrap) qc_validate(qc_set(qc, list(curve_extrap = e)))
+  configs <- curve_configs(models, extrap)
   if (!is.numeric(k) || length(k) != 1L || k < 2) cli::cli_abort("{.arg k} must be at least 2.")
   ppt_msg("Validating growth curves: {k}-fold cross-validation and truncation", "h1")
 
@@ -243,7 +251,7 @@ validate_adg <- function(weight, models = c("poly1", "poly2", "poly3", "gompertz
   day0 <- weight$daily[, min(date - seq_days + 1L)]
 
   fits <- fit_by_pig(rec, validate_adg_one_pig, step = "validate_adg", qc = qc,
-                     models = models, trim_days = trim_days, day0 = day0)
+                     configs = configs, trim_days = trim_days, day0 = day0)
   out <- fits$result
   cv <- out[type == "cv", .(responder, model, rmse, mae)]
   tr <- out[type != "cv", .(responder, model, truncation = type, adg, adg_full)]
@@ -261,40 +269,50 @@ validate_adg <- function(weight, models = c("poly1", "poly2", "poly3", "gompertz
   summary <- merge(cv_sum, wide, by = "model", all = TRUE)
   ord <- unlist(lapply(unique(tr$truncation), function(t) paste0(c("bias_", "rmse_", "spearman_", "n_"), t)))
   data.table::setcolorder(summary, c("model", "cv_rmse", "cv_mae", intersect(ord, names(summary))))
-  summary <- summary[match(models, model)]
+  summary <- summary[match(configs$label, model)]
 
   if (ppt_verbose() >= 1L && nrow(summary) > 0L) {
     best <- summary[which.min(cv_rmse)]
     ppt_msg("Lowest cross-validation error: {.val {best$model}} ({round(best$cv_rmse, 2)} kg)", "success")
   }
   structure(list(summary = summary, cv = cv, truncation = tr, failed = fits$failed,
-                 settings = list(qc = qc, models = models, k = k,
+                 settings = list(qc = qc, models = models, extrap = extrap, k = k,
                                  trim_days = trim_days, seed = seed)),
             class = c("ppt_validation", "ppt_result"))
 }
 
+# Model x extrapolation combinations to compare, with their labels.
+curve_configs <- function(models, extrap) {
+  cfg <- data.table::CJ(model = models, extrap = extrap, sorted = FALSE)
+  cfg[, label := data.table::fifelse(extrap == "curve", model, paste0(model, "+", extrap))]
+  cfg[]
+}
+
 # Cross-validation and truncation of one pig for validate_adg().
-validate_adg_one_pig <- function(d, qc, models, trim_days, day0) {
+validate_adg_one_pig <- function(d, qc, configs, trim_days, day0) {
   first_day <- min(d$date)
   t <- as.numeric(difftime(d$entry_time, as.POSIXct(first_day, tz = "UTC"), units = "days"))
   y <- d$weight
   folds <- sort(unique(d$fold))
   rows <- list()
-  for (m in models) {
+  for (ci in seq_len(nrow(configs))) {
+    m <- configs$model[ci]
+    ex <- configs$extrap[ci]
+    lab <- configs$label[ci]
     # cross-validation: weight of the left-out days
     err <- rep(NA_real_, length(y))
     for (f in folds) {
       test <- d$fold == f
       if (sum(!test) < 10L) next
-      curve <- tryCatch(suppressWarnings(fit_growth_curve(t[!test], y[!test], m)),
+      curve <- tryCatch(suppressWarnings(fit_growth_curve(t[!test], y[!test], m, ex)),
                         error = function(e) NULL)
       if (!is.null(curve)) err[test] <- y[test] - curve$pred(t[test])
     }
     rows[[length(rows) + 1L]] <- data.table::data.table(
-      type = "cv", model = m, rmse = sqrt(mean(err^2, na.rm = TRUE)),
+      type = "cv", model = lab, rmse = sqrt(mean(err^2, na.rm = TRUE)),
       mae = mean(abs(err), na.rm = TRUE), adg = NA_real_, adg_full = NA_real_)
     # truncation: ADG with the first / last days hidden
-    q <- qc_set(qc, list(curve_model = m))
+    q <- qc_set(qc, list(curve_model = m, curve_extrap = ex))
     adg_of <- function(dd) {
       if (data.table::uniqueN(dd$date) < 10L) return(NA_real_)
       tryCatch(suppressWarnings(adg_one_pig(dd, q, day0)$adg), error = function(e) NA_real_)
@@ -303,7 +321,7 @@ validate_adg_one_pig <- function(d, qc, models, trim_days, day0) {
     last_day <- max(d$date)
     for (td in trim_days) {
       rows[[length(rows) + 1L]] <- data.table::data.table(
-        type = c(paste0("late", td), paste0("early", td)), model = m,
+        type = c(paste0("late", td), paste0("early", td)), model = lab,
         rmse = NA_real_, mae = NA_real_,
         adg = c(adg_of(d[date >= first_day + td]), adg_of(d[date <= last_day - td])),
         adg_full = full)
@@ -327,6 +345,10 @@ validate_adg_one_pig <- function(d, qc, models, trim_days, day0) {
 #'     last recorded day (the method of [calc_adg()]);
 #'   - `"poly1"`, `"poly2"`, `"poly3"`, `"gompertz"`: that growth curve,
 #'     fitted on the remaining records, for every missing day.
+#' @param extrap Extrapolations of the curve beyond the records to compare
+#'   (values of `curve_extrap`): `"curve"` (default), `"tangent"` or both.
+#'   With `"tangent"`, a method is labelled e.g. `"linear+tangent"`. It
+#'   matters for the days hidden at the ends (`"late<d>"`, `"early<d>"`).
 #' @param scenarios Patterns of hidden days, as in [validate_adfi()]:
 #'   `"random<p>"`, `"blocks<n>"`, `"late<d>"`, `"early<d>"`. Only recorded
 #'   stage days are hidden.
@@ -346,6 +368,7 @@ validate_adg_one_pig <- function(d, qc, models, trim_days, day0) {
 #' - `settings`.
 #' @export
 validate_weight_fill <- function(weight, methods = c("linear", "poly1", "poly2", "poly3", "gompertz"),
+                                 extrap = "curve",
                                  scenarios = c("random30", "blocks3", "late20", "early15"),
                                  reps = 3, max_pigs = NULL, seed = 1, verbose = 1, cores = 1) {
   local_verbose(verbose)
@@ -358,6 +381,8 @@ validate_weight_fill <- function(weight, methods = c("linear", "poly1", "poly2",
   if (!is.character(methods) || length(methods) == 0L || !all(methods %in% ok_methods)) {
     cli::cli_abort("{.arg methods} must be one or more of {.val {ok_methods}}.")
   }
+  for (e in extrap) qc_validate(qc_set(qc, list(curve_extrap = e)))
+  configs <- curve_configs(methods, extrap)
   sc <- parse_scenarios(scenarios)
   ppt_msg("Validating weight fill methods ({length(scenarios)} scenario{?s} x {reps} repetition{?s})", "h1")
 
@@ -380,7 +405,7 @@ validate_weight_fill <- function(weight, methods = c("linear", "poly1", "poly2",
   rec <- rec[!vapply(info, is.null, logical(1))]
   if (nrow(rec) == 0L) cli::cli_abort("No pig with an ADG to validate.")
   fits <- fit_by_pig(rec, validate_fill_one_pig, step = "validate_weight_fill", qc = qc,
-                     methods = methods, day0 = day0)
+                     configs = configs, day0 = day0)
   per_pig <- fits$result
   summary <- per_pig[, .(
     daily_rmse = sqrt(sum(sq_err, na.rm = TRUE) / sum(n_hidden)),
@@ -396,18 +421,18 @@ validate_weight_fill <- function(weight, methods = c("linear", "poly1", "poly2",
   summary <- rho[summary, on = c("scenario", "method")]
   data.table::setcolorder(summary, c("scenario", "method", "daily_rmse", "daily_mae", "daily_bias",
                                      "adg_bias", "adg_rmse", "adg_spearman", "n_pigs"))
-  summary <- summary[order(match(scenario, scenarios), match(method, methods))]
+  summary <- summary[order(match(scenario, scenarios), match(method, configs$label))]
   if (ppt_verbose() >= 1L) {
     ppt_msg("{data.table::uniqueN(per_pig$responder)} pig{?s} used", "info")
   }
   structure(list(summary = summary, per_pig = per_pig, failed = fits$failed,
-                 settings = list(qc = qc, methods = methods, scenarios = scenarios,
-                                 reps = reps, seed = seed)),
+                 settings = list(qc = qc, methods = methods, extrap = extrap,
+                                 scenarios = scenarios, reps = reps, seed = seed)),
             class = c("ppt_validation", "ppt_result"))
 }
 
 # Fill of one pig under every mask and method for validate_weight_fill().
-validate_fill_one_pig <- function(d, qc, methods, day0) {
+validate_fill_one_pig <- function(d, qc, configs, day0) {
   info <- d$info[[1L]]
   d <- d[, .(date, entry_time, weight)]
   rows <- list()
@@ -415,8 +440,10 @@ validate_fill_one_pig <- function(d, qc, methods, day0) {
     hidden_days <- info$days[mk$hide]
     dd <- d[!date %in% hidden_days]
     truth <- info$truth[mk$hide]
-    for (m in methods) {
-      q <- if (m == "linear") qc else qc_set(qc, list(curve_model = m))
+    for (ci in seq_len(nrow(configs))) {
+      m <- configs$model[ci]
+      q <- qc_set(qc, if (m == "linear") list(curve_extrap = configs$extrap[ci])
+                      else list(curve_model = m, curve_extrap = configs$extrap[ci]))
       res <- tryCatch(suppressWarnings(adg_one_pig(dd, q, day0, fill = if (m == "linear") "linear" else "curve")),
                       error = function(e) NULL)
       err <- rep(NA_real_, length(truth))
@@ -434,7 +461,7 @@ validate_fill_one_pig <- function(d, qc, methods, day0) {
       }
       ok <- !is.na(err)
       rows[[length(rows) + 1L]] <- data.table::data.table(
-        scenario = mk$scenario, rep = mk$rep, method = m,
+        scenario = mk$scenario, rep = mk$rep, method = configs$label[ci],
         adg = adg, adg_full = info$adg_full,
         sq_err = sum(err[ok]^2), abs_err = sum(abs(err[ok])), sum_err = sum(err[ok]),
         n_hidden = sum(ok))
@@ -452,6 +479,8 @@ validate_fill_one_pig <- function(d, qc, methods, day0) {
 #'
 #' @param adfi Result of [calc_adfi()].
 #' @param methods Imputation methods to compare (values of `impute_method`).
+#'   For `"loess_pop"`, the population curve of each pig is fitted without
+#'   that pig (leave-one-out), so its hidden days do not inform the curve.
 #' @param scenarios Patterns of hidden days:
 #'   - `"random<p>"`: `p`% of the recorded days at random, e.g. `"random30"`;
 #'   - `"blocks<n>"`: `n` blocks of 3-10 consecutive days, e.g. `"blocks3"`;
@@ -474,7 +503,7 @@ validate_fill_one_pig <- function(d, qc, methods, day0) {
 #' - `per_pig`: the error of every pig, scenario, repetition and method;
 #' - `settings`.
 #' @export
-validate_adfi <- function(adfi, methods = c("loess_lm", "linear"),
+validate_adfi <- function(adfi, methods = c("loess_pop", "loess_lm", "linear"),
                           scenarios = c("random30", "blocks3", "late20", "early15"),
                           reps = 5, min_coverage = 0.8, max_pigs = NULL, seed = 1,
                           verbose = 1, cores = 1) {
@@ -499,11 +528,19 @@ validate_adfi <- function(adfi, methods = c("loess_lm", "linear"),
   d[, observed := state %in% c("org", "corr")]
   d[, dfi_true := data.table::fifelse(observed, dfi, NA_real_)]
   data.table::setorder(d, responder, date)
+  # leave-one-out population curves, keyed by pig
+  pop <- NULL
+  if ("loess_pop" %in% methods) {
+    breeds <- if ("breed" %in% names(adfi$per_pig)) adfi$per_pig[, .(responder, breed)] else NULL
+    pop <- pop_curves_loo(d[observed == TRUE & !is.na(bw), .(responder, dfi = dfi_true, bw)],
+                          pigs, breeds)
+    d[, pop_key := responder]
+  }
 
   # hidden days, drawn once so that results do not depend on `cores`
   d[, masks := list(list(make_masks(observed, sc, reps))), by = responder]
   fits <- fit_by_pig(d, validate_adfi_one_pig, step = "validate_adfi", qc = qc,
-                     methods = methods)
+                     methods = methods, pop = pop)
   per_pig <- fits$result
   summary <- per_pig[!is.na(err_pct), .(
     mean_abs_error_pct = mean(abs(err_pct)),
@@ -527,6 +564,23 @@ validate_adfi <- function(adfi, methods = c("loess_lm", "linear"),
                  settings = list(qc = qc, methods = methods, scenarios = scenarios,
                                  reps = reps, min_coverage = min_coverage, seed = seed)),
             class = c("ppt_validation", "ppt_result"))
+}
+
+# Population curve of each pig fitted on the other pigs (of its breed when
+# the breed has at least `min_pigs` other pigs), named by pig.
+pop_curves_loo <- function(rec, pigs, breeds = NULL, min_pigs = 10L) {
+  if (!is.null(breeds)) rec <- merge(rec, breeds, by = "responder", all.x = TRUE)
+  out <- lapply(pigs, function(p) {
+    o <- rec[responder != p]
+    if (!is.null(breeds)) {
+      b <- breeds[responder == p, breed][1L]
+      ob <- o[breed %in% b]
+      if (!is.na(b) && data.table::uniqueN(ob$responder) >= min_pigs) o <- ob
+    }
+    fit_pop_curve(o$dfi, o$bw, data.table::uniqueN(o$responder))
+  })
+  names(out) <- pigs
+  out[!vapply(out, is.null, logical(1))]
 }
 
 # A random sample of at most `max_pigs` pig IDs (all when NULL).
@@ -578,19 +632,19 @@ make_masks <- function(observed, sc, reps) {
 }
 
 # Imputation of one pig under every mask and method for validate_adfi().
-validate_adfi_one_pig <- function(d, qc, methods) {
+validate_adfi_one_pig <- function(d, qc, methods, pop = NULL) {
   masks <- d$masks[[1L]]
   truth <- mean(d$dfi_true, na.rm = TRUE)
   rows <- vector("list", length(masks) * length(methods))
   i <- 0L
   for (mk in masks) {
-    dd <- d[, .(date, seq_days, bw, in_stage, dfi_true, observed)]
+    dd <- d[, intersect(c("date", "seq_days", "bw", "in_stage", "dfi_true", "observed", "pop_key"), names(d)), with = FALSE]
     dd[, dfi_check := data.table::fifelse(mk$hide, NA_real_, dfi_true)]
     dd[, state := data.table::fifelse(is.na(dfi_check), NA_character_, "org")]
     for (m in methods) {
       i <- i + 1L
       q <- qc_set(qc, list(impute_method = m))
-      im <- tryCatch(impute_dfi_one_pig(dd, q), error = function(e) NULL)
+      im <- tryCatch(impute_dfi_one_pig(dd, q, pop = pop), error = function(e) NULL)
       est <- if (is.null(im)) NA_real_ else im$dfi
       hidden <- mk$hide & !is.na(est)
       adfi_est <- if (is.null(im) || any(is.na(est[dd$observed]))) NA_real_ else mean(est[dd$observed])
