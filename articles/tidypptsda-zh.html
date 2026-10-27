@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.1.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.2.0</span>
       </span>
     </div>
 
@@ -434,8 +434,6 @@ weight       体重        kg</code></pre>
 <ul>
 <li>品种表的列名不同时，用
 <code>id = "耳标列名", breed = "品种列名"</code> 指定。</li>
-<li>耳标号先按测定站记录的原始号匹配，所以被拆成 <code>id_站号</code>
-的个体也能拿到品种。</li>
 <li>品种表里找不到的猪会给出警告，这些猪的品种记为 NA。</li>
 </ul>
 <p>有了品种列以后：</p>
@@ -559,12 +557,14 @@ ADG。任意参数都可以覆盖：</p>
 <li>未识别耳标的访问会<strong>保留</strong>，并标记为
 <code>identified = FALSE</code>：计算前后两次访问的料重差、时间差时需要用到它们。</li>
 <li>FIRE 跨零点的访问会自动修正离站时间；体重为 0 的记录视为缺失。</li>
-<li>一头猪出现在多个站时，按时间关系分三种情况处理：
+<li>一头猪出现在多个站时（跑到别的栏、被放回、隔离后放错栏等），各站的记录都视为这头猪的真实数据，全部保留，也支持转回原站：
 <ul>
-<li>转栏：保留全部记录；</li>
-<li>两段之间间隔过长：拆成两个个体，耳标号改为
-<code>id_站号</code>；</li>
-<li>两站时间交错：剔除少数站在交错时段内的记录，视为读卡误读。</li>
+<li>夹在另一站连续访问中间、不超过 2
+次的零星访问视为读卡误读，转为未识别访问；</li>
+<li>中间的空档（例如隔离治疗）不拆分个体，按缺失处理；最长无访问超过
+<code>max_gap_days</code>（3 天），或转栏前后体重跳变超过
+<code>max_jump_kg</code>（10 kg）时，<code><a href="../reference/clean_weight.html">clean_weight()</a></code>
+把猪标为低可信度。</li>
 </ul>
 每头猪的处理结果可以用 <code>attr(visits, "stations")</code> 查看。</li>
 </ul>
@@ -800,12 +800,12 @@ LOESS 平滑插补，超过 3 天的用每头猪的”日采食 ~
 <span><span class="co">#&gt; Key: &lt;responder&gt;</span></span>
 <span><span class="co">#&gt;    responder weight_from weight_to feed_kg gain_kg   fcr weight_coverage_kg</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;       &lt;num&gt;     &lt;num&gt;   &lt;num&gt;   &lt;num&gt; &lt;num&gt;              &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:     25822          60        70    24.6    10.2  2.40                9.1</span></span>
-<span><span class="co">#&gt; 2:     25822          70        80    21.4     5.9  3.59                5.1</span></span>
-<span><span class="co">#&gt; 3:     25822          80        90    25.7     9.3  2.78                8.1</span></span>
-<span><span class="co">#&gt; 4:     25822          90       100    32.0    10.3  3.09                9.2</span></span>
-<span><span class="co">#&gt; 5:     25822         100       110    23.0     9.7  2.37                8.1</span></span>
-<span><span class="co">#&gt; 6:     25822         110       120    30.8     8.9  3.47                8.0</span></span></code></pre></div>
+<span><span class="co">#&gt; 1:     25822          60        70    22.1     9.7  2.27                9.1</span></span>
+<span><span class="co">#&gt; 2:     25822          70        80    23.8     9.8  2.43                5.1</span></span>
+<span><span class="co">#&gt; 3:     25822          80        90    25.7     9.9  2.60                8.1</span></span>
+<span><span class="co">#&gt; 4:     25822          90       100    28.4     9.9  2.85                9.2</span></span>
+<span><span class="co">#&gt; 5:     25822         100       110    30.1    10.0  3.00                8.1</span></span>
+<span><span class="co">#&gt; 6:     25822         110       120    23.7    10.1  2.35                8.0</span></span></code></pre></div>
 </div>
 </div>
 <div class="section level2">

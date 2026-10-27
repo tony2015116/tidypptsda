@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.1.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.2.0</span>
       </span>
     </div>
 
@@ -286,7 +286,10 @@ g/d，日期为 <code>Date</code> 类型。</p>
 </tbody>
 </table>
 <p><code>attr(res$visits, "stations")</code>
-记录跨站猪的处理结果（转栏、拆分为两个个体或读卡误读）。</p>
+每头猪一行，记录跨站情况：<code>location_path</code>（如
+<code>101&gt;102&gt;101</code>）、<code>main_location</code>（访问最多的站）、<code>n_locations</code>、<code>n_transfers</code>（转栏次数）、<code>transfer</code>、<code>misreads</code>（转为未识别访问的误读次数）、<code>longest_gap_days</code>（最长无访问天数）和
+<code>weight_jump_kg</code>（转栏前后扣除正常生长后的体重差，没有转栏时为
+<code>NA</code>）。</p>
 </div>
 <div class="section level2">
 <h2 id="weight体重质控">3. <code>$weight</code>：体重质控<a class="anchor" aria-label="anchor" href="#weight%E4%BD%93%E9%87%8D%E8%B4%A8%E6%8E%A7"></a>
@@ -335,6 +338,16 @@ g/d，日期为 <code>Date</code> 类型。</p>
 <tr class="even">
 <td><code>track_removed</code></td>
 <td>逐日回溯追踪剔除的记录比例（未追踪时为 <code>NA</code>）</td>
+</tr>
+<tr class="odd">
+<td><code>longest_gap_days</code></td>
+<td>最长无访问天数；超过 <code>max_gap_days</code>
+时降级（测定中断，例如隔离治疗）</td>
+</tr>
+<tr class="even">
+<td><code>weight_jump_kg</code></td>
+<td>转栏前后的体重跳变（来自 <code><a href="../reference/prep_visits.html">prep_visits()</a></code>）；绝对值超过
+<code>max_jump_kg</code> 时降级</td>
 </tr>
 <tr class="odd">
 <td><code>status</code></td>
@@ -797,13 +810,13 @@ g/d，日期为 <code>Date</code> 类型。</p>
 </tr>
 <tr class="even">
 <td><code>n_days</code></td>
-<td>段内天数</td>
+<td>段内天数（按生长曲线上的体重归段）</td>
 </tr>
 <tr class="odd">
 <td>
 <code>feed_kg</code>、<code>gain_kg</code>、<code>fcr</code>
 </td>
-<td>段内采食量、增重和段料肉比</td>
+<td>段内采食量、增重（按生长曲线计算）和段料肉比</td>
 </tr>
 <tr class="even">
 <td><code>n_observed_feed</code></td>
@@ -855,7 +868,7 @@ g/d，日期为 <code>Date</code> 类型。</p>
 </tr>
 <tr class="even">
 <td><code>step</code></td>
-<td>在哪一步被剔除：<code>prep_visits</code>（读卡误读）、<code>clean_weight</code>（体重质控）、<code>calc_adg</code>（没有日增重）、<code>calc_adfi</code>（没有日采食）</td>
+<td>在哪一步被剔除：<code>prep_visits</code>（读卡误读，访问已转为未识别访问，猪本身不剔除）、<code>clean_weight</code>（体重质控）、<code>calc_adg</code>（没有日增重）、<code>calc_adfi</code>（没有日采食）</td>
 </tr>
 <tr class="odd">
 <td><code>reason</code></td>

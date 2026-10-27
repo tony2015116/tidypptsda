@@ -19,7 +19,7 @@ pipeline. Every parameter has a default; override any of them through
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.1.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.2.0</span>
       </span>
     </div>
 
@@ -123,12 +123,16 @@ pipeline. Every parameter has a default; override any of them through
     <h2>Parameters</h2>
 
 
-<p><strong>Station transfer</strong> (pigs seen at several stations)</p><ul><li><p><code>max_gap_days</code>: maximum gap between two stations to treat the pig as
-transferred. A larger gap splits it into two animals. Default 3.</p></li>
-<li><p><code>max_overlap_days</code>: maximum time overlap between two stations. A larger
-overlap is treated as transponder misreads. Default 1.</p></li>
-<li><p><code>max_jump_kg</code>: body weight jump at the transfer that triggers a
-warning. Default 10.</p></li>
+<p><strong>Station transfer and test interruptions</strong> (see <code><a href="prep_visits.html">prep_visits()</a></code>)</p><ul><li><p><code>misread_max_visits</code>: a run of at most this many consecutive visits at
+another station, inside the pig's visits at its current station, is a
+transponder misread: the visits are kept as unidentified visits.
+Default 2.</p></li>
+<li><p><code>max_gap_days</code>: a pig without any visit for longer than this (e.g.
+isolated for treatment, at any station or between two stations) is
+flagged as low confidence by <code><a href="clean_weight.html">clean_weight()</a></code>. Default 3.</p></li>
+<li><p><code>max_jump_kg</code>: body weight jump at a station transfer, beyond the
+expected growth over the gap, that gives a warning and flags the pig as
+low confidence. Default 10.</p></li>
 </ul><p><strong>Body weight records</strong> (used by <code><a href="clean_weight.html">clean_weight()</a></code>, in this order)</p><ul><li><p><code>weight_range</code>: valid body weight of a single record, kg. Default
 <code>c(15, 150)</code>.</p></li>
 <li><p><code>adapt_days</code>: adaptation period after entry, days (default 7). Body
@@ -172,7 +176,7 @@ its records (default 0.4) is flagged as low confidence: the scale
 probably did not weigh it correctly for a long time (e.g. a faulty load
 cell).</p></li>
 <li><p><code>smooth_r2_min</code>: a pig whose valid weights fit their LOESS smooth with
-an R<c2><b2> below this (default 0.99) is flagged as low confidence.</b2></c2></p></li>
+an R² below this (default 0.99) is flagged as low confidence.</p></li>
 </ul><p><strong>Growth, filled weights and ADG</strong> (used by <code><a href="calc_adg.html">calc_adg()</a></code>)</p><ul><li><p><code>stage_range</code>: body weight interval for ADG, ADFI and FCR, kg. Default
 <code>c(30, 120)</code>.</p></li>
 <li><p><code>curve_model</code>: growth curve that fixes the stage start and end and fills

@@ -19,7 +19,7 @@ the traits."><meta property="og:image" content="https://tony2015116.github.io/ti
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.1.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.2.0</span>
       </span>
     </div>
 
@@ -138,8 +138,9 @@ settings (0.7).</p></dd>
 <li><p><code>summary</code>: numeric summary (<code>n</code>, <code>min</code>, <code>max</code>, <code>median</code>, <code>mean</code>,
 <code>sd</code>, <code>cv</code>) of the main traits, for all pigs, for pigs with
 <code>fcr_flag = "ok"</code> and, with a <code>breed</code> column, for each breed;</p></li>
-<li><p><code>by_bin</code>: one row per pig and body weight class of <code>bin_width</code> kg:
-feed (<code>feed_kg</code>), gain (<code>gain_kg</code>), segment <code>fcr</code>,
+<li><p><code>by_bin</code>: one row per pig and body weight class of <code>bin_width</code> kg
+(days are put into classes by the growth curve): feed (<code>feed_kg</code>),
+gain (<code>gain_kg</code>, from the growth curve), segment <code>fcr</code>,
 <code>weight_coverage_kg</code> (span of recorded body weights in the class),
 <code>low_coverage</code> (inner class covered by less than
 <code>min_bin_coverage_kg</code>) and <code>fcr_out</code> (segment FCR outside

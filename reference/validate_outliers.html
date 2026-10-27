@@ -20,7 +20,7 @@ far ADG moves from the ADG of the clean records."><meta property="og:image" cont
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.1.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.2.0</span>
       </span>
     </div>
 
@@ -210,7 +210,7 @@ removes.</p>
 <span class="r-in"><span><span class="va">vo</span> <span class="op">&lt;-</span> <span class="fu">validate_outliers</span><span class="op">(</span><span class="va">visits</span>, reps <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Validating weight outlier methods (1 repetition, 5% artificial errors)</span> <span style="color: #00BBBB;">──────</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Validating outlier methods <span style="color: #00BB00;">■■■■■■■■■                       </span>  25% | ETA:  5s</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Validating outlier methods <span style="color: #00BB00;">■■■■■■■■■                       </span>  25% | ETA:  6s</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Validating outlier methods <span style="color: #00BB00;">■■■■■■■■■■■■■■■■■■■■■■■         </span>  75% | ETA:  2s</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Validating outlier methods <span style="color: #00BB00;">■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■ </span> 100% | ETA:  0s</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> track+rlm+loess: 93% of errors found, 0.4% of good records removed, ADG error</span>
@@ -247,7 +247,7 @@ removes.</p>
 <span class="r-in"><span><span class="va">va</span> <span class="op">&lt;-</span> <span class="fu"><a href="validate_adg.html">validate_adg</a></span><span class="op">(</span><span class="va">w</span>, models <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"poly1"</span>, <span class="st">"poly2"</span>, <span class="st">"poly3"</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Validating growth curves: 5-fold cross-validation and truncation</span> <span style="color: #00BBBB;">────────────</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> validate_adg: fitting pigs <span style="color: #00BB00;">■■■■■■■■■■                      </span>  31% | ETA:  2s</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> validate_adg: fitting pigs <span style="color: #00BB00;">■■■■■■■■■■■■■                   </span>  41% | ETA:  2s</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> validate_adg: fitting pigs <span style="color: #00BB00;">■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■ </span> 100% | ETA:  0s</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Lowest cross-validation error: <span style="color: #0000BB;">"poly3"</span> (1.39 kg)</span>
 <span class="r-in"><span><span class="va">va</span><span class="op">$</span><span class="va">summary</span></span></span>

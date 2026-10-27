@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.1.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.2.0</span>
       </span>
     </div>
 
@@ -163,8 +163,8 @@
 <span><span class="co">#&gt; ── <span style="font-weight: bold;">QC settings</span> ──</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="font-weight: bold;">Station transfer</span></span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">misread_max_visits</span>: 2</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">max_gap_days</span>: 3</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">max_overlap_days</span>: 1</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">max_jump_kg</span>: 10</span></span>
 <span><span class="co">#&gt; <span style="font-weight: bold;">Body weight records</span></span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">weight_range</span>: 15, 150</span></span>
@@ -259,12 +259,14 @@
 </tr></thead>
 <tbody>
 <tr class="odd">
-<td>跨站</td>
+<td>跨站与测定中断</td>
 <td>
-<code>max_gap_days</code>、<code>max_overlap_days</code>、<code>max_jump_kg</code>
+<code>misread_max_visits</code>、<code>max_gap_days</code>、<code>max_jump_kg</code>
 </td>
-<td>3、1、10</td>
-<td><code><a href="../reference/prep_visits.html">prep_visits()</a></code></td>
+<td>2、3、10</td>
+<td>
+<code><a href="../reference/prep_visits.html">prep_visits()</a></code>、<code><a href="../reference/clean_weight.html">clean_weight()</a></code>
+</td>
 </tr>
 <tr class="even">
 <td>体重记录</td>
@@ -324,11 +326,20 @@
 g，日采食量（<code>dfi_range</code>）用 kg，时间用秒（s）或天（d）。</p>
 </div>
 <div class="section level2">
-<h2 id="跨站转栏参数">3. 跨站（转栏）参数<a class="anchor" aria-label="anchor" href="#%E8%B7%A8%E7%AB%99%E8%BD%AC%E6%A0%8F%E5%8F%82%E6%95%B0"></a>
+<h2 id="跨站与测定中断参数">3. 跨站与测定中断参数<a class="anchor" aria-label="anchor" href="#%E8%B7%A8%E7%AB%99%E4%B8%8E%E6%B5%8B%E5%AE%9A%E4%B8%AD%E6%96%AD%E5%8F%82%E6%95%B0"></a>
 </h2>
-<p>一头猪出现在多个测定站时，<code><a href="../reference/prep_visits.html">prep_visits()</a></code>
-会比较它在各站的时间段，判断属于转栏、两个个体还是读卡误读，结果见
-<code>attr(visits, "stations")</code>。</p>
+<p>一头猪出现在多个测定站，通常是<strong>猪真的被挪了位置</strong>：跑到另一栏后一直没被发现；被发现后放回原栏；或者因病隔离，治好后放错了栏，之后可能又调回原栏。这些记录都是真实的，属于同一头猪。读卡误读则不同：猪还在自己的站上连续采食，另一个站上零星冒出一两次它的记录。</p>
+<p>所以 <code><a href="../reference/prep_visits.html">prep_visits()</a></code>
+把每头猪的访问按时间排好，切成”同一个站上的连续访问段”：</p>
+<ul>
+<li>只有 <code>misread_max_visits</code> 次（默认 2
+次）以内的短段，判为误读。这几次访问<strong>保留为未识别访问</strong>（<code>identified = FALSE</code>），因为它们确实发生在那个料槽上，Casey
+规则计算前后访问的料重差、时间差时要用到；</li>
+<li>其余各段都是这头猪真实的停留，全部保留。猪可以转任意多次，也可以转回原来的站（<code>location_path</code>
+如 <code>101&gt;102&gt;101</code>）；</li>
+<li>中间没有访问的空档（例如隔离治疗）<strong>不会把猪拆成两个个体</strong>，空档天数按缺失处理。</li>
+</ul>
+<p>结果见 <code>attr(visits, "stations")</code>。</p>
 <table class="table">
 <colgroup>
 <col width="20%">
@@ -346,25 +357,24 @@ g，日采食量（<code>dfi_range</code>）用 kg，时间用秒（s）或天�
 </tr></thead>
 <tbody>
 <tr class="odd">
+<td><code>misread_max_visits</code></td>
+<td>夹在另一站连续访问之间、不超过这么多次的连续访问判为误读，转为未识别访问</td>
+<td>次</td>
+<td>2</td>
+<td>≥ 0</td>
+</tr>
+<tr class="even">
 <td><code>max_gap_days</code></td>
-<td>前一站末次访问与后一站首次访问之间允许的最大间隔。不超过此值视为转栏；超过则视为两个不同的个体，耳标号改为
-<code>id_站号</code>
-</td>
+<td>一头猪最长有多少天没有任何访问（无论在同一站还是两站之间）。超过时，<code><a href="../reference/clean_weight.html">clean_weight()</a></code>
+把它标为低可信度，原因写”测定中断”：病中和病后的生长、采食往往不代表这头猪的正常水平</td>
 <td>天</td>
 <td>3</td>
 <td>≥ 0</td>
 </tr>
-<tr class="even">
-<td><code>max_overlap_days</code></td>
-<td>两站时间段允许重叠的最大天数。超过此值视为读卡误读，剔除记录较少的那一站在重叠时段内的访问</td>
-<td>天</td>
-<td>1</td>
-<td>≥ 0</td>
-</tr>
 <tr class="odd">
 <td><code>max_jump_kg</code></td>
-<td>转栏前后体重差的警告阈值（取衔接处前后各 20
-条有效体重的中位数比较）。只发出警告，不删除数据</td>
+<td>转栏前后体重差（取衔接处前后各 20
+条有效体重的中位数，扣除空档期间按日增重应长的体重）超过此值时发出警告，并把猪标为低可信度，可能是耳标装错或放错了猪</td>
 <td>kg</td>
 <td>10</td>
 <td>≥ 0</td>
@@ -373,10 +383,11 @@ g，日采食量（<code>dfi_range</code>）用 kg，时间用秒（s）或天�
 </table>
 <p><strong>调整建议</strong></p>
 <ul>
-<li>转栏时猪在过渡栏停留较久（例如消毒、隔离数天），可把
-<code>max_gap_days</code> 调大到 5–7。</li>
-<li>如果经常出现”相邻两栏读到同一头猪”的串号情况，可把
-<code>max_overlap_days</code> 调小到 0.5，误读会被更早识别出来。</li>
+<li>示例数据中，每头猪最长的无访问时间不超过 2.2 天，所以默认的 3
+天不会误标正常的猪。测定站故障停机几天时，这个站上所有的猪都会被标出，这时可以把
+<code>max_gap_days</code> 临时调大。</li>
+<li>本包假设每个测定站在单独的栏里。如果一栏装有两台测定站、猪可以随意来回，同一天在两站都有大量访问是正常的，会被当成频繁转栏（转栏超过
+3 次时会给出提示）。</li>
 </ul>
 </div>
 <div class="section level2">
@@ -1139,7 +1150,8 @@ YY、LL、DD 三个品种和 20–140 kg 的体重段：</p>
 </h3>
 <p><code><a href="../reference/calc_fcr.html">calc_fcr()</a></code> 把计算区间按 <code>bin_width</code>（默认 10
 kg）分段，对每头猪的每一段计算采食量、增重和分段料肉比，结果保存在
-<code>$by_bin</code> 中。有两项检查：</p>
+<code>$by_bin</code>
+中。每天归入哪一段、每段增重多少，都按<strong>生长曲线</strong>上的体重计算：每天的实测体重有波动，段边界附近的日子会被随机分到相邻的段，使段内体重的极差偏大。有两项检查：</p>
 <ol style="list-style-type: decimal">
 <li>
 <strong>体重记录是否断档</strong>：对首尾段之间的中间段，如果实测体重覆盖的范围小于
@@ -1158,17 +1170,12 @@ kg），说明这一段体重记录不足，例如耳标脱落、不会进站或
 <span><span class="va">b</span> <span class="op">&lt;-</span> <span class="va">res_n</span><span class="op">$</span><span class="va">fcr</span><span class="op">$</span><span class="va">by_bin</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>segments <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">b</span><span class="op">)</span>, low_coverage <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">b</span><span class="op">$</span><span class="va">low_coverage</span><span class="op">)</span>, fcr_outside <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">b</span><span class="op">$</span><span class="va">fcr_out</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;     segments low_coverage  fcr_outside </span></span>
-<span><span class="co">#&gt;          257            5            6</span></span>
+<span><span class="co">#&gt;          258            5            1</span></span>
 <span><span class="va">b</span><span class="op">[</span><span class="va">fcr_out</span> <span class="op">==</span> <span class="cn">TRUE</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">weight_from</span>, <span class="va">weight_to</span>, fcr <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">fcr</span>, <span class="fl">2</span><span class="op">)</span>, <span class="va">fcr_min</span>, <span class="va">fcr_max</span><span class="op">)</span><span class="op">]</span></span>
 <span><span class="co">#&gt; Key: &lt;responder&gt;</span></span>
 <span><span class="co">#&gt;    responder weight_from weight_to   fcr fcr_min fcr_max</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;       &lt;num&gt;     &lt;num&gt; &lt;num&gt;   &lt;num&gt;   &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:     13954          80        90  4.02    1.36    3.86</span></span>
-<span><span class="co">#&gt; 2:     14969          70        80  3.63    1.35    3.59</span></span>
-<span><span class="co">#&gt; 3:     15034          30        40  3.32    0.76    3.16</span></span>
-<span><span class="co">#&gt; 4:     15604          80        90  4.14    1.36    3.86</span></span>
-<span><span class="co">#&gt; 5:     15961          70        80  3.72    1.35    3.59</span></span>
-<span><span class="co">#&gt; 6:     15967          70        80  5.05    1.35    3.59</span></span></code></pre></div>
+<span><span class="co">#&gt; 1:     15967          60        70  3.59    1.28    3.41</span></span></code></pre></div>
 <p>在示例数据中，分段料肉比超出范围的只有 15967 号的 50–70 kg
 段。这头猪在 4
 月下旬采食骤降、体重停止增长，很可能生过病，分段检查正好把它找了出来。</p>

@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.1.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.2.0</span>
       </span>
     </div>
 
@@ -94,6 +94,34 @@
       <small>Source: <a href="https://github.com/tony2015116/tidypptsda/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="page-header" data-toc-text="1.2.0" id="tidypptsda-120">tidypptsda 1.2.0<a class="anchor" aria-label="anchor" href="#tidypptsda-120"></a></h2>
+<div class="section level3">
+<h3 id="station-transfers-prep_visits-1-2-0">Station transfers (prep_visits)<a class="anchor" aria-label="anchor" href="#station-transfers-prep_visits-1-2-0"></a></h3>
+<ul><li>
+<strong>(breaking)</strong> Pigs seen at several stations are now handled by runs of consecutive visits instead of the first and last visit at each station. Before, a single stray read could stretch a station’s time span and remove hundreds of real visits at the other station.
+<ul><li>A run of at most <code>misread_max_visits</code> (new, default 2) visits inside the visits at another station is a transponder misread. Misreads are <strong>kept as unidentified visits</strong> (<code>identified = FALSE</code>) instead of being deleted, so the feeder error checks and the unidentified feed of the feeder stay right.</li>
+<li>All other runs are real stays: a pig can move any number of times, also back to a station it used before (<code>"101&gt;102&gt;101"</code>).</li>
+<li>A gap without visits (e.g. isolation for treatment) no longer splits a pig into <code>&lt;id&gt;_&lt;station&gt;</code>. <code>max_gap_days</code> now flags pigs whose longest gap is longer (<code><a href="../reference/clean_weight.html">clean_weight()</a></code>: low confidence, “test interrupted”).</li>
+<li>The weight jump at a transfer allows for growth over the gap; a jump above <code>max_jump_kg</code> now also flags the pig as low confidence.</li>
+<li>
+<code>max_overlap_days</code> is removed (<code><a href="../reference/qc_config.html">qc_config()</a></code> says what to use instead). The <code>"stations"</code> attribute has new columns <code>n_transfers</code>, <code>misreads</code> and <code>longest_gap_days</code>; <code>split</code> and <code>misreads_removed</code> are gone.</li>
+</ul></li>
+</ul></div>
+<div class="section level3">
+<h3 id="other-fixes-1-2-0">Other fixes<a class="anchor" aria-label="anchor" href="#other-fixes-1-2-0"></a></h3>
+<ul><li>
+<code><a href="../reference/calc_adg.html">calc_adg()</a></code>: a pig whose growth curve never enters <code>stage_range</code> (all weights above or below it) gets <code>adg_type = "none"</code> instead of a “partial” ADG over its whole test. The end of the stage is the first time the curve <em>rises</em> through the upper limit, so an extrapolated curve that starts above it no longer hides the real crossing.</li>
+<li>
+<code><a href="../reference/calc_fcr.html">calc_fcr()</a></code>: days are put into weight classes, and the class gain is computed, from the growth curve. With the noisy daily weights, days near a class limit fell into the neighbouring class and inflated the gain (inner classes now 8.8-11.1 kg of 10 kg, before 4.5-11.4 kg).</li>
+<li>
+<code>validate_outliers(cores &gt; 1)</code> no longer runs parallel fits inside parallel jobs (4 cores gave 16 processes), and matches records by unique keys.</li>
+<li>
+<code><a href="../reference/prep_visits.html">prep_visits()</a></code>: a missing <code>duration</code> is computed from <code>exit_time</code> row by row (with the midnight correction), not only when the whole column is missing.</li>
+<li>
+<code>cores &gt; 1</code> on Windows stops with a clear message when the package is loaded with <code>devtools::load_all()</code> or the workers cannot load it.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="page-header" data-toc-text="1.1.0" id="tidypptsda-110">tidypptsda 1.1.0<a class="anchor" aria-label="anchor" href="#tidypptsda-110"></a></h2>
 <div class="section level3">

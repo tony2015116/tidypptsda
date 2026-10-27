@@ -18,7 +18,7 @@ pig whether its weight data are good enough for growth analysis."><meta property
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.1.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.2.0</span>
       </span>
     </div>
 
@@ -134,10 +134,12 @@ pig whether its weight data are good enough for growth analysis.</p>
     <p>An object of class <code>ppt_weight</code> (a list):</p><ul><li><p><code>per_pig</code>: one row per pig with <code>n_records</code>, <code>n_valid</code>,
 <code>n_outliers</code>, <code>first_date</code>, <code>last_date</code>, <code>test_days</code>,
 <code>missing_rate</code>, <code>entry_weight</code>, <code>exit_weight</code> (kg, from the LOESS
-smooth of the valid weights), <code>r2</code> (R<c2><b2> of that smooth),
+smooth of the valid weights), <code>r2</code> (R² of that smooth),
 <code>track_removed</code> (share of the records removed by the
-tracking, <code>NA</code> when not tracked), <code>status</code> (<code>"keep"</code>,
-<code>"low_confidence"</code> or <code>"removed"</code>) and <code>reason</code>;</b2></c2></p></li>
+tracking, <code>NA</code> when not tracked), <code>longest_gap_days</code> (longest time
+without a visit), <code>weight_jump_kg</code> (from <code><a href="prep_visits.html">prep_visits()</a></code>, <code>NA</code>
+without station transfer), <code>status</code> (<code>"keep"</code>,
+<code>"low_confidence"</code> or <code>"removed"</code>) and <code>reason</code>;</p></li>
 <li><p><code>daily</code>: one row per pig and day for pigs not removed: median of the
 valid weights (<code>weight</code>, kg), <code>n_records</code>, <code>n_outliers</code>;</p></li>
 <li><p><code>records</code>: every weight record with <code>fitted</code>, <code>outlier</code> and
@@ -156,7 +158,11 @@ weight) remove the pig;</p></li>
 a tracking that removes more than <code>track_flag_share</code> of the records,
 or <code>r2 &lt; smooth_r2_min</code> mark the pig <code>"low_confidence"</code> but keep it: its
 growth can still be estimated by extrapolation in <code><a href="calc_adg.html">calc_adg()</a></code>, with a
-flag.</p></li>
+flag;</p></li>
+<li><p>so do a test interrupted for more than <code>max_gap_days</code> days (no visit
+at all, e.g. isolation for treatment: growth and intake around it are
+often not typical of the pig) and a body weight jump above
+<code>max_jump_kg</code> at a station transfer.</p></li>
 </ul></div>
     <div id="see-also">
     <h2>See also</h2>
@@ -181,7 +187,7 @@ settings.</p></div>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> ── <span style="color: #0000BB; font-weight: bold;">&lt;ppt_weight&gt;</span> ──</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Pigs: 30 (keep 28, low confidence 1, removed 1)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">$per_pig</span>: 30 rows x 15 columns</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">$per_pig</span>: 30 rows x 17 columns</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">$daily</span>: 2789 rows x 7 columns</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">$removed</span>: 1 row x 4 columns</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">$records</span>: 31472 rows x 10 columns</span>

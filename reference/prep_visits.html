@@ -18,7 +18,7 @@ the same columns and units for both station types."><meta property="og:image" co
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.1.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.2.0</span>
       </span>
     </div>
 
@@ -132,7 +132,7 @@ already standard.</p></dd>
 <dt id="arg-qc">qc<a class="anchor" aria-label="anchor" href="#arg-qc"></a></dt>
 <dd><p>QC settings from <code><a href="qc_config.html">qc_config()</a></code>. Used here: <code>duration_max</code> (to
 tell a FIRE midnight crossing from a recording error) and the station
-transfer parameters <code>max_gap_days</code>, <code>max_overlap_days</code>, <code>max_jump_kg</code>.</p></dd>
+transfer parameters <code>misread_max_visits</code>, <code>max_jump_kg</code>.</p></dd>
 
 
 <dt id="arg-verbose">verbose<a class="anchor" aria-label="anchor" href="#arg-verbose"></a></dt>
@@ -158,24 +158,46 @@ first day), <code>seq_in_day</code> (visit number of the pig that day),
 <li><p><code>source_file</code>, if present in the input.</p></li>
 </ul><p>Attributes:</p><ul><li><p><code>"station"</code>: station type;</p></li>
 <li><p><code>"stations"</code>: one row per pig with its station history (see below);</p></li>
-<li><p><code>"removed"</code>: log of visits removed as transponder misreads;</p></li>
+<li><p><code>"removed"</code>: log of visits turned into unidentified visits as
+transponder misreads;</p></li>
 <li><p><code>"prep_summary"</code>: number of rows dropped at each step.</p></li>
 </ul></div>
     <div id="station-transfer">
     <h2>Station transfer</h2>
 
 
-<p>For each pig seen at several stations, the time span at each station is
-compared:</p><ul><li><p><strong>misread</strong>: the span at a minor station overlaps the span at the main
-station (most visits) by more than <code>max_overlap_days</code>. Visits at the
-minor station inside the main span are removed as transponder misreads.</p></li>
-<li><p><strong>transfer</strong>: consecutive spans are separated by at most
-<code>max_gap_days</code>. All visits are kept, each with its real <code>location</code>. A
-body weight jump above <code>max_jump_kg</code> at the transfer gives a warning.</p></li>
-<li><p><strong>split</strong>: a gap longer than <code>max_gap_days</code>. The spans are treated as
-different animals and <code>responder</code> becomes <code>"&lt;id&gt;_&lt;location&gt;"</code>.</p></li>
-</ul><p>A pig that returns to a station it already used is not supported: the
-return looks like an overlap and is treated as misreads.</p>
+<p>A pig can be recorded at several stations because it was really moved:
+it escaped to another pen and stayed there, was found and put back, or
+was isolated for treatment and returned to the wrong pen. These visits
+are real and belong to the same pig. A transponder misread, in contrast,
+gives a few scattered visits at another station while the pig keeps
+visiting its own station.</p>
+<p>So the identified visits of each pig are put in time order and cut into
+runs of consecutive visits at the same station:</p><ul><li><p><strong>misread</strong>: a run of at most <code>misread_max_visits</code> visits. Shortest
+runs are dropped first, so that the runs around them join. The visits
+stay in the data as unidentified visits (<code>identified = FALSE</code>,
+<code>responder = NA</code>, <code>responder_raw</code> kept): they did happen at that
+feeder and are needed for the feeder error checks and the
+unidentified feed of the feeder.</p></li>
+<li><p><strong>transfer</strong>: every remaining run is a real stay at a station. A pig
+can move any number of times, also back to a station it used before
+(<code>location_path</code> such as <code>"101&gt;102&gt;101"</code>). All visits are kept with
+their real <code>location</code>.</p></li>
+<li><p>at each transfer the body weight before and after (median of the 20
+valid weights next to it) is compared, allowing for growth over the
+gap. A jump above <code>max_jump_kg</code> gives a warning, and
+<code><a href="clean_weight.html">clean_weight()</a></code> flags the pig as low confidence.</p></li>
+</ul><p>A gap without visits (e.g. isolation for treatment) never splits a pig
+into two animals: the days are missing, and <code><a href="clean_weight.html">clean_weight()</a></code> flags the
+pig as low confidence when the longest gap exceeds <code>max_gap_days</code>.</p>
+<p>The <code>"stations"</code> attribute has one row per pig: <code>location_path</code>,
+<code>main_location</code> (station with most visits), <code>n_locations</code>,
+<code>n_transfers</code>, <code>transfer</code>, <code>misreads</code> (visits turned unidentified),
+<code>longest_gap_days</code> and <code>weight_jump_kg</code> (largest jump beyond the
+expected growth, <code>NA</code> without transfer).</p>
+<p>All stations are assumed to be in separate pens. Stations in the same
+pen, which a pig visits in turn, look like many transfers; a warning is
+given when a pig moves more than 3 times.</p>
     </div>
     <div id="see-also">
     <h2>See also</h2>
@@ -230,22 +252,22 @@ return looks like an overlap and is treated as misreads.</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Station history of each pig</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">visits</span>, <span class="st">"stations"</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    responder responder_raw location_path main_location n_locations transfer</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>       &lt;char&gt;        &lt;char&gt;        &lt;char&gt;        &lt;char&gt;       &lt;int&gt;   &lt;lgcl&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:     25822         25822           101           101           1    FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:     35853         35853           101           101           1    FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:     35855         35855           101           101           1    FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:     35862         35862           101           101           1    FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:     35865         35865           101           101           1    FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:     35869         35869           101           101           1    FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     split misreads_removed weight_jump_kg</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    &lt;lgcl&gt;            &lt;int&gt;          &lt;num&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:  FALSE                0             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:  FALSE                0             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:  FALSE                0             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:  FALSE                0             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:  FALSE                0             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:  FALSE                0             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    responder location_path main_location n_locations n_transfers transfer</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       &lt;char&gt;        &lt;char&gt;        &lt;char&gt;       &lt;int&gt;       &lt;int&gt;   &lt;lgcl&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:     25822           101           101           1           0    FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:     35853           101           101           1           0    FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:     35855           101           101           1           0    FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4:     35862           101           101           1           0    FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5:     35865           101           101           1           0    FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6:     35869           101           101           1           0    FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    misreads longest_gap_days weight_jump_kg</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       &lt;int&gt;            &lt;num&gt;          &lt;num&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:        0        0.7254051             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:        0        0.6270370             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:        0        0.6021412             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4:        0        0.5934722             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5:        0        0.5991898             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6:        0        0.6719097             NA</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># NEDAP data gets the same columns and units</span></span></span>
 <span class="r-in"><span><span class="va">nedap_visits</span> <span class="op">&lt;-</span> <span class="fu">prep_visits</span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></span>
