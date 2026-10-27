@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.2.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.3.0</span>
       </span>
     </div>
 
@@ -94,6 +94,26 @@
       <small>Source: <a href="https://github.com/tony2015116/tidypptsda/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="page-header" data-toc-text="1.3.0" id="tidypptsda-130">tidypptsda 1.3.0<a class="anchor" aria-label="anchor" href="#tidypptsda-130"></a></h2>
+<div class="section level3">
+<h3 id="feed-intake-imputation-1-3-0">Feed intake imputation<a class="anchor" aria-label="anchor" href="#feed-intake-imputation-1-3-0"></a></h3>
+<ul><li>New default <code>impute_method = "loess_pop"</code>: long gaps (more than <code>long_gap_days</code>) and the days before the first / after the last recorded day are filled from the <strong>population curve</strong> of daily intake on body weight, scaled to the intake level of the pig: <code>dfi = r * f(bw)</code>. <code>f</code> is a quadratic regression over the recorded stage days of all pigs (of each breed with at least 10 pigs when there is a <code>breed</code> column), held constant beyond the weights it was fitted on; <code>r</code> is the pig’s recorded intake divided by <code>f</code> over its recorded days, shrunk towards 1 with weight <code>n / (n + 10)</code>. Short gaps still use LOESS.
+<ul><li>On the example data, with 30 days hidden at the stage start, the ADFI error fell from 9.7% to 2.3% (NEDAP) and from 15.6% to 3.8% (FIRE); random gaps are unchanged. Curves per station were not better than one curve for all pigs.</li>
+<li>The per-pig regression of 1.2.0 stays available as <code>impute_method = "loess_lm"</code>; <code>"linear"</code> is unchanged.</li>
+<li>
+<code><a href="../reference/calc_adfi.html">calc_adfi()</a></code> returns the curves in <code>$pop_curve</code>.</li>
+</ul></li>
+<li>
+<code><a href="../reference/validate_adfi.html">validate_adfi()</a></code> compares <code>"loess_pop"</code>, <code>"loess_lm"</code> and <code>"linear"</code> by default; the population curve of each pig is fitted without that pig (leave-one-out).</li>
+</ul></div>
+<div class="section level3">
+<h3 id="growth-curve-extrapolation-1-3-0">Growth curve extrapolation<a class="anchor" aria-label="anchor" href="#growth-curve-extrapolation-1-3-0"></a></h3>
+<ul><li>New <code>curve_extrap</code> (default <code>"curve"</code>, unchanged results): with <code>"tangent"</code>, the growth curve is continued beyond the first / last record by a straight line with the robust slope of the records of the first / last 14 days (limited to 0.2-1.5 kg/d), instead of the polynomial itself. <code>curve_used</code> then reads e.g. <code>"poly2 + tangent"</code>.</li>
+<li>
+<code><a href="../reference/validate_adg.html">validate_adg()</a></code> and <code><a href="../reference/validate_weight_fill.html">validate_weight_fill()</a></code> gain <code>extrap</code> to compare both, e.g. <code>validate_adg(w, extrap = c("curve", "tangent"))</code>. On the example data the tangent lowered the truncation error of poly2 in most scenarios (30 days hidden at the start: 53 to 38 g/d NEDAP, 344 to 173 g/d FIRE) but not in all (FIRE, 20 days at the start: 123 to 129 g/d).</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="page-header" data-toc-text="1.2.0" id="tidypptsda-120">tidypptsda 1.2.0<a class="anchor" aria-label="anchor" href="#tidypptsda-120"></a></h2>
 <div class="section level3">

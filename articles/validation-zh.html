@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.2.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.3.0</span>
       </span>
     </div>
 
@@ -156,19 +156,19 @@
 </tr>
 <tr class="even">
 <td><code><a href="../reference/validate_adg.html">validate_adg()</a></code></td>
-<td>生长曲线模型（poly1/2/3、gompertz）</td>
+<td>生长曲线模型（poly1/2/3、gompertz），以及曲线外推还是切线外推（<code>extrap</code>）</td>
 <td>k 折交叉验证；隐藏测定开头或结尾若干天（模拟晚进站、早出栏），看 ADG
 变化多少</td>
 </tr>
 <tr class="odd">
 <td><code><a href="../reference/validate_weight_fill.html">validate_weight_fill()</a></code></td>
-<td>体重填充方法（线性插值、poly1/2/3、gompertz）</td>
+<td>体重填充方法（线性插值、poly1/2/3、gompertz），以及外推方式（<code>extrap</code>）</td>
 <td>隐藏区间内部分有记录的日子（随机、成段、开头、结尾），重新填充，与实测日体重和
 ADG 比较</td>
 </tr>
 <tr class="even">
 <td><code><a href="../reference/validate_adfi.html">validate_adfi()</a></code></td>
-<td>日采食填充方法（loess_lm、linear）</td>
+<td>日采食填充方法（loess_pop、loess_lm、linear）</td>
 <td>隐藏部分有记录的日子（随机、成段、开头、结尾），重新填充，与实测比较</td>
 </tr>
 </tbody>
@@ -385,6 +385,30 @@ ADG，与同一模型用全部数据算出的 ADG
 这类晚进站的批次可考虑 <code>curve_model = "poly1"</code>。</li>
 </ul>
 </div>
+<div class="section level3">
+<h3 id="曲线外推还是切线外推">曲线外推还是切线外推<a class="anchor" aria-label="anchor" href="#%E6%9B%B2%E7%BA%BF%E5%A4%96%E6%8E%A8%E8%BF%98%E6%98%AF%E5%88%87%E7%BA%BF%E5%A4%96%E6%8E%A8"></a>
+</h3>
+<p><code>extrap = c("curve", "tangent")</code>
+同时比较两种外推方式（<code>curve_extrap</code>）：记录范围内两者用同一条曲线，范围之外切线外推改为直线，斜率取首、末
+14 天记录的稳健斜率。带切线的模型标为 <code>poly2+tangent</code>
+等。</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">va_t</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_adg.html">validate_adg</a></span><span class="op">(</span><span class="va">w_n</span>, models <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"poly1"</span>, <span class="st">"poly2"</span><span class="op">)</span>, extrap <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"curve"</span>, <span class="st">"tangent"</span><span class="op">)</span>,</span>
+<span>                     trim_days <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">10</span>, <span class="fl">20</span>, <span class="fl">30</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
+<span><span class="fu">tidy</span><span class="op">(</span><span class="va">va_t</span><span class="op">)</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"model"</span>, <span class="st">"cv_rmse"</span>, <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grep</a></span><span class="op">(</span><span class="st">"^rmse_"</span>, <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">va_t</span><span class="op">$</span><span class="va">summary</span><span class="op">)</span>, value <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span>, with <span class="op">=</span> <span class="cn">FALSE</span><span class="op">]</span></span>
+<span><span class="co">#&gt; Key: &lt;model&gt;</span></span>
+<span><span class="co">#&gt;            model cv_rmse rmse_late10 rmse_early10 rmse_late20 rmse_early20 rmse_late30 rmse_early30</span></span>
+<span><span class="co">#&gt;           &lt;char&gt;   &lt;num&gt;       &lt;num&gt;        &lt;num&gt;       &lt;num&gt;        &lt;num&gt;       &lt;num&gt;        &lt;num&gt;</span></span>
+<span><span class="co">#&gt; 1:         poly1    1.81        16.4         21.3        33.4         51.6        66.4         67.3</span></span>
+<span><span class="co">#&gt; 2: poly1+tangent    1.80        14.3         21.0        25.8         50.7        61.6         65.9</span></span>
+<span><span class="co">#&gt; 3:         poly2    1.59        23.7         22.6        36.4         49.6        52.6         74.0</span></span>
+<span><span class="co">#&gt; 4: poly2+tangent    1.58        20.8         21.8        32.7         49.5        38.3         64.1</span></span></code></pre></div>
+<p>在两份示例数据上，poly2 加切线后，截断检验的 ADG
+误差在多数场景下变小，外推越远改善越大（NEDAP 开头缺 30 天：53 → 38
+g/d；FIRE 开头缺 30 天：344 → 173 g/d）；但 FIRE 开头缺 20 天时略差（123
+→ 129 g/d）。没有在所有场景下都更好，所以默认仍是
+<code>curve_extrap = "curve"</code>。交叉验证几乎不受影响，因为它预测的大多是记录范围内的体重。</p>
+</div>
 </div>
 <div class="section level2">
 <h2 id="体重填充validate_weight_fill">3. 体重填充：<code>validate_weight_fill()</code><a class="anchor" aria-label="anchor" href="#%E4%BD%93%E9%87%8D%E5%A1%AB%E5%85%85validate_weight_fill"></a>
@@ -408,7 +432,7 @@ ADG，与同一模型用全部数据算出的 ADG
 <p>指标：<code>daily_rmse</code>、<code>daily_mae</code>、<code>daily_bias</code>
 是被隐藏日子的填充体重与实测日体重之差（kg）；<code>adg_bias</code>、<code>adg_rmse</code>（g/d）和
 <code>adg_spearman</code> 是 ADG 与参照 ADG 的比较。</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sc_w</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"random30"</span>, <span class="st">"blocks3"</span>, <span class="st">"blocks6"</span>, <span class="st">"late10"</span>, <span class="st">"late20"</span>, <span class="st">"early15"</span><span class="op">)</span></span>
 <span><span class="va">vw_n</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_weight_fill.html">validate_weight_fill</a></span><span class="op">(</span><span class="va">w_n</span>, scenarios <span class="op">=</span> <span class="va">sc_w</span>, reps <span class="op">=</span> <span class="fl">2</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="fu">tidy</span><span class="op">(</span><span class="va">vw_n</span><span class="op">)</span></span>
@@ -446,7 +470,7 @@ ADG，与同一模型用全部数据算出的 ADG
 <span><span class="co">#&gt; 30:  early15 gompertz      1.440     1.160     0.3840   6.8900    38.80        0.989     29</span></span>
 <span><span class="co">#&gt;     scenario   method daily_rmse daily_mae daily_bias adg_bias adg_rmse adg_spearman n_pigs</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;   &lt;char&gt;      &lt;num&gt;     &lt;num&gt;      &lt;num&gt;    &lt;num&gt;    &lt;num&gt;        &lt;num&gt;  &lt;int&gt;</span></span></code></pre></div>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">vw_f</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_weight_fill.html">validate_weight_fill</a></span><span class="op">(</span><span class="va">w_f</span>, scenarios <span class="op">=</span> <span class="va">sc_w</span>, reps <span class="op">=</span> <span class="fl">2</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="fu">tidy</span><span class="op">(</span><span class="va">vw_f</span><span class="op">)</span></span>
 <span><span class="co">#&gt;     scenario   method daily_rmse daily_mae daily_bias adg_bias adg_rmse adg_spearman n_pigs</span></span>
@@ -523,55 +547,76 @@ ADG，与同一模型用全部数据算出的 ADG
 </ul>
 <p>数字可以改，例如
 <code>random50</code>、<code>blocks6</code>、<code>late10</code>。然后用
-<code>methods</code> 中的每种方法（默认 <code>loess_lm</code> 和
+<code>methods</code> 中的每种方法（默认
+<code>loess_pop</code>、<code>loess_lm</code> 和
 <code>linear</code>）重新插补，在<strong>原本有记录的日子</strong>上计算
 ADFI，与实测的 ADFI 比较。</p>
+<p><code>loess_pop</code>
+的群体曲线对每头猪都用<strong>留一法</strong>拟合：只用其他猪的数据，被隐藏的日子不会通过曲线”泄露”回来。</p>
 <p>指标：<code>mean_abs_error_pct</code>、<code>p95_abs_error_pct</code>
 是个体 ADFI 误差绝对值的平均和 95% 分位数（占实测 ADFI
 的百分比）；<code>bias_pct</code> 是平均偏差；<code>spearman</code> 是
 ADFI 排名与实测的相关；<code>daily_rmse</code>
 是被隐藏日子的日采食误差（g/d）。</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">f_n</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calc_adfi.html">calc_adfi</a></span><span class="op">(</span><span class="va">v_n</span>, <span class="fu"><a href="../reference/calc_adg.html">calc_adg</a></span><span class="op">(</span><span class="va">w_n</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="va">sc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"random30"</span>, <span class="st">"random50"</span>, <span class="st">"blocks3"</span>, <span class="st">"blocks6"</span>, <span class="st">"late10"</span>, <span class="st">"late20"</span>, <span class="st">"early15"</span><span class="op">)</span></span>
 <span><span class="va">vf_n</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_adfi.html">validate_adfi</a></span><span class="op">(</span><span class="va">f_n</span>, scenarios <span class="op">=</span> <span class="va">sc</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="fu">tidy</span><span class="op">(</span><span class="va">vf_n</span><span class="op">)</span></span>
-<span><span class="co">#&gt;     scenario   method mean_abs_error_pct p95_abs_error_pct bias_pct spearman daily_rmse n_pigs</span></span>
-<span><span class="co">#&gt;       &lt;char&gt;   &lt;char&gt;              &lt;num&gt;             &lt;num&gt;    &lt;num&gt;    &lt;num&gt;      &lt;num&gt;  &lt;int&gt;</span></span>
-<span><span class="co">#&gt;  1: random30 loess_lm               1.00              2.54    0.102    0.989        457     29</span></span>
-<span><span class="co">#&gt;  2: random30   linear               1.07              2.76    0.122    0.989        514     29</span></span>
-<span><span class="co">#&gt;  3: random50 loess_lm               1.56              4.20    0.167    0.979        476     29</span></span>
-<span><span class="co">#&gt;  4: random50   linear               1.60              3.61    0.323    0.979        508     29</span></span>
-<span><span class="co">#&gt;  5:  blocks3 loess_lm               1.40              2.93   -0.380    0.988        490     29</span></span>
-<span><span class="co">#&gt;  6:  blocks3   linear               1.57              3.84   -0.250    0.975        514     29</span></span>
-<span><span class="co">#&gt;  7:  blocks6 loess_lm               2.60              5.20   -0.770    0.967        501     29</span></span>
-<span><span class="co">#&gt;  8:  blocks6   linear               2.44              6.35   -0.267    0.965        513     29</span></span>
-<span><span class="co">#&gt;  9:   late10 loess_lm               1.57              2.55    1.470    0.992        501     29</span></span>
-<span><span class="co">#&gt; 10:   late10   linear               1.57              2.55    1.470    0.992        501     29</span></span>
-<span><span class="co">#&gt; 11:   late20 loess_lm               4.61              7.00    4.410    0.955        702     29</span></span>
-<span><span class="co">#&gt; 12:   late20   linear               4.61              7.00    4.410    0.955        702     29</span></span>
-<span><span class="co">#&gt; 13:  early15 loess_lm               3.52              8.42    3.280    0.976        838     29</span></span>
-<span><span class="co">#&gt; 14:  early15   linear               3.52              8.42    3.280    0.976        838     29</span></span></code></pre></div>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<span><span class="co">#&gt;     scenario    method mean_abs_error_pct p95_abs_error_pct bias_pct spearman daily_rmse n_pigs</span></span>
+<span><span class="co">#&gt;       &lt;char&gt;    &lt;char&gt;              &lt;num&gt;             &lt;num&gt;    &lt;num&gt;    &lt;num&gt;      &lt;num&gt;  &lt;int&gt;</span></span>
+<span><span class="co">#&gt;  1: random30 loess_pop              1.030              2.60   0.0296    0.990        456     29</span></span>
+<span><span class="co">#&gt;  2: random30  loess_lm              1.000              2.54   0.1020    0.989        457     29</span></span>
+<span><span class="co">#&gt;  3: random30    linear              1.070              2.76   0.1220    0.989        514     29</span></span>
+<span><span class="co">#&gt;  4: random50 loess_pop              1.510              3.85   0.0813    0.980        466     29</span></span>
+<span><span class="co">#&gt;  5: random50  loess_lm              1.560              4.20   0.1670    0.979        476     29</span></span>
+<span><span class="co">#&gt;  6: random50    linear              1.600              3.61   0.3230    0.979        508     29</span></span>
+<span><span class="co">#&gt;  7:  blocks3 loess_pop              1.240              2.79  -0.3110    0.991        465     29</span></span>
+<span><span class="co">#&gt;  8:  blocks3  loess_lm              1.400              2.93  -0.3800    0.988        490     29</span></span>
+<span><span class="co">#&gt;  9:  blocks3    linear              1.570              3.84  -0.2500    0.975        514     29</span></span>
+<span><span class="co">#&gt; 10:  blocks6 loess_pop              2.080              5.31  -0.3930    0.974        478     29</span></span>
+<span><span class="co">#&gt; 11:  blocks6  loess_lm              2.600              5.20  -0.7700    0.967        501     29</span></span>
+<span><span class="co">#&gt; 12:  blocks6    linear              2.440              6.35  -0.2670    0.965        513     29</span></span>
+<span><span class="co">#&gt; 13:   late10 loess_pop              0.613              1.53  -0.2010    0.996        288     29</span></span>
+<span><span class="co">#&gt; 14:   late10  loess_lm              1.570              2.55   1.4700    0.992        501     29</span></span>
+<span><span class="co">#&gt; 15:   late10    linear              1.570              2.55   1.4700    0.992        501     29</span></span>
+<span><span class="co">#&gt; 16:   late20 loess_pop              1.430              4.35  -0.3270    0.978        321     29</span></span>
+<span><span class="co">#&gt; 17:   late20  loess_lm              4.610              7.00   4.4100    0.955        702     29</span></span>
+<span><span class="co">#&gt; 18:   late20    linear              4.610              7.00   4.4100    0.955        702     29</span></span>
+<span><span class="co">#&gt; 19:  early15 loess_pop              2.330              5.09   1.2700    0.974        737     29</span></span>
+<span><span class="co">#&gt; 20:  early15  loess_lm              3.520              8.42   3.2800    0.976        838     29</span></span>
+<span><span class="co">#&gt; 21:  early15    linear              3.520              8.42   3.2800    0.976        838     29</span></span>
+<span><span class="co">#&gt;     scenario    method mean_abs_error_pct p95_abs_error_pct bias_pct spearman daily_rmse n_pigs</span></span>
+<span><span class="co">#&gt;       &lt;char&gt;    &lt;char&gt;              &lt;num&gt;             &lt;num&gt;    &lt;num&gt;    &lt;num&gt;      &lt;num&gt;  &lt;int&gt;</span></span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">f_f</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calc_adfi.html">calc_adfi</a></span><span class="op">(</span><span class="va">v_f</span>, <span class="fu"><a href="../reference/calc_adg.html">calc_adg</a></span><span class="op">(</span><span class="va">w_f</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="va">vf_f</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_adfi.html">validate_adfi</a></span><span class="op">(</span><span class="va">f_f</span>, scenarios <span class="op">=</span> <span class="va">sc</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="fu">tidy</span><span class="op">(</span><span class="va">vf_f</span><span class="op">)</span></span>
-<span><span class="co">#&gt;     scenario   method mean_abs_error_pct p95_abs_error_pct bias_pct spearman daily_rmse n_pigs</span></span>
-<span><span class="co">#&gt;       &lt;char&gt;   &lt;char&gt;              &lt;num&gt;             &lt;num&gt;    &lt;num&gt;    &lt;num&gt;      &lt;num&gt;  &lt;int&gt;</span></span>
-<span><span class="co">#&gt;  1: random30 loess_lm               1.47              3.62   0.2440    0.938        653     23</span></span>
-<span><span class="co">#&gt;  2: random30   linear               1.49              3.88  -0.0463    0.930        690     23</span></span>
-<span><span class="co">#&gt;  3: random50 loess_lm               2.16              5.46  -0.3020    0.894        650     23</span></span>
-<span><span class="co">#&gt;  4: random50   linear               2.43              6.37  -0.3750    0.870        681     23</span></span>
-<span><span class="co">#&gt;  5:  blocks3 loess_lm               2.23              5.46  -0.0751    0.867        651     23</span></span>
-<span><span class="co">#&gt;  6:  blocks3   linear               2.55              6.98   0.6690    0.885        719     23</span></span>
-<span><span class="co">#&gt;  7:  blocks6 loess_lm               4.83             11.50  -0.4240    0.653        752     23</span></span>
-<span><span class="co">#&gt;  8:  blocks6   linear               5.42             13.20  -0.3300    0.583        830     23</span></span>
-<span><span class="co">#&gt;  9:   late10 loess_lm               2.16              7.07  -0.8930    0.885        642     23</span></span>
-<span><span class="co">#&gt; 10:   late10   linear               2.16              7.07  -0.8930    0.885        642     23</span></span>
-<span><span class="co">#&gt; 11:   late20 loess_lm               6.57             10.90  -1.9900    0.487        801     23</span></span>
-<span><span class="co">#&gt; 12:   late20   linear               6.57             10.90  -1.9900    0.487        801     23</span></span>
-<span><span class="co">#&gt; 13:  early15 loess_lm               4.01              6.80  -0.9150    0.709        855     23</span></span>
-<span><span class="co">#&gt; 14:  early15   linear               4.01              6.80  -0.9150    0.709        855     23</span></span></code></pre></div>
+<span><span class="co">#&gt;     scenario    method mean_abs_error_pct p95_abs_error_pct bias_pct spearman daily_rmse n_pigs</span></span>
+<span><span class="co">#&gt;       &lt;char&gt;    &lt;char&gt;              &lt;num&gt;             &lt;num&gt;    &lt;num&gt;    &lt;num&gt;      &lt;num&gt;  &lt;int&gt;</span></span>
+<span><span class="co">#&gt;  1: random30 loess_pop               1.42              3.54   0.1960    0.933        652     23</span></span>
+<span><span class="co">#&gt;  2: random30  loess_lm               1.47              3.62   0.2440    0.938        653     23</span></span>
+<span><span class="co">#&gt;  3: random30    linear               1.49              3.88  -0.0463    0.930        690     23</span></span>
+<span><span class="co">#&gt;  4: random50 loess_pop               2.18              5.31  -0.3440    0.907        651     23</span></span>
+<span><span class="co">#&gt;  5: random50  loess_lm               2.16              5.46  -0.3020    0.894        650     23</span></span>
+<span><span class="co">#&gt;  6: random50    linear               2.43              6.37  -0.3750    0.870        681     23</span></span>
+<span><span class="co">#&gt;  7:  blocks3 loess_pop               2.11              5.22  -0.2120    0.894        641     23</span></span>
+<span><span class="co">#&gt;  8:  blocks3  loess_lm               2.23              5.46  -0.0751    0.867        651     23</span></span>
+<span><span class="co">#&gt;  9:  blocks3    linear               2.55              6.98   0.6690    0.885        719     23</span></span>
+<span><span class="co">#&gt; 10:  blocks6 loess_pop               3.32              6.54  -0.4630    0.750        676     23</span></span>
+<span><span class="co">#&gt; 11:  blocks6  loess_lm               4.83             11.50  -0.4240    0.653        752     23</span></span>
+<span><span class="co">#&gt; 12:  blocks6    linear               5.42             13.20  -0.3300    0.583        830     23</span></span>
+<span><span class="co">#&gt; 13:   late10 loess_pop               1.55              2.76  -0.4700    0.921        530     23</span></span>
+<span><span class="co">#&gt; 14:   late10  loess_lm               2.16              7.07  -0.8930    0.885        642     23</span></span>
+<span><span class="co">#&gt; 15:   late10    linear               2.16              7.07  -0.8930    0.885        642     23</span></span>
+<span><span class="co">#&gt; 16:   late20 loess_pop               2.70              7.46  -0.5850    0.830        559     23</span></span>
+<span><span class="co">#&gt; 17:   late20  loess_lm               6.57             10.90  -1.9900    0.487        801     23</span></span>
+<span><span class="co">#&gt; 18:   late20    linear               6.57             10.90  -1.9900    0.487        801     23</span></span>
+<span><span class="co">#&gt; 19:  early15 loess_pop               3.01              9.04  -0.1400    0.816        825     23</span></span>
+<span><span class="co">#&gt; 20:  early15  loess_lm               4.01              6.80  -0.9150    0.709        855     23</span></span>
+<span><span class="co">#&gt; 21:  early15    linear               4.01              6.80  -0.9150    0.709        855     23</span></span>
+<span><span class="co">#&gt;     scenario    method mean_abs_error_pct p95_abs_error_pct bias_pct spearman daily_rmse n_pigs</span></span>
+<span><span class="co">#&gt;       &lt;char&gt;    &lt;char&gt;              &lt;num&gt;             &lt;num&gt;    &lt;num&gt;    &lt;num&gt;      &lt;num&gt;  &lt;int&gt;</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="怎么看-3">怎么看<a class="anchor" aria-label="anchor" href="#%E6%80%8E%E4%B9%88%E7%9C%8B-3"></a>
@@ -581,13 +626,20 @@ ADFI 排名与实测的相关；<code>daily_rmse</code>
 <strong>随机缺失影响很小</strong>：即使随机缺一半，个体 ADFI
 的误差也只有百分之几。</li>
 <li>
-<strong>中间缺失时，<code>loess_lm</code> 略好于
-<code>linear</code></strong>：成段缺失时误差小 0.2–0.6
-个百分点，被隐藏日子的日采食误差也更小。</li>
+<strong>两端缺失时，<code>loess_pop</code>
+的误差约为另两种方法的一半</strong>：<code>loess_lm</code> 和
+<code>linear</code> 在两端用的是同一个单猪回归，结果完全相同。NEDAP
+开头缺 20 天时，误差从 4.6% 降到 1.4%，偏差从 +4.4% 降到约 0；FIRE
+开头缺 20 天时，误差从 6.6% 降到 2.7%，排名相关从 0.49 升到
+0.83。单猪回归在两端会系统性地高估或低估：晚进站的猪只有后期数据，直线往前推时，前期采食会被高估。</li>
 <li>
-<strong>两端缺失时两者完全相同</strong>：两种方法在区间两端都用”日采食
-~ 体重”回归。开头缺 20 天以上时误差明显增大；FIRE
-的测定期本来就短，开头缺 20 天后排名相关只剩 0.5 左右。</li>
+<strong>中间成段缺失时，<code>loess_pop</code> 也略好</strong>：FIRE
+缺 6 段时，误差从 4.8%（<code>loess_lm</code>）降到
+3.3%；随机缺失时三种方法几乎相同。</li>
+<li>例外：FIRE 结尾缺 15 天时，<code>loess_pop</code>
+的平均误差和排名相关更好，但 95% 分位数略高（9.0% 对
+6.8%），说明少数猪的末期采食偏离了群体曲线的形状。</li>
+<li>无论哪种方法，缺的天数越多误差越大：<strong>保证区间两端有记录，仍然比选择插补方法更重要</strong>。</li>
 </ul>
 <p>这和《数据质量建议》中的结论一致：<strong>保证测定期两端有记录，比选择插补方法更重要</strong>。这也是
 <code><a href="../reference/calc_fcr.html">calc_fcr()</a></code> 把两端外推超过 15
@@ -598,7 +650,7 @@ ADFI 排名与实测的相关；<code>daily_rmse</code>
 <h2 id="在实际数据上使用">5. 在实际数据上使用<a class="anchor" aria-label="anchor" href="#%E5%9C%A8%E5%AE%9E%E9%99%85%E6%95%B0%E6%8D%AE%E4%B8%8A%E4%BD%BF%E7%94%A8"></a>
 </h2>
 <p>大批次数据建议抽样并行运行：</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">visits</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/prep_visits.html">prep_visits</a></span><span class="op">(</span><span class="fu"><a href="../reference/read_station.html">read_station</a></span><span class="op">(</span><span class="st">"数据/"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">w</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/clean_weight.html">clean_weight</a></span><span class="op">(</span><span class="va">visits</span>, cores <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span>
 <span><span class="va">a</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calc_adg.html">calc_adg</a></span><span class="op">(</span><span class="va">w</span>, cores <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span>

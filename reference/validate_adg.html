@@ -26,7 +26,7 @@ all records of the same model.
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.2.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.3.0</span>
       </span>
     </div>
 
@@ -118,6 +118,7 @@ all records of the same model.</p></li>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">validate_adg</span><span class="op">(</span></span>
 <span>  <span class="va">weight</span>,</span>
 <span>  models <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"poly1"</span>, <span class="st">"poly2"</span>, <span class="st">"poly3"</span>, <span class="st">"gompertz"</span><span class="op">)</span>,</span>
+<span>  extrap <span class="op">=</span> <span class="st">"curve"</span>,</span>
 <span>  k <span class="op">=</span> <span class="fl">5</span>,</span>
 <span>  trim_days <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">10</span>, <span class="fl">20</span><span class="op">)</span>,</span>
 <span>  qc <span class="op">=</span> <span class="va">weight</span><span class="op">$</span><span class="va">settings</span>,</span>
@@ -138,6 +139,14 @@ all records of the same model.</p></li>
 
 <dt id="arg-models">models<a class="anchor" aria-label="anchor" href="#arg-models"></a></dt>
 <dd><p>Curve models to compare (values of <code>curve_model</code>).</p></dd>
+
+
+<dt id="arg-extrap">extrap<a class="anchor" aria-label="anchor" href="#arg-extrap"></a></dt>
+<dd><p>Extrapolations to compare (values of <code>curve_extrap</code>):
+<code>"curve"</code> (default), <code>"tangent"</code> or both. With <code>"tangent"</code>, a model is
+labelled e.g. <code>"poly2+tangent"</code>. Mainly the truncation results differ:
+cross-validation differs only for left-out days at the very ends of the
+records.</p></dd>
 
 
 <dt id="arg-k">k<a class="anchor" aria-label="anchor" href="#arg-k"></a></dt>
@@ -172,7 +181,7 @@ Default <code>c(10, 20)</code>.</p></dd>
 </dl></div>
     <div id="value">
     <h2>Value</h2>
-    <p>A list of class <code>ppt_validation</code> with</p><ul><li><p><code>summary</code>: one row per model: <code>cv_rmse</code> and <code>cv_mae</code> (kg, weight of the
+    <p>A list of class <code>ppt_validation</code> with</p><ul><li><p><code>summary</code>: one row per model (and extrapolation): <code>cv_rmse</code> and <code>cv_mae</code> (kg, weight of the
 left-out records), and for each truncation (<code>late10</code>, <code>early10</code>, ...)
 the ADG <code>bias</code>, <code>rmse</code> (g/d) and Spearman rank correlation <code>spearman</code>
 with the full-data ADG, and how many pigs still get an ADG (<code>n</code>);</p></li>

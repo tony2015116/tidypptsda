@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.2.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.3.0</span>
       </span>
     </div>
 
@@ -222,7 +222,7 @@
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Pigs with ADG: 29</span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Pigs with FCR: 29 (23 ok, 6 low confidence)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Removed pigs: 1 (see <span style="color: #00BB00;">$removed</span>)</span></span>
-<span><span class="co">#&gt; Mean ADG 1205 g/d, ADFI 2847 g/d, FCR 2.36</span></span></code></pre></div>
+<span><span class="co">#&gt; Mean ADG 1205 g/d, ADFI 2846 g/d, FCR 2.36</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="数据要求">2. 数据要求<a class="anchor" aria-label="anchor" href="#%E6%95%B0%E6%8D%AE%E8%A6%81%E6%B1%82"></a>
@@ -454,8 +454,8 @@ weight       体重        kg</code></pre>
 LOESS
 检测异常值；区间内缺失的体重中间线性插值、两端用二次曲线；采食错误按
 Casey 等（2005）判定、按 Jiao 等（2014）校正，缺失的采食短缺口用
-LOESS、长缺口和两端用”日采食 ~ 体重”回归；FCR = ADFI ÷
-ADG。任意参数都可以覆盖：</p>
+LOESS、长缺口和两端用全群”日采食 ~ 体重”曲线 × 个体采食水平；FCR = ADFI
+÷ ADG。任意参数都可以覆盖：</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">qc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>, <span class="fl">115</span><span class="op">)</span>, min_test_days <span class="op">=</span> <span class="fl">40</span><span class="op">)</span></span>
 <span><span class="va">qc</span><span class="op">$</span><span class="va">stage_range</span></span>
@@ -507,8 +507,9 @@ ADG。任意参数都可以覆盖：</p>
 </tr>
 <tr class="odd">
 <td><code>impute_method</code></td>
-<td>采食填充：loess_lm（≤ 3 天 LOESS，其余回归）或 linear</td>
-<td>loess_lm</td>
+<td>采食填充：loess_pop（≤ 3 天 LOESS，其余群体曲线 ×
+个体比例）、loess_lm（其余用单猪回归）或 linear</td>
+<td>loess_pop</td>
 </tr>
 <tr class="even">
 <td><code>max_extrap_days</code></td>
@@ -516,11 +517,16 @@ ADG。任意参数都可以覆盖：</p>
 <td>30</td>
 </tr>
 <tr class="odd">
+<td><code>curve_extrap</code></td>
+<td>记录范围外沿生长曲线（curve）还是切线（tangent）外推</td>
+<td>curve</td>
+</tr>
+<tr class="even">
 <td><code>max_edge_extrap_days</code></td>
 <td>区间两端填充超过此天数的猪标记为低可信度</td>
 <td>15</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>duration_max</code></td>
 <td>单次访问时长上限（s），对应错误类型 OTV-hi</td>
 <td>3600</td>
@@ -690,13 +696,14 @@ LOESS 平滑曲线的 R² 低于 0.99 的猪也降级。详见《质控参数详
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">ADFI over 60-120 kg</span> <span style="color: #00BBBB;">─────────────────────────────────────────────────────────</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Correction model: 1490 pig-days, 16 error covariates</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Population curve of intake on body weight: all (25 pigs)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Stage days recorded without error (org): <span style="font-weight: bold;">1,133</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Corrected (corr): <span style="font-weight: bold;">84</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Interpolated (iii): <span style="font-weight: bold;">4</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Extrapolated (elrp): <span style="font-weight: bold;">49</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Missing: <span style="font-weight: bold;">0</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Pig-days outside dfi_range: <span style="font-weight: bold;">7</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Mean ADFI over the stage: 3247 g/d</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Mean ADFI over the stage: 3244 g/d</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">adfi</span><span class="op">$</span><span class="va">daily</span><span class="op">[</span><span class="va">in_stage</span> <span class="op">==</span> <span class="cn">TRUE</span>, <span class="va">state</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; corr elrp  iii  org </span></span>
@@ -710,8 +717,10 @@ Y，再用混合模型扣除错误项的影响（Jiao
 <li>
 <strong>填充</strong>：只在与 ADG
 相同的体重区间内进行。两个有记录的日子之间，连续缺失不超过 3 天的用
-LOESS 平滑插补，超过 3 天的用每头猪的”日采食 ~
-体重”线性回归；区间两端缺失的日子同样用这个回归。回归用的是上一步补齐后的日体重。<code>qc_config(impute_method = "linear")</code>
+LOESS 平滑插补；超过 3
+天的、以及区间两端缺失的日子，用全群（有品种时按品种）的”日采食 ~
+体重”曲线乘以这头猪自己的采食水平。曲线提供采食随体重变化的形状，个体比例保留这头猪吃得多还是少。体重用的是上一步补齐后的日体重。<code>qc_config(impute_method = "loess_lm")</code>
+改用每头猪自己的”日采食 ~ 体重”线性回归；<code>"linear"</code>
 时，中间改用线性插值。</li>
 </ol>
 <p><code>state</code> 列标明每一天的来源：</p>
@@ -753,7 +762,7 @@ LOESS 平滑插补，超过 3 天的用每头猪的”日采食 ~
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">FCR over 60-120 kg</span> <span style="color: #00BBBB;">──────────────────────────────────────────────────────────</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> FCR for 25 pigs: 21 ok, 4 low confidence</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Mean FCR 2.70 (SD 0.16), ADG 1206 g/d, ADFI 3247 g/d</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Mean FCR 2.70 (SD 0.16), ADG 1206 g/d, ADFI 3244 g/d</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">fcr</span><span class="op">$</span><span class="va">per_pig</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">adg</span>, <span class="va">adfi</span>, <span class="va">fcr</span>, <span class="va">fcr_flag</span>, <span class="va">fcr_note</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    responder      adg     adfi      fcr       fcr_flag</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;    &lt;num&gt;    &lt;num&gt;    &lt;num&gt;         &lt;char&gt;</span></span>
@@ -762,7 +771,7 @@ LOESS 平滑插补，超过 3 天的用每头猪的”日采食 ~
 <span><span class="co">#&gt; 3:     35855 1357.855 3875.943 2.854460             ok</span></span>
 <span><span class="co">#&gt; 4:     35862 1172.778 3243.425 2.765592             ok</span></span>
 <span><span class="co">#&gt; 5:     35865 1194.068 3157.331 2.644180             ok</span></span>
-<span><span class="co">#&gt; 6:     35869 1152.201 3476.451 3.017227             ok</span></span>
+<span><span class="co">#&gt; 6:     35869 1152.201 3440.722 2.986218             ok</span></span>
 <span><span class="co">#&gt;                                   fcr_note</span></span>
 <span><span class="co">#&gt;                                     &lt;char&gt;</span></span>
 <span><span class="co">#&gt; 1: weight records cover 5.1 kg of 70-80 kg</span></span>
@@ -775,7 +784,7 @@ LOESS 平滑插补，超过 3 天的用每头猪的”日采食 ~
 <span><span class="co">#&gt;     group        trait     n     min     max  median    mean     sd    cv</span></span>
 <span><span class="co">#&gt;    &lt;char&gt;       &lt;char&gt; &lt;num&gt;   &lt;num&gt;   &lt;num&gt;   &lt;num&gt;   &lt;num&gt;  &lt;num&gt; &lt;num&gt;</span></span>
 <span><span class="co">#&gt; 1:    all          adg    25  935.14 1460.47 1205.57 1205.91 106.53  0.09</span></span>
-<span><span class="co">#&gt; 2:    all         adfi    25 2573.34 3875.94 3220.84 3246.85 251.78  0.08</span></span>
+<span><span class="co">#&gt; 2:    all         adfi    25 2567.56 3875.94 3216.80 3244.44 248.74  0.08</span></span>
 <span><span class="co">#&gt; 3:    all          fcr    25    2.35    3.02    2.67    2.70   0.16  0.06</span></span>
 <span><span class="co">#&gt; 4:    all           gf    25    0.33    0.43    0.37    0.37   0.02  0.06</span></span>
 <span><span class="co">#&gt; 5:    all   stage_days    25   40.19   63.77   49.23   49.80   4.79  0.10</span></span>
@@ -919,13 +928,13 @@ R²、<code>adg_type</code>，以及区间从下限长到上限用了多少天�
 <tr class="even">
 <td>绿色点</td>
 <td>filled (between records)</td>
-<td>两个有记录的日子之间缺失：≤ 3 天 LOESS，&gt; 3 天用”日采食 ~
-体重”回归（<code>iii</code>）</td>
+<td>两个有记录的日子之间缺失：≤ 3 天 LOESS，&gt; 3 天用群体曲线 ×
+个体比例（<code>iii</code>）</td>
 </tr>
 <tr class="odd">
 <td>紫红色点</td>
 <td>filled (stage ends)</td>
-<td>区间两端缺失，用”日采食 ~ 体重”回归（<code>elrp</code>）</td>
+<td>区间两端缺失，用群体曲线 × 个体比例（<code>elrp</code>）</td>
 </tr>
 <tr class="even">
 <td>细灰线</td>

@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.2.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.3.0</span>
       </span>
     </div>
 
@@ -294,7 +294,9 @@ kg）内的剔除（<code>"weight_range"</code>）。</li>
 <li>
 <strong>生长曲线</strong>（<code>curve_model</code>，默认二次曲线
 <code>poly2</code>，可选
-<code>poly1</code>、<code>poly3</code>、<code>gompertz</code>）拟合每头猪的有效记录。曲线第一次到达区间上限的时间为区间终点；终点之前、曲线最后一次从下方越过区间下限的时间为起点。</li>
+<code>poly1</code>、<code>poly3</code>、<code>gompertz</code>）拟合每头猪的有效记录。在首条记录之前、末条记录之后，默认沿曲线本身外推；<code>curve_extrap = "tangent"</code>
+时改为直线外推，斜率取首、末 14 天记录的稳健回归斜率（限制在 0.2–1.5
+kg/d），避免多项式外推几周后弯折。曲线第一次到达区间上限的时间为区间终点；终点之前、曲线最后一次从下方越过区间下限的时间为起点。</li>
 <li>
 <strong>补齐区间内每一天的体重</strong>：
 <ul>
@@ -348,7 +350,7 @@ ADG：</p>
 <div class="section level2">
 <h2 id="采食填充与日采食calc_adfi">5. 采食填充与日采食：<code>calc_adfi()</code><a class="anchor" aria-label="anchor" href="#%E9%87%87%E9%A3%9F%E5%A1%AB%E5%85%85%E4%B8%8E%E6%97%A5%E9%87%87%E9%A3%9Fcalc_adfi"></a>
 </h2>
-<p>区间内没有可用采食的日子，默认（<code>impute_method = "loess_lm"</code>）这样补齐：</p>
+<p>区间内没有可用采食的日子，默认（<code>impute_method = "loess_pop"</code>）这样补齐：</p>
 <table class="table">
 <colgroup>
 <col width="33%">
@@ -368,20 +370,43 @@ ADG：</p>
 </tr>
 <tr class="even">
 <td>两个有记录的日子之间，连续缺失 &gt; 3 天</td>
-<td>线性回归 <code>日采食 ~ 体重</code>
-</td>
+<td>群体曲线 × 个体比例</td>
 <td><code>iii</code></td>
 </tr>
 <tr class="odd">
 <td>首个有记录日之前、末个有记录日之后</td>
-<td>线性回归 <code>日采食 ~ 体重</code>
-</td>
+<td>群体曲线 × 个体比例</td>
 <td><code>elrp</code></td>
 </tr>
 </tbody>
 </table>
-<p>回归中的体重是补齐后的日体重，每头猪单独拟合。这套规则与国家测定规程中日采食缺失的处理方法相同。<code>impute_method = "linear"</code>
-时，中间一律线性插值，两端仍用回归。</p>
+<p><strong>群体曲线 ×
+个体比例</strong>：<code>日采食 = r × f(体重)</code>。</p>
+<ul>
+<li>
+<code>f</code> 是全部猪区间内有记录日子的二次回归
+<code>日采食 ~ 体重 + 体重²</code>。数据中有 <code>breed</code>
+列时，猪数不少于 10
+头的品种各拟合一条，其余的猪用全群曲线。超出拟合时体重范围的体重，<code>f</code>
+取范围端点的值，不再外推。</li>
+<li>
+<code>r</code> 是这头猪的采食水平：它有记录日子的采食之和 ÷
+同样日子上 <code>f</code> 之和，再按记录天数 <code>n</code> 向 1
+收缩（权重
+<code>n / (n + 10)</code>），记录少的猪不会被几天数据带偏。</li>
+<li>一头猪的数据很少覆盖整个区间。只用它自己的数据拟合”日采食 ~
+体重”直线，在有数据的那一段可能很平或很陡，往外推就会出错：晚进站的猪，30
+kg 时会被填上 60 kg
+时的采食量。群体曲线提供采食随体重变化的<strong>形状</strong>，个体比例保留这头猪自己的<strong>水平</strong>。</li>
+<li>在示例数据上，区间开头缺 30 天时，个体 ADFI 误差从 9.7% 降到
+2.3%（NEDAP）、从 15.6% 降到
+3.8%（FIRE）；随机缺失时与原方法相同。按单个测定站拟合曲线的结果与全群相近、略差，所以默认用全群。曲线系数保存在
+<code>adfi$pop_curve</code> 中。</li>
+</ul>
+<p>回归中的体重是补齐后的日体重。可选的方法：<code>impute_method = "loess_lm"</code>
+时，长缺失和两端用每头猪自己的线性回归 <code>日采食 ~ 体重</code>（1.3.0
+之前的默认方法，与国家测定规程中日采食缺失的处理方法相同）；<code>"linear"</code>
+时，中间一律线性插值，两端用每头猪自己的回归。</p>
 <p><strong>ADFI</strong> =
 区间内全部日子（实测、校正、填充）日采食量的平均值。</p>
 </div>
@@ -410,7 +435,7 @@ kg（<code>min_bin_coverage_kg</code>）；</li>
 <span><span class="co">#&gt;       &lt;char&gt; &lt;num&gt; &lt;num&gt; &lt;num&gt;         &lt;char&gt;</span></span>
 <span><span class="co">#&gt; 1:     13913  1210  2643  2.18             ok</span></span>
 <span><span class="co">#&gt; 2:     13918  1163  2566  2.21             ok</span></span>
-<span><span class="co">#&gt; 3:     13954  1124  2681  2.39 low_confidence</span></span>
+<span><span class="co">#&gt; 3:     13954  1124  2679  2.38 low_confidence</span></span>
 <span><span class="co">#&gt; 4:     13996  1335  2860  2.14             ok</span></span>
 <span><span class="co">#&gt; 5:     14962  1279  2831  2.21             ok</span></span></code></pre></div>
 </div>
@@ -441,7 +466,7 @@ kg（<code>min_bin_coverage_kg</code>）；</li>
 <tr class="even">
 <td>区间两端的体重</td>
 <td>二次曲线</td>
-<td>直线、三次曲线、Gompertz</td>
+<td>直线、三次曲线、Gompertz；曲线之外用切线外推（<code>curve_extrap = "tangent"</code>）</td>
 <td>
 <code><a href="../reference/validate_weight_fill.html">validate_weight_fill()</a></code>、<code><a href="../reference/validate_adg.html">validate_adg()</a></code>
 </td>
@@ -454,8 +479,9 @@ kg（<code>min_bin_coverage_kg</code>）；</li>
 </tr>
 <tr class="even">
 <td>采食填充</td>
-<td>LOESS（≤ 3 天）+ 体重回归</td>
-<td>线性插值 + 体重回归</td>
+<td>LOESS（≤ 3 天）+ 群体曲线 × 个体比例</td>
+<td>LOESS + 单猪体重回归（<code>loess_lm</code>）、线性插值 +
+单猪回归（<code>linear</code>）</td>
 <td><code><a href="../reference/validate_adfi.html">validate_adfi()</a></code></td>
 </tr>
 </tbody>

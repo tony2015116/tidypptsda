@@ -19,7 +19,7 @@ pipeline. Every parameter has a default; override any of them through
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.2.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.3.0</span>
       </span>
     </div>
 
@@ -185,6 +185,13 @@ the weights before the first and after the last recorded day:
 to <code>"poly2"</code> when it does not converge). Missing days between recorded
 days are always filled by linear interpolation.</p></li>
 <li><p><code>max_extrap_days</code>: maximum extrapolation of the curve, days. Default 30.</p></li>
+<li><p><code>curve_extrap</code>: how the curve continues before the first and after the
+last record. <code>"curve"</code> (default): the fitted curve itself;
+<code>"tangent"</code>: a straight line from the curve at the first / last
+record, with the robust slope of the records of the first / last 14
+days (limited to 0.2-1.5 kg/d). A polynomial bends away from the data
+when it is extrapolated for weeks; the tangent does not. Compare both
+on your data with <code>validate_adg(extrap = c("curve", "tangent"))</code>.</p></li>
 </ul><p><strong>Feeder errors</strong> (Casey et al. 2005, Table 3)</p><ul><li><p><code>fiv_range</code>: FIV-lo / FIV-hi, feed intake per visit, g.</p></li>
 <li><p><code>fiv0_abs_max</code>: FIV-0, maximum |FIV| for a 0 s visit, g.</p></li>
 <li><p><code>duration_max</code>: OTV-hi, maximum occupation time per visit, s.</p></li>
@@ -207,13 +214,15 @@ weight class), <code>fiv_max</code> (g) and optionally <code>breed</code>. See
 <li><p><code>dfi_quantile</code>: optional, lower and upper quantile cut-offs (e.g.
 <code>c(0.025, 0.99)</code>). <code>NULL</code> = off.</p></li>
 <li><p><code>dfi_correct</code>: <code>"lmm"</code> (Jiao et al. 2014) or <code>"none"</code>.</p></li>
-<li><p><code>impute_method</code>: how missing stage days are filled.
-<code>"loess_lm"</code> (default): gaps between recorded days of up to
-<code>long_gap_days</code> days are filled from a robust LOESS smooth of the daily
-intake, longer gaps and the days before the first / after the last
-recorded day by a linear regression of daily intake on body weight;
-<code>"linear"</code>: linear interpolation between recorded days, the same
-regression at the ends.</p></li>
+<li><p><code>impute_method</code>: how missing stage days are filled. Gaps between
+recorded days of up to <code>long_gap_days</code> days are filled from a robust
+LOESS smooth of the daily intake (<code>"loess_pop"</code>, <code>"loess_lm"</code>); longer
+gaps and the days before the first / after the last recorded day:
+<code>"loess_pop"</code> (default): from the population curve of daily intake on
+body weight (all pigs, or each breed), scaled to the intake level of
+the pig; <code>"loess_lm"</code>: from a linear regression of the pig's own daily
+intake on body weight; <code>"linear"</code>: linear interpolation between
+recorded days whatever the gap, the per-pig regression at the ends.</p></li>
 <li><p><code>long_gap_days</code>: default 3.</p></li>
 </ul><p><strong>Confidence flags</strong> (used by <code><a href="calc_fcr.html">calc_fcr()</a></code>)</p><ul><li><p><code>max_edge_extrap_days</code>: a pig is <code>"low_confidence"</code> when its weights or
 its feed intake are filled over more than this many days at the start

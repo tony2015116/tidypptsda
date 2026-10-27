@@ -19,7 +19,7 @@ are used, and errors are measured on the recorded days only."><meta property="og
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.2.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.3.0</span>
       </span>
     </div>
 
@@ -106,7 +106,7 @@ are used, and errors are measured on the recorded days only.</p>
     <div id="ref-usage">
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">validate_adfi</span><span class="op">(</span></span>
 <span>  <span class="va">adfi</span>,</span>
-<span>  methods <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"loess_lm"</span>, <span class="st">"linear"</span><span class="op">)</span>,</span>
+<span>  methods <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"loess_pop"</span>, <span class="st">"loess_lm"</span>, <span class="st">"linear"</span><span class="op">)</span>,</span>
 <span>  scenarios <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"random30"</span>, <span class="st">"blocks3"</span>, <span class="st">"late20"</span>, <span class="st">"early15"</span><span class="op">)</span>,</span>
 <span>  reps <span class="op">=</span> <span class="fl">5</span>,</span>
 <span>  min_coverage <span class="op">=</span> <span class="fl">0.8</span>,</span>
@@ -126,7 +126,9 @@ are used, and errors are measured on the recorded days only.</p>
 
 
 <dt id="arg-methods">methods<a class="anchor" aria-label="anchor" href="#arg-methods"></a></dt>
-<dd><p>Imputation methods to compare (values of <code>impute_method</code>).</p></dd>
+<dd><p>Imputation methods to compare (values of <code>impute_method</code>).
+For <code>"loess_pop"</code>, the population curve of each pig is fitted without
+that pig (leave-one-out), so its hidden days do not inform the curve.</p></dd>
 
 
 <dt id="arg-scenarios">scenarios<a class="anchor" aria-label="anchor" href="#arg-scenarios"></a></dt>

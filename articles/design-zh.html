@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.2.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.3.0</span>
       </span>
     </div>
 
@@ -185,16 +185,16 @@ kg 分段，以及图中的虚线。</p>
 <tr class="odd">
 <td>两个有记录的日子之间</td>
 <td>前后两天线性插值</td>
-<td>≤ 3 天：LOESS 平滑；&gt; 3 天：采食对体重的回归</td>
+<td>≤ 3 天：LOESS 平滑；&gt; 3 天：群体曲线 × 个体比例</td>
 </tr>
 <tr class="even">
 <td>区间两端（进站晚、出栏早）</td>
 <td>生长曲线</td>
-<td>采食对体重的回归</td>
+<td>群体曲线 × 个体比例</td>
 </tr>
 </tbody>
 </table>
-<p>背后的考虑是：<strong>中间缺失时，前后两天的实测最能说明这头猪当时的状态</strong>；两端缺失时没有实测可依，只能靠模型。用自己的数据验证过：中间缺失时，线性插值的日体重误差约
+<p>背后的考虑是：<strong>中间缺失时，前后两天的实测最能说明这头猪当时的状态</strong>；两端缺失时没有实测可依，只能靠模型。采食的模型借用全群的曲线形状：一头猪自己的数据只覆盖区间的一段，用它外推到另一段很容易出错，而全群合起来覆盖了整个区间，每头猪只需提供自己的采食水平。用自己的数据验证过：中间缺失时，线性插值的日体重误差约
 0.8 kg，用生长曲线约 1.1–1.6 kg。</p>
 <p>补齐之后，ADG
 就是区间内每天体重对日期回归的斜率。这个定义直观，和”每天长多少”的说法一致；有一两天的读数偏高或偏低，对斜率的影响也很小；R²
