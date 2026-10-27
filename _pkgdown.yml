@@ -67,6 +67,7 @@ reference:
   - validate_adg
   - validate_weight_fill
   - validate_adfi
+  - validate_truncation
 - title: Plots
   desc: One plot per station and one panel per pig; write them to files.
   contents:

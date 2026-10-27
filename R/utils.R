@@ -369,7 +369,8 @@ utils::globalVariables(c(
   "adg_curve", "rlm_w", "i.rlm_w", "feed_missing", "r2_daily", "w_obs",
   "i.weight", "i.dfi", "i.state", "removed", "step", "weight_filled", "x",
   "n_observed_days", "n_interpolated_days", "n_curve_days", "r_squared", "fill",
-  "info", "abs_err", "sum_err", "adg_spearman", "pop_key", "i.pop_key", "label"
+  "info", "abs_err", "sum_err", "adg_spearman", "pop_key", "i.pop_key", "label",
+  "setting", "scenario", "trait", "truncated", "n_lost", "i.start_date", "i.end_date"
 ))
 
 #' @export

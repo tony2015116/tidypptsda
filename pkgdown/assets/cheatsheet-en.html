@@ -338,6 +338,7 @@ save_plots(g, "plots", suffix = "growth")</code></pre>
     <tr><td><code>validate_adg()</code></td><td>growth curves: cross-validation and truncation (late entry, early exit); <code>extrap</code> compares curve and tangent</td></tr>
     <tr><td><code>validate_weight_fill()</code></td><td>hide daily weights: linear interpolation vs each curve</td></tr>
     <tr><td><code>validate_adfi()</code></td><td>hide daily intake: loess_pop vs loess_lm vs linear</td></tr>
+    <tr><td><code>validate_truncation()</code></td><td><b>whole pipeline</b>: drop all visits of some pigs, rerun, compare ADG / ADFI / FCR of several settings (no leakage)</td></tr>
   </table>
 <pre><code>vw <- validate_weight_fill(w, max_pigs = 300, cores = 4)
 vw$summary

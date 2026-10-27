@@ -530,5 +530,43 @@ vf$summary
 
 
 
+# validate_truncation
+
+`validate_truncation()` checks the whole pipeline **without information
+leaking back** from hidden data. It removes every visit (body weight and
+feed) of part of the pigs over some days of the stage, as if they had
+entered late, left early or missed a stretch of the test, reruns
+`clean_weight()`, `calc_adg()`, `calc_adfi()` and `calc_fcr()`, and compares
+ADG, ADFI and FCR of these pigs with the result of all data. Each pig is
+truncated once per repetition while the other pigs keep their records, so
+population curves and the correction model still see the whole stage, as in
+a real batch where only some pigs have missing ends. Several QC settings
+can be compared on the same hidden data.
+
+The other validation functions are faster but look at one step at a time,
+with the rest of the data known: `validate_adfi()` keeps the body weight of
+the hidden feed days and the stage of the full data, `validate_adg()` and
+`validate_weight_fill()` use weight records cleaned with all data. They are
+somewhat optimistic, most of all at the stage ends.
+
+
+
+```{r example-validate_truncation}
+visits <- prep_visits(nedap, verbose = 0)
+# 2 settings x 1 scenario x 1 repetition; use more repetitions on real data
+res <- validate_truncation(
+  visits,
+  settings = list(lm = qc_config(impute_method = "loess_lm"), pop = qc_config()),
+  scenarios = "late20", reps = 1
+)
+res$summary[, .(setting, trait, mae_pct, spearman, slope, top_agree)]
+```
+
+
+
+<!--
+
+
+
 # Inflate your package
 -->
