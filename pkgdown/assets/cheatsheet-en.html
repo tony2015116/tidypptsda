@@ -193,7 +193,7 @@ visits <- add_breed(visits, read.csv("breeds.csv"),
   <h2>QC settings <small>qc_config()</small></h2>
 <pre><code>qc <- qc_config(stage_range = c(60, 120),
                 curve_model = "poly1")
-qc                          <span class="c"># all 42 parameters, by group</span>
+qc                          <span class="c"># all 43 parameters, by group</span>
 run_pipeline(raw, qc = qc)</code></pre>
   <table>
     <tr><th>Parameter</th><th>Default</th><th>Meaning</th></tr>
@@ -203,7 +203,8 @@ run_pipeline(raw, qc = qc)</code></pre>
     <tr><td><code>weight_outlier</code></td><td>rlm, loess</td><td>outlier methods after tracking</td></tr>
     <tr><td><code>min_test_days</code></td><td>35</td><td>shortest test (removes)</td></tr>
     <tr><td><code>curve_model</code></td><td>poly2</td><td>curve that fills the stage ends</td></tr>
-    <tr><td><code>impute_method</code></td><td>loess_lm</td><td>feed filling, or linear</td></tr>
+    <tr><td><code>impute_method</code></td><td>loess_pop</td><td>feed filling: population curve × pig level; or loess_lm, linear</td></tr>
+    <tr><td><code>curve_extrap</code></td><td>curve</td><td>beyond the records: the curve, or tangent</td></tr>
     <tr><td><code>max_edge_extrap_days</code></td><td>15</td><td>more filling at the ends: low confidence</td></tr>
     <tr><td><code>duration_max</code></td><td>3600</td><td>longest visit (s)</td></tr>
   </table>
@@ -240,7 +241,7 @@ run_pipeline(raw, qc = qc)</code></pre>
     <tr><th><code>source</code></th><th>From</th></tr>
     <tr><td><code>observed</code></td><td>median of the day's valid weights</td></tr>
     <tr><td><code>interpolated</code></td><td>between recorded days: linear interpolation</td></tr>
-    <tr><td><code>curve</code></td><td>before the first / after the last record: growth curve</td></tr>
+    <tr><td><code>curve</code></td><td>before the first / after the last record: growth curve (tangent with <code>curve_extrap = "tangent"</code>)</td></tr>
   </table>
   <p>3. <b>ADG = slope of the daily weights on the day over the stage</b> (g/d), with <code>r_squared</code>.</p>
   <table>
@@ -257,14 +258,14 @@ run_pipeline(raw, qc = qc)</code></pre>
   <ul>
     <li><b>Errors</b>: the 16 rules of Casey et al. (2005) (feed per visit, duration, feeding rate, trough weight differences…); run inside <code>calc_adfi()</code>.</li>
     <li><b>Correction</b>: mixed model of Jiao et al. (2014), removes the effect of the error covariates; days without errors unchanged.</li>
-    <li><b>Filling</b>: on the ADG stage days only; the regression uses the filled daily weights.</li>
+    <li><b>Filling</b>: on the ADG stage days only, with the filled daily weights. Long gaps and stage ends: <b>population (or breed) curve of intake on body weight × the pig's intake level</b>, see <code>adfi$pop_curve</code>.</li>
   </ul>
   <table>
     <tr><th><code>state</code></th><th>The day's intake is</th></tr>
     <tr><td><code>org</code></td><td>recorded, no error visit that day</td></tr>
     <tr><td><code>corr</code></td><td>corrected by the model</td></tr>
-    <tr><td><code>iii</code></td><td>gap between records: ≤ 3 d LOESS, &gt; 3 d regression on body weight</td></tr>
-    <tr><td><code>elrp</code></td><td>missing at the stage ends: same regression</td></tr>
+    <tr><td><code>iii</code></td><td>gap between records: ≤ 3 d LOESS, &gt; 3 d population curve × pig level</td></tr>
+    <tr><td><code>elrp</code></td><td>missing at the stage ends: population curve × pig level</td></tr>
     <tr><td><code>missing</code></td><td>cannot be estimated</td></tr>
   </table>
   <p><b>ADFI</b> = mean daily intake over the stage; <code>coverage</code> = share of days recorded (incl. corrected).</p>
@@ -334,9 +335,9 @@ save_plots(g, "plots", suffix = "growth")</code></pre>
   <table>
     <tr><th>Function</th><th>Tests</th></tr>
     <tr><td><code>validate_outliers()</code></td><td>artificial errors: detection, false removals and ADG error of outlier methods</td></tr>
-    <tr><td><code>validate_adg()</code></td><td>growth curves: cross-validation and truncation (late entry, early exit)</td></tr>
+    <tr><td><code>validate_adg()</code></td><td>growth curves: cross-validation and truncation (late entry, early exit); <code>extrap</code> compares curve and tangent</td></tr>
     <tr><td><code>validate_weight_fill()</code></td><td>hide daily weights: linear interpolation vs each curve</td></tr>
-    <tr><td><code>validate_adfi()</code></td><td>hide daily intake: loess_lm vs linear</td></tr>
+    <tr><td><code>validate_adfi()</code></td><td>hide daily intake: loess_pop vs loess_lm vs linear</td></tr>
   </table>
 <pre><code>vw <- validate_weight_fill(w, max_pigs = 300, cores = 4)
 vw$summary

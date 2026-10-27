@@ -6,7 +6,7 @@
 \usage{
 validate_adfi(
   adfi,
-  methods = c("loess_lm", "linear"),
+  methods = c("loess_pop", "loess_lm", "linear"),
   scenarios = c("random30", "blocks3", "late20", "early15"),
   reps = 5,
   min_coverage = 0.8,
@@ -19,7 +19,9 @@ validate_adfi(
 \arguments{
 \item{adfi}{Result of \code{\link[=calc_adfi]{calc_adfi()}}.}
 
-\item{methods}{Imputation methods to compare (values of \code{impute_method}).}
+\item{methods}{Imputation methods to compare (values of \code{impute_method}).
+For \code{"loess_pop"}, the population curve of each pig is fitted without
+that pig (leave-one-out), so its hidden days do not inform the curve.}
 
 \item{scenarios}{Patterns of hidden days:
 \itemize{

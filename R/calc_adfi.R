@@ -28,6 +28,10 @@
 #'     `n_visits`, `n_error_visits`, `dfi_raw`, `dfi_error_free`,
 #'     `dfi_corrected`, `dfi` (final value, g) and `state`;
 #'   - `model`: fixed-effect estimates of the correction model;
+#'   - `pop_curve`: the population curves of `impute_method = "loess_pop"`,
+#'     one row per group (`"all"` or a breed): `n_pigs`, `n_days`,
+#'     coefficients `b0`, `b1`, `b2` of `dfi = b0 + b1 bw + b2 bw^2` (g, kg)
+#'     and the weight range `bw_min`, `bw_max`; no rows for other methods;
 #'   - `removed`, `settings`.
 #'
 #' @references
@@ -107,10 +111,16 @@ calc_adfi <- function(visits, adg, qc = adg$settings, verbose = 1, cores = 1) {
   )]
   data.table::setorder(daily, responder, date)
 
-  imp <- fit_by_pig(daily, impute_dfi_one_pig, step = "calc_adfi", qc = qc)
+  pc <- if (qc$impute_method == "loess_pop") {
+    pop_curves(daily, if (has_breed) pigs[, .(responder, breed)] else NULL)
+  } else {
+    list(curves = NULL, key = NULL, table = pop_curve_table(list()))
+  }
+  if (!is.null(pc$key)) daily[pc$key, on = "responder", pop_key := i.pop_key]
+  imp <- fit_by_pig(daily, impute_dfi_one_pig, step = "calc_adfi", qc = qc, pop = pc$curves)
   daily <- imp$result
   data.table::setnames(daily, "y", "dfi_error_free")
-  daily[, c("dfi_check", "pig_location", "all_error") := NULL]
+  daily[, intersect(c("dfi_check", "pig_location", "all_error", "pop_key"), names(daily)) := NULL]
   data.table::setcolorder(daily, c("responder", "location", "date", "seq_days",
                                    "bw", "in_stage", "n_visits", "n_error_visits",
                                    "dfi_raw", "dfi_error_free", "dfi_corrected",
@@ -146,10 +156,10 @@ calc_adfi <- function(visits, adg, qc = adg$settings, verbose = 1, cores = 1) {
   removed <- rbind(adg$removed,
                    new_removed(no_adfi$responder, no_adfi$location, "calc_adfi", why))
 
-  report_adfi(per_pig, daily, corr, n_range, n_quant, qc)
+  report_adfi(per_pig, daily, corr, n_range, n_quant, qc, pc$table)
   new_ppt_result(per_pig = per_pig, daily = daily, removed = removed,
                  settings = qc, class = "ppt_adfi") |>
-    add_element(model = corr$coefficients)
+    add_element(model = corr$coefficients, pop_curve = pc$table)
 }
 
 # Fit the correction model and compute dfi_corrected.
@@ -289,13 +299,66 @@ adg_bw <- function(adg) {
                          bw = bw, in_stage = d$in_stage)
 }
 
+# Population curve of daily intake (g) on body weight (kg): quadratic
+# regression on recorded days. NULL when the data are too few.
+fit_pop_curve <- function(dfi, bw, n_pigs = NA_integer_) {
+  ok <- !is.na(dfi) & !is.na(bw)
+  if (sum(ok) < 30L || data.table::uniqueN(round(bw[ok])) < 10L) return(NULL)
+  x <- bw[ok]
+  b <- stats::coef(stats::lm(dfi[ok] ~ x + I(x^2)))
+  if (anyNA(b)) return(NULL)
+  list(coef = unname(b), range = range(x), n_pigs = n_pigs, n_days = sum(ok))
+}
+
+# Curve value, held constant beyond the weights it was fitted on.
+pop_predict <- function(curve, bw) {
+  x <- pmin(pmax(bw, curve$range[1L]), curve$range[2L])
+  pmax(0, curve$coef[1L] + curve$coef[2L] * x + curve$coef[3L] * x^2)
+}
+
+# Population curves on the recorded stage days: one for all pigs and one
+# for each breed with at least `min_pigs` pigs. `key` gives the curve of
+# each pig.
+pop_curves <- function(daily, breeds = NULL, min_pigs = 10L) {
+  rec <- daily[in_stage == TRUE & !is.na(dfi_check) & !is.na(bw), .(responder, dfi = dfi_check, bw)]
+  curves <- list(all = fit_pop_curve(rec$dfi, rec$bw, data.table::uniqueN(rec$responder)))
+  key <- data.table::data.table(responder = unique(daily$responder), pop_key = "all")
+  if (!is.null(breeds) && nrow(rec) > 0L) {
+    rec <- merge(rec, breeds, by = "responder")
+    nb <- rec[!is.na(breed), .(n = data.table::uniqueN(responder)), by = breed]
+    for (b in nb[n >= min_pigs, breed]) {
+      cv <- fit_pop_curve(rec[breed == b, dfi], rec[breed == b, bw], nb[breed == b, n])
+      if (is.null(cv)) next
+      curves[[paste0("breed ", b)]] <- cv
+      key[responder %in% breeds[breed == b, responder], pop_key := paste0("breed ", b)]
+    }
+  }
+  curves <- curves[!vapply(curves, is.null, logical(1))]
+  if (length(curves) == 0L) key <- NULL
+  list(curves = curves, key = key, table = pop_curve_table(curves))
+}
+
+pop_curve_table <- function(curves) {
+  if (length(curves) == 0L) {
+    return(data.table::data.table(group = character(), n_pigs = integer(), n_days = integer(),
+                                  b0 = numeric(), b1 = numeric(), b2 = numeric(),
+                                  bw_min = numeric(), bw_max = numeric()))
+  }
+  data.table::rbindlist(lapply(names(curves), function(g) {
+    cv <- curves[[g]]
+    data.table::data.table(group = g, n_pigs = as.integer(cv$n_pigs), n_days = as.integer(cv$n_days),
+                           b0 = cv$coef[1L], b1 = cv$coef[2L], b2 = cv$coef[3L],
+                           bw_min = cv$range[1L], bw_max = cv$range[2L])
+  }))
+}
+
 # Impute the stage days of one pig.
 # - inside the recorded period ("iii"): gaps of up to long_gap_days days by a
 #   robust LOESS of intake over the days, longer gaps by a regression of
 #   intake on body weight ("loess_lm"); or linear interpolation ("linear");
 # - before the first / after the last recorded day ("elrp"): regression of
 #   intake on body weight.
-impute_dfi_one_pig <- function(d, qc) {
+impute_dfi_one_pig <- function(d, qc, pop = NULL) {
   d <- data.table::copy(d)
   ok <- !is.na(d$dfi_check)
   d[, dfi := dfi_check]
@@ -309,11 +372,29 @@ impute_dfi_one_pig <- function(d, qc) {
   outside <- need & !inside
   okb <- ok & !is.na(d$bw)
   bw_fit <- if (sum(okb) >= 5L) stats::lm(dfi_check ~ bw, data = d[okb]) else NULL
-  by_bw <- function(rows) {
+  by_lm <- function(rows) {
     rows <- rows & !is.na(d$bw)
     if (!is.null(bw_fit) && any(rows)) {
       d[rows, dfi := pmax(0, stats::predict(bw_fit, newdata = d[rows]))]
     }
+  }
+  # population curve scaled to the intake level of the pig on its recorded
+  # stage days, shrunk towards 1 when the pig has few recorded days
+  curve <- NULL
+  if (qc$impute_method == "loess_pop" && length(pop) > 0L) {
+    k <- if ("pop_key" %in% names(d) && !is.na(d$pop_key[1L])) d$pop_key[1L] else "all"
+    curve <- pop[[k]] %||% pop[["all"]]
+  }
+  by_bw <- if (is.null(curve)) by_lm else function(rows) {
+    rows <- rows & !is.na(d$bw)
+    if (!any(rows)) return(invisible())
+    lev <- okb & d$in_stage
+    if (sum(lev) < 5L) lev <- okb
+    n <- sum(lev)
+    r <- sum(d$dfi_check[lev]) / sum(pop_predict(curve, d$bw[lev]))
+    if (!is.finite(r)) return(by_lm(rows))
+    r <- n / (n + 10) * r + 10 / (n + 10)
+    d[rows, dfi := r * pop_predict(curve, bw)]
   }
 
   if (any(inside)) {
@@ -364,9 +445,12 @@ loess_extend <- function(x, y, span) {
   }
 }
 
-report_adfi <- function(per_pig, daily, corr, n_range, n_quant, qc) {
+report_adfi <- function(per_pig, daily, corr, n_range, n_quant, qc, pop_table = NULL) {
   if (corr$status == "fitted") {
     ppt_msg("Correction model: {corr$n_obs} pig-days, {corr$n_terms} error covariate{?s}", "info")
+  }
+  if (!is.null(pop_table) && nrow(pop_table) > 0L) {
+    ppt_msg("Population curve{?s} of intake on body weight: {paste0(pop_table$group, ' (', pop_table$n_pigs, ' pigs)', collapse = ', ')}", "info")
   }
   st <- daily[in_stage == TRUE, .N, by = state]
   get_n <- function(s) st[state == s, sum(N)]

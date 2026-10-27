@@ -118,12 +118,12 @@ res$weight$records[, .N, by = qc_flag]
 | `r_squared` | 这个回归的 R² |
 | `n_observed_days`、`n_interpolated_days`、`n_curve_days` | 区间内日体重为实测、线性插值、生长曲线填充的天数 |
 | `adg_curve` | 对照用：生长曲线在区间两端的体重差 ÷ 天数 |
-| `curve_used`、`curve_r2` | 实际使用的生长曲线和它的 R² |
+| `curve_used`、`curve_r2` | 实际使用的生长曲线和它的 R²；切线外推时注明 `+ tangent`，如 `poly2 + tangent` |
 | `adg_type` | `observed`：区间两端都在测定期内；`extrapolated`：需要外推，但不超过 `max_extrap_days`；`partial`：外推后仍到不了端点，只算覆盖到的部分；`none`：覆盖不足 7 天，没有日增重 |
 | `start_date`、`end_date` | 曲线到达区间下限、上限的日期（区间的起止） |
 | `start_weight`、`end_weight` | 起止处的体重 |
 | `stage_days` | 区间天数 |
-| `extrap_days_start`、`extrap_days_end` | 起点在首条记录之前、终点在末条记录之后，由生长曲线外推的天数 |
+| `extrap_days_start`、`extrap_days_end` | 起点在首条记录之前、终点在末条记录之后，由生长曲线（或切线）外推的天数 |
 | `weight_status`、`weight_reason` | 体重质控的结论（来自 `$weight`） |
 
 ### `daily`
@@ -157,8 +157,8 @@ res$weight$records[, .N, by = qc_flag]
 |---|---|
 | `org` | 实测，当天没有错误访问 |
 | `corr` | 当天有错误访问，用模型校正 |
-| `iii` | 两个有记录的日子之间缺失：≤ 3 天用 LOESS，> 3 天用"日采食 ~ 体重"回归（`impute_method = "linear"` 时为线性插值） |
-| `elrp` | 区间两端缺失，用"日采食 ~ 体重"回归 |
+| `iii` | 两个有记录的日子之间缺失：≤ 3 天用 LOESS，> 3 天用群体曲线 × 个体比例（`loess_lm` 时为单猪回归，`linear` 时为线性插值） |
+| `elrp` | 区间两端缺失，用群体曲线 × 个体比例（`loess_lm`、`linear` 时为单猪回归） |
 | `missing` | 无法估计 |
 | `NA` | 区间外的日子，不需要插补 |
 
@@ -176,6 +176,10 @@ res$weight$records[, .N, by = qc_flag]
 ### `model`：校正模型的系数
 
 `term`（变量）、`estimate`（系数）、`std_error`、`p_value`。错误协变量以 `pte_`（该类错误的访问占比）、`otd_`（该类错误访问的停留时长）、`fid_`（该类错误访问的采食量）开头。
+
+### `pop_curve`：采食插补用的群体曲线
+
+`impute_method = "loess_pop"` 时，每条群体曲线一行：`group`（`all` 为全群，`breed XX` 为某品种）、`n_pigs`、`n_days`、二次曲线 `日采食 = b0 + b1·体重 + b2·体重²` 的系数 `b0`、`b1`、`b2`（g、kg），以及拟合所用的体重范围 `bw_min`、`bw_max`（范围之外取端点的值）。其他方法时为空表。
 
 ## 6. `$fcr`：料肉比与最终结果
 

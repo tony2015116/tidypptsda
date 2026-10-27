@@ -95,6 +95,13 @@ the weights before the first and after the last recorded day:
 to \code{"poly2"} when it does not converge). Missing days between recorded
 days are always filled by linear interpolation.
 \item \code{max_extrap_days}: maximum extrapolation of the curve, days. Default 30.
+\item \code{curve_extrap}: how the curve continues before the first and after the
+last record. \code{"curve"} (default): the fitted curve itself;
+\code{"tangent"}: a straight line from the curve at the first / last
+record, with the robust slope of the records of the first / last 14
+days (limited to 0.2-1.5 kg/d). A polynomial bends away from the data
+when it is extrapolated for weeks; the tangent does not. Compare both
+on your data with \code{validate_adg(extrap = c("curve", "tangent"))}.
 }
 
 \strong{Feeder errors} (Casey et al. 2005, Table 3)
@@ -125,13 +132,15 @@ weight class), \code{fiv_max} (g) and optionally \code{breed}. See
 \item \code{dfi_quantile}: optional, lower and upper quantile cut-offs (e.g.
 \code{c(0.025, 0.99)}). \code{NULL} = off.
 \item \code{dfi_correct}: \code{"lmm"} (Jiao et al. 2014) or \code{"none"}.
-\item \code{impute_method}: how missing stage days are filled.
-\code{"loess_lm"} (default): gaps between recorded days of up to
-\code{long_gap_days} days are filled from a robust LOESS smooth of the daily
-intake, longer gaps and the days before the first / after the last
-recorded day by a linear regression of daily intake on body weight;
-\code{"linear"}: linear interpolation between recorded days, the same
-regression at the ends.
+\item \code{impute_method}: how missing stage days are filled. Gaps between
+recorded days of up to \code{long_gap_days} days are filled from a robust
+LOESS smooth of the daily intake (\code{"loess_pop"}, \code{"loess_lm"}); longer
+gaps and the days before the first / after the last recorded day:
+\code{"loess_pop"} (default): from the population curve of daily intake on
+body weight (all pigs, or each breed), scaled to the intake level of
+the pig; \code{"loess_lm"}: from a linear regression of the pig's own daily
+intake on body weight; \code{"linear"}: linear interpolation between
+recorded days whatever the gap, the per-pig regression at the ends.
 \item \code{long_gap_days}: default 3.
 }
 

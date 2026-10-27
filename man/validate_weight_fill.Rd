@@ -7,6 +7,7 @@
 validate_weight_fill(
   weight,
   methods = c("linear", "poly1", "poly2", "poly3", "gompertz"),
+  extrap = "curve",
   scenarios = c("random30", "blocks3", "late20", "early15"),
   reps = 3,
   max_pigs = NULL,
@@ -26,6 +27,11 @@ last recorded day (the method of \code{\link[=calc_adg]{calc_adg()}});
 \item \code{"poly1"}, \code{"poly2"}, \code{"poly3"}, \code{"gompertz"}: that growth curve,
 fitted on the remaining records, for every missing day.
 }}
+
+\item{extrap}{Extrapolations of the curve beyond the records to compare
+(values of \code{curve_extrap}): \code{"curve"} (default), \code{"tangent"} or both.
+With \code{"tangent"}, a method is labelled e.g. \code{"linear+tangent"}. It
+matters for the days hidden at the ends (\code{"late<d>"}, \code{"early<d>"}).}
 
 \item{scenarios}{Patterns of hidden days, as in \code{\link[=validate_adfi]{validate_adfi()}}:
 \code{"random<p>"}, \code{"blocks<n>"}, \code{"late<d>"}, \code{"early<d>"}. Only recorded

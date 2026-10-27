@@ -8,7 +8,8 @@
 #'
 #' @param weight Result of [clean_weight()].
 #' @param qc QC settings; by default the ones used by [clean_weight()].
-#'   Used here: `stage_range`, `curve_model`, `max_extrap_days`.
+#'   Used here: `stage_range`, `curve_model`, `max_extrap_days`,
+#'   `curve_extrap`.
 #' @param verbose 0 (silent), 1 (summary, default) or 2 (details).
 #' @param cores Number of CPU cores for the per-pig computations. Default 1.
 #'
@@ -116,7 +117,7 @@ adg_one_pig <- function(d, qc, day0, fill = "linear") {
   t <- as.numeric(difftime(d$entry_time, as.POSIXct(first_day, tz = "UTC"),
                            units = "days"))
   y <- d$weight
-  curve <- fit_growth_curve(t, y, qc$curve_model)
+  curve <- fit_growth_curve(t, y, qc$curve_model, qc$curve_extrap %||% "curve")
 
   lo <- qc$stage_range[1L]
   hi <- qc$stage_range[2L]
@@ -207,8 +208,9 @@ adg_one_pig <- function(d, qc, day0, fill = "linear") {
 }
 
 # Fit a growth curve. Returns a prediction function, the fitted values,
-# the residual SD, R2 and the name of the model actually used.
-fit_growth_curve <- function(t, y, model) {
+# the residual SD, R2 and the name of the model actually used. With
+# extrap = "tangent", the prediction beyond the records is a straight line.
+fit_growth_curve <- function(t, y, model, extrap = "curve") {
   fit_poly <- function(k, name = paste0("poly", k)) {
     f <- stats::lm(y ~ poly(t, k, raw = TRUE))
     b <- stats::coef(f)
@@ -235,6 +237,39 @@ fit_growth_curve <- function(t, y, model) {
   res <- y - curve$fitted
   curve$sigma <- stats::sd(res)
   curve$r2 <- 1 - sum(res^2) / sum((y - mean(y))^2)
+  if (extrap == "tangent") curve <- tangent_ends(curve, t, y)
+  curve
+}
+
+# Continue the curve beyond the records by straight lines: from the curve at
+# the first / last record, with the robust slope of the records of the first
+# / last `window` days, limited to `slope_range` kg/d.
+tangent_ends <- function(curve, t, y, window = 14, slope_range = c(0.2, 1.5)) {
+  tmin <- min(t)
+  tmax <- max(t)
+  win <- min(window, (tmax - tmin) / 2)
+  slope <- function(sel) {
+    if (sum(sel) < 5L || diff(range(t[sel])) < 2) return(NA_real_)
+    g <- tryCatch(stats::coef(MASS::rlm(cbind(1, t[sel]), y[sel], psi = MASS::psi.bisquare,
+                                        maxit = 50))[2L],
+                  error = function(e) stats::coef(stats::lm(y[sel] ~ t[sel]))[2L])
+    min(slope_range[2L], max(slope_range[1L], unname(g)))
+  }
+  g_start <- slope(t <= tmin + win)
+  g_end <- slope(t >= tmax - win)
+  p <- curve$pred
+  p_start <- p(tmin)
+  p_end <- p(tmax)
+  curve$pred <- function(x) {
+    out <- p(x)
+    lo <- x < tmin & !is.na(g_start)
+    hi <- x > tmax & !is.na(g_end)
+    out[lo] <- p_start + g_start * (x[lo] - tmin)
+    out[hi] <- p_end + g_end * (x[hi] - tmax)
+    out
+  }
+  curve$name <- paste0(curve$name, " + tangent")
+  curve$tangent_slopes <- c(start = g_start, end = g_end)
   curve
 }
 

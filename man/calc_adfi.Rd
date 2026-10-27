@@ -34,6 +34,10 @@ recorded or corrected value), \code{adg_type};
 \code{n_visits}, \code{n_error_visits}, \code{dfi_raw}, \code{dfi_error_free},
 \code{dfi_corrected}, \code{dfi} (final value, g) and \code{state};
 \item \code{model}: fixed-effect estimates of the correction model;
+\item \code{pop_curve}: the population curves of \code{impute_method = "loess_pop"},
+one row per group (\code{"all"} or a breed): \code{n_pigs}, \code{n_days},
+coefficients \code{b0}, \code{b1}, \code{b2} of \verb{dfi = b0 + b1 bw + b2 bw^2} (g, kg)
+and the weight range \code{bw_min}, \code{bw_max}; no rows for other methods;
 \item \code{removed}, \code{settings}.
 }
 }

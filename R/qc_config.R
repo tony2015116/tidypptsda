@@ -79,6 +79,13 @@
 #'   to `"poly2"` when it does not converge). Missing days between recorded
 #'   days are always filled by linear interpolation.
 #' - `max_extrap_days`: maximum extrapolation of the curve, days. Default 30.
+#' - `curve_extrap`: how the curve continues before the first and after the
+#'   last record. `"curve"` (default): the fitted curve itself;
+#'   `"tangent"`: a straight line from the curve at the first / last
+#'   record, with the robust slope of the records of the first / last 14
+#'   days (limited to 0.2-1.5 kg/d). A polynomial bends away from the data
+#'   when it is extrapolated for weeks; the tangent does not. Compare both
+#'   on your data with `validate_adg(extrap = c("curve", "tangent"))`.
 #'
 #' **Feeder errors** (Casey et al. 2005, Table 3)
 #' - `fiv_range`: FIV-lo / FIV-hi, feed intake per visit, g.
@@ -105,13 +112,15 @@
 #' - `dfi_quantile`: optional, lower and upper quantile cut-offs (e.g.
 #'   `c(0.025, 0.99)`). `NULL` = off.
 #' - `dfi_correct`: `"lmm"` (Jiao et al. 2014) or `"none"`.
-#' - `impute_method`: how missing stage days are filled.
-#'   `"loess_lm"` (default): gaps between recorded days of up to
-#'   `long_gap_days` days are filled from a robust LOESS smooth of the daily
-#'   intake, longer gaps and the days before the first / after the last
-#'   recorded day by a linear regression of daily intake on body weight;
-#'   `"linear"`: linear interpolation between recorded days, the same
-#'   regression at the ends.
+#' - `impute_method`: how missing stage days are filled. Gaps between
+#'   recorded days of up to `long_gap_days` days are filled from a robust
+#'   LOESS smooth of the daily intake (`"loess_pop"`, `"loess_lm"`); longer
+#'   gaps and the days before the first / after the last recorded day:
+#'   `"loess_pop"` (default): from the population curve of daily intake on
+#'   body weight (all pigs, or each breed), scaled to the intake level of
+#'   the pig; `"loess_lm"`: from a linear regression of the pig's own daily
+#'   intake on body weight; `"linear"`: linear interpolation between
+#'   recorded days whatever the gap, the per-pig regression at the ends.
 #' - `long_gap_days`: default 3.
 #'
 #' **Confidence flags** (used by [calc_fcr()])
@@ -279,6 +288,7 @@ qc_defaults <- function() {
     stage_range = c(30, 120),
     curve_model = "poly2",
     max_extrap_days = 30,
+    curve_extrap = "curve",
     # feeder errors, Casey et al. (2005) Table 3
     fiv_range = c(-20, 2000),
     fiv0_abs_max = 20,
@@ -294,7 +304,7 @@ qc_defaults <- function() {
     dfi_range = c(0, 6),
     dfi_quantile = NULL,
     dfi_correct = "lmm",
-    impute_method = "loess_lm",
+    impute_method = "loess_pop",
     long_gap_days = 3,
     # confidence flags
     max_edge_extrap_days = 15,
@@ -319,7 +329,7 @@ qc_groups <- function() {
     exit_weight_min = "Pig-level checks", track_flag_share = "Pig-level checks",
     smooth_r2_min = "Pig-level checks",
     stage_range = "Growth and ADG", curve_model = "Growth and ADG",
-    max_extrap_days = "Growth and ADG",
+    max_extrap_days = "Growth and ADG", curve_extrap = "Growth and ADG",
     fiv_range = "Feeder errors", fiv0_abs_max = "Feeder errors",
     duration_max = "Feeder errors", speed_fiv_lo_max = "Feeder errors",
     speed_strict_max = "Feeder errors", speed_range = "Feeder errors",
@@ -352,7 +362,7 @@ qc_spec <- function() {
     entry_weight_max = num(0), exit_weight_min = num(0), track_flag_share = num(0, 1),
     smooth_r2_min = num(0, 1, null = TRUE),
     stage_range = rng(0), curve_model = chc(c("poly1", "poly2", "poly3", "gompertz")),
-    max_extrap_days = num(0),
+    max_extrap_days = num(0), curve_extrap = chc(c("curve", "tangent")),
     fiv_range = rng(), fiv0_abs_max = num(0), duration_max = num(0),
     speed_fiv_lo_max = num(0), speed_strict_max = num(0), speed_range = rng(0),
     idle_duration_max = num(0), trough_diff_range = rng(),
@@ -360,7 +370,7 @@ qc_spec <- function() {
     fiv_max_by_weight = tbl(c("weight_from", "fiv_max"), optional = "breed"),
     dfi_range = rng(0), dfi_quantile = rng(0, 1, null = TRUE),
     dfi_correct = chc(c("lmm", "none")),
-    impute_method = chc(c("loess_lm", "linear")),
+    impute_method = chc(c("loess_pop", "loess_lm", "linear")),
     long_gap_days = num(1),
     max_edge_extrap_days = num(0), min_coverage = num(0, 1),
     bin_width = num(1), min_bin_coverage_kg = num(0),

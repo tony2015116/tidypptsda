@@ -7,6 +7,7 @@
 validate_adg(
   weight,
   models = c("poly1", "poly2", "poly3", "gompertz"),
+  extrap = "curve",
   k = 5,
   trim_days = c(10, 20),
   qc = weight$settings,
@@ -20,6 +21,12 @@ validate_adg(
 \item{weight}{Result of \code{\link[=clean_weight]{clean_weight()}}.}
 
 \item{models}{Curve models to compare (values of \code{curve_model}).}
+
+\item{extrap}{Extrapolations to compare (values of \code{curve_extrap}):
+\code{"curve"} (default), \code{"tangent"} or both. With \code{"tangent"}, a model is
+labelled e.g. \code{"poly2+tangent"}. Mainly the truncation results differ:
+cross-validation differs only for left-out days at the very ends of the
+records.}
 
 \item{k}{Number of folds. Default 5.}
 
@@ -40,7 +47,7 @@ Default \code{c(10, 20)}.}
 \value{
 A list of class \code{ppt_validation} with
 \itemize{
-\item \code{summary}: one row per model: \code{cv_rmse} and \code{cv_mae} (kg, weight of the
+\item \code{summary}: one row per model (and extrapolation): \code{cv_rmse} and \code{cv_mae} (kg, weight of the
 left-out records), and for each truncation (\code{late10}, \code{early10}, ...)
 the ADG \code{bias}, \code{rmse} (g/d) and Spearman rank correlation \code{spearman}
 with the full-data ADG, and how many pigs still get an ADG (\code{n});

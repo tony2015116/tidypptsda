@@ -170,3 +170,38 @@ test_that("first_cross finds the rising crossing only", {
   expect_true(is.na(first_cross(function(t) t + 200, 120, 0, 30)))
   expect_equal(first_cross(function(t) 2 * t, 20, 0, 30), 10, tolerance = 1e-8)
 })
+
+test_that("curve_extrap = 'tangent' continues the curve by straight lines", {
+  # a growth that slows down: a parabola bends when extrapolated
+  set.seed(3)
+  t <- sort(runif(600, 0, 60))
+  y <- 50 + 1.2 * t - 0.006 * t^2 + rnorm(600, 0, 0.5)
+  cv <- fit_growth_curve(t, y, "poly2")
+  tg <- fit_growth_curve(t, y, "poly2", "tangent")
+  expect_equal(tg$name, "poly2 + tangent")
+  inside <- seq(min(t), max(t), length.out = 13)
+  expect_equal(tg$pred(inside), cv$pred(inside))          # same inside the records
+  expect_equal(tg$fitted, cv$fitted)
+  # beyond the last record: straight line with the slope of the last 14 days
+  g <- unname(tg$tangent_slopes["end"])
+  expect_equal(tg$pred(80) - tg$pred(70), 10 * g, tolerance = 1e-8)
+  expect_equal(g, 1.2 - 2 * 0.006 * 53, tolerance = 0.1)
+  expect_gt(tg$pred(90), cv$pred(90))                      # the parabola bends down
+  # slopes are limited to 0.2-1.5 kg/d
+  flat <- fit_growth_curve(t, rep(80, 600) + rnorm(600, 0, 0.3), "poly1", "tangent")
+  expect_equal(unname(flat$tangent_slopes), c(0.2, 0.2))
+})
+
+test_that("calc_adg uses the tangent only when asked", {
+  w <- clean_weight(prep_visits(fire, verbose = 0), verbose = 0)
+  q <- qc_config(stage_range = c(60, 120))
+  a <- calc_adg(w, q, verbose = 0)
+  b <- calc_adg(w, qc_set(q, list(curve_extrap = "tangent")), verbose = 0)
+  expect_true(all(grepl("tangent", b$per_pig[!is.na(curve_used), curve_used])))
+  expect_false(any(grepl("tangent", a$per_pig$curve_used)))
+  # pigs that need no extrapolation keep their ADG
+  same <- a$per_pig$adg_type == "observed" & b$per_pig$adg_type == "observed"
+  expect_equal(a$per_pig$adg[same], b$per_pig$adg[same])
+  expect_false(isTRUE(all.equal(a$per_pig$adg, b$per_pig$adg)))
+  expect_equal(b$settings$curve_extrap, "tangent")
+})

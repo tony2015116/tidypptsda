@@ -82,10 +82,10 @@ test_that("missing days are interpolated inside and extrapolated outside", {
   gap <- days[40:44]
   v2 <- v[!(responder %in% pig & date %in% gap)]
   a <- calc_adg(clean_weight(v2, verbose = 0), verbose = 0)
-  f <- calc_adfi(v2, a, verbose = 0)
+  f <- calc_adfi(v2, a, qc = qc_set(a$settings, list(impute_method = "loess_lm")), verbose = 0)
   d <- f$daily[responder == pig & date %in% gap]
   expect_equal(d$state, rep("iii", 5))
-  # a 5-day gap (> long_gap_days) is filled by the regression on body weight
+  # a 5-day gap (> long_gap_days) is filled by the per-pig regression on body weight
   rec <- f$daily[responder == pig & state %in% c("org", "corr")]
   fit <- stats::lm(dfi ~ bw, data = rec)
   expect_equal(d$dfi, pmax(0, unname(stats::predict(fit, newdata = d))), tolerance = 1e-6)
@@ -103,8 +103,10 @@ test_that("short gaps use LOESS, long gaps and the ends the regression on weight
   d[30:40, dfi_check := NA]            # long gap
   d[1:3, dfi_check := NA]              # start
   d[, state := data.table::fifelse(is.na(dfi_check), NA_character_, "org")]
-  q <- qc_config()
+  q <- qc_config(impute_method = "loess_lm")
   out <- impute_dfi_one_pig(d, q)
+  # without population curves, loess_pop falls back to the per-pig regression
+  expect_equal(impute_dfi_one_pig(d, qc_config())$dfi, out$dfi)
   expect_false(anyNA(out$dfi))
   truth <- 1500 + 20 * (1:n)
   miss <- c(1:3, 10, 11, 30:40)
@@ -156,4 +158,58 @@ test_that("inputs are not modified and bad inputs are rejected", {
   calc_adfi(r$visits, r$adg, verbose = 0)
   expect_equal(as.list(r$visits), as.list(before))
   expect_error(calc_adfi(r$visits, list()), "calc_adg")
+})
+
+test_that("loess_pop scales the population curve to the pig", {
+  curve <- list(coef = c(500, 40, -0.1), range = c(30, 120), n_pigs = 10L, n_days = 500L)
+  f <- function(bw) 500 + 40 * bw - 0.1 * bw^2
+  expect_equal(pop_predict(curve, c(20, 50, 130)), f(c(30, 50, 120)))   # held at the range ends
+  n <- 60
+  d <- data.table::data.table(seq_days = 1:n, bw = 30 + 1.2 * (1:n), in_stage = TRUE)
+  d[, dfi_check := 1.1 * f(bw)]                 # the pig eats 10% more than the population
+  d[c(1:10, 30:40), dfi_check := NA]            # start and a long gap
+  d[, state := data.table::fifelse(is.na(dfi_check), NA_character_, "org")]
+  out <- impute_dfi_one_pig(d, qc_config(), pop = list(all = curve))
+  nrec <- sum(!is.na(d$dfi_check))
+  r <- nrec / (nrec + 10) * 1.1 + 10 / (nrec + 10)
+  expect_equal(out$dfi[c(1:10, 30:40)], r * f(d$bw[c(1:10, 30:40)]))
+  expect_true(all(out$state[1:10] == "elrp"))
+  expect_true(all(out$state[30:40] == "iii"))
+  # the curve of the pig's group is used
+  d[, pop_key := "breed A"]
+  half <- list(coef = curve$coef / 2, range = curve$range)
+  out2 <- impute_dfi_one_pig(d, qc_config(), pop = list(all = curve, "breed A" = half))
+  expect_equal(out2$dfi[1:10], (nrec / (nrec + 10) * 2.2 + 10 / (nrec + 10)) * f(d$bw[1:10]) / 2)
+})
+
+test_that("calc_adfi fits population curves for all pigs and per breed", {
+  r <- run_adfi(nedap)
+  pc <- r$adfi$pop_curve
+  expect_equal(pc$group, "all")
+  expect_gt(pc$n_pigs, 20)
+  expect_true(all(c("b0", "b1", "b2", "bw_min", "bw_max") %in% names(pc)))
+  expect_false("pop_key" %in% names(r$adfi$daily))
+  # per breed: two breeds of 15 pigs each
+  pigs <- sort(unique(r$visits[identified == TRUE, responder]))
+  vb <- add_breed(r$visits, data.frame(responder = pigs, breed = rep(c("YY", "LL"), length.out = length(pigs))),
+                  verbose = 0)
+  ab <- calc_adg(clean_weight(vb, verbose = 0), verbose = 0)
+  fb <- calc_adfi(vb, ab, verbose = 0)
+  expect_setequal(fb$pop_curve$group, c("all", "breed LL", "breed YY"))
+  # other methods: no curve
+  fl <- calc_adfi(r$visits, r$adg, qc = qc_set(r$adg$settings, list(impute_method = "loess_lm")), verbose = 0)
+  expect_equal(nrow(fl$pop_curve), 0L)
+  expect_false(isTRUE(all.equal(fl$per_pig$adfi, r$adfi$per_pig$adfi)))
+})
+
+test_that("validate_adfi compares loess_pop with leave-one-out curves", {
+  r <- run_adfi(nedap)
+  res <- validate_adfi(r$adfi, scenarios = "late20", reps = 2, verbose = 0)
+  expect_setequal(res$summary$method, c("loess_pop", "loess_lm", "linear"))
+  s <- res$summary
+  expect_lt(s[method == "loess_pop", mean_abs_error_pct], s[method == "loess_lm", mean_abs_error_pct])
+  loo <- pop_curves_loo(data.table::data.table(responder = rep(c("a", "b"), each = 40),
+                                               dfi = 2000 + 1:80, bw = 30 + 1:80), c("a", "b"))
+  expect_equal(names(loo), c("a", "b"))
+  expect_equal(loo$a$range, c(71, 110))   # fitted on pig b only
 })

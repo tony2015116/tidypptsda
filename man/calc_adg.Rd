@@ -10,7 +10,8 @@ calc_adg(weight, qc = weight$settings, verbose = 1, cores = 1)
 \item{weight}{Result of \code{\link[=clean_weight]{clean_weight()}}.}
 
 \item{qc}{QC settings; by default the ones used by \code{\link[=clean_weight]{clean_weight()}}.
-Used here: \code{stage_range}, \code{curve_model}, \code{max_extrap_days}.}
+Used here: \code{stage_range}, \code{curve_model}, \code{max_extrap_days},
+\code{curve_extrap}.}
 
 \item{verbose}{0 (silent), 1 (summary, default) or 2 (details).}
 
