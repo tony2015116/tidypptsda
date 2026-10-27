@@ -10,8 +10,8 @@
 #' @param breeds A data frame with one row per pig: the pig ID and its
 #'   breed (or line).
 #' @param id Name of the ID column in `breeds`. It is matched to the
-#'   transponder number `responder_raw` (so pigs split by [prep_visits()]
-#'   keep their breed), then to `responder`. Default `"responder"`.
+#'   transponder number `responder_raw`, then to `responder`. Unidentified
+#'   visits get no breed. Default `"responder"`.
 #' @param breed Name of the breed column in `breeds`. Default `"breed"`.
 #' @param verbose 0 (silent), 1 (summary, default) or 2 (details).
 #'

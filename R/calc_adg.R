@@ -30,7 +30,7 @@
 #'     days without valid weight), `weight_filled` (observed, interpolated
 #'     or curve weight, kg), `source` (`"observed"`, `"interpolated"` or
 #'     `"curve"`), `predicted` weight of the growth curve with `lower` /
-#'     `upper` limits (<c2><b1> 1.96 residual SD) and `in_stage`;
+#'     `upper` limits (± 1.96 residual SD) and `in_stage`;
 #'   - `removed`: pigs removed so far, plus pigs without ADG;
 #'   - `settings`: QC settings.
 #'
@@ -132,7 +132,9 @@ adg_one_pig <- function(d, qc, day0, fill = "linear") {
   a <- if (is.na(t_lo)) tmin else t_lo
   b <- if (is.na(t_hi)) tmax else t_hi
   tol <- 0.5
-  none <- b - a < 7
+  # a pig whose curve is above the stage at the start of [a, b] or below it
+  # at the end never was inside the stage
+  none <- b - a < 7 || curve$pred(a) >= hi || curve$pred(b) <= lo
   adg_type <- if (none) {
     "none"
   } else if (is.na(t_lo) || is.na(t_hi)) {
@@ -248,13 +250,16 @@ last_up_cross <- function(pred, target, from, to, step = 0.1) {
   g[i] + (target - p[i]) / (p[i + 1L] - p[i]) * step
 }
 
+# First time the curve rises through `target` (an extrapolated curve that
+# starts above it, e.g. the left branch of a parabola, is not a crossing).
 first_cross <- function(pred, target, from, to, step = 0.1) {
-  if (to <= from) return(NA_real_)
+  if (to - from < step) return(NA_real_)
   g <- seq(from, to, by = step)
   p <- pred(g)
-  i <- which(p >= target)[1L]
-  if (is.na(i) || i == 1L) return(NA_real_)
-  g[i - 1L] + (target - p[i - 1L]) / (p[i] - p[i - 1L]) * step
+  up <- which(p[-length(p)] < target & p[-1L] >= target)
+  if (length(up) == 0L) return(NA_real_)
+  i <- up[1L]
+  g[i] + (target - p[i]) / (p[i + 1L] - p[i]) * step
 }
 
 report_adg <- function(per_pig, fits) {

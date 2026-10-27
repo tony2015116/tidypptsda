@@ -13,8 +13,8 @@ add_breed(visits, breeds, id = "responder", breed = "breed", verbose = 1)
 breed (or line).}
 
 \item{id}{Name of the ID column in \code{breeds}. It is matched to the
-transponder number \code{responder_raw} (so pigs split by \code{\link[=prep_visits]{prep_visits()}}
-keep their breed), then to \code{responder}. Default \code{"responder"}.}
+transponder number \code{responder_raw}, then to \code{responder}. Unidentified
+visits get no breed. Default \code{"responder"}.}
 
 \item{breed}{Name of the breed column in \code{breeds}. Default \code{"breed"}.}
 

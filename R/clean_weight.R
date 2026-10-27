@@ -19,9 +19,11 @@
 #'   - `per_pig`: one row per pig with `n_records`, `n_valid`,
 #'     `n_outliers`, `first_date`, `last_date`, `test_days`,
 #'     `missing_rate`, `entry_weight`, `exit_weight` (kg, from the LOESS
-#'     smooth of the valid weights), `r2` (R<c2><b2> of that smooth),
+#'     smooth of the valid weights), `r2` (R² of that smooth),
 #'     `track_removed` (share of the records removed by the
-#'     tracking, `NA` when not tracked), `status` (`"keep"`,
+#'     tracking, `NA` when not tracked), `longest_gap_days` (longest time
+#'     without a visit), `weight_jump_kg` (from [prep_visits()], `NA`
+#'     without station transfer), `status` (`"keep"`,
 #'     `"low_confidence"` or `"removed"`) and `reason`;
 #'   - `daily`: one row per pig and day for pigs not removed: median of the
 #'     valid weights (`weight`, kg), `n_records`, `n_outliers`;
@@ -41,7 +43,11 @@
 #'   a tracking that removes more than `track_flag_share` of the records,
 #'   or `r2 < smooth_r2_min` mark the pig `"low_confidence"` but keep it: its
 #'   growth can still be estimated by extrapolation in [calc_adg()], with a
-#'   flag.
+#'   flag;
+#' - so do a test interrupted for more than `max_gap_days` days (no visit
+#'   at all, e.g. isolation for treatment: growth and intake around it are
+#'   often not typical of the pig) and a body weight jump above
+#'   `max_jump_kg` at a station transfer.
 #'
 #' @seealso [prep_visits()] for the previous step, [qc_config()] for the
 #'   settings.
@@ -121,6 +127,12 @@ clean_weight <- function(visits, qc = qc_config(), verbose = 1, cores = 1) {
   per_pig[, test_days := as.integer(last_date - first_date) + 1L]
   per_pig[, missing_rate := 1 - valid_days / test_days]
   per_pig <- merge(per_pig, pig_fit, by = "responder", all.x = TRUE)
+  # test interruptions and weight jumps at station transfers
+  per_pig <- merge(per_pig, longest_gap(dt), by = "responder", all.x = TRUE)
+  st <- attr(visits, "stations", exact = TRUE)
+  per_pig[, weight_jump_kg := if (!is.null(st) && "weight_jump_kg" %in% names(st)) {
+    st$weight_jump_kg[match(responder, st$responder)]
+  } else NA_real_]
   per_pig <- merge(main_loc, per_pig, by = "responder", all.y = TRUE)
   pig_breed <- breed_of(dt)
   if (!is.null(pig_breed)) per_pig <- merge(pig_breed, per_pig, by = "responder", all.y = TRUE)
@@ -367,6 +379,10 @@ pig_reasons <- function(p, qc, failed, type = c("remove", "flag")) {
         sprintf("entry weight %.1f kg > %s kg", p$entry_weight, qc$entry_weight_max))
     add(p$exit_weight < qc$exit_weight_min,
         sprintf("exit weight %.1f kg < %s kg", p$exit_weight, qc$exit_weight_min))
+    add(p$longest_gap_days > qc$max_gap_days,
+        sprintf("test interrupted for %.1f days (e.g. isolation for treatment)", p$longest_gap_days))
+    add(abs(p$weight_jump_kg) > qc$max_jump_kg,
+        sprintf("body weight jumps %+.1f kg at a station transfer", p$weight_jump_kg))
     add(p$track_removed > qc$track_flag_share,
         sprintf("tracking removed %.0f%% of the weight records (possible weighing fault, e.g. a faulty load cell)",
                 100 * p$track_removed))

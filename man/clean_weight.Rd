@@ -25,9 +25,11 @@ An object of class \code{ppt_weight} (a list):
 \item \code{per_pig}: one row per pig with \code{n_records}, \code{n_valid},
 \code{n_outliers}, \code{first_date}, \code{last_date}, \code{test_days},
 \code{missing_rate}, \code{entry_weight}, \code{exit_weight} (kg, from the LOESS
-smooth of the valid weights), \code{r2} (R\if{html}{\out{<c2>}}\if{html}{\out{<b2>}} of that smooth),
+smooth of the valid weights), \code{r2} (R² of that smooth),
 \code{track_removed} (share of the records removed by the
-tracking, \code{NA} when not tracked), \code{status} (\code{"keep"},
+tracking, \code{NA} when not tracked), \code{longest_gap_days} (longest time
+without a visit), \code{weight_jump_kg} (from \code{\link[=prep_visits]{prep_visits()}}, \code{NA}
+without station transfer), \code{status} (\code{"keep"},
 \code{"low_confidence"} or \code{"removed"}) and \code{reason};
 \item \code{daily}: one row per pig and day for pigs not removed: median of the
 valid weights (\code{weight}, kg), \code{n_records}, \code{n_outliers};
@@ -53,7 +55,11 @@ weight) remove the pig;
 a tracking that removes more than \code{track_flag_share} of the records,
 or \code{r2 < smooth_r2_min} mark the pig \code{"low_confidence"} but keep it: its
 growth can still be estimated by extrapolation in \code{\link[=calc_adg]{calc_adg()}}, with a
-flag.
+flag;
+\item so do a test interrupted for more than \code{max_gap_days} days (no visit
+at all, e.g. isolation for treatment: growth and intake around it are
+often not typical of the pig) and a body weight jump above
+\code{max_jump_kg} at a station transfer.
 }
 }
 \examples{

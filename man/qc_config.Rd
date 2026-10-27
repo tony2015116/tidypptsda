@@ -19,14 +19,18 @@ pipeline. Every parameter has a default; override any of them through
 }
 \section{Parameters}{
 
-\strong{Station transfer} (pigs seen at several stations)
+\strong{Station transfer and test interruptions} (see \code{\link[=prep_visits]{prep_visits()}})
 \itemize{
-\item \code{max_gap_days}: maximum gap between two stations to treat the pig as
-transferred. A larger gap splits it into two animals. Default 3.
-\item \code{max_overlap_days}: maximum time overlap between two stations. A larger
-overlap is treated as transponder misreads. Default 1.
-\item \code{max_jump_kg}: body weight jump at the transfer that triggers a
-warning. Default 10.
+\item \code{misread_max_visits}: a run of at most this many consecutive visits at
+another station, inside the pig's visits at its current station, is a
+transponder misread: the visits are kept as unidentified visits.
+Default 2.
+\item \code{max_gap_days}: a pig without any visit for longer than this (e.g.
+isolated for treatment, at any station or between two stations) is
+flagged as low confidence by \code{\link[=clean_weight]{clean_weight()}}. Default 3.
+\item \code{max_jump_kg}: body weight jump at a station transfer, beyond the
+expected growth over the gap, that gives a warning and flags the pig as
+low confidence. Default 10.
 }
 
 \strong{Body weight records} (used by \code{\link[=clean_weight]{clean_weight()}}, in this order)
@@ -78,7 +82,7 @@ its records (default 0.4) is flagged as low confidence: the scale
 probably did not weigh it correctly for a long time (e.g. a faulty load
 cell).
 \item \code{smooth_r2_min}: a pig whose valid weights fit their LOESS smooth with
-an R\if{html}{\out{<c2>}}\if{html}{\out{<b2>}} below this (default 0.99) is flagged as low confidence.
+an R² below this (default 0.99) is flagged as low confidence.
 }
 
 \strong{Growth, filled weights and ADG} (used by \code{\link[=calc_adg]{calc_adg()}})

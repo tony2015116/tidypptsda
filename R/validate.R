@@ -114,8 +114,10 @@ validate_outliers <- function(visits, qc = qc_config(),
     unlist(lapply(seq_len(reps), function(r) lapply(names(methods), function(m)
       list(rep = r, method = m, d = spoiled[[r]]))), recursive = FALSE)
   )
+  # jobs run in parallel, so each job fits its pigs on one core
   res <- run_with_progress(jobs, validate_outlier_job, label = "Validating outlier methods",
-                           qc = qc, methods = methods, adg_true = adg_true, cores = cores)
+                           qc = qc, methods = methods, adg_true = adg_true, cores = cores,
+                           job_cores = 1L)
   per_rep <- data.table::rbindlist(res)
   per_rep[, method := factor(method, levels = c("none", names(methods)))]
   data.table::setorder(per_rep, method, rep)
@@ -155,18 +157,20 @@ outlier_qc <- function(qc, m) {
 }
 
 # One repetition x method of validate_outliers().
-validate_outlier_job <- function(job, qc, methods, adg_true, cores = 1L) {
+validate_outlier_job <- function(job, qc, methods, adg_true, job_cores = 1L) {
   d <- job$d
   q <- if (job$method == "none") qc else outlier_qc(qc, methods[[job$method]])
   # the clean records already start after the adaptation period
   q <- qc_set(q, list(adapt_days = 0))
-  w <- clean_weight(d, q, verbose = 0, cores = cores)
+  w <- clean_weight(d, q, verbose = 0, cores = job_cores)
   if (job$method == "none") {
     w$records[qc_flag != "weight_range", `:=`(outlier = FALSE, qc_flag = "")]
   }
-  flags <- w$records[, .(responder, entry_time, weight, outlier)]
+  # identical records get identical flags; unique keys keep one row per record
+  flags <- unique(w$records[, .(responder, entry_time, weight, outlier)],
+                  by = c("responder", "entry_time", "weight"))
   m <- d[flags, on = c("responder", "entry_time", "weight"), nomatch = NULL]
-  a <- calc_adg(w, q, verbose = 0, cores = cores)$per_pig[, .(responder, adg)]
+  a <- calc_adg(w, q, verbose = 0, cores = job_cores)$per_pig[, .(responder, adg)]
   a <- a[adg_true, on = "responder", nomatch = NULL][!is.na(adg) & !is.na(adg_true)]
   tp <- sum(m$injected & m$outlier)
   data.table::data.table(

@@ -10,13 +10,17 @@
 #' @param ... Parameters to override, as `name = value`. See **Parameters**.
 #'
 #' @section Parameters:
-#' **Station transfer** (pigs seen at several stations)
-#' - `max_gap_days`: maximum gap between two stations to treat the pig as
-#'   transferred. A larger gap splits it into two animals. Default 3.
-#' - `max_overlap_days`: maximum time overlap between two stations. A larger
-#'   overlap is treated as transponder misreads. Default 1.
-#' - `max_jump_kg`: body weight jump at the transfer that triggers a
-#'   warning. Default 10.
+#' **Station transfer and test interruptions** (see [prep_visits()])
+#' - `misread_max_visits`: a run of at most this many consecutive visits at
+#'   another station, inside the pig's visits at its current station, is a
+#'   transponder misread: the visits are kept as unidentified visits.
+#'   Default 2.
+#' - `max_gap_days`: a pig without any visit for longer than this (e.g.
+#'   isolated for treatment, at any station or between two stations) is
+#'   flagged as low confidence by [clean_weight()]. Default 3.
+#' - `max_jump_kg`: body weight jump at a station transfer, beyond the
+#'   expected growth over the gap, that gives a warning and flags the pig as
+#'   low confidence. Default 10.
 #'
 #' **Body weight records** (used by [clean_weight()], in this order)
 #' - `weight_range`: valid body weight of a single record, kg. Default
@@ -64,7 +68,7 @@
 #'   probably did not weigh it correctly for a long time (e.g. a faulty load
 #'   cell).
 #' - `smooth_r2_min`: a pig whose valid weights fit their LOESS smooth with
-#'   an R<c2><b2> below this (default 0.99) is flagged as low confidence.
+#'   an R² below this (default 0.99) is flagged as low confidence.
 #'
 #' **Growth, filled weights and ADG** (used by [calc_adg()])
 #' - `stage_range`: body weight interval for ADG, ADFI and FCR, kg. Default
@@ -149,6 +153,10 @@ qc_config <- function(...) {
                          "i" = "Use {.code qc_config()} and override single parameters, e.g. {.code qc_config(duration_max = 1800)}."))
       }
       cli::cli_abort("All parameters in {.arg ...} must be named.")
+    }
+    if ("max_overlap_days" %in% nms) {
+      cli::cli_abort(c("{.arg max_overlap_days} was removed in tidypptsda 1.2.0.",
+                       "i" = "Misreads are now found by run length: see {.arg misread_max_visits} (default 2)."))
     }
     unknown <- setdiff(nms, names(cfg))
     if (length(unknown) > 0L) {
@@ -246,8 +254,8 @@ qc_set <- function(cfg, values) {
 qc_defaults <- function() {
   list(
     # station transfer
+    misread_max_visits = 2,
     max_gap_days = 3,
-    max_overlap_days = 1,
     max_jump_kg = 10,
     # body weight records
     weight_range = c(15, 150),
@@ -299,7 +307,7 @@ qc_defaults <- function() {
 
 qc_groups <- function() {
   g <- c(
-    max_gap_days = "Station transfer", max_overlap_days = "Station transfer",
+    misread_max_visits = "Station transfer", max_gap_days = "Station transfer",
     max_jump_kg = "Station transfer",
     weight_range = "Body weight records", adapt_days = "Body weight records",
     weight_track = "Body weight records", track_tol = "Body weight records",
@@ -335,7 +343,7 @@ qc_spec <- function() {
   tbl <- function(cols, optional = character()) list(type = "table", cols = cols, optional = optional, null = TRUE)
   lgl <- function() list(type = "logical", null = FALSE)
   list(
-    max_gap_days = num(0), max_overlap_days = num(0), max_jump_kg = num(0),
+    misread_max_visits = num(0), max_gap_days = num(0), max_jump_kg = num(0),
     weight_range = rng(0), adapt_days = num(0), weight_track = lgl(), track_tol = num(0, 1),
     weight_outlier = chc(c("rlm", "loess", "stl", "sd"), multiple = TRUE),
     outlier_combine = chc(c("any", "majority")),

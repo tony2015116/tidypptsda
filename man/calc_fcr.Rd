@@ -27,8 +27,9 @@ An object of class \code{ppt_fcr} (a list):
 \item \code{summary}: numeric summary (\code{n}, \code{min}, \code{max}, \code{median}, \code{mean},
 \code{sd}, \code{cv}) of the main traits, for all pigs, for pigs with
 \code{fcr_flag = "ok"} and, with a \code{breed} column, for each breed;
-\item \code{by_bin}: one row per pig and body weight class of \code{bin_width} kg:
-feed (\code{feed_kg}), gain (\code{gain_kg}), segment \code{fcr},
+\item \code{by_bin}: one row per pig and body weight class of \code{bin_width} kg
+(days are put into classes by the growth curve): feed (\code{feed_kg}),
+gain (\code{gain_kg}, from the growth curve), segment \code{fcr},
 \code{weight_coverage_kg} (span of recorded body weights in the class),
 \code{low_coverage} (inner class covered by less than
 \code{min_bin_coverage_kg}) and \code{fcr_out} (segment FCR outside

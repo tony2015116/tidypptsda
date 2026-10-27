@@ -22,7 +22,7 @@ library(data.table)
 
 | 步骤 | 函数 | 做什么 | 方法来源 |
 |---|---|---|---|
-| 1 | `prep_visits()` | 统一 NEDAP / FIRE 的字段，识别转栏、误读 | 本包 |
+| 1 | `prep_visits()` | 统一 NEDAP / FIRE 的字段，识别转栏（可转回原站）、误读 | 本包 |
 | 2 | `clean_weight()` | 体重范围 → 适应期 → 逐日回溯追踪 → rlm + LOESS 异常值检测 → 个体判定 | Jiao 等（2014）；Cleveland（1979）；追踪为本包方法 |
 | 3 | `calc_adg()` | 生长曲线确定区间起止 → 补齐区间内每天的体重 → 回归斜率即 ADG | 补齐方法与国家测定规程一致 |
 | 4 | `flag_feed_errors()` | 每次访问按 16 条规则判断采食错误 | Casey 等（2005） |

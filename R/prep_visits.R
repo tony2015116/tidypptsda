@@ -19,7 +19,7 @@
 #'   already standard.
 #' @param qc QC settings from [qc_config()]. Used here: `duration_max` (to
 #'   tell a FIRE midnight crossing from a recording error) and the station
-#'   transfer parameters `max_gap_days`, `max_overlap_days`, `max_jump_kg`.
+#'   transfer parameters `misread_max_visits`, `max_jump_kg`.
 #' @param verbose 0 (silent), 1 (summary, default) or 2 (details).
 #'
 #' @return A `data.table`, one row per visit, ordered by `location` and
@@ -42,23 +42,48 @@
 #'   Attributes:
 #'   - `"station"`: station type;
 #'   - `"stations"`: one row per pig with its station history (see below);
-#'   - `"removed"`: log of visits removed as transponder misreads;
+#'   - `"removed"`: log of visits turned into unidentified visits as
+#'     transponder misreads;
 #'   - `"prep_summary"`: number of rows dropped at each step.
 #'
 #' @section Station transfer:
-#' For each pig seen at several stations, the time span at each station is
-#' compared:
-#' - **misread**: the span at a minor station overlaps the span at the main
-#'   station (most visits) by more than `max_overlap_days`. Visits at the
-#'   minor station inside the main span are removed as transponder misreads.
-#' - **transfer**: consecutive spans are separated by at most
-#'   `max_gap_days`. All visits are kept, each with its real `location`. A
-#'   body weight jump above `max_jump_kg` at the transfer gives a warning.
-#' - **split**: a gap longer than `max_gap_days`. The spans are treated as
-#'   different animals and `responder` becomes `"<id>_<location>"`.
+#' A pig can be recorded at several stations because it was really moved:
+#' it escaped to another pen and stayed there, was found and put back, or
+#' was isolated for treatment and returned to the wrong pen. These visits
+#' are real and belong to the same pig. A transponder misread, in contrast,
+#' gives a few scattered visits at another station while the pig keeps
+#' visiting its own station.
 #'
-#' A pig that returns to a station it already used is not supported: the
-#' return looks like an overlap and is treated as misreads.
+#' So the identified visits of each pig are put in time order and cut into
+#' runs of consecutive visits at the same station:
+#' - **misread**: a run of at most `misread_max_visits` visits. Shortest
+#'   runs are dropped first, so that the runs around them join. The visits
+#'   stay in the data as unidentified visits (`identified = FALSE`,
+#'   `responder = NA`, `responder_raw` kept): they did happen at that
+#'   feeder and are needed for the feeder error checks and the
+#'   unidentified feed of the feeder.
+#' - **transfer**: every remaining run is a real stay at a station. A pig
+#'   can move any number of times, also back to a station it used before
+#'   (`location_path` such as `"101>102>101"`). All visits are kept with
+#'   their real `location`.
+#' - at each transfer the body weight before and after (median of the 20
+#'   valid weights next to it) is compared, allowing for growth over the
+#'   gap. A jump above `max_jump_kg` gives a warning, and
+#'   [clean_weight()] flags the pig as low confidence.
+#'
+#' A gap without visits (e.g. isolation for treatment) never splits a pig
+#' into two animals: the days are missing, and [clean_weight()] flags the
+#' pig as low confidence when the longest gap exceeds `max_gap_days`.
+#'
+#' The `"stations"` attribute has one row per pig: `location_path`,
+#' `main_location` (station with most visits), `n_locations`,
+#' `n_transfers`, `transfer`, `misreads` (visits turned unidentified),
+#' `longest_gap_days` and `weight_jump_kg` (largest jump beyond the
+#' expected growth, `NA` without transfer).
+#'
+#' All stations are assumed to be in separate pens. Stations in the same
+#' pen, which a pig visits in turn, look like many transfers; a warning is
+#' given when a pig moves more than 3 times.
 #'
 #' @seealso [read_station()] for the previous step.
 #' @export
@@ -176,20 +201,19 @@ finish_standard <- function(dt, duration_max) {
   for (col in c("responder_raw", "location")) {
     data.table::set(out, j = col, value = as.character(out[[col]]))
   }
-  n_cross <- 0L
-  if (all(is.na(out$duration))) {
-    entry <- out$entry_time
-    exit <- out$exit_time
-    crossing <- !is.na(exit) & !is.na(entry) & exit < entry &
-      as.numeric(difftime(exit + 86400, entry, units = "secs")) <= duration_max
-    exit[crossing] <- exit[crossing] + 86400
-    out[, exit_time := exit]
-    out[, duration := as.numeric(difftime(exit_time, entry_time, units = "secs"))]
-    n_cross <- sum(crossing)
-  } else {
-    out[, duration := as.numeric(duration)]
-    out[is.na(exit_time), exit_time := entry_time + duration]
-  }
+  # row by row: a missing duration comes from the exit time (with the
+  # midnight correction), a missing exit time from the duration
+  entry <- out$entry_time
+  exit <- out$exit_time
+  dur <- as.numeric(out$duration)
+  need <- is.na(dur) & !is.na(exit) & !is.na(entry)
+  crossing <- need & exit < entry &
+    as.numeric(difftime(exit + 86400, entry, units = "secs")) <= duration_max
+  exit[crossing] <- exit[crossing] + 86400
+  dur[need] <- as.numeric(difftime(exit[need], entry[need], units = "secs"))
+  out[, `:=`(exit_time = exit, duration = dur)]
+  out[is.na(exit_time), exit_time := entry_time + duration]
+  n_cross <- sum(crossing)
   finish_ids(out)
   data.table::setattr(out, "n_midnight", n_cross)
   out
@@ -229,119 +253,146 @@ ppt_bullets_counts <- function(counts, level = 1L) {
   ppt_msg(stats::setNames(lines, rep("*", length(lines))), "bullets", level = level)
 }
 
-# Classify pigs seen at several stations (misread / transfer / split).
+# Pigs seen at several stations: misreads (short runs of visits at another
+# station) become unidentified visits, all other runs are real stays.
 resolve_transfers <- function(dt, qc) {
-  day <- 86400
-  seg_of <- function(v) {
-    v[, .(start = min(entry_time), end = max(exit_time, na.rm = TRUE), n = .N),
-      by = location][order(start)]
-  }
+  dt[, row_id := .I]
   ids <- dt[identified == TRUE, .(n_loc = data.table::uniqueN(location)), by = responder]
   multi <- ids[n_loc > 1L, responder]
 
   stations <- dt[identified == TRUE, .(
-    responder_raw = responder[1L],
     location_path = location[1L],
     main_location = location[1L],
     n_locations = 1L,
+    n_transfers = 0L,
     transfer = FALSE,
-    split = FALSE,
-    misreads_removed = 0L,
+    misreads = 0L,
     weight_jump_kg = NA_real_
   ), by = responder]
 
   misread_rows <- integer()
-  new_id <- data.table::data.table(row = integer(), responder = character())
-  multi_rows <- list()
+  multi_rows <- vector("list", length(multi))
   removed <- new_removed()
-  dt[, row_id := .I]
 
-  for (r in multi) {
-    v <- dt[identified == TRUE & responder == r]
-    seg <- seg_of(v)
-    main <- seg[which.max(n), location]
-    main_span <- seg[location == main]
-
-    # 1. misreads: minor stations overlapping the main span
-    n_mis <- 0L
-    for (loc in setdiff(seg$location, main)) {
-      s <- seg[location == loc]
-      overlap <- as.numeric(difftime(min(s$end, main_span$end),
-                                     max(s$start, main_span$start), units = "days"))
-      if (overlap > qc$max_overlap_days) {
-        rows <- v[location == loc & entry_time >= main_span$start &
-                    entry_time <= main_span$end, row_id]
-        misread_rows <- c(misread_rows, rows)
-        n_mis <- n_mis + length(rows)
-        removed <- rbind(removed, new_removed(r, loc, "prep_visits",
-          sprintf("%d visits at station %s during the main station span: transponder misreads",
-                  length(rows), loc)))
+  for (k in seq_along(multi)) {
+    r <- multi[k]
+    v <- dt[identified == TRUE & responder == r][order(entry_time)]
+    loc <- v$location
+    keep <- misread_runs(loc, qc$misread_max_visits)
+    if (any(!keep)) {
+      misread_rows <- c(misread_rows, v$row_id[!keep])
+      for (l in unique(loc[!keep])) {
+        removed <- rbind(removed, new_removed(r, l, "prep_visits", sprintf(
+          "%d visit(s) at station %s inside the visits at another station: transponder misreads, kept as unidentified",
+          sum(!keep & loc == l), l)))
       }
     }
-    v <- v[!row_id %in% misread_rows]
-    seg <- seg_of(v)
-
-    # 2. transfer or split, by the gap between consecutive spans
-    gaps <- if (nrow(seg) > 1L) {
-      as.numeric(difftime(seg$start[-1L], seg$end[-nrow(seg)], units = "days"))
-    } else numeric()
-    group <- cumsum(c(TRUE, gaps > qc$max_gap_days))
-    seg[, group := group]
-    split <- max(group) > 1L
-
-    for (g in unique(group)) {
-      sg <- seg[group == g]
-      animal <- if (split) paste0(r, "_", sg$location[1L]) else r
-      rows <- v[location %in% sg$location, row_id]
-      new_id <- rbind(new_id, data.table::data.table(row = rows, responder = animal))
-
-      jump <- NA_real_
-      if (nrow(sg) > 1L) {
-        jumps <- vapply(seq_len(nrow(sg) - 1L), function(k) {
-          before <- v[location == sg$location[k] & !is.na(weight)][order(-entry_time)][seq_len(min(.N, 20L)), stats::median(weight)]
-          after <- v[location == sg$location[k + 1L] & !is.na(weight)][order(entry_time)][seq_len(min(.N, 20L)), stats::median(weight)]
-          after - before
-        }, numeric(1))
-        jump <- jumps[which.max(abs(jumps))]
-        if (!is.na(jump) && abs(jump) > qc$max_jump_kg) {
-          ppt_warn("Pig {.val {animal}}: body weight changes by {round(jump, 1)} kg at the station transfer {paste(sg$location, collapse = '>')}.")
-        }
+    v <- v[keep]
+    runs <- rle(v$location)
+    ends <- cumsum(runs$lengths)
+    starts <- ends - runs$lengths + 1L
+    jump <- NA_real_
+    if (length(starts) > 1L) {
+      jump <- transfer_jump(v, starts, ends, qc$weight_range)
+      if (!is.na(jump) && abs(jump) > qc$max_jump_kg) {
+        ppt_warn("Pig {.val {r}}: body weight changes by {round(jump, 1)} kg more than expected at the station transfer {paste(runs$values, collapse = '>')}.")
       }
-      multi_rows[[length(multi_rows) + 1L]] <- data.table::data.table(
-        responder = animal, responder_raw = r,
-        location_path = paste(sg$location, collapse = ">"),
-        main_location = sg[which.max(n), location],
-        n_locations = nrow(sg), transfer = nrow(sg) > 1L, split = split,
-        misreads_removed = n_mis, weight_jump_kg = jump
-      )
     }
+    if (length(starts) > 4L) {
+      ppt_warn("Pig {.val {r}} moves {length(starts) - 1L} times between stations ({paste(runs$values, collapse = '>')}). Are these stations in the same pen?")
+    }
+    multi_rows[[k]] <- data.table::data.table(
+      responder = r,
+      location_path = paste(runs$values, collapse = ">"),
+      main_location = names(which.max(table(v$location))),
+      n_locations = data.table::uniqueN(v$location),
+      n_transfers = length(starts) - 1L,
+      transfer = length(starts) > 1L,
+      misreads = sum(!keep),
+      weight_jump_kg = jump
+    )
   }
 
   misread_visits <- dt[row_id %in% misread_rows]
-  dt <- dt[!row_id %in% misread_rows]
-  if (nrow(new_id) > 0L) {
-    dt[new_id, on = c(row_id = "row"), responder := i.responder]
-  }
+  dt[row_id %in% misread_rows, `:=`(identified = FALSE, responder = NA_character_)]
   dt[, row_id := NULL]
 
   stations <- data.table::rbindlist(c(list(stations[!responder %in% multi]), multi_rows))
+  stations <- merge(stations, longest_gap(dt), by = "responder", all.x = TRUE)
+  data.table::setcolorder(stations, c(setdiff(names(stations), c("longest_gap_days", "weight_jump_kg")),
+                                      "longest_gap_days", "weight_jump_kg"))
   data.table::setorder(stations, main_location, responder)
 
   n_tr <- stations[transfer == TRUE, .N]
-  n_sp <- data.table::uniqueN(stations[split == TRUE, responder_raw])
-  n_mr <- data.table::uniqueN(removed$responder)
+  n_mr <- stations[misreads > 0L, .N]
   if (length(multi) == 0L) {
     ppt_msg("No pig was seen at more than one station", "info")
   } else {
-    ppt_msg("{length(multi)} pig{?s} seen at several stations: {n_tr} transfer{?s}, {n_sp} split into separate animals, {n_mr} with misreads removed ({length(misread_rows)} visits)", "warning")
+    ppt_msg("{length(multi)} pig{?s} seen at several stations: {n_tr} moved between stations, {n_mr} with misreads ({length(misread_rows)} visits kept as unidentified)", "warning")
     if (ppt_verbose() >= 2L) {
-      show <- stations[responder_raw %in% multi]
+      show <- stations[responder %in% multi]
       for (i in seq_len(nrow(show))) {
-        ppt_msg("{show$responder[i]}: {show$location_path[i]}{if (show$split[i]) ' (split)' else ''}{if (show$misreads_removed[i] > 0) paste0(', ', show$misreads_removed[i], ' misreads removed') else ''}", "info", level = 2L)
+        ppt_msg("{show$responder[i]}: {show$location_path[i]}{if (show$misreads[i] > 0) paste0(', ', show$misreads[i], ' misreads') else ''}", "info", level = 2L)
       }
     }
   }
 
   list(visits = dt, stations = stations, removed = removed,
        misread_visits = misread_visits)
+}
+
+# Which visits to keep, given the station of each visit in time order:
+# runs of at most `max_visits` visits are misreads. The shortest run (ties:
+# the station with fewer visits) is dropped first, so that the runs around
+# it join, until every run is longer than `max_visits` or one run is left.
+misread_runs <- function(loc, max_visits) {
+  keep <- rep(TRUE, length(loc))
+  if (max_visits < 1) return(keep)
+  repeat {
+    idx <- which(keep)
+    runs <- rle(loc[idx])
+    if (length(runs$lengths) <= 1L) break
+    cand <- which(runs$lengths <= max_visits)
+    if (length(cand) == 0L) break
+    total <- table(loc[idx])
+    j <- cand[order(runs$lengths[cand], as.numeric(total[runs$values[cand]]))[1L]]
+    end <- sum(runs$lengths[seq_len(j)])
+    keep[idx[(end - runs$lengths[j] + 1L):end]] <- FALSE
+  }
+  keep
+}
+
+# Largest body weight jump at the transfers of one pig, beyond the growth
+# expected over the gap (robust slope of all its valid weights). Before and
+# after: median of the 20 valid weights next to the transfer.
+transfer_jump <- function(v, starts, ends, weight_range) {
+  ok <- !is.na(v$weight) & v$weight >= weight_range[1L] & v$weight <= weight_range[2L]
+  t <- as.numeric(v$entry_time) / 86400
+  slope <- if (sum(ok) >= 10L) {
+    tryCatch(unname(stats::coef(MASS::rlm(v$weight[ok] ~ t[ok], maxit = 50))[2L]),
+             error = function(e) NA_real_, warning = function(w) NA_real_)
+  } else NA_real_
+  if (is.na(slope)) slope <- 0
+  jumps <- vapply(seq_len(length(starts) - 1L), function(k) {
+    before <- which(ok & seq_along(ok) <= ends[k])
+    after <- which(ok & seq_along(ok) >= starts[k + 1L])
+    if (length(before) == 0L || length(after) == 0L) return(NA_real_)
+    before <- utils::tail(before, 20L)
+    after <- utils::head(after, 20L)
+    gap <- t[starts[k + 1L]] - t[ends[k]]
+    stats::median(v$weight[after]) - stats::median(v$weight[before]) - slope * gap
+  }, numeric(1))
+  if (all(is.na(jumps))) return(NA_real_)
+  jumps[which.max(abs(jumps))]
+}
+
+# Longest time without any identified visit, per pig (days).
+longest_gap <- function(dt) {
+  ex <- if ("exit_time" %in% names(dt)) dt$exit_time else dt$entry_time
+  v <- data.table::data.table(responder = dt$responder, entry_time = dt$entry_time,
+                              exit_time = data.table::fifelse(is.na(ex), dt$entry_time, ex))[dt$identified %in% TRUE]
+  data.table::setorder(v, responder, entry_time)
+  v[, .(longest_gap_days = if (.N > 1L) {
+    max(0, as.numeric(entry_time[-1L]) - cummax(as.numeric(exit_time))[-.N]) / 86400
+  } else 0), by = responder]
 }

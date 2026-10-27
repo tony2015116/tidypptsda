@@ -83,37 +83,87 @@ test_that("a transfer keeps all visits with their real station", {
   st <- attr(v, "stations")
   expect_equal(nrow(st), 1L)
   expect_true(st$transfer)
-  expect_false(st$split)
+  expect_equal(st$n_transfers, 1L)
   expect_equal(st$location_path, "101>102")
   expect_equal(nrow(v), nrow(d))
   expect_setequal(unique(v$location), c("101", "102"))
   expect_equal(unique(v$responder), "15497")
 })
 
-test_that("a long gap splits the pig into two animals", {
+test_that("a pig put back to its station keeps all its visits (A > B > A)", {
+  d <- one_pig()
+  tt <- d$visit_time
+  d[tt > quantile(tt, 0.4) & tt < quantile(tt, 0.6), location := 102L]
+  v <- prep_visits(d, verbose = 0)
+  st <- attr(v, "stations")
+  expect_equal(st$location_path, "101>102>101")
+  expect_equal(st$n_transfers, 2L)
+  expect_equal(st$main_location, "101")
+  expect_equal(v[identified == TRUE, .N], nrow(d))
+  expect_equal(st$misreads, 0L)
+})
+
+test_that("an isolation gap keeps one pig and flags it in clean_weight", {
   d <- one_pig()
   m <- mid_time(d)
+  # isolated for 10 days, then put into the wrong pen
   d <- d[visit_time < m | visit_time > m + 10 * 86400]
   d[visit_time > m, location := 102L]
   v <- prep_visits(d, verbose = 0)
   st <- attr(v, "stations")
-  expect_equal(sort(st$responder), c("15497_101", "15497_102"))
-  expect_true(all(st$split))
-  expect_equal(v[location == "102", unique(responder)], "15497_102")
-  expect_equal(unique(st$responder_raw), "15497")
+  expect_equal(unique(v[identified == TRUE, responder]), "15497")
+  expect_equal(st$location_path, "101>102")
+  expect_gt(st$longest_gap_days, 9.9)
+  w <- clean_weight(v, verbose = 0)
+  expect_equal(w$per_pig$status, "low_confidence")
+  expect_match(w$per_pig$reason, "interrupted for 10")
+  # the same gap at one station is flagged too
+  d[, location := 101L]
+  w1 <- clean_weight(prep_visits(d, verbose = 0), verbose = 0)
+  expect_match(w1$per_pig$reason, "interrupted")
+  # without a long gap the pig is not flagged for it
+  w0 <- clean_weight(prep_visits(one_pig(), verbose = 0), verbose = 0)
+  expect_false(grepl("interrupted", w0$per_pig$reason))
 })
 
-test_that("overlapping visits at a minor station are removed as misreads", {
+test_that("scattered misreads become unidentified visits", {
   d <- one_pig()
-  # 30 visits spread over the whole test also recorded at station 102
+  # 30 single visits spread over the whole test also recorded at station 102
   misread <- d[seq(1, .N, length.out = 30)]
   misread[, `:=`(location = 102L, visit_time = visit_time + 1)]
   v <- prep_visits(rbind(d, misread), verbose = 0)
   st <- attr(v, "stations")
-  expect_equal(st$misreads_removed, 30L)
-  expect_equal(unique(v$location), "101")
-  expect_equal(nrow(v), nrow(d))
+  expect_equal(st$misreads, 30L)
+  expect_equal(st$location_path, "101")
+  expect_equal(v[identified == TRUE, .N], nrow(d))
+  expect_equal(v[identified == FALSE & location == "102", .N], 30L)
+  expect_true(all(v[identified == FALSE]$responder_raw == "15497"))
   expect_equal(nrow(attr(v, "removed")), 1L)
+})
+
+test_that("one misread after a transfer does not remove the real visits", {
+  d <- one_pig()
+  m <- d$visit_time[floor(0.6 * nrow(d))]
+  d[visit_time > m, location := 102L]
+  # one stray read at the old station, long after the transfer
+  stray <- d[location == 102L][floor(.N / 2)]
+  stray[, `:=`(location = 101L, visit_time = visit_time + 60)]
+  v <- prep_visits(rbind(d, stray), verbose = 0)
+  st <- attr(v, "stations")
+  expect_equal(st$location_path, "101>102")
+  expect_equal(st$misreads, 1L)
+  expect_equal(v[identified == TRUE, .N], nrow(d))
+  expect_equal(v[identified == TRUE & location == "102", .N], d[location == 102L, .N])
+})
+
+test_that("misread runs are found shortest first", {
+  expect_equal(misread_runs(c("a", "a", "a", "b", "a", "a", "a"), 2), c(rep(TRUE, 3), FALSE, rep(TRUE, 3)))
+  # interleaved misreads at a transfer boundary
+  x <- c(rep("a", 5), "b", "b", "a", rep("b", 5))
+  expect_equal(x[misread_runs(x, 2)], c(rep("a", 5), rep("b", 7)))
+  # three visits are a real stay
+  expect_true(all(misread_runs(c(rep("a", 5), rep("b", 3), rep("a", 5)), 2)))
+  expect_true(all(misread_runs(c("a", "b"), 0)))
 })
 
 test_that("a weight jump at a transfer gives a warning", {
@@ -124,10 +174,31 @@ test_that("a weight jump at a transfer gives a warning", {
   expect_message(v <- prep_visits(d, verbose = 1), "transfer")
   expect_gt(attr(v, "stations")$weight_jump_kg, 10)
   expect_silent(prep_visits(d, verbose = 0))
+  w <- clean_weight(v, verbose = 0)
+  expect_match(w$per_pig$reason, "jumps")
+  # normal growth over a transfer gap is not a jump
+  d2 <- one_pig()
+  m2 <- mid_time(d2)
+  d2 <- d2[visit_time < m2 | visit_time > m2 + 10 * 86400]
+  d2[visit_time > m2, location := 102L]
+  expect_lt(abs(attr(prep_visits(d2, verbose = 0), "stations")$weight_jump_kg), 5)
 })
 
 test_that("bad inputs give clear errors", {
   expect_error(prep_visits(nedap, qc = list()), "qc_config")
   expect_error(prep_visits(fire, station = "nedap", verbose = 0), "visit_time")
   expect_error(prep_visits(1:3), "data.frame")
+})
+
+test_that("a missing duration comes from the exit time, row by row", {
+  d <- data.table::data.table(
+    responder = "1", location = "101",
+    entry_time = as.POSIXct(c("2024-01-01 10:00:00", "2024-01-01 23:59:00", "2024-01-02 08:00:00"), tz = "UTC"),
+    exit_time = as.POSIXct(c(NA, "2024-01-01 00:04:00", "2024-01-02 08:10:00"), tz = "UTC"),
+    duration = c(120, NA, NA), feed_intake = 100, weight = 50,
+    trough_in = NA_real_, trough_out = NA_real_, topup = NA_real_)
+  out <- finish_standard(d, duration_max = 3600)
+  expect_equal(out$duration, c(120, 300, 600))
+  expect_equal(out$exit_time[1], d$entry_time[1] + 120)
+  expect_equal(attr(out, "n_midnight"), 1L)
 })

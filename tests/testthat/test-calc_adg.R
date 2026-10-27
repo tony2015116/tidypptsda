@@ -152,3 +152,21 @@ test_that("pigs with too little of the stage get no ADG and are logged", {
 test_that("bad inputs are rejected", {
   expect_error(calc_adg(list()), "clean_weight")
 })
+
+test_that("pigs that never are inside the stage get no ADG", {
+  w <- clean_weight(prep_visits(nedap, verbose = 0), verbose = 0)
+  # every pig stays below 150 kg, and starts above 20 kg after adaptation
+  above <- calc_adg(w, qc_config(stage_range = c(150, 200), weight_range = c(1, 250)), verbose = 0)
+  expect_true(all(above$per_pig$adg_type == "none"))
+  expect_equal(above$daily[in_stage == TRUE, .N], 0L)
+  below <- calc_adg(w, qc_config(stage_range = c(1, 5), weight_range = c(1, 250)), verbose = 0)
+  expect_true(all(below$per_pig$adg_type == "none"))
+})
+
+test_that("first_cross finds the rising crossing only", {
+  # left branch of a parabola starts above the target
+  pred <- function(t) (t - 10)^2 + 100
+  expect_equal(first_cross(pred, 120, 0, 30, step = 0.01), 10 + sqrt(20), tolerance = 1e-3)
+  expect_true(is.na(first_cross(function(t) t + 200, 120, 0, 30)))
+  expect_equal(first_cross(function(t) 2 * t, 20, 0, 30), 10, tolerance = 1e-8)
+})
