@@ -65,4 +65,9 @@ Hide recorded daily weights of the stage on purpose, fill them again with
 each method and compare with the recorded values. Errors are measured on
 the hidden days (filled minus recorded daily weight) and on ADG (against
 the ADG of all records with the settings of \code{weight}).
+
+All weight records of the hidden days are removed before cleaning, and the
+remaining records are cleaned again with the settings of \code{weight}
+(\code{\link[=clean_weight]{clean_weight()}}), so the hidden days do not decide which of the other
+records are kept (before 1.5.0 the records were cleaned on all days).
 }

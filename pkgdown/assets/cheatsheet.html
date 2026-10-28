@@ -334,15 +334,17 @@ save_plots(g, "图", suffix = "growth")</code></pre>
   <h2>方法验证 <small>在自己的数据上检验</small></h2>
   <table>
     <tr><th>函数</th><th>检验</th></tr>
-    <tr><td><code>validate_outliers()</code></td><td>加入人为误差，比较异常值方法的检出率、误删率和 ADG 误差</td></tr>
-    <tr><td><code>validate_adg()</code></td><td>生长曲线的交叉验证与截断（晚进站、早出栏）；<code>extrap</code> 比较曲线与切线外推</td></tr>
+    <tr><td><code>validate_outliers()</code></td><td>加入人为误差，比较异常值方法的检出率、误删率和 ADG 误差；干净记录取各方法的共识</td></tr>
+    <tr><td><code>validate_adg()</code></td><td>生长曲线的分块交叉验证（<code>block_days</code>）与截断（晚进站、早出栏）；<code>extrap</code> 比较曲线与切线外推</td></tr>
     <tr><td><code>validate_weight_fill()</code></td><td>隐藏日体重，比较线性插值与各曲线的填充误差</td></tr>
-    <tr><td><code>validate_adfi()</code></td><td>隐藏日采食，比较 loess_pop、loess_lm、linear</td></tr>
+    <tr><td><code>validate_adfi()</code></td><td>隐藏日采食，比较 loess_pop、loess_lm、linear；传入 <code>weight</code> 时体重也重新计算</td></tr>
     <tr><td><code>validate_truncation()</code></td><td><b>整条流程</b>：截断部分猪的全部访问后重跑，比较多套设置的 ADG / ADFI / FCR（无泄露，最接近实际）</td></tr>
   </table>
 <pre><code>vw <- validate_weight_fill(w, max_pigs = 300, cores = 4)
 vw$summary
-<span class="c"># 场景：random30 / blocks3 / late20 / early15</span></code></pre>
+<span class="c"># 场景：random30 / blocks3 / late20 / early15</span>
+<span class="c"># 隐藏的日子先删掉再清洗，不泄露（1.5.0 起）</span>
+vf <- validate_adfi(f, weight = w)</code></pre>
 </section>
 
 <section class="k-check">

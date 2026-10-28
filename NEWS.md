@@ -1,3 +1,33 @@
+# tidypptsda 1.5.0
+
+## Validation functions without information leaking from hidden data
+
+All four single-step validators now hide days **before** cleaning, so the
+hidden data no longer decide what happens to the rest. Their numbers
+change, mostly at the stage ends; the methods of the pipeline are
+unchanged.
+
+* `validate_adg()`: cross-validation uses **blocks** of `block_days`
+  consecutive days (new argument, default 7) as folds, instead of single
+  random days whose neighbours stayed in the training data
+  (`block_days = 1` gives the old folds). In both cross-validation and
+  truncation, all weight records of the hidden days are removed and the
+  remaining records are cleaned again with `clean_weight()`.
+* `validate_weight_fill()`: the remaining records are cleaned again after
+  the hidden days are removed.
+* `validate_adfi()` gains `weight` (the result of `clean_weight()`): the
+  weight records of the hidden days are hidden too, and the daily body
+  weight used for the imputation is computed again from the remaining
+  records. Without `weight` it works as before, with a warning.
+* `validate_outliers()` gains `reference = c("consensus", "qc")`: by default
+  the clean records are those that **no** compared method flags, so the
+  method of `qc` is no longer favoured; the reference ADG comes from the
+  clean records without any outlier method. `reference = "qc"` gives the
+  old behaviour. `$settings$n_clean` gives the number of clean records.
+* Found by the leakage-free checks: when a long stretch just before the
+  last records is missing, the backward weight tracking can drop the last
+  few records of a pig, so its end has to be extrapolated.
+
 # tidypptsda 1.4.0
 
 ## Defaults changed by a leakage-free validation

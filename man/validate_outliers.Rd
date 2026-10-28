@@ -15,6 +15,7 @@ validate_outliers(
   reps = 3,
   max_pigs = NULL,
   seed = 1,
+  reference = c("consensus", "qc"),
   verbose = 1,
   cores = 1
 )
@@ -22,8 +23,8 @@ validate_outliers(
 \arguments{
 \item{visits}{Result of \code{\link[=prep_visits]{prep_visits()}}.}
 
-\item{qc}{QC settings from \code{\link[=qc_config]{qc_config()}}. They define the clean records
-(records kept by \code{qc}) and every setting except \code{weight_outlier}.}
+\item{qc}{QC settings from \code{\link[=qc_config]{qc_config()}}: every setting except
+\code{weight_outlier} and \code{weight_track}.}
 
 \item{methods}{Named list of outlier method sets to compare. Each element
 holds values of \code{weight_outlier}, plus \code{"track"} to track the weight
@@ -47,6 +48,12 @@ time on large data (a few hundred pigs are enough). Default \code{NULL}: all.}
 
 \item{seed}{Random seed, for reproducible results.}
 
+\item{reference}{Which records count as clean, i.e. receive the
+artificial errors and give the reference ADG: \code{"consensus"} (default)
+the records kept by \code{qc} \strong{and} by every method in \code{methods}, so that
+no method is favoured; \code{"qc"} the records kept by \code{qc} (before 1.5.0),
+which favours the method of \code{qc}.}
+
 \item{verbose}{0 (silent), 1 (summary and progress, default).}
 
 \item{cores}{Number of CPU cores for \code{\link[=clean_weight]{clean_weight()}} and \code{\link[=calc_adg]{calc_adg()}}.}
@@ -69,11 +76,13 @@ artificial errors are found, how many good records are removed, and how
 far ADG moves from the ADG of the clean records.
 }
 \details{
-The clean records are those that \code{qc} keeps, so they are not free of error
-themselves. A method that disagrees with \code{qc} therefore gets a higher
-\code{false_positive_rate}; compare methods mainly on \code{sensitivity} and ADG.
-The row \code{none} shows the result when only \code{weight_range} is applied
-(errors that push a weight outside it are still found).
+The clean records are found by the methods themselves, so they are not
+free of error. With \code{reference = "consensus"} a record is clean only when
+no method flags it: every method starts from the same records, and a
+method is not judged "wrong" for flagging a record that \code{qc} happened to
+keep. The reference ADG is the ADG of the clean records, without any
+outlier method. The row \code{none} shows the result when only \code{weight_range}
+is applied (errors that push a weight outside it are still found).
 
 Errors placed at random times shift single records but hardly move a
 growth curve fitted to hundreds of records, so ADG differences between
@@ -93,11 +102,12 @@ va <- validate_adg(w, models = c("poly1", "poly2", "poly3"))
 va$summary
 
 # 3. weight fill methods
-vw <- validate_weight_fill(w, methods = c("linear", "poly2"), scenarios = c("blocks3", "late20"), reps = 1)
+vw <- validate_weight_fill(w, methods = c("linear", "poly2"),
+                           scenarios = c("blocks3", "late20"), reps = 1)
 vw$summary
 
 # 4. feed intake imputation
 adfi <- calc_adfi(visits, calc_adg(w, verbose = 0), verbose = 0)
-vf <- validate_adfi(adfi, scenarios = c("random30", "late20"), reps = 2)
+vf <- validate_adfi(adfi, w, scenarios = c("random30", "late20"), reps = 2)
 vf$summary
 }
