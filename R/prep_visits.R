@@ -128,7 +128,7 @@ prep_visits <- function(data, station = NULL, format = NULL, qc = qc_config(),
     if (!is.null(src)) dt[, source_file := src]
   }
 
-  ppt_msg("Preparing {toupper(station)} visits", "h1")
+  ppt_step("Preparing {toupper(station)} visits")
   n_raw <- nrow(dt)
 
   dt <- finish_standard(dt, qc$duration_max)
@@ -147,14 +147,15 @@ prep_visits <- function(data, station = NULL, format = NULL, qc = qc_config(),
   dt <- unique(dt)
   n_dup <- n_before - nrow(dt)
 
-  ppt_bullets_counts(c(
-    "Visits read" = n_raw,
-    "Unidentified visits (kept, identified = FALSE)" = dt[identified == FALSE, .N],
-    "Visits crossing midnight (exit time corrected)" = if (station == "fire" || n_cross > 0L) n_cross else NA,
-    "Body weights of 0 set to NA" = n_zero_weight,
-    "Rows without entry time (dropped)" = n_no_time,
-    "Duplicated rows (dropped)" = n_dup
-  ))
+  ppt_rows(
+    ppt_row("Visits read", n_raw, keep = TRUE),
+    ppt_row("unidentified (kept, identified = FALSE)", dt[identified == FALSE, .N], of = n_raw, depth = 1L),
+    ppt_row("crossing midnight (exit time corrected)", if (station == "fire" || n_cross > 0L) n_cross else NA,
+            of = n_raw, depth = 1L),
+    ppt_row("body weight 0 (set to NA)", n_zero_weight, of = n_raw, depth = 1L),
+    ppt_row("no entry time (dropped)", n_no_time, of = n_raw, depth = 1L, warn = TRUE),
+    ppt_row("duplicated (dropped)", n_dup, of = n_raw, depth = 1L, warn = TRUE)
+  )
 
   # Pigs seen at more than one station.
   tr <- resolve_transfers(dt, qc)
@@ -183,7 +184,7 @@ prep_visits <- function(data, station = NULL, format = NULL, qc = qc_config(),
     duplicates = n_dup, misreads = nrow(tr$misread_visits)
   ))
 
-  ppt_msg("{data.table::uniqueN(dt$responder, na.rm = TRUE)} pigs at {data.table::uniqueN(dt$location)} station{?s}, {nrow(dt)} visits over {max(dt$seq_days)} days", "success")
+  ppt_done("{data.table::uniqueN(dt$responder, na.rm = TRUE)} pigs at {data.table::uniqueN(dt$location)} station{?s}, {fmt_n(nrow(dt))} visits over {max(dt$seq_days)} days")
   if (!"breed" %in% names(dt)) {
     ppt_msg("No {.field breed} column. To use breed in the feed intake model and breed-specific limits, add it with {.fn add_breed}.", "info")
   }
@@ -245,12 +246,6 @@ finish_ids <- function(out) {
   out[, identified := !unidentified]
   out[, responder := data.table::fifelse(identified, raw, NA_character_)]
   invisible(out)
-}
-
-ppt_bullets_counts <- function(counts, level = 1L) {
-  counts <- counts[!is.na(counts)]
-  lines <- paste0(names(counts), ": {.strong ", format(counts, big.mark = ","), "}")
-  ppt_msg(stats::setNames(lines, rep("*", length(lines))), "bullets", level = level)
 }
 
 # Pigs seen at several stations: misreads (short runs of visits at another

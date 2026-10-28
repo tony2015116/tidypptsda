@@ -17,6 +17,7 @@ flat_tidypptsda.Rmd:
   - R/run_pipeline.R
   - R/validate.R
   - R/validate_truncation.R
+  - R/write_report.R
   - R/write_results.R
   - R/example-datasets.R
   tests:
@@ -34,6 +35,7 @@ flat_tidypptsda.Rmd:
   - tests/testthat/test-calc_fcr.R
   - tests/testthat/test-plot_adg.R
   - tests/testthat/test-run_pipeline.R
+  - tests/testthat/test-write_report.R
   - tests/testthat/test-write_results.R
   - tests/testthat/test-validate.R
   - tests/testthat/test-validate_truncation.R

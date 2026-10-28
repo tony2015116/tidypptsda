@@ -63,7 +63,7 @@ calc_adfi <- function(visits, adg, qc = adg$settings, verbose = 1, cores = 1) {
                      verbose = ppt_verbose())
   }
 
-  ppt_msg("ADFI over {qc$stage_range[1]}-{qc$stage_range[2]} kg", "h1")
+  ppt_step("ADFI over {qc$stage_range[1]}-{qc$stage_range[2]} kg")
 
   has_breed <- "breed" %in% names(adg$per_pig)
   pigs <- adg$per_pig[!is.na(adg), intersect(c("responder", "location", "breed", "adg", "adg_type", "stage"),
@@ -459,18 +459,21 @@ report_adfi <- function(per_pig, daily, corr, n_range, n_quant, qc, pop_table = 
   }
   st <- daily[in_stage == TRUE, .N, by = state]
   get_n <- function(s) st[state == s, sum(N)]
-  ppt_bullets_counts(c(
-    "Stage days recorded without error (org)" = get_n("org"),
-    "Corrected (corr)" = get_n("corr"),
-    "Interpolated (iii)" = get_n("iii"),
-    "Extrapolated (elrp)" = get_n("elrp"),
-    "Missing" = get_n("missing"),
-    "Pig-days outside dfi_range" = n_range,
-    "Pig-days outside dfi_quantile" = if (is.null(qc$dfi_quantile)) NA else n_quant
-  ))
+  n_days <- sum(st$N)
+  ppt_rows(
+    ppt_row("Stage pig-days", n_days, keep = TRUE),
+    ppt_row("recorded without error (org)", get_n("org"), of = n_days, depth = 1L, keep = TRUE),
+    ppt_row("corrected (corr)", get_n("corr"), of = n_days, depth = 1L),
+    ppt_row("filled between records (iii)", get_n("iii"), of = n_days, depth = 1L),
+    ppt_row("filled at the stage ends (elrp)", get_n("elrp"), of = n_days, depth = 1L),
+    ppt_row("missing", get_n("missing"), of = n_days, depth = 1L, warn = TRUE),
+    ppt_row("outside dfi_range", n_range, of = n_days, depth = 1L, warn = TRUE),
+    ppt_row("outside dfi_quantile", if (is.null(qc$dfi_quantile)) NA else n_quant, of = n_days,
+            depth = 1L, warn = TRUE)
+  )
   ok <- per_pig[!is.na(adfi)]
   if (nrow(ok) > 0L) {
-    ppt_msg("Mean ADFI over the stage: {round(mean(ok$adfi))} g/d", "success")
+    ppt_done("ADFI {round(mean(ok$adfi))} \u00b1 {round(stats::sd(ok$adfi))} g/d (mean \u00b1 SD)")
     ppt_msg("Recorded stage days only: recorded {round(mean(ok$adfi_raw, na.rm = TRUE))} g/d, error-free part {round(mean(ok$adfi_error_free, na.rm = TRUE))} g/d", "info", level = 2L)
   }
   if (any(is.na(per_pig$adfi))) {

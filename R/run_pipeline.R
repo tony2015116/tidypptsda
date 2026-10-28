@@ -16,7 +16,9 @@
 #'
 #' @return An object of class `ppt_pipeline`: a list with `visits`,
 #'   `weight`, `adg`, `adfi` and `fcr`, plus `removed` (every pig removed,
-#'   with the step and the reason).
+#'   with the step and the reason). Printing it shows a summary box. With
+#'   `verbose >= 1` the steps are numbered with their run time, the box is
+#'   shown at the end and the result is returned invisibly.
 #' @export
 #' @examples
 #' res <- run_pipeline(fire, qc = qc_config(stage_range = c(60, 120)), verbose = 0)
@@ -26,34 +28,82 @@ run_pipeline <- function(data, station = NULL, qc = qc_config(), breeds = NULL,
                          verbose = 1, cores = 1) {
   local_verbose(verbose)
   check_qc(qc)
+  t0 <- Sys.time()
+  # numbered steps: prep, weight, ADG, feeder errors, ADFI, FCR
+  old <- options(tidypptsda.steps = 6L)
+  .ppt_state$step <- 0L
+  on.exit({
+    options(old)
+    .ppt_state$step <- 0L
+  }, add = TRUE)
+  if (ppt_verbose() >= 1L) {
+    cli::cli_rule(left = "tidypptsda {utils::packageVersion('tidypptsda')} \u00b7 run_pipeline",
+                  right = "stage {qc$stage_range[1]}-{qc$stage_range[2]} kg")
+  }
   visits <- prep_visits(data, station = station, qc = qc, verbose = verbose)
   if (!is.null(breeds)) visits <- add_breed(visits, breeds, verbose = verbose)
   weight <- clean_weight(visits, qc = qc, verbose = verbose, cores = cores)
   adg <- calc_adg(weight, qc = qc, verbose = verbose, cores = cores)
   adfi <- calc_adfi(visits, adg, qc = qc, verbose = verbose, cores = cores)
   fcr <- calc_fcr(adg, adfi, verbose = verbose)
-  structure(
+  res <- structure(
     list(visits = visits, weight = weight, adg = adg, adfi = adfi, fcr = fcr,
          removed = fcr$removed),
     class = "ppt_pipeline"
   )
+  if (ppt_verbose() >= 1L) {
+    cli::cat_line()
+    pipeline_box(res, elapsed = as.numeric(difftime(Sys.time(), t0, units = "secs")))
+    return(invisible(res))
+  }
+  res
+}
+
+# Summary box of a pipeline result: pigs, mean traits, pigs to check.
+pipeline_box <- function(x, elapsed = NULL, max_pigs = 5L) {
+  n_id <- data.table::uniqueN(x$visits$responder, na.rm = TRUE)
+  p <- x$fcr$per_pig
+  n_rm <- data.table::uniqueN(x$removed$responder)
+  s <- x$fcr$summary[group == "all"]
+  ms <- function(tr, fmt) {
+    r <- s[trait == tr]
+    if (nrow(r) == 0L || r$n == 0) return("-")
+    paste0(sprintf(fmt, r$mean), " \u00b1 ", sprintf(fmt, r$sd))
+  }
+  bold <- cli::style_bold
+  lines <- c(
+    paste0(bold("Pigs   "), n_id, " in the data \u00b7 ", sum(!is.na(p$fcr)), " with FCR (",
+           sum(p$fcr_flag %in% "ok"), " ok, ", sum(p$fcr_flag %in% "low_confidence"),
+           " low confidence) \u00b7 ", n_rm, " removed"),
+    paste0(bold("ADG    "), ms("adg", "%.0f"), " g/d"),
+    paste0(bold("ADFI   "), ms("adfi", "%.0f"), " g/d"),
+    paste0(bold("FCR    "), ms("fcr", "%.2f"))
+  )
+  low <- p[fcr_flag %in% "low_confidence"]
+  chk <- c(if (nrow(low) > 0L) paste0(low$responder, " (", low$location, "): ", low$fcr_note),
+           if (n_rm > 0L) paste0(x$removed$responder, " (", x$removed$location, "): removed, ",
+                                 x$removed$reason))
+  if (length(chk) > 0L) {
+    more <- length(chk) - max_pigs
+    chk <- utils::head(chk, max_pigs)
+    lines <- c(lines, "", bold(cli::col_yellow("Check")),
+               paste0("  ", cli::col_yellow(chk)),
+               if (more > 0L) cli::col_grey(paste0("  ... and ", more, " more ($fcr$per_pig, $removed)")))
+  }
+  lines <- c(lines, "", cli::col_grey(paste0(
+    "Next: plot_adg(), plot_adfi(), write_report(), write_results()",
+    if (!is.null(elapsed)) sprintf(" \u00b7 %.1fs", elapsed) else "")))
+  width <- max(40L, cli::console_width() - 4L)
+  lines <- cli::ansi_strtrim(lines, width)
+  st <- toupper(attr(x$visits, "station") %||% "")
+  box <- cli::boxx(lines, header = paste0(" Results ", st, " "), border_style = "round",
+                   padding = c(0, 1, 0, 1))
+  cli::cli_verbatim(format(box))
+  invisible(NULL)
 }
 
 #' @export
 print.ppt_pipeline <- function(x, ...) {
-  cli::cli_h2("tidypptsda pipeline ({toupper(attr(x$visits, 'station'))})")
-  n_id <- data.table::uniqueN(x$visits$responder, na.rm = TRUE)
-  p <- x$fcr$per_pig
-  cli::cli_bullets(c(
-    "*" = "Pigs in the data: {n_id}",
-    "*" = "Pigs with weight data kept: {x$weight$per_pig[status != 'removed', .N]}",
-    "*" = "Pigs with ADG: {sum(!is.na(x$adg$per_pig$adg))}",
-    "*" = "Pigs with FCR: {sum(!is.na(p$fcr))} ({sum(p$fcr_flag %in% 'ok')} ok, {sum(p$fcr_flag %in% 'low_confidence')} low confidence)",
-    "*" = "Removed pigs: {data.table::uniqueN(x$removed$responder)} (see {.field $removed})"
-  ))
-  s <- x$fcr$summary[group == "all" & trait %in% c("adg", "adfi", "fcr")]
-  if (nrow(s) > 0L) {
-    cli::cli_text("Mean ADG {round(s[trait == 'adg', mean])} g/d, ADFI {round(s[trait == 'adfi', mean])} g/d, FCR {sprintf('%.2f', s[trait == 'fcr', mean])}")
-  }
+  pipeline_box(x)
   invisible(x)
 }

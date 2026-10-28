@@ -473,6 +473,20 @@ res$fcr$summary[group == "all"]
 
 
 
+# write_report
+
+`write_report()` writes the results as a small website to browse like a
+book: one page per station with its growth and feed intake plots and a
+table of its pigs, and an overview page in front. Arrow keys turn the
+pages; a pig ID in the search box jumps to its station.
+
+```{r example-write_report}
+res <- run_pipeline(nedap, verbose = 0)
+dir <- file.path(tempdir(), "report")
+write_report(res, dir)
+# then open file.path(dir, "index.html") in a web browser
+```
+
 # write_results
 
 `write_results()` writes the tables of an analysis to CSV files named

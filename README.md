@@ -77,6 +77,7 @@ adfi    <- calc_adfi(visits, adg)
 fcr     <- calc_fcr(adg, adfi)
 
 plot_adg(adg, weight = weight) |> save_plots("plots", suffix = "growth")
+write_report(run_pipeline(fire), "report")   # HTML report, a page per station
 ```
 
 <img src="man/figures/README-plot-1.png" width="100%" />

@@ -135,7 +135,7 @@
   <div class="step" style="--k: var(--c-weight)"><b>calc_adg()</b>fill weights + ADG</div><span class="arrow">→</span>
   <div class="step" style="--k: var(--c-feed)"><b>calc_adfi()</b>correct, fill feed</div><span class="arrow">→</span>
   <div class="step" style="--k: var(--c-fcr)"><b>calc_fcr()</b>FCR + confidence</div><span class="arrow">→</span>
-  <div class="step" style="--k: var(--c-out)"><b>plot_* / write_results()</b>plots, export</div>
+  <div class="step" style="--k: var(--c-out)"><b>plot_* / write_results() / write_report()</b>plots, export, HTML report</div>
   <span class="note">All in one: <code>run_pipeline()</code>; all thresholds: <code>qc_config()</code></span>
 </div>
 
@@ -151,7 +151,8 @@ raw <- read_station("export/", station = "nedap")
 res <- run_pipeline(raw)            <span class="c"># or run_pipeline(nedap)</span>
 res$fcr$per_pig                     <span class="c"># final results</span>
 res$removed                         <span class="c"># removed pigs, with reasons</span>
-write_results(res, dir = "results", farm = "A01")</code></pre>
+write_results(res, dir = "results", farm = "A01")
+write_report(res, "results/report")  <span class="c"># HTML: a page per station, arrow keys</span></code></pre>
   <p>Example data: <code>nedap</code>, <code>fire</code> (raw station exports).</p>
 </section>
 
