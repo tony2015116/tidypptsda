@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.4.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.5.0</span>
       </span>
     </div>
 
@@ -160,7 +160,8 @@
 <tr class="even">
 <td><code><a href="../reference/validate_adg.html">validate_adg()</a></code></td>
 <td>生长曲线模型（poly1/2/3、gompertz），以及曲线外推还是切线外推（<code>extrap</code>）</td>
-<td>k 折交叉验证；隐藏测定开头或结尾若干天（模拟晚进站、早出栏），看 ADG
+<td>按连续若干天分块的 k
+折交叉验证；隐藏测定开头或结尾若干天（模拟晚进站、早出栏），看 ADG
 变化多少</td>
 </tr>
 <tr class="odd">
@@ -172,7 +173,7 @@ ADG 比较</td>
 <tr class="even">
 <td><code><a href="../reference/validate_adfi.html">validate_adfi()</a></code></td>
 <td>日采食填充方法（loess_pop、loess_lm、linear）</td>
-<td>隐藏部分有记录的日子（随机、成段、开头、结尾），重新填充，与实测比较</td>
+<td>隐藏部分有记录的日子（随机、成段、开头、结尾），这些日子的体重也一并隐藏，重新填充，与实测比较</td>
 </tr>
 <tr class="odd">
 <td><strong><code><a href="../reference/validate_truncation.html">validate_truncation()</a></code></strong></td>
@@ -185,37 +186,51 @@ ADG、ADFI、FCR 比较</td>
 </table>
 <p><strong>比较设置、做最终决定时，请以
 <code><a href="../reference/validate_truncation.html">validate_truncation()</a></code> 为准。</strong>
-前四个函数快，适合单独看某一步，但都用到了一部分被”隐藏”的信息，结果偏乐观，在区间两端最明显：</p>
+前四个函数快，适合单独看某一步。从 1.5.0
+起，它们都<strong>先删掉被隐藏日子的记录，再对剩下的记录重新清洗</strong>，被隐藏的数据不再影响其余记录的取舍：</p>
 <table class="table">
 <colgroup>
-<col width="50%">
-<col width="50%">
+<col width="33%">
+<col width="33%">
+<col width="33%">
 </colgroup>
 <thead><tr class="header">
 <th>函数</th>
-<th>用到的被隐藏信息</th>
+<th>1.5.0 之前用到的被隐藏信息</th>
+<th>现在</th>
 </tr></thead>
 <tbody>
 <tr class="odd">
-<td><code><a href="../reference/validate_adfi.html">validate_adfi()</a></code></td>
-<td>被隐藏的采食日仍用真实体重，区间起止也来自全部数据；现实中没有采食记录的日子大多也没有体重</td>
+<td><code><a href="../reference/validate_outliers.html">validate_outliers()</a></code></td>
+<td>“干净记录”由 <code>qc</code> 的方法判定，偏向这种方法</td>
+<td>干净记录取<strong>所有被比较方法都保留</strong>的记录（<code>reference = "consensus"</code>）</td>
 </tr>
 <tr class="even">
+<td>
+<code><a href="../reference/validate_adg.html">validate_adg()</a></code>（交叉验证）</td>
+<td>按天随机分折，留出日子的前后一天都在训练集里，衡量的更像是插值能力</td>
+<td>按连续 <code>block_days</code>（默认
+7）天分块再分折，训练集重新清洗</td>
+</tr>
+<tr class="odd">
 <td>
 <code><a href="../reference/validate_adg.html">validate_adg()</a></code>（截断）、<code><a href="../reference/validate_weight_fill.html">validate_weight_fill()</a></code>
 </td>
 <td>异常值清洗（包括从末期往回的逐日追踪）在隐藏之前用全部记录做过</td>
+<td>剩下的记录重新清洗</td>
 </tr>
-<tr class="odd">
-<td>
-<code><a href="../reference/validate_adg.html">validate_adg()</a></code>（交叉验证）</td>
-<td>按天随机分折，留出日子的前后一天都在训练集里，衡量的更像是插值能力</td>
+<tr class="even">
+<td><code><a href="../reference/validate_adfi.html">validate_adfi()</a></code></td>
+<td>被隐藏的采食日仍用真实体重</td>
+<td>传入 <code>weight</code>
+时，这些日子的体重记录也删掉，日体重用剩下的记录重新计算</td>
 </tr>
 </tbody>
 </table>
-<p>例如 NEDAP 隐藏结尾 30 天时，poly2 的 ADG 误差在
-<code><a href="../reference/validate_adg.html">validate_adg()</a></code> 中约 74 g/d，在
-<code><a href="../reference/validate_truncation.html">validate_truncation()</a></code> 中约 115 g/d。</p>
+<p>剩下的局限：它们每次只看一步，其余步骤仍用全部数据的结果（例如
+<code><a href="../reference/validate_adfi.html">validate_adfi()</a></code>
+的区间起止、采食记录的校正都来自全部数据）。各步骤之间的相互影响，只有
+<code><a href="../reference/validate_truncation.html">validate_truncation()</a></code> 能看到。</p>
 <p>五个函数都返回 <code>ppt_validation</code>
 对象，<code>$summary</code>
 是各方法的汇总比较，其余元素是每头猪的明细。结果可以用 <code>seed</code>
@@ -240,9 +255,10 @@ ADG、ADFI、FCR 比较</td>
 <h3 id="做法">做法<a class="anchor" aria-label="anchor" href="#%E5%81%9A%E6%B3%95"></a>
 </h3>
 <ol style="list-style-type: decimal">
-<li>先用 <code>qc</code>
-的设置清洗一遍，被保留的记录视为”干净记录”，由此算出的 ADG
-视为”真值”；</li>
+<li>先用 <code>qc</code> 和 <code>methods</code>
+中的每种方法各清洗一遍，<strong>所有方法都保留</strong>的记录视为”干净记录”（<code>reference = "consensus"</code>，默认），由它们（不做异常值检测）算出的
+ADG 视为”真值”。这样哪种方法都不占便宜；<code>reference = "qc"</code> 是
+1.5.0 之前的做法，只用 <code>qc</code> 判定；</li>
 <li>随机挑选 <code>rate</code>（默认 5%）的干净记录，加上或减去
 <code>size</code>（默认 3–15 kg）的误差；</li>
 <li>对加了误差的数据，分别用 <code>methods</code>
@@ -275,41 +291,41 @@ ADG、ADFI、FCR 比较</td>
 <span><span class="fu">tidy</span><span class="op">(</span><span class="va">vo_n</span><span class="op">)</span></span>
 <span><span class="co">#&gt;             method sensitivity false_positive_rate precision adg_bias adg_rmse adg_spearman n_pigs</span></span>
 <span><span class="co">#&gt;             &lt;char&gt;       &lt;num&gt;               &lt;num&gt;     &lt;num&gt;    &lt;num&gt;    &lt;num&gt;        &lt;num&gt;  &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:            none      0.0112            0.00e+00     1.000 -0.08190     1.78        0.999     29</span></span>
-<span><span class="co">#&gt; 2: track+rlm+loess      0.9360            4.78e-03     0.914  0.56900     2.04        0.999     29</span></span>
-<span><span class="co">#&gt; 3:           track      0.6900            3.68e-04     0.990  0.18400     1.38        1.000     29</span></span>
-<span><span class="co">#&gt; 4:             rlm      0.8820            1.61e-03     0.967  0.39900     1.73        0.999     29</span></span>
-<span><span class="co">#&gt; 5:           loess      0.9000            4.09e-05     0.999  0.09200     1.16        0.999     29</span></span>
-<span><span class="co">#&gt; 6:       rlm+loess      0.9130            1.62e-03     0.968  0.44000     1.68        0.999     29</span></span>
-<span><span class="co">#&gt; 7:             stl      0.9350            7.16e-03     0.876  1.23000     5.34        0.999     29</span></span>
-<span><span class="co">#&gt; 8:              sd      0.5890            0.00e+00     1.000  0.00431     1.42        0.999     29</span></span></code></pre></div>
+<span><span class="co">#&gt; 1:            none       0.011            0.00e+00     1.000  -0.2550    1.870        0.999     29</span></span>
+<span><span class="co">#&gt; 2: track+rlm+loess       0.940            5.58e-03     0.901   0.5540    2.190        0.999     29</span></span>
+<span><span class="co">#&gt; 3:           track       0.681            5.08e-04     0.986   0.0806    1.260        0.999     29</span></span>
+<span><span class="co">#&gt; 4:             rlm       0.885            1.94e-03     0.961   0.3430    1.650        0.999     29</span></span>
+<span><span class="co">#&gt; 5:           loess       0.903            8.24e-05     0.998   0.0352    0.848        1.000     29</span></span>
+<span><span class="co">#&gt; 6:       rlm+loess       0.917            1.98e-03     0.961   0.3990    1.630        0.999     29</span></span>
+<span><span class="co">#&gt; 7:             stl       0.946            2.75e-03     0.949   0.1390    0.806        1.000     29</span></span>
+<span><span class="co">#&gt; 8:              sd       0.599            0.00e+00     1.000  -0.3240    1.710        0.999     29</span></span></code></pre></div>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">vo_f</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_outliers.html">validate_outliers</a></span><span class="op">(</span><span class="va">v_f</span>, <span class="va">qc_f</span>, reps <span class="op">=</span> <span class="fl">3</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="fu">tidy</span><span class="op">(</span><span class="va">vo_f</span><span class="op">)</span></span>
 <span><span class="co">#&gt;             method sensitivity false_positive_rate precision adg_bias adg_rmse adg_spearman n_pigs</span></span>
 <span><span class="co">#&gt;             &lt;char&gt;       &lt;num&gt;               &lt;num&gt;     &lt;num&gt;    &lt;num&gt;    &lt;num&gt;        &lt;num&gt;  &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:            none     0.00427            0.000000        NA    1.040     6.79        0.994     25</span></span>
-<span><span class="co">#&gt; 2: track+rlm+loess     0.93100            0.005690     0.897    2.810    10.90        0.999     25</span></span>
-<span><span class="co">#&gt; 3:           track     0.68700            0.000264     0.993    0.657     4.08        0.998     25</span></span>
-<span><span class="co">#&gt; 4:             rlm     0.88700            0.003040     0.939    2.140     9.21        0.999     25</span></span>
-<span><span class="co">#&gt; 5:           loess     0.90600            0.000485     0.990    0.247     3.02        1.000     25</span></span>
-<span><span class="co">#&gt; 6:       rlm+loess     0.92200            0.003180     0.939    2.090     9.12        0.999     25</span></span>
-<span><span class="co">#&gt; 7:             stl     0.90200            0.004450     0.915    0.451     2.92        0.999     25</span></span>
-<span><span class="co">#&gt; 8:              sd     0.57500            0.000000     1.000    1.250     4.79        0.997     25</span></span></code></pre></div>
+<span><span class="co">#&gt; 1:            none     0.00502            0.00e+00     1.000    2.010     7.28        0.993     25</span></span>
+<span><span class="co">#&gt; 2: track+rlm+loess     0.91800            4.93e-03     0.908    2.280     9.66        0.999     25</span></span>
+<span><span class="co">#&gt; 3:           track     0.66900            4.44e-05     0.999    1.070     4.29        0.999     25</span></span>
+<span><span class="co">#&gt; 4:             rlm     0.86800            2.53e-03     0.948    1.750     7.25        0.999     25</span></span>
+<span><span class="co">#&gt; 5:           loess     0.89900            4.00e-04     0.992    0.257     2.58        1.000     25</span></span>
+<span><span class="co">#&gt; 6:       rlm+loess     0.90800            2.62e-03     0.949    1.750     7.09        0.999     25</span></span>
+<span><span class="co">#&gt; 7:             stl     0.88800            1.69e-03     0.965    1.020     3.64        0.999     25</span></span>
+<span><span class="co">#&gt; 8:              sd     0.57300            0.00e+00     1.000    0.391     3.32        0.999     25</span></span></code></pre></div>
 <p>实际的称重误差多数是<strong>偏低</strong>的（猪只有前腿站在秤上），可以用
 <code>direction = "down"</code> 单独检验：</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">tidy</span><span class="op">(</span><span class="fu"><a href="../reference/validate_outliers.html">validate_outliers</a></span><span class="op">(</span><span class="va">v_n</span>, <span class="va">qc_n</span>, reps <span class="op">=</span> <span class="fl">3</span>, direction <span class="op">=</span> <span class="st">"down"</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;             method sensitivity false_positive_rate precision adg_bias adg_rmse adg_spearman n_pigs</span></span>
 <span><span class="co">#&gt;             &lt;char&gt;       &lt;num&gt;               &lt;num&gt;     &lt;num&gt;    &lt;num&gt;    &lt;num&gt;        &lt;num&gt;  &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:            none     0.00789            0.000000     1.000  0.18500     2.54        0.999     29</span></span>
-<span><span class="co">#&gt; 2: track+rlm+loess     0.92500            0.004230     0.921  0.40300     1.96        0.999     29</span></span>
-<span><span class="co">#&gt; 3:           track     0.67300            0.000259     0.993 -0.67300     1.26        1.000     29</span></span>
-<span><span class="co">#&gt; 4:             rlm     0.87200            0.001700     0.965  0.29800     1.94        1.000     29</span></span>
-<span><span class="co">#&gt; 5:           loess     0.89500            0.000231     0.995  0.00817     1.25        1.000     29</span></span>
-<span><span class="co">#&gt; 6:       rlm+loess     0.90600            0.001760     0.965  0.22800     1.67        1.000     29</span></span>
-<span><span class="co">#&gt; 7:             stl     0.93700            0.006670     0.882  1.00000     5.17        1.000     29</span></span>
-<span><span class="co">#&gt; 8:              sd     0.55500            0.000000     1.000 -0.13100     1.63        1.000     29</span></span></code></pre></div>
+<span><span class="co">#&gt; 1:            none      0.0103            0.000000     1.000   0.1460     2.69        0.999     29</span></span>
+<span><span class="co">#&gt; 2: track+rlm+loess      0.9370            0.005310     0.904   0.3910     2.06        0.999     29</span></span>
+<span><span class="co">#&gt; 3:           track      0.6670            0.000480     0.987  -0.7710     1.53        1.000     29</span></span>
+<span><span class="co">#&gt; 4:             rlm      0.8740            0.002320     0.953   0.3840     1.96        1.000     29</span></span>
+<span><span class="co">#&gt; 5:           loess      0.9050            0.000261     0.995   0.0129     1.07        1.000     29</span></span>
+<span><span class="co">#&gt; 6:       rlm+loess      0.9150            0.002400     0.953   0.4010     1.91        0.999     29</span></span>
+<span><span class="co">#&gt; 7:             stl      0.9350            0.002400     0.954  -0.0431     0.92        0.999     29</span></span>
+<span><span class="co">#&gt; 8:              sd      0.5580            0.000000     1.000  -0.1400     1.40        1.000     29</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="怎么看">怎么看<a class="anchor" aria-label="anchor" href="#%E6%80%8E%E4%B9%88%E7%9C%8B"></a>
@@ -319,26 +335,26 @@ ADG、ADFI、FCR 比较</td>
 <strong>默认的 <code>track+rlm+loess</code>
 检出率最高之一</strong>（3–15 kg
 的人为误差找出九成以上），误删的好记录约
-0.5%。只做追踪（<code>track</code>）几乎不误删，但只能找出约 7
-成：小于追踪容差（8%，至少 2 kg）的误差会被保留。</li>
+0.5%，是各方法中最多的：它把三种方法判为异常的记录都删掉。只做追踪（<code>track</code>）几乎不误删，但只能找出约
+7 成：小于追踪容差（8%，至少 2 kg）的误差会被保留。</li>
 <li>
 <strong>检出率与误删率此消彼长</strong>。stl
-检出率高，但误删也多；sd 几乎不误删，但只能找出六成左右；loess
-单独使用时误删很少、检出率也高，在示例数据上 ADG 误差最小。</li>
+检出率与默认相当，误删约为默认的一半；sd
+几乎不误删，但只能找出六成左右；loess
+单独使用时误删很少、检出率也有九成，在示例数据上 ADG 误差最小。</li>
 <li>
 <strong>ADG
 对随机分布的误差并不敏感</strong>。一头猪有几百到上千条体重记录，零散的误差对回归斜率的影响很小，所以即使完全不做异常值检测（<code>none</code>），ADG
 的误差也只有几 g/d。各方法 ADG
 的差别主要来自它们<strong>误删了哪些好记录</strong>：例如 FIRE 上，rlm
-会删掉一部分偏离二次曲线、但其实正常的记录，ADG 误差约 10 g/d，loess
-只有约 3 g/d。</li>
+会删掉一部分偏离二次曲线、但其实正常的记录，ADG 误差约 7 g/d，loess 不到
+3 g/d。</li>
 <li>真正会明显影响 ADG
 的是<strong>集中出现</strong>的误差，例如进站初期几头小猪同时上秤，或秤在几天内持续漂移。这正是逐日回溯追踪要处理的情况，人为加入的随机误差检验不出它的作用，请结合
 <code><a href="../reference/plot_adg.html">plot_adg()</a></code> 的图逐站检查。</li>
 </ul>
-<p>注意：“干净记录”本身是由 <code>qc</code> 的设置（默认
-<code>track+rlm+loess</code>）判定的，并非完全没有误差；与它判定方式不同的方法，误删率会显得偏高或偏低。比较方法时应以检出率和
-ADG 为主。</p>
+<p>注意：“干净记录”是各方法的共识，并非完全没有误差：所有方法都漏掉的真实误差，仍留在干净记录里。<code>$settings$n_clean</code>
+是干净记录的条数。</p>
 </div>
 </div>
 <div class="section level2">
@@ -350,10 +366,12 @@ ADG 为主。</p>
 </h3>
 <ul>
 <li>
-<strong>k 折交叉验证</strong>：把每头猪有记录的日子随机分成
+<strong>分块 k 折交叉验证</strong>：把每头猪的日子按连续
+<code>block_days</code> 天（默认 7 天）切成块，再把块随机分成
 <code>k</code> 组（默认 5
 组），轮流留出一组，用其余各组拟合曲线，预测留出日子的体重。<code>cv_rmse</code>、<code>cv_mae</code>
-是预测误差（kg），反映曲线<strong>描述数据</strong>的能力。</li>
+是预测误差（kg），反映曲线<strong>描述数据</strong>的能力。按块留出，留出日子的邻近几天也不在训练集里，更接近真实的成段缺失；<code>block_days = 1</code>
+是 1.5.0 之前按单天分折的做法，误差会明显偏小。</li>
 <li>
 <strong>截断检验</strong>：隐藏测定开头（<code>late</code>，模拟晚进站）或结尾（<code>early</code>，模拟早出栏）的
 <code>trim_days</code> 天（默认 10 天和 20 天），重新计算
@@ -362,64 +380,71 @@ ADG，与同一模型用全部数据算出的 ADG
 <code>spearman_*</code>
 反映曲线<strong>外推</strong>的稳定性，这正是测定期没有覆盖整个体重区间时最关心的问题。</li>
 </ul>
+<p>两种检验都先删掉被隐藏日子的全部体重记录，再用 <code>qc</code>
+的设置重新清洗剩下的记录。</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">va_n</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_adg.html">validate_adg</a></span><span class="op">(</span><span class="va">w_n</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="fu">tidy</span><span class="op">(</span><span class="va">va_n</span><span class="op">)</span></span>
 <span><span class="co">#&gt;             model cv_rmse cv_mae bias_late10 rmse_late10 spearman_late10 n_late10 bias_early10</span></span>
 <span><span class="co">#&gt;            &lt;char&gt;   &lt;num&gt;  &lt;num&gt;       &lt;num&gt;       &lt;num&gt;           &lt;num&gt;    &lt;int&gt;        &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:    poly1+start    1.80   1.46        7.86        14.3           0.987       29         4.28</span></span>
-<span><span class="co">#&gt; 2:    poly2+start    1.59   1.29       14.00        20.8           0.991       29         7.14</span></span>
-<span><span class="co">#&gt; 3:    poly3+start    1.39   1.11       14.70        23.9           0.986       29         4.63</span></span>
-<span><span class="co">#&gt; 4: gompertz+start    1.43   1.15        8.79        16.4           0.990       29         5.33</span></span>
+<span><span class="co">#&gt; 1:    poly1+start    1.95   1.59        11.4        23.6           0.960       29         4.30</span></span>
+<span><span class="co">#&gt; 2:    poly2+start    1.93   1.52        24.0        31.3           0.969       29         7.43</span></span>
+<span><span class="co">#&gt; 3:    poly3+start    1.81   1.40        26.1        37.2           0.959       29         4.83</span></span>
+<span><span class="co">#&gt; 4: gompertz+start    1.72   1.35        17.4        26.8           0.963       29         5.70</span></span>
 <span><span class="co">#&gt;    rmse_early10 spearman_early10 n_early10 bias_late20 rmse_late20 spearman_late20 n_late20</span></span>
 <span><span class="co">#&gt;           &lt;num&gt;            &lt;num&gt;     &lt;int&gt;       &lt;num&gt;       &lt;num&gt;           &lt;num&gt;    &lt;int&gt;</span></span>
-<span><span class="co">#&gt; 1:         21.3            0.997        29        8.97        25.9           0.960       29</span></span>
-<span><span class="co">#&gt; 2:         22.6            0.997        29       22.60        32.5           0.955       29</span></span>
-<span><span class="co">#&gt; 3:         23.5            0.997        29       25.50        38.0           0.942       29</span></span>
-<span><span class="co">#&gt; 4:         22.2            0.999        29       16.10        28.4           0.947       29</span></span>
+<span><span class="co">#&gt; 1:         21.5            0.997        29       -5.10        29.0           0.939       29</span></span>
+<span><span class="co">#&gt; 2:         23.0            0.996        29        9.87        28.2           0.947       29</span></span>
+<span><span class="co">#&gt; 3:         23.9            0.996        29       17.00        36.2           0.915       29</span></span>
+<span><span class="co">#&gt; 4:         22.5            0.999        29        5.83        26.8           0.937       29</span></span>
 <span><span class="co">#&gt;    bias_early20 rmse_early20 spearman_early20 n_early20</span></span>
 <span><span class="co">#&gt;           &lt;num&gt;        &lt;num&gt;            &lt;num&gt;     &lt;int&gt;</span></span>
-<span><span class="co">#&gt; 1:        0.595         51.6            0.970        29</span></span>
-<span><span class="co">#&gt; 2:       14.300         49.6            0.979        29</span></span>
-<span><span class="co">#&gt; 3:       -5.810         60.1            0.920        29</span></span>
-<span><span class="co">#&gt; 4:        0.221         51.6            0.980        29</span></span></code></pre></div>
+<span><span class="co">#&gt; 1:        0.236         51.9            0.971        29</span></span>
+<span><span class="co">#&gt; 2:       14.100         49.9            0.976        29</span></span>
+<span><span class="co">#&gt; 3:       -3.190         60.1            0.933        29</span></span>
+<span><span class="co">#&gt; 4:       -0.114         52.0            0.981        29</span></span></code></pre></div>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">va_f</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_adg.html">validate_adg</a></span><span class="op">(</span><span class="va">w_f</span>, qc <span class="op">=</span> <span class="va">qc_f</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="fu">tidy</span><span class="op">(</span><span class="va">va_f</span><span class="op">)</span></span>
 <span><span class="co">#&gt;             model cv_rmse cv_mae bias_late10 rmse_late10 spearman_late10 n_late10 bias_early10</span></span>
 <span><span class="co">#&gt;            &lt;char&gt;   &lt;num&gt;  &lt;num&gt;       &lt;num&gt;       &lt;num&gt;           &lt;num&gt;    &lt;int&gt;        &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:    poly1+start    1.86   1.51       -1.75        20.1           0.981       25       -17.60</span></span>
-<span><span class="co">#&gt; 2:    poly2+start    1.62   1.32      -36.30        48.6           0.892       25        -7.02</span></span>
-<span><span class="co">#&gt; 3:    poly3+start    1.53   1.23      -56.50        68.3           0.902       25        16.60</span></span>
-<span><span class="co">#&gt; 4: gompertz+start    1.63   1.34      -34.60        48.3           0.892       25        -9.39</span></span>
+<span><span class="co">#&gt; 1:    poly1+start    2.09   1.73       -16.7        78.4           0.796       25       -17.00</span></span>
+<span><span class="co">#&gt; 2:    poly2+start    1.99   1.63       -49.1       109.0           0.638       25        -6.77</span></span>
+<span><span class="co">#&gt; 3:    poly3+start    2.21   1.75       -72.6       126.0           0.508       25        17.10</span></span>
+<span><span class="co">#&gt; 4: gompertz+start    1.99   1.64       -48.2       108.0           0.657       25        -9.18</span></span>
 <span><span class="co">#&gt;    rmse_early10 spearman_early10 n_early10 bias_late20 rmse_late20 spearman_late20 n_late20</span></span>
 <span><span class="co">#&gt;           &lt;num&gt;            &lt;num&gt;     &lt;int&gt;       &lt;num&gt;       &lt;num&gt;           &lt;num&gt;    &lt;int&gt;</span></span>
-<span><span class="co">#&gt; 1:         40.4            0.962        25        11.6         124           0.576       25</span></span>
-<span><span class="co">#&gt; 2:         29.4            0.945        25       -19.4         129           0.543       25</span></span>
-<span><span class="co">#&gt; 3:         44.1            0.862        25       -45.4         135           0.451       25</span></span>
-<span><span class="co">#&gt; 4:         38.7            0.946        25       -18.3         129           0.542       25</span></span>
+<span><span class="co">#&gt; 1:         40.2            0.963        25         144         167           0.812       24</span></span>
+<span><span class="co">#&gt; 2:         30.7            0.938        25         147         184           0.811       24</span></span>
+<span><span class="co">#&gt; 3:         44.3            0.856        25         134         170           0.795       25</span></span>
+<span><span class="co">#&gt; 4:         40.6            0.937        25         147         184           0.814       24</span></span>
 <span><span class="co">#&gt;    bias_early20 rmse_early20 spearman_early20 n_early20</span></span>
 <span><span class="co">#&gt;           &lt;num&gt;        &lt;num&gt;            &lt;num&gt;     &lt;int&gt;</span></span>
-<span><span class="co">#&gt; 1:        -64.6         90.6            0.890        25</span></span>
-<span><span class="co">#&gt; 2:        -84.8        122.0            0.793        25</span></span>
-<span><span class="co">#&gt; 3:         49.3        113.0            0.645        25</span></span>
-<span><span class="co">#&gt; 4:        -90.7        129.0            0.726        25</span></span></code></pre></div>
+<span><span class="co">#&gt; 1:        -66.2         90.6            0.891        25</span></span>
+<span><span class="co">#&gt; 2:        -93.3        129.0            0.762        25</span></span>
+<span><span class="co">#&gt; 3:         34.5        116.0            0.592        25</span></span>
+<span><span class="co">#&gt; 4:        -91.0        124.0            0.802        25</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="怎么看-1">怎么看<a class="anchor" aria-label="anchor" href="#%E6%80%8E%E4%B9%88%E7%9C%8B-1"></a>
 </h3>
 <ul>
 <li>
-<strong>交叉验证总是偏向灵活的模型</strong>：poly3 和 gompertz 的
-<code>cv_rmse</code> 最小，因为它们能贴合生长曲线上的小起伏。</li>
+<strong>交叉验证偏向灵活的模型，但分块之后没那么明显</strong>：按单天分折时（<code>block_days = 1</code>），NEDAP
+上 poly3 和 gompertz 的误差最小（约 1.46 kg，poly2 约 1.63
+kg），因为它们能贴合生长曲线上的小起伏，而留出的日子两边都有记录；按 7
+天分块后，NEDAP 上仍是 gompertz 最小（1.72 kg），FIRE 上 poly3
+反而最差（2.21 kg，poly2 和 gompertz 1.99
+kg）：留出一整段时，灵活的曲线在段内容易走偏。</li>
 <li>
 <strong>截断检验的结论却常常相反</strong>：灵活的模型外推往往不稳定。区间中间有实测时，曲线只影响起止时间，ADG
 对曲线形式不敏感；隐藏开头或结尾后，那一段要靠曲线填充，差别就出来了。</li>
 <li>
 <strong>没有一种模型在所有情形下都最好</strong>。在示例数据上，NEDAP
-隐藏开头 20 天时 gompertz 和 poly1 最稳定（约 32 g/d），poly3 最差（约
-48 g/d）；FIRE 的猪进站时已在区间下限附近，隐藏开头 10 天时 poly1
-的误差约 24 g/d，poly2 和 gompertz 超过 100 g/d。</li>
+隐藏开头 20 天时 gompertz 最稳定（约 27 g/d），poly1、poly2 约 28–29
+g/d，poly3 最差（约 36 g/d）；FIRE 的猪进站时已在区间下限附近，隐藏开头
+10 天时 poly1 的误差约 78 g/d，poly2 和 gompertz 约 110 g/d，poly3 约
+126 g/d。</li>
 <li>选择模型时，先看本批次的猪是否覆盖了整个体重区间（<code><a href="../reference/calc_adg.html">calc_adg()</a></code>
 结果中的
 <code>adg_type</code>、<code>n_curve_days</code>）：大多数猪都是
@@ -443,18 +468,19 @@ ADG，与同一模型用全部数据算出的 ADG
 <span><span class="co">#&gt; Key: &lt;model&gt;</span></span>
 <span><span class="co">#&gt;            model cv_rmse rmse_late10 rmse_early10 rmse_late20 rmse_early20 rmse_late30 rmse_early30</span></span>
 <span><span class="co">#&gt;           &lt;char&gt;   &lt;num&gt;       &lt;num&gt;        &lt;num&gt;       &lt;num&gt;        &lt;num&gt;       &lt;num&gt;        &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:         poly1    1.81        16.4         21.3        33.4         51.6        66.4         67.3</span></span>
-<span><span class="co">#&gt; 2:   poly1+start    1.80        14.3         21.3        25.9         51.6        61.6         67.4</span></span>
-<span><span class="co">#&gt; 3: poly1+tangent    1.80        14.3         21.0        25.8         50.7        61.6         65.9</span></span>
-<span><span class="co">#&gt; 4:         poly2    1.59        23.7         22.6        36.4         49.6        52.6         74.0</span></span>
-<span><span class="co">#&gt; 5:   poly2+start    1.59        20.8         22.6        32.5         49.6        38.1         73.8</span></span>
-<span><span class="co">#&gt; 6: poly2+tangent    1.58        20.8         21.8        32.7         49.5        38.3         64.1</span></span></code></pre></div>
-<p>在两份示例数据上，poly2 加切线后，截断检验的 ADG
-误差在多数场景下变小，外推越远改善越大（NEDAP 开头缺 30 天：53 → 38
-g/d）。只看 ADG
-时两端都用切线最好；但末端的采食是按外推的体重填充的，从整条流程看，末端用切线会让
+<span><span class="co">#&gt; 1:         poly1    2.01        27.0         21.5        51.2         51.9        82.6         64.0</span></span>
+<span><span class="co">#&gt; 2:   poly1+start    1.95        23.6         21.5        29.0         51.9        84.5         64.0</span></span>
+<span><span class="co">#&gt; 3: poly1+tangent    1.92        23.5         21.0        28.9         51.3        84.4         66.2</span></span>
+<span><span class="co">#&gt; 4:         poly2    2.10        33.9         23.0        44.8         49.9        69.2         75.0</span></span>
+<span><span class="co">#&gt; 5:   poly2+start    1.93        31.3         23.0        28.2         49.9        86.8         74.8</span></span>
+<span><span class="co">#&gt; 6: poly2+tangent    1.89        31.4         22.0        28.4         50.0        86.9         64.5</span></span></code></pre></div>
+<p>在示例 NEDAP 数据上，开头缺 10–20 天时，开头切线明显改善 ADG（poly2
+开头缺 20 天：45 → 28 g/d）；开头缺 30 天时反而变差（69 → 87
+g/d），外推太远时直线不如曲线。末端切线在结尾缺 30 天时改善 poly2（75 →
+65 g/d）。但末端的采食是按外推的体重填充的，从整条流程看，末端用切线会让
 FCR 排名变差（见第 5 节），所以默认
-<code>"start"</code>。交叉验证几乎不受影响，因为它预测的大多是记录范围内的体重。</p>
+<code>"start"</code>。分块交叉验证中，含首末两块的那几折也要外推，所以外推方式对
+<code>cv_rmse</code> 也有一些影响。</p>
 </div>
 </div>
 <div class="section level2">
@@ -466,7 +492,7 @@ FCR 排名变差（见第 5 节），所以默认
 <p>对每头猪，先用全部记录算出区间和 ADG（作为参照），再按
 <code>scenarios</code>
 隐藏区间内一部分<strong>有记录的日子</strong>（场景的写法同
-<code><a href="../reference/validate_adfi.html">validate_adfi()</a></code>），删掉这些日子的全部体重记录，然后用
+<code><a href="../reference/validate_adfi.html">validate_adfi()</a></code>），删掉这些日子的全部体重记录，对剩下的记录重新清洗，然后用
 <code>methods</code> 中的每种方法重新填充、重新计算 ADG：</p>
 <ul>
 <li>
@@ -485,36 +511,36 @@ FCR 排名变差（见第 5 节），所以默认
 <span><span class="fu">tidy</span><span class="op">(</span><span class="va">vw_n</span><span class="op">)</span></span>
 <span><span class="co">#&gt;     scenario         method daily_rmse daily_mae daily_bias adg_bias adg_rmse adg_spearman n_pigs</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;         &lt;char&gt;      &lt;num&gt;     &lt;num&gt;      &lt;num&gt;    &lt;num&gt;    &lt;num&gt;        &lt;num&gt;  &lt;int&gt;</span></span>
-<span><span class="co">#&gt;  1: random30   linear+start      0.804     0.591   -0.04940  -0.0956     4.03        0.995     29</span></span>
-<span><span class="co">#&gt;  2: random30    poly1+start      1.610     1.300    0.20800  -4.9900    12.10        0.985     29</span></span>
-<span><span class="co">#&gt;  3: random30    poly2+start      1.420     1.150    0.10200  -5.3800     9.52        0.994     29</span></span>
-<span><span class="co">#&gt;  4: random30    poly3+start      1.160     0.916   -0.03770  -7.6800    14.10        0.993     29</span></span>
-<span><span class="co">#&gt;  5: random30 gompertz+start      1.180     0.942   -0.03040  -6.4700     9.54        0.994     29</span></span>
-<span><span class="co">#&gt;  6:  blocks3   linear+start      1.010     0.793   -0.04210  -1.5500     5.83        0.995     29</span></span>
-<span><span class="co">#&gt;  7:  blocks3    poly1+start      1.760     1.400    0.19300  -5.6900    12.50        0.985     29</span></span>
-<span><span class="co">#&gt;  8:  blocks3    poly2+start      1.540     1.230    0.07160  -6.5300    11.30        0.991     29</span></span>
-<span><span class="co">#&gt;  9:  blocks3    poly3+start      1.250     1.020   -0.19100  -7.2500    13.50        0.986     29</span></span>
-<span><span class="co">#&gt; 10:  blocks3 gompertz+start      1.280     1.020   -0.14500  -7.6100    10.70        0.990     29</span></span>
-<span><span class="co">#&gt; 11:  blocks6   linear+start      1.050     0.799    0.00651  -1.8700    11.50        0.988     29</span></span>
-<span><span class="co">#&gt; 12:  blocks6    poly1+start      1.880     1.470    0.41800  -5.7600    26.40        0.953     29</span></span>
-<span><span class="co">#&gt; 13:  blocks6    poly2+start      1.580     1.260    0.18500  -7.9400    19.40        0.980     29</span></span>
-<span><span class="co">#&gt; 14:  blocks6    poly3+start      1.430     1.080    0.00741  -8.1000    22.90        0.980     29</span></span>
-<span><span class="co">#&gt; 15:  blocks6 gompertz+start      1.310     1.050   -0.03920  -5.0100    16.20        0.985     29</span></span>
-<span><span class="co">#&gt; 16:   late10   linear+start      1.290     0.892   -0.30800   4.6100    11.90        0.988     29</span></span>
-<span><span class="co">#&gt; 17:   late10    poly1+start      2.110     1.640   -0.19300   4.8200    19.00        0.967     29</span></span>
-<span><span class="co">#&gt; 18:   late10    poly2+start      2.170     1.730   -0.50500   7.4500    21.60        0.981     29</span></span>
-<span><span class="co">#&gt; 19:   late10    poly3+start      1.710     1.310   -0.32900   0.1250    19.00        0.987     29</span></span>
-<span><span class="co">#&gt; 20:   late10 gompertz+start      1.480     1.140   -0.03150  -3.2400    12.80        0.989     29</span></span>
-<span><span class="co">#&gt; 21:   late20   linear+start      1.780     1.370    0.54100  -5.8200    25.20        0.949     29</span></span>
-<span><span class="co">#&gt; 22:   late20    poly1+start      2.380     2.000    0.95500  -8.1200    30.40        0.919     29</span></span>
-<span><span class="co">#&gt; 23:   late20    poly2+start      2.360     1.920    0.71000  -5.6400    32.80        0.944     29</span></span>
-<span><span class="co">#&gt; 24:   late20    poly3+start      1.920     1.470    0.54300 -10.4000    30.40        0.946     29</span></span>
-<span><span class="co">#&gt; 25:   late20 gompertz+start      1.950     1.490    0.62700 -11.5000    29.10        0.952     29</span></span>
-<span><span class="co">#&gt; 26:  early15   linear+start      1.510     1.220    0.21600   9.3300    38.20        0.982     29</span></span>
-<span><span class="co">#&gt; 27:  early15    poly1+start      1.580     1.290   -0.34600   3.7500    39.80        0.989     29</span></span>
-<span><span class="co">#&gt; 28:  early15    poly2+start      1.470     1.210   -0.12800   5.7100    39.20        0.990     29</span></span>
-<span><span class="co">#&gt; 29:  early15    poly3+start      1.600     1.260    0.57400   6.4800    39.40        0.987     29</span></span>
-<span><span class="co">#&gt; 30:  early15 gompertz+start      1.440     1.160    0.38400   7.1900    38.80        0.989     29</span></span>
+<span><span class="co">#&gt;  1: random30   linear+start      0.835     0.601    -0.0632    0.311     6.06        0.996     29</span></span>
+<span><span class="co">#&gt;  2: random30    poly1+start      1.620     1.320     0.2220   -5.190    12.60        0.983     29</span></span>
+<span><span class="co">#&gt;  3: random30    poly2+start      1.440     1.160     0.1090   -5.620    10.90        0.993     29</span></span>
+<span><span class="co">#&gt;  4: random30    poly3+start      1.170     0.927    -0.0385   -6.590    11.80        0.993     29</span></span>
+<span><span class="co">#&gt;  5: random30 gompertz+start      1.190     0.949    -0.0290   -6.540     9.89        0.994     29</span></span>
+<span><span class="co">#&gt;  6:  blocks3   linear+start      1.090     0.833    -0.0878   -0.762    15.30        0.995     29</span></span>
+<span><span class="co">#&gt;  7:  blocks3    poly1+start      1.770     1.400     0.2070   -5.480    12.40        0.984     29</span></span>
+<span><span class="co">#&gt;  8:  blocks3    poly2+start      1.530     1.230     0.0291   -6.530    15.50        0.991     29</span></span>
+<span><span class="co">#&gt;  9:  blocks3    poly3+start      1.330     1.060    -0.2160   -5.910    20.30        0.985     29</span></span>
+<span><span class="co">#&gt; 10:  blocks3 gompertz+start      1.270     1.020    -0.1970   -7.310    12.40        0.990     29</span></span>
+<span><span class="co">#&gt; 11:  blocks6   linear+start      2.920     1.080     0.2590   13.700    90.60        0.878     29</span></span>
+<span><span class="co">#&gt; 12:  blocks6    poly1+start      1.760     1.420     0.3570   -0.732    44.60        0.945     29</span></span>
+<span><span class="co">#&gt; 13:  blocks6    poly2+start      3.120     1.510     0.4010    5.220    92.20        0.865     29</span></span>
+<span><span class="co">#&gt; 14:  blocks6    poly3+start      1.380     1.080    -0.0393    4.040    55.50        0.954     29</span></span>
+<span><span class="co">#&gt; 15:  blocks6 gompertz+start      2.990     1.300     0.1780    9.770    92.20        0.872     29</span></span>
+<span><span class="co">#&gt; 16:   late10   linear+start      1.970     1.430    -0.9670   10.200    21.20        0.980     29</span></span>
+<span><span class="co">#&gt; 17:   late10    poly1+start      2.130     1.680    -0.2040    4.490    20.40        0.972     29</span></span>
+<span><span class="co">#&gt; 18:   late10    poly2+start      2.310     1.870    -0.7500    8.740    23.80        0.979     29</span></span>
+<span><span class="co">#&gt; 19:   late10    poly3+start      2.010     1.600    -0.6590    3.990    23.70        0.979     29</span></span>
+<span><span class="co">#&gt; 20:   late10 gompertz+start      1.650     1.260    -0.3170    0.113    16.60        0.983     29</span></span>
+<span><span class="co">#&gt; 21:   late20   linear+start      2.430     1.670     0.3530   -6.770    50.40        0.922     29</span></span>
+<span><span class="co">#&gt; 22:   late20    poly1+start      3.180     2.380     1.3700  -19.400    52.30        0.913     29</span></span>
+<span><span class="co">#&gt; 23:   late20    poly2+start      2.700     2.120     0.7580  -10.900    51.70        0.913     29</span></span>
+<span><span class="co">#&gt; 24:   late20    poly3+start      2.240     1.670     0.4390  -12.100    53.40        0.927     29</span></span>
+<span><span class="co">#&gt; 25:   late20 gompertz+start      2.240     1.590     0.5820  -13.500    46.00        0.935     29</span></span>
+<span><span class="co">#&gt; 26:  early15   linear+start      1.540     1.240     0.2860   11.900    44.20        0.986     29</span></span>
+<span><span class="co">#&gt; 27:  early15    poly1+start      1.610     1.310    -0.3640    4.710    43.80        0.985     29</span></span>
+<span><span class="co">#&gt; 28:  early15    poly2+start      1.520     1.250    -0.1000    7.430    43.50        0.985     29</span></span>
+<span><span class="co">#&gt; 29:  early15    poly3+start      1.660     1.310     0.5430    7.530    46.10        0.986     29</span></span>
+<span><span class="co">#&gt; 30:  early15 gompertz+start      1.480     1.200     0.3760    8.370    43.30        0.989     29</span></span>
 <span><span class="co">#&gt;     scenario         method daily_rmse daily_mae daily_bias adg_bias adg_rmse adg_spearman n_pigs</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;         &lt;char&gt;      &lt;num&gt;     &lt;num&gt;      &lt;num&gt;    &lt;num&gt;    &lt;num&gt;        &lt;num&gt;  &lt;int&gt;</span></span></code></pre></div>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
@@ -522,36 +548,36 @@ FCR 排名变差（见第 5 节），所以默认
 <span><span class="fu">tidy</span><span class="op">(</span><span class="va">vw_f</span><span class="op">)</span></span>
 <span><span class="co">#&gt;     scenario         method daily_rmse daily_mae daily_bias adg_bias adg_rmse adg_spearman n_pigs</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;         &lt;char&gt;      &lt;num&gt;     &lt;num&gt;      &lt;num&gt;    &lt;num&gt;    &lt;num&gt;        &lt;num&gt;  &lt;int&gt;</span></span>
-<span><span class="co">#&gt;  1: random30   linear+start       0.92     0.701    -0.0858   -0.952     9.23        0.987     25</span></span>
-<span><span class="co">#&gt;  2: random30    poly1+start       1.77     1.380     0.1640   -3.840    43.70        0.971     25</span></span>
-<span><span class="co">#&gt;  3: random30    poly2+start       1.44     1.140    -0.1200    4.730    13.60        0.983     25</span></span>
-<span><span class="co">#&gt;  4: random30    poly3+start       1.31     1.020    -0.0887    4.890    16.60        0.981     25</span></span>
-<span><span class="co">#&gt;  5: random30 gompertz+start       1.45     1.160    -0.1380    1.910    15.20        0.985     25</span></span>
-<span><span class="co">#&gt;  6:  blocks3   linear+start       1.28     0.965    -0.1150    1.620    16.60        0.987     25</span></span>
-<span><span class="co">#&gt;  7:  blocks3    poly1+start       2.04     1.610     0.2010    1.510    48.40        0.941     25</span></span>
-<span><span class="co">#&gt;  8:  blocks3    poly2+start       1.67     1.320    -0.1670    8.520    22.90        0.970     25</span></span>
-<span><span class="co">#&gt;  9:  blocks3    poly3+start       1.65     1.280    -0.1130    9.080    25.70        0.954     25</span></span>
-<span><span class="co">#&gt; 10:  blocks3 gompertz+start       1.69     1.330    -0.2210    6.460    25.40        0.959     25</span></span>
-<span><span class="co">#&gt; 11:  blocks6   linear+start       1.44     1.060     0.2540  -16.000    67.00        0.910     25</span></span>
-<span><span class="co">#&gt; 12:  blocks6    poly1+start       2.07     1.640     0.6460   -7.760    76.20        0.908     25</span></span>
-<span><span class="co">#&gt; 13:  blocks6    poly2+start       1.87     1.480     0.2320   -6.590    71.00        0.903     25</span></span>
-<span><span class="co">#&gt; 14:  blocks6    poly3+start       2.02     1.430     0.3060    6.520    48.70        0.845     25</span></span>
-<span><span class="co">#&gt; 15:  blocks6 gompertz+start       1.91     1.520     0.2040   -8.930    74.00        0.903     25</span></span>
-<span><span class="co">#&gt; 16:   late10   linear+start       1.51     1.150     0.2450   -5.500    27.10        0.904     25</span></span>
-<span><span class="co">#&gt; 17:   late10    poly1+start       1.78     1.420    -0.6500    4.480    46.70        0.947     25</span></span>
-<span><span class="co">#&gt; 18:   late10    poly2+start       2.04     1.660     0.1040   -2.950    36.90        0.889     25</span></span>
-<span><span class="co">#&gt; 19:   late10    poly3+start       1.92     1.540     0.2300   -4.390    38.90        0.886     25</span></span>
-<span><span class="co">#&gt; 20:   late10 gompertz+start       2.08     1.710     0.1340   -5.520    38.40        0.900     25</span></span>
-<span><span class="co">#&gt; 21:   late20   linear+start       1.65     1.290    -0.3310   -0.917    50.50        0.886     25</span></span>
-<span><span class="co">#&gt; 22:   late20    poly1+start       2.29     1.870    -0.8220   13.900    69.40        0.871     25</span></span>
-<span><span class="co">#&gt; 23:   late20    poly2+start       2.13     1.670    -0.7340   10.800    63.20        0.832     25</span></span>
-<span><span class="co">#&gt; 24:   late20    poly3+start       2.49     1.910    -0.4530    1.640    86.50        0.732     25</span></span>
-<span><span class="co">#&gt; 25:   late20 gompertz+start       2.16     1.710    -0.7950   10.100    63.60        0.830     25</span></span>
-<span><span class="co">#&gt; 26:  early15   linear+start       1.80     1.350    -0.0995   -6.650    47.40        0.952     25</span></span>
-<span><span class="co">#&gt; 27:  early15    poly1+start       2.38     1.920    -0.5690  -21.500    60.10        0.960     25</span></span>
-<span><span class="co">#&gt; 28:  early15    poly2+start       2.05     1.580    -0.3780  -12.200    50.30        0.961     25</span></span>
-<span><span class="co">#&gt; 29:  early15    poly3+start       2.80     2.270    -0.5030   -7.200    50.20        0.846     25</span></span>
-<span><span class="co">#&gt; 30:  early15 gompertz+start       1.87     1.460    -0.1550   -4.570    30.30        0.965     25</span></span>
+<span><span class="co">#&gt;  1: random30   linear+start      0.934     0.709    -0.0762   -2.100     11.0        0.987     25</span></span>
+<span><span class="co">#&gt;  2: random30    poly1+start      1.780     1.380     0.1630   -4.210     43.7        0.971     25</span></span>
+<span><span class="co">#&gt;  3: random30    poly2+start      1.450     1.150    -0.1260    3.260     13.6        0.984     25</span></span>
+<span><span class="co">#&gt;  4: random30    poly3+start      1.310     1.030    -0.0923    4.550     15.7        0.976     25</span></span>
+<span><span class="co">#&gt;  5: random30 gompertz+start      1.460     1.170    -0.1440    0.618     17.3        0.981     25</span></span>
+<span><span class="co">#&gt;  6:  blocks3   linear+start      1.350     1.010    -0.0542    0.482     20.7        0.981     25</span></span>
+<span><span class="co">#&gt;  7:  blocks3    poly1+start      2.080     1.640     0.1780    0.549     49.0        0.942     25</span></span>
+<span><span class="co">#&gt;  8:  blocks3    poly2+start      1.750     1.370    -0.1620    7.170     27.5        0.963     25</span></span>
+<span><span class="co">#&gt;  9:  blocks3    poly3+start      1.760     1.360    -0.0955    8.470     27.6        0.947     25</span></span>
+<span><span class="co">#&gt; 10:  blocks3 gompertz+start      1.770     1.390    -0.2130    4.850     31.2        0.962     25</span></span>
+<span><span class="co">#&gt; 11:  blocks6   linear+start      1.790     1.250     0.2270  -10.400     77.0        0.889     25</span></span>
+<span><span class="co">#&gt; 12:  blocks6    poly1+start      2.180     1.710     0.6350   -2.920     81.1        0.906     25</span></span>
+<span><span class="co">#&gt; 13:  blocks6    poly2+start      2.080     1.600     0.2120   -1.880     80.5        0.891     25</span></span>
+<span><span class="co">#&gt; 14:  blocks6    poly3+start      2.280     1.600     0.2310   15.400     60.8        0.845     25</span></span>
+<span><span class="co">#&gt; 15:  blocks6 gompertz+start      2.130     1.650     0.1940   -3.950     83.5        0.899     25</span></span>
+<span><span class="co">#&gt; 16:   late10   linear+start      1.920     1.440     0.5200  -11.100     37.1        0.879     25</span></span>
+<span><span class="co">#&gt; 17:   late10    poly1+start      1.790     1.430    -0.5770    3.070     47.3        0.940     25</span></span>
+<span><span class="co">#&gt; 18:   late10    poly2+start      2.240     1.810     0.2340   -6.590     42.5        0.875     25</span></span>
+<span><span class="co">#&gt; 19:   late10    poly3+start      2.270     1.810     0.4540   -9.800     46.2        0.871     25</span></span>
+<span><span class="co">#&gt; 20:   late10 gompertz+start      2.240     1.830     0.2360   -8.750     43.5        0.886     25</span></span>
+<span><span class="co">#&gt; 21:   late20   linear+start      1.940     1.530    -0.6190    7.130     57.9        0.845     25</span></span>
+<span><span class="co">#&gt; 22:   late20    poly1+start      2.480     2.020    -0.9930   19.400     75.6        0.856     25</span></span>
+<span><span class="co">#&gt; 23:   late20    poly2+start      2.260     1.810    -0.9040   16.500     69.4        0.795     25</span></span>
+<span><span class="co">#&gt; 24:   late20    poly3+start      2.560     1.910    -0.5030    2.770     92.5        0.742     25</span></span>
+<span><span class="co">#&gt; 25:   late20 gompertz+start      2.310     1.860    -0.9750   16.400     71.1        0.802     25</span></span>
+<span><span class="co">#&gt; 26:  early15   linear+start      2.300     1.660    -0.4740  -15.300     60.2        0.930     24</span></span>
+<span><span class="co">#&gt; 27:  early15    poly1+start      2.450     1.970    -0.5780  -22.500     62.6        0.953     24</span></span>
+<span><span class="co">#&gt; 28:  early15    poly2+start      2.330     1.720    -0.4590  -15.100     60.1        0.943     24</span></span>
+<span><span class="co">#&gt; 29:  early15    poly3+start      2.970     2.450    -0.3700   -2.360     50.7        0.829     24</span></span>
+<span><span class="co">#&gt; 30:  early15 gompertz+start      2.280     1.640    -0.2750   -8.710     50.8        0.940     24</span></span>
 <span><span class="co">#&gt;     scenario         method daily_rmse daily_mae daily_bias adg_bias adg_rmse adg_spearman n_pigs</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;         &lt;char&gt;      &lt;num&gt;     &lt;num&gt;      &lt;num&gt;    &lt;num&gt;    &lt;num&gt;        &lt;num&gt;  &lt;int&gt;</span></span></code></pre></div>
 </div>
@@ -560,15 +586,19 @@ FCR 排名变差（见第 5 节），所以默认
 </h3>
 <ul>
 <li>
-<strong>区间中间，线性插值明显好于生长曲线</strong>：随机或成段缺失时，线性插值的日体重误差约
-0.8–1.6 kg，生长曲线约 1.1–2.1 kg；ADG
-的误差也是线性插值最小。原因是前后两天的实测体重已经包含了这头猪当时的生长状态，而曲线只描述整体趋势。</li>
+<strong>区间中间短缺时，线性插值明显好于生长曲线</strong>：随机或缺
+3 段时，线性插值的日体重误差约 0.8–1.4 kg，生长曲线约 1.2–2.1
+kg。原因是前后两天的实测体重已经包含了这头猪当时的生长状态，而曲线只描述整体趋势。</li>
 <li>
-<strong>隐藏开头时</strong>，区间起点之前往往还有区间下限以下的记录，线性插值仍能在两端实测之间插值，所以
-<code>late</code> 场景下也常常是 <code>linear</code> 最好。</li>
+<strong>缺得多时（<code>blocks6</code>，约三成的日子），个别猪会出大错</strong>：NEDAP
+上一头猪被隐藏的日子紧挨着最后几天记录，重新清洗时，从末期往回的逐日追踪在三周的空档之后接不上，把最后两天的记录也删掉了，末端只能靠曲线外推，ADG
+偏高约 670 g/d，拉高了 <code>linear</code> 的
+<code>adg_rmse</code>。真实缺失时也会发生同样的事，这正是不泄露的检验才看得到的。</li>
+<li>
+<strong>隐藏开头时</strong>，区间起点之前往往还有区间下限以下的记录，线性插值仍能在两端实测之间插值，日体重误差与曲线相近或更小。</li>
 <li>
 <strong>隐藏结尾时</strong>（<code>early15</code>），末个有记录日之后没有实测，各方法都只能靠曲线，结果接近；ADG
-的误差在 30–50 g/d，比中间缺失大得多。</li>
+的误差在 40–60 g/d，比中间缺失大得多。</li>
 <li>结论与采食插补相同：<strong>保证区间两端有记录，比选择填充方法更重要</strong>。</li>
 </ul>
 </div>
@@ -598,6 +628,10 @@ FCR 排名变差（见第 5 节），所以默认
 <code>loess_pop</code>、<code>loess_lm</code> 和
 <code>linear</code>）重新插补，在<strong>原本有记录的日子</strong>上计算
 ADFI，与实测的 ADFI 比较。</p>
+<p>插补要用到日体重。传入
+<code>weight</code>（<code><a href="../reference/clean_weight.html">clean_weight()</a></code>
+的结果）时，被隐藏日子的体重记录也一并删掉，剩下的记录重新清洗、重新算日体重，和这头猪真的没进站时一样；不传时沿用全部数据的日体重（1.5.0
+之前的做法，会给出警告）。</p>
 <p><code>loess_pop</code>
 的群体曲线对每头猪都用<strong>留一法</strong>拟合：只用其他猪的数据，被隐藏的日子不会通过曲线”泄露”回来。</p>
 <p>指标：<code>mean_abs_error_pct</code>、<code>p95_abs_error_pct</code>
@@ -608,60 +642,60 @@ ADFI 排名与实测的相关；<code>daily_rmse</code>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">f_n</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calc_adfi.html">calc_adfi</a></span><span class="op">(</span><span class="va">v_n</span>, <span class="fu"><a href="../reference/calc_adg.html">calc_adg</a></span><span class="op">(</span><span class="va">w_n</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="va">sc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"random30"</span>, <span class="st">"random50"</span>, <span class="st">"blocks3"</span>, <span class="st">"blocks6"</span>, <span class="st">"late10"</span>, <span class="st">"late20"</span>, <span class="st">"early15"</span><span class="op">)</span></span>
-<span><span class="va">vf_n</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_adfi.html">validate_adfi</a></span><span class="op">(</span><span class="va">f_n</span>, scenarios <span class="op">=</span> <span class="va">sc</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
+<span><span class="va">vf_n</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_adfi.html">validate_adfi</a></span><span class="op">(</span><span class="va">f_n</span>, <span class="va">w_n</span>, scenarios <span class="op">=</span> <span class="va">sc</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="fu">tidy</span><span class="op">(</span><span class="va">vf_n</span><span class="op">)</span></span>
 <span><span class="co">#&gt;     scenario    method mean_abs_error_pct p95_abs_error_pct bias_pct spearman daily_rmse n_pigs</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;    &lt;char&gt;              &lt;num&gt;             &lt;num&gt;    &lt;num&gt;    &lt;num&gt;      &lt;num&gt;  &lt;int&gt;</span></span>
-<span><span class="co">#&gt;  1: random30 loess_pop              1.100              2.58  0.01880    0.989        455     29</span></span>
-<span><span class="co">#&gt;  2: random30  loess_lm              1.090              2.56  0.06020    0.990        456     29</span></span>
-<span><span class="co">#&gt;  3: random30    linear              1.010              2.43  0.07860    0.989        506     29</span></span>
-<span><span class="co">#&gt;  4: random50 loess_pop              1.800              4.36 -0.10900    0.981        463     29</span></span>
-<span><span class="co">#&gt;  5: random50  loess_lm              1.800              4.11  0.00912    0.982        465     29</span></span>
-<span><span class="co">#&gt;  6: random50    linear              1.740              4.37  0.13500    0.978        515     29</span></span>
-<span><span class="co">#&gt;  7:  blocks3 loess_pop              1.270              3.11  0.00746    0.987        474     29</span></span>
-<span><span class="co">#&gt;  8:  blocks3  loess_lm              1.340              3.33 -0.35300    0.981        478     29</span></span>
-<span><span class="co">#&gt;  9:  blocks3    linear              1.610              4.84 -0.21800    0.973        532     29</span></span>
-<span><span class="co">#&gt; 10:  blocks6 loess_pop              1.880              5.72 -0.50300    0.979        475     29</span></span>
-<span><span class="co">#&gt; 11:  blocks6  loess_lm              2.310              5.76 -0.89100    0.962        499     29</span></span>
-<span><span class="co">#&gt; 12:  blocks6    linear              2.400              6.80 -0.36100    0.953        527     29</span></span>
-<span><span class="co">#&gt; 13:   late10 loess_pop              0.615              1.61 -0.20500    0.993        290     29</span></span>
-<span><span class="co">#&gt; 14:   late10  loess_lm              1.580              2.55  1.47000    0.990        503     29</span></span>
-<span><span class="co">#&gt; 15:   late10    linear              1.580              2.55  1.47000    0.990        503     29</span></span>
-<span><span class="co">#&gt; 16:   late20 loess_pop              1.440              4.36 -0.33800    0.968        322     29</span></span>
-<span><span class="co">#&gt; 17:   late20  loess_lm              4.600              7.00  4.41000    0.950        702     29</span></span>
-<span><span class="co">#&gt; 18:   late20    linear              4.600              7.00  4.41000    0.950        702     29</span></span>
-<span><span class="co">#&gt; 19:  early15 loess_pop              3.520              8.42  3.28000    0.970        839     29</span></span>
-<span><span class="co">#&gt; 20:  early15  loess_lm              3.520              8.42  3.28000    0.970        839     29</span></span>
-<span><span class="co">#&gt; 21:  early15    linear              3.520              8.42  3.28000    0.970        839     29</span></span>
+<span><span class="co">#&gt;  1: random30 loess_pop              1.100              2.55  0.01770    0.989        455     29</span></span>
+<span><span class="co">#&gt;  2: random30  loess_lm              1.090              2.52  0.06180    0.990        457     29</span></span>
+<span><span class="co">#&gt;  3: random30    linear              1.010              2.42  0.07510    0.989        507     29</span></span>
+<span><span class="co">#&gt;  4: random50 loess_pop              1.810              4.27 -0.10200    0.980        466     29</span></span>
+<span><span class="co">#&gt;  5: random50  loess_lm              1.810              4.31 -0.00435    0.982        467     29</span></span>
+<span><span class="co">#&gt;  6: random50    linear              1.740              4.39  0.10600    0.977        514     29</span></span>
+<span><span class="co">#&gt;  7:  blocks3 loess_pop              1.290              3.08  0.00254    0.987        477     29</span></span>
+<span><span class="co">#&gt;  8:  blocks3  loess_lm              1.360              3.26 -0.34500    0.981        483     29</span></span>
+<span><span class="co">#&gt;  9:  blocks3    linear              1.610              4.84 -0.21300    0.973        533     29</span></span>
+<span><span class="co">#&gt; 10:  blocks6 loess_pop              1.940              5.48 -0.51600    0.976        484     29</span></span>
+<span><span class="co">#&gt; 11:  blocks6  loess_lm              2.390              6.05 -0.88700    0.959        508     29</span></span>
+<span><span class="co">#&gt; 12:  blocks6    linear              2.420              6.80 -0.35700    0.953        529     29</span></span>
+<span><span class="co">#&gt; 13:   late10 loess_pop              0.724              1.75 -0.41000    0.988        313     29</span></span>
+<span><span class="co">#&gt; 14:   late10  loess_lm              1.540              2.55  1.31000    0.990        498     29</span></span>
+<span><span class="co">#&gt; 15:   late10    linear              1.540              2.55  1.31000    0.990        498     29</span></span>
+<span><span class="co">#&gt; 16:   late20 loess_pop              1.340              3.50 -0.29700    0.980        321     29</span></span>
+<span><span class="co">#&gt; 17:   late20  loess_lm              4.490              7.06  4.26000    0.954        679     29</span></span>
+<span><span class="co">#&gt; 18:   late20    linear              4.490              7.06  4.26000    0.954        679     29</span></span>
+<span><span class="co">#&gt; 19:  early15 loess_pop              3.700              8.51  3.39000    0.969        863     29</span></span>
+<span><span class="co">#&gt; 20:  early15  loess_lm              3.700              8.51  3.39000    0.969        863     29</span></span>
+<span><span class="co">#&gt; 21:  early15    linear              3.700              8.51  3.39000    0.969        863     29</span></span>
 <span><span class="co">#&gt;     scenario    method mean_abs_error_pct p95_abs_error_pct bias_pct spearman daily_rmse n_pigs</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;    &lt;char&gt;              &lt;num&gt;             &lt;num&gt;    &lt;num&gt;    &lt;num&gt;      &lt;num&gt;  &lt;int&gt;</span></span></code></pre></div>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">f_f</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calc_adfi.html">calc_adfi</a></span><span class="op">(</span><span class="va">v_f</span>, <span class="fu"><a href="../reference/calc_adg.html">calc_adg</a></span><span class="op">(</span><span class="va">w_f</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
-<span><span class="va">vf_f</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_adfi.html">validate_adfi</a></span><span class="op">(</span><span class="va">f_f</span>, scenarios <span class="op">=</span> <span class="va">sc</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
+<span><span class="va">vf_f</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_adfi.html">validate_adfi</a></span><span class="op">(</span><span class="va">f_f</span>, <span class="va">w_f</span>, scenarios <span class="op">=</span> <span class="va">sc</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="fu">tidy</span><span class="op">(</span><span class="va">vf_f</span><span class="op">)</span></span>
 <span><span class="co">#&gt;     scenario    method mean_abs_error_pct p95_abs_error_pct bias_pct spearman daily_rmse n_pigs</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;    &lt;char&gt;              &lt;num&gt;             &lt;num&gt;    &lt;num&gt;    &lt;num&gt;      &lt;num&gt;  &lt;int&gt;</span></span>
-<span><span class="co">#&gt;  1: random30 loess_pop               1.45              3.79    0.485    0.922        635     23</span></span>
-<span><span class="co">#&gt;  2: random30  loess_lm               1.48              3.69    0.503    0.921        631     23</span></span>
-<span><span class="co">#&gt;  3: random30    linear               1.53              4.22    0.245    0.918        682     23</span></span>
-<span><span class="co">#&gt;  4: random50 loess_pop               2.03              4.88    0.379    0.916        662     23</span></span>
-<span><span class="co">#&gt;  5: random50  loess_lm               2.00              5.02    0.334    0.920        665     23</span></span>
-<span><span class="co">#&gt;  6: random50    linear               2.21              6.42   -0.152    0.913        699     23</span></span>
-<span><span class="co">#&gt;  7:  blocks3 loess_pop               2.18              5.45   -0.358    0.880        642     23</span></span>
-<span><span class="co">#&gt;  8:  blocks3  loess_lm               2.33              6.12   -0.473    0.856        660     23</span></span>
-<span><span class="co">#&gt;  9:  blocks3    linear               2.80              8.48    0.207    0.831        748     23</span></span>
-<span><span class="co">#&gt; 10:  blocks6 loess_pop               3.21              6.79   -0.635    0.788        670     23</span></span>
-<span><span class="co">#&gt; 11:  blocks6  loess_lm               4.44              8.75   -0.953    0.696        730     23</span></span>
-<span><span class="co">#&gt; 12:  blocks6    linear               5.19             13.00   -0.895    0.671        817     23</span></span>
-<span><span class="co">#&gt; 13:   late10 loess_pop               1.60              3.44   -0.500    0.921        548     23</span></span>
-<span><span class="co">#&gt; 14:   late10  loess_lm               2.14              7.07   -0.987    0.889        655     23</span></span>
-<span><span class="co">#&gt; 15:   late10    linear               2.14              7.07   -0.987    0.889        655     23</span></span>
-<span><span class="co">#&gt; 16:   late20 loess_pop               2.72              7.13   -0.606    0.832        558     23</span></span>
-<span><span class="co">#&gt; 17:   late20  loess_lm               6.76             11.00   -2.210    0.502        806     23</span></span>
-<span><span class="co">#&gt; 18:   late20    linear               6.76             11.00   -2.210    0.502        806     23</span></span>
-<span><span class="co">#&gt; 19:  early15 loess_pop               4.03              6.79   -0.939    0.710        856     23</span></span>
-<span><span class="co">#&gt; 20:  early15  loess_lm               4.03              6.79   -0.939    0.710        856     23</span></span>
-<span><span class="co">#&gt; 21:  early15    linear               4.03              6.79   -0.939    0.710        856     23</span></span>
+<span><span class="co">#&gt;  1: random30 loess_pop               1.46              3.81    0.482    0.921        637     23</span></span>
+<span><span class="co">#&gt;  2: random30  loess_lm               1.48              3.70    0.497    0.924        633     23</span></span>
+<span><span class="co">#&gt;  3: random30    linear               1.53              4.23    0.246    0.919        683     23</span></span>
+<span><span class="co">#&gt;  4: random50 loess_pop               2.04              4.92    0.369    0.918        666     23</span></span>
+<span><span class="co">#&gt;  5: random50  loess_lm               2.02              5.09    0.344    0.916        670     23</span></span>
+<span><span class="co">#&gt;  6: random50    linear               2.22              6.41   -0.155    0.910        700     23</span></span>
+<span><span class="co">#&gt;  7:  blocks3 loess_pop               2.22              5.43   -0.337    0.886        647     23</span></span>
+<span><span class="co">#&gt;  8:  blocks3  loess_lm               2.39              6.22   -0.487    0.861        668     23</span></span>
+<span><span class="co">#&gt;  9:  blocks3    linear               2.79              8.48    0.197    0.839        747     23</span></span>
+<span><span class="co">#&gt; 10:  blocks6 loess_pop               3.30              7.79   -0.583    0.772        683     23</span></span>
+<span><span class="co">#&gt; 11:  blocks6  loess_lm               4.71              9.17   -0.978    0.693        760     23</span></span>
+<span><span class="co">#&gt; 12:  blocks6    linear               5.29             13.20   -1.070    0.691        833     23</span></span>
+<span><span class="co">#&gt; 13:   late10 loess_pop               1.56              3.18   -0.429    0.918        548     23</span></span>
+<span><span class="co">#&gt; 14:   late10  loess_lm               2.14              7.47   -0.952    0.883        656     23</span></span>
+<span><span class="co">#&gt; 15:   late10    linear               2.14              7.47   -0.952    0.883        656     23</span></span>
+<span><span class="co">#&gt; 16:   late20 loess_pop               2.55              6.86   -0.743    0.862        562     23</span></span>
+<span><span class="co">#&gt; 17:   late20  loess_lm               6.95             12.20   -2.380    0.443        820     23</span></span>
+<span><span class="co">#&gt; 18:   late20    linear               6.95             12.20   -2.380    0.443        820     23</span></span>
+<span><span class="co">#&gt; 19:  early15 loess_pop               4.00              6.88   -1.280    0.740        857     22</span></span>
+<span><span class="co">#&gt; 20:  early15  loess_lm               4.00              6.88   -1.280    0.740        857     22</span></span>
+<span><span class="co">#&gt; 21:  early15    linear               4.00              6.88   -1.280    0.740        857     22</span></span>
 <span><span class="co">#&gt;     scenario    method mean_abs_error_pct p95_abs_error_pct bias_pct spearman daily_rmse n_pigs</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;    &lt;char&gt;              &lt;num&gt;             &lt;num&gt;    &lt;num&gt;    &lt;num&gt;      &lt;num&gt;  &lt;int&gt;</span></span></code></pre></div>
 </div>
@@ -674,15 +708,17 @@ ADFI 排名与实测的相关；<code>daily_rmse</code>
 的误差也只有百分之几。</li>
 <li>
 <strong>开头缺失时，<code>loess_pop</code> 明显更好</strong>：NEDAP
-开头缺 20 天时，误差从 4.6% 降到 1.4%，偏差从 +4.4% 降到约 0；FIRE
-开头缺 20 天时，误差从 6.8% 降到 2.7%，排名相关从 0.50 升到
-0.83。晚进站的猪只有后期数据，单猪回归的直线往前推时，前期采食会被高估。</li>
+开头缺 20 天时，误差从 4.5% 降到 1.3%，偏差从 +4.3% 降到约 0；FIRE
+开头缺 20 天时，误差从 7.0% 降到 2.6%，排名相关从 0.44 升到
+0.86。晚进站的猪只有后期数据，单猪回归的直线往前推时，前期采食会被高估。</li>
 <li>
 <strong>中间成段缺失时，<code>loess_pop</code> 也略好</strong>：FIRE
-缺 6 段时，误差从 4.4%（<code>loess_lm</code>）降到 3.2%。</li>
+缺 6 段时，误差从 4.7%（<code>loess_lm</code>）降到 3.3%。</li>
 <li>
 <strong>结尾缺失时三种方法相同</strong>：末个记录之后，三种方法都用这头猪自己的回归。</li>
-<li>这些数字偏乐观：被隐藏的采食日在这里仍有真实体重（见开头的说明）。整条流程的无泄露检验见下一节。</li>
+<li>体重也重新计算后，示例数据上的误差只变化了零点几个百分点（例如 FIRE
+开头缺 20 天，<code>loess_lm</code> 6.8% →
+7.0%）：这一步对日体重并不敏感。区间起止和各步骤之间的相互影响，见下一节的整条流程检验。</li>
 <li>无论哪种方法，缺的天数越多误差越大：<strong>保证区间两端有记录，仍然比选择插补方法更重要</strong>。</li>
 </ul>
 <p>这和《数据质量建议》中的结论一致：<strong>保证测定期两端有记录，比选择插补方法更重要</strong>。这也是
@@ -904,7 +940,7 @@ ADFI 排名与实测的相关；<code>daily_rmse</code>
 <span><span class="va">vo</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_outliers.html">validate_outliers</a></span><span class="op">(</span><span class="va">visits</span>, max_pigs <span class="op">=</span> <span class="fl">300</span>, cores <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span>
 <span><span class="va">va</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_adg.html">validate_adg</a></span><span class="op">(</span><span class="va">w</span>, max_pigs <span class="op">=</span> <span class="fl">300</span>, cores <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span>
 <span><span class="va">vw</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_weight_fill.html">validate_weight_fill</a></span><span class="op">(</span><span class="va">w</span>, max_pigs <span class="op">=</span> <span class="fl">300</span>, cores <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span>
-<span><span class="va">vf</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_adfi.html">validate_adfi</a></span><span class="op">(</span><span class="va">f</span>, max_pigs <span class="op">=</span> <span class="fl">300</span>, cores <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span>
+<span><span class="va">vf</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_adfi.html">validate_adfi</a></span><span class="op">(</span><span class="va">f</span>, <span class="va">w</span>, max_pigs <span class="op">=</span> <span class="fl">300</span>, cores <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span>
 <span><span class="va">vt</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_truncation.html">validate_truncation</a></span><span class="op">(</span><span class="va">visits</span>, settings <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>default <span class="op">=</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>                                                  curve <span class="op">=</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>curve_extrap <span class="op">=</span> <span class="st">"curve"</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>                          reps <span class="op">=</span> <span class="fl">2</span>, cores <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span>
@@ -930,8 +966,8 @@ ADFI 排名与实测的相关；<code>daily_rmse</code>
 <ul>
 <li>各项验证都假设误差或缺失是<strong>随机</strong>发生的。实际中，缺失往往和猪的状态有关：例如猪生病时采食少，也更容易缺少记录。这种偏差无法通过验证发现，也无法靠更换方法消除。</li>
 <li>
-<code><a href="../reference/validate_outliers.html">validate_outliers()</a></code> 的”干净记录”由 <code>qc</code>
-中的方法判定，本身并非完全没有误差。</li>
+<code><a href="../reference/validate_outliers.html">validate_outliers()</a></code>
+的”干净记录”是各方法的共识，所有方法都漏掉的真实误差仍在其中。</li>
 <li>
 <code><a href="../reference/validate_weight_fill.html">validate_weight_fill()</a></code>
 隐藏的是整天的记录，与真实缺失（不进站、耳标脱落）相同；但被隐藏的日子是随机选的，而真实缺失可能与猪的状态有关。</li>

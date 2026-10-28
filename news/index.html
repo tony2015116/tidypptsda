@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.4.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.5.0</span>
       </span>
     </div>
 
@@ -97,6 +97,22 @@
       <small>Source: <a href="https://github.com/tony2015116/tidypptsda/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="page-header" data-toc-text="1.5.0" id="tidypptsda-150">tidypptsda 1.5.0<a class="anchor" aria-label="anchor" href="#tidypptsda-150"></a></h2>
+<div class="section level3">
+<h3 id="validation-functions-without-information-leaking-from-hidden-data-1-5-0">Validation functions without information leaking from hidden data<a class="anchor" aria-label="anchor" href="#validation-functions-without-information-leaking-from-hidden-data-1-5-0"></a></h3>
+<p>All four single-step validators now hide days <strong>before</strong> cleaning, so the hidden data no longer decide what happens to the rest. Their numbers change, mostly at the stage ends; the methods of the pipeline are unchanged.</p>
+<ul><li>
+<code><a href="../reference/validate_adg.html">validate_adg()</a></code>: cross-validation uses <strong>blocks</strong> of <code>block_days</code> consecutive days (new argument, default 7) as folds, instead of single random days whose neighbours stayed in the training data (<code>block_days = 1</code> gives the old folds). In both cross-validation and truncation, all weight records of the hidden days are removed and the remaining records are cleaned again with <code><a href="../reference/clean_weight.html">clean_weight()</a></code>.</li>
+<li>
+<code><a href="../reference/validate_weight_fill.html">validate_weight_fill()</a></code>: the remaining records are cleaned again after the hidden days are removed.</li>
+<li>
+<code><a href="../reference/validate_adfi.html">validate_adfi()</a></code> gains <code>weight</code> (the result of <code><a href="../reference/clean_weight.html">clean_weight()</a></code>): the weight records of the hidden days are hidden too, and the daily body weight used for the imputation is computed again from the remaining records. Without <code>weight</code> it works as before, with a warning.</li>
+<li>
+<code><a href="../reference/validate_outliers.html">validate_outliers()</a></code> gains <code>reference = c("consensus", "qc")</code>: by default the clean records are those that <strong>no</strong> compared method flags, so the method of <code>qc</code> is no longer favoured; the reference ADG comes from the clean records without any outlier method. <code>reference = "qc"</code> gives the old behaviour. <code>$settings$n_clean</code> gives the number of clean records.</li>
+<li>Found by the leakage-free checks: when a long stretch just before the last records is missing, the backward weight tracking can drop the last few records of a pig, so its end has to be extrapolated.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="page-header" data-toc-text="1.4.0" id="tidypptsda-140">tidypptsda 1.4.0<a class="anchor" aria-label="anchor" href="#tidypptsda-140"></a></h2>
 <div class="section level3">

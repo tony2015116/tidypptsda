@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.4.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.5.0</span>
       </span>
     </div>
 
@@ -1085,9 +1085,9 @@ YY、LL、DD 三个品种和 20–140 kg 的体重段：</p>
 <li>三种插补方法在随机缺失时结果几乎相同，差别主要在区间开头和成段缺失：开头缺
 20 天时，<code>loess_pop</code> 的 ADFI 误差比 <code>loess_lm</code>
 小约三分之一（457 头猪的无泄露检验：7.5% →
-4.9%）；末端两者相同。比较时请用
-<code><a href="../reference/validate_truncation.html">validate_truncation()</a></code>，<code><a href="../reference/validate_adfi.html">validate_adfi()</a></code>
-保留了被隐藏日子的体重，结果偏乐观（见《方法验证》）。</li>
+4.9%）；末端两者相同。比较整条流程时请用
+<code><a href="../reference/validate_truncation.html">validate_truncation()</a></code>；<code><a href="../reference/validate_adfi.html">validate_adfi()</a></code>
+只看插补这一步（见《方法验证》）。</li>
 <li>
 <code>loess_pop</code>
 的群体曲线来自本批次的猪，批次里的猪太少（少于约 10
