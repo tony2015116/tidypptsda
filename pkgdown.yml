@@ -3,13 +3,14 @@ pkgdown: 2.2.1
 pkgdown_sha: ~
 articles:
   design-zh: design-zh.html
+  fill-zh: fill-zh.html
   get-started: get-started.html
   methods-zh: methods-zh.html
   output-zh: output-zh.html
   qc-parameters-zh: qc-parameters-zh.html
   tidypptsda-zh: tidypptsda-zh.html
   validation-zh: validation-zh.html
-last_built: 2026-10-27T03:09Z
+last_built: 2026-10-28T04:01Z
 urls:
   reference: https://tony2015116.github.io/tidypptsda/reference
   article: https://tony2015116.github.io/tidypptsda/articles

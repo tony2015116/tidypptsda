@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.3.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.4.0</span>
       </span>
     </div>
 
@@ -68,6 +68,9 @@
     </li>
     <li>
       <a href="../articles/methods-zh.html">计算方法说明：从原始记录到料肉比</a>
+    </li>
+    <li>
+      <a href="../articles/fill-zh.html">填充方法：日体重与日采食</a>
     </li>
     <li>
       <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线、体重填充与采食插补</a>
@@ -188,7 +191,7 @@
 <span><span class="co">#&gt;   <span style="color: #00BB00;">stage_range</span>: 30, 120</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">curve_model</span>: poly2</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">max_extrap_days</span>: 30</span></span>
-<span><span class="co">#&gt;   <span style="color: #00BB00;">curve_extrap</span>: curve</span></span>
+<span><span class="co">#&gt;   <span style="color: #00BB00;">curve_extrap</span>: start</span></span>
 <span><span class="co">#&gt; <span style="font-weight: bold;">Feeder errors</span></span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">fiv_range</span>: -20, 2000</span></span>
 <span><span class="co">#&gt;   <span style="color: #00BB00;">fiv0_abs_max</span>: 20</span></span>
@@ -290,7 +293,7 @@
 <td>
 <code>stage_range</code>、<code>curve_model</code>、<code>max_extrap_days</code>、<code>curve_extrap</code>
 </td>
-<td>30–120、poly2、30、curve</td>
+<td>30–120、poly2、30、start</td>
 <td><code><a href="../reference/calc_adg.html">calc_adg()</a></code></td>
 </tr>
 <tr class="odd">
@@ -745,13 +748,12 @@ NEDAP 数据中，保留的猪 R² 都在 0.993 以上（中位数约 0.998）�
 </tr>
 <tr class="even">
 <td><code>curve_extrap</code></td>
-<td>首条记录之前、末条记录之后怎么外推：<code>"curve"</code>
-沿生长曲线本身；<code>"tangent"</code>
-从曲线在首/末条记录处的值出发画直线，斜率取首/末 14
-天记录的稳健回归斜率（限制在 0.2–1.5 kg/d）</td>
+<td>记录范围之外怎么外推。<code>"start"</code>：首条记录之前从曲线在首条记录处的值出发画直线，斜率取首
+14 天记录的稳健回归斜率（限制在 0.2–1.5
+kg/d），末条记录之后沿生长曲线；<code>"tangent"</code>：两端都用直线；<code>"curve"</code>：两端都沿生长曲线</td>
 <td>—</td>
-<td><code>"curve"</code></td>
-<td>curve / tangent</td>
+<td><code>"start"</code></td>
+<td>start / curve / tangent</td>
 </tr>
 </tbody>
 </table>
@@ -774,14 +776,13 @@ kg、又掉回去时，起点取之后真正进入区间的那一次）。搜索
 <code>n_observed_days</code>、<code>n_interpolated_days</code>、<code>n_curve_days</code>
 中。</li>
 </ol>
-<p><strong>切线外推</strong>：二次、三次曲线往记录范围外推几周时容易弯折，例如末期增重稍慢时，曲线外推后会提前”封顶”。<code>curve_extrap = "tangent"</code>
-时，记录范围内仍用原来的曲线，范围之外改为直线。在示例数据上隐藏开头或结尾
-10–30 天记录时，poly2 加切线后 ADG 误差在多数场景下变小（例如 NEDAP
-开头缺 30 天：53 → 38 g/d；FIRE 开头缺 30 天：344 → 173 g/d），但 FIRE
-开头缺 20 天时略差（123 → 129 g/d）。所以默认仍是
-<code>"curve"</code>，建议先用
-<code>validate_adg(extrap = c("curve", "tangent"))</code>
-在自己的数据上比较。</p>
+<p><strong>切线外推</strong>：二次、三次曲线往记录范围外推几周时容易弯折，例如末期增重稍慢时，曲线外推后会提前”封顶”。切线外推时，记录范围内仍用原来的曲线，范围之外改为直线。在
+457 头 NEDAP 猪的无泄露检验中（《方法验证》中的
+<code><a href="../reference/validate_truncation.html">validate_truncation()</a></code>），开头用切线使 ADG 误差在开头缺 20
+天时从 81 降到 66 g/d、FCR 排名相关从 0.82 升到 0.86；末端用切线虽然 ADG
+也更准，但末端的采食是按外推的体重填充的，FCR 排名反而变差（结尾缺 30
+天时，前 20% 一致率从 0.70 降到 0.44）。所以默认
+<code>"start"</code>：只在首条记录之前用切线。示意图见《填充方法》。</p>
 <p><code>adg_curve</code> 是生长曲线在区间两端的体重差 ÷
 天数，只用来对照。<code>r_squared</code>
 受体重跨度影响，只在同一批次、同一区间内比较才有意义。<code>gompertz</code>
@@ -799,8 +800,8 @@ kg、又掉回去时，起点取之后真正进入区间的那一次）。搜索
 <span><span class="op">}</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    curve_model mean_adg curve_days</span></span>
 <span><span class="co">#&gt;         &lt;char&gt;    &lt;num&gt;      &lt;int&gt;</span></span>
-<span><span class="co">#&gt; 1:       poly1     1207         42</span></span>
-<span><span class="co">#&gt; 2:       poly2     1205         35</span></span>
+<span><span class="co">#&gt; 1:       poly1     1206         43</span></span>
+<span><span class="co">#&gt; 2:       poly2     1205         37</span></span>
 <span><span class="co">#&gt; 3:       poly3     1199         65</span></span>
 <span><span class="co">#&gt; 4:    gompertz     1200         62</span></span></code></pre></div>
 <div class="section level3">
@@ -822,8 +823,8 @@ kg、又掉回去时，起点取之后真正进入区间的那一次）。搜索
 <span><span class="op">}</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;     stage observed extrapolated fcr_ok fcr_low</span></span>
 <span><span class="co">#&gt;    &lt;char&gt;    &lt;int&gt;        &lt;int&gt;  &lt;int&gt;   &lt;int&gt;</span></span>
-<span><span class="co">#&gt; 1: 30-120        0           15      2      23</span></span>
-<span><span class="co">#&gt; 2: 60-120       12           13     21       4</span></span></code></pre></div>
+<span><span class="co">#&gt; 1: 30-120        0           24      3      22</span></span>
+<span><span class="co">#&gt; 2: 60-120       13           12     21       4</span></span></code></pre></div>
 <p><strong>调整建议</strong>：<code>stage_range</code>
 的两端都应落在大多数猪的实测体重范围之内。区间下限宜比典型进站体重高
 5–10 kg，上限宜比典型出栏体重低约 5 kg。</p>
@@ -1055,11 +1056,10 @@ YY、LL、DD 三个品种和 20–140 kg 的体重段：</p>
 <td><code>impute_method</code></td>
 <td>两个有记录的日子之间，连续缺失不超过 <code>long_gap_days</code>
 天时用 LOESS
-平滑插补（<code>"loess_pop"</code>、<code>"loess_lm"</code>）。更长的缺失和区间两端（首个有记录日之前、末个有记录日之后）：<code>"loess_pop"</code>
-用全群（有品种时按品种）“日采食 ~ 体重”二次曲线 ×
-这头猪的采食水平；<code>"loess_lm"</code> 用这头猪自己的”日采食 ~
-体重”线性回归；<code>"linear"</code>
-中间一律线性插值，两端用这头猪自己的回归</td>
+平滑插补（<code>"loess_pop"</code>、<code>"loess_lm"</code>）。<code>"loess_pop"</code>：更长的缺失和首个有记录日之前用全群（有品种时按品种）“日采食
+~ 体重”二次曲线 ×
+这头猪的采食水平，末个有记录日之后用这头猪自己的”日采食 ~
+体重”线性回归；<code>"loess_lm"</code>：这些位置都用这头猪自己的回归；<code>"linear"</code>：中间一律线性插值，两端用这头猪自己的回归</td>
 <td>—</td>
 <td><code>"loess_pop"</code></td>
 <td>loess_pop / loess_lm / linear</td>
@@ -1082,10 +1082,12 @@ YY、LL、DD 三个品种和 20–140 kg 的体重段：</p>
 <ul>
 <li>公猪后期日采食量可能超过 4 kg，<code>dfi_range</code> 的上限不宜低于
 5 kg。</li>
-<li>三种插补方法在随机缺失时结果几乎相同，差别主要在区间两端和成段缺失。<code>loess_pop</code>
-在两端缺失时误差约为 <code>loess_lm</code>
-的一半（见《方法验证》），可以用 <code><a href="../reference/validate_adfi.html">validate_adfi()</a></code>
-在自己的数据上比较。</li>
+<li>三种插补方法在随机缺失时结果几乎相同，差别主要在区间开头和成段缺失：开头缺
+20 天时，<code>loess_pop</code> 的 ADFI 误差比 <code>loess_lm</code>
+小约三分之一（457 头猪的无泄露检验：7.5% →
+4.9%）；末端两者相同。比较时请用
+<code><a href="../reference/validate_truncation.html">validate_truncation()</a></code>，<code><a href="../reference/validate_adfi.html">validate_adfi()</a></code>
+保留了被隐藏日子的体重，结果偏乐观（见《方法验证》）。</li>
 <li>
 <code>loess_pop</code>
 的群体曲线来自本批次的猪，批次里的猪太少（少于约 10
@@ -1167,8 +1169,8 @@ YY、LL、DD 三个品种和 20–140 kg 的体重段：</p>
 <span><span class="co">#&gt;    max_edge_extrap_days fcr_ok</span></span>
 <span><span class="co">#&gt;                   &lt;num&gt;  &lt;int&gt;</span></span>
 <span><span class="co">#&gt; 1:                   10      0</span></span>
-<span><span class="co">#&gt; 2:                   15      2</span></span>
-<span><span class="co">#&gt; 3:                   30     13</span></span></code></pre></div>
+<span><span class="co">#&gt; 2:                   15      3</span></span>
+<span><span class="co">#&gt; 3:                   30     20</span></span></code></pre></div>
 <p>缺失模拟显示：区间两端缺 10 天以内时，ADFI 误差约 2–4%；缺 20 天时约
 7%；缺 30 天时为 9–14%。默认的 15
 天是在”保留更多个体”和”保证精度”之间的折中。育种评估要求更高时可设为
@@ -1199,13 +1201,12 @@ kg），说明这一段体重记录不足，例如耳标脱落、不会进站或
 <span><span class="va">b</span> <span class="op">&lt;-</span> <span class="va">res_n</span><span class="op">$</span><span class="va">fcr</span><span class="op">$</span><span class="va">by_bin</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>segments <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">b</span><span class="op">)</span>, low_coverage <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">b</span><span class="op">$</span><span class="va">low_coverage</span><span class="op">)</span>, fcr_outside <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">b</span><span class="op">$</span><span class="va">fcr_out</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;     segments low_coverage  fcr_outside </span></span>
-<span><span class="co">#&gt;          258            5            2</span></span>
+<span><span class="co">#&gt;          258            5            1</span></span>
 <span><span class="va">b</span><span class="op">[</span><span class="va">fcr_out</span> <span class="op">==</span> <span class="cn">TRUE</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">weight_from</span>, <span class="va">weight_to</span>, fcr <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">fcr</span>, <span class="fl">2</span><span class="op">)</span>, <span class="va">fcr_min</span>, <span class="va">fcr_max</span><span class="op">)</span><span class="op">]</span></span>
 <span><span class="co">#&gt; Key: &lt;responder&gt;</span></span>
 <span><span class="co">#&gt;    responder weight_from weight_to   fcr fcr_min fcr_max</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;       &lt;num&gt;     &lt;num&gt; &lt;num&gt;   &lt;num&gt;   &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:     15967          60        70  3.59    1.28    3.41</span></span>
-<span><span class="co">#&gt; 2:     15967          80        90  4.04    1.36    3.86</span></span></code></pre></div>
+<span><span class="co">#&gt; 1:     15967          60        70  3.59    1.28    3.41</span></span></code></pre></div>
 <p>在示例数据中，分段料肉比超出范围的只有 15967 号的 50–70 kg
 段。这头猪在 4
 月下旬采食骤降、体重停止增长，很可能生过病，分段检查正好把它找了出来。</p>

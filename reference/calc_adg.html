@@ -18,7 +18,7 @@ average daily gain (ADG) over a body weight stage."><meta property="og:image" co
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.3.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.4.0</span>
       </span>
     </div>
 
@@ -48,6 +48,9 @@ average daily gain (ADG) over a body weight stage."><meta property="og:image" co
     </li>
     <li>
       <a href="../articles/methods-zh.html">计算方法说明：从原始记录到料肉比</a>
+    </li>
+    <li>
+      <a href="../articles/fill-zh.html">填充方法：日体重与日采食</a>
     </li>
     <li>
       <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线、体重填充与采食插补</a>
@@ -182,14 +185,14 @@ or curve weight, kg), <code>source</code> (<code>"observed"</code>, <code>"inter
 <span class="r-in"><span><span class="va">adg_g</span> <span class="op">&lt;-</span> <span class="fu">calc_adg</span><span class="op">(</span><span class="va">w</span>, qc <span class="op">=</span> <span class="fu"><a href="qc_config.html">qc_config</a></span><span class="op">(</span>curve_model <span class="op">=</span> <span class="st">"gompertz"</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">adg_g</span><span class="op">$</span><span class="va">per_pig</span><span class="op">$</span><span class="va">curve_used</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gompertz </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>       29 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gompertz + tangent (start) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                         29 </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Source of the daily weights over the stage</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">adg</span><span class="op">$</span><span class="va">daily</span><span class="op">[</span><span class="va">in_stage</span> <span class="op">==</span> <span class="cn">TRUE</span>, <span class="va">source</span><span class="op">]</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>        curve interpolated     observed </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>           35           12         2158 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>           37           12         2158 </span>
 </code></pre></div>
     </div>
   </div>

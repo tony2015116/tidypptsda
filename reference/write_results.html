@@ -18,7 +18,7 @@ calc_fcr()) to CSV files."><meta property="og:image" content="https://tony201511
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.3.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.4.0</span>
       </span>
     </div>
 
@@ -48,6 +48,9 @@ calc_fcr()) to CSV files."><meta property="og:image" content="https://tony201511
     </li>
     <li>
       <a href="../articles/methods-zh.html">计算方法说明：从原始记录到料肉比</a>
+    </li>
+    <li>
+      <a href="../articles/fill-zh.html">填充方法：日体重与日采食</a>
     </li>
     <li>
       <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线、体重填充与采食插补</a>
@@ -164,19 +167,19 @@ directory.</p></dd>
     <h2>Examples</h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">out</span> <span class="op">&lt;-</span> <span class="fu">write_results</span><span class="op">(</span><span class="va">res</span>, dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"results"</span><span class="op">)</span>, farm <span class="op">=</span> <span class="st">"demo"</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Wrote 9 files to <span style="color: #0000BB;">/tmp/RtmpaK7Dii/results</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Wrote 9 files to <span style="color: #0000BB;">/tmp/RtmpGN12cL/results</span></span>
 <span class="r-in"><span><span class="va">out</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           table                                                   file  rows</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>          &lt;char&gt;                                                 &lt;char&gt; &lt;int&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:          fcr          /tmp/RtmpaK7Dii/results/demo_fcr_20261027.csv    29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:       by_bin       /tmp/RtmpaK7Dii/results/demo_by_bin_20261027.csv   258</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:   daily_feed   /tmp/RtmpaK7Dii/results/demo_daily_feed_20261027.csv  2820</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4: daily_weight /tmp/RtmpaK7Dii/results/demo_daily_weight_20261027.csv  2605</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:  weight_pigs  /tmp/RtmpaK7Dii/results/demo_weight_pigs_20261027.csv    30</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:   feed_model   /tmp/RtmpaK7Dii/results/demo_feed_model_20261027.csv    14</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7:      summary      /tmp/RtmpaK7Dii/results/demo_summary_20261027.csv    14</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 8:      removed      /tmp/RtmpaK7Dii/results/demo_removed_20261027.csv     1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 9:     settings     /tmp/RtmpaK7Dii/results/demo_settings_20261027.csv    43</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:          fcr          /tmp/RtmpGN12cL/results/demo_fcr_20261028.csv    29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:       by_bin       /tmp/RtmpGN12cL/results/demo_by_bin_20261028.csv   258</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:   daily_feed   /tmp/RtmpGN12cL/results/demo_daily_feed_20261028.csv  2820</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4: daily_weight /tmp/RtmpGN12cL/results/demo_daily_weight_20261028.csv  2607</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5:  weight_pigs  /tmp/RtmpGN12cL/results/demo_weight_pigs_20261028.csv    30</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6:   feed_model   /tmp/RtmpGN12cL/results/demo_feed_model_20261028.csv    14</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7:      summary      /tmp/RtmpGN12cL/results/demo_summary_20261028.csv    14</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8:      removed      /tmp/RtmpGN12cL/results/demo_removed_20261028.csv     1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9:     settings     /tmp/RtmpGN12cL/results/demo_settings_20261028.csv    43</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"results"</span><span class="op">)</span>, recursive <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 </code></pre></div>
     </div>

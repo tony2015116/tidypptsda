@@ -19,7 +19,7 @@ the ADG stage."><meta property="og:image" content="https://tony2015116.github.io
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.3.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.4.0</span>
       </span>
     </div>
 
@@ -49,6 +49,9 @@ the ADG stage."><meta property="og:image" content="https://tony2015116.github.io
     </li>
     <li>
       <a href="../articles/methods-zh.html">计算方法说明：从原始记录到料肉比</a>
+    </li>
+    <li>
+      <a href="../articles/fill-zh.html">填充方法：日体重与日采食</a>
     </li>
     <li>
       <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线、体重填充与采食插补</a>
@@ -175,24 +178,24 @@ Duroc pigs: I. <em>Journal of Animal Science</em>, 92, 2377-2386.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Visits with at least one error: <span style="font-weight: bold;">1.58%</span> of 31652 identified visits</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">ADFI over 30-120 kg</span> <span style="color: #00BBBB;">─────────────────────────────────────────────────────────</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Correction model: 2573 pig-days, 10 error covariates</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Correction model: 2575 pig-days, 10 error covariates</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Population curve of intake on body weight: all (29 pigs)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Stage days recorded without error (org): <span style="font-weight: bold;">1,903</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Stage days recorded without error (org): <span style="font-weight: bold;">1,905</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Corrected (corr): <span style="font-weight: bold;">270</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Interpolated (iii): <span style="font-weight: bold;">1</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Extrapolated (elrp): <span style="font-weight: bold;">31</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Missing: <span style="font-weight: bold;">0</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Pig-days outside dfi_range: <span style="font-weight: bold;">1</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Mean ADFI over the stage: 2846 g/d</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Mean ADFI over the stage: 2845 g/d</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">adfi</span><span class="op">$</span><span class="va">per_pig</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    responder location  stage     adfi     adg_type adfi_raw adfi_error_free</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       &lt;char&gt;   &lt;char&gt; &lt;char&gt;    &lt;num&gt;       &lt;char&gt;    &lt;num&gt;           &lt;num&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:     13913      101 30-120 2642.642     observed 2624.829        2623.974</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:     13918      101 30-120 2566.360     observed 2540.500        2539.662</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:     13954      101 30-120 2678.836 extrapolated 2622.948        2622.221</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:     13996      101 30-120 2860.269     observed 2839.957        2836.714</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:     14962      101 30-120 2830.564     observed 2816.375        2816.083</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:     15006      101 30-120 3121.557     observed 3107.429        3107.229</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:     13913      101 30-120 2642.654     observed 2624.829        2623.974</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:     13918      101 30-120 2566.372     observed 2540.500        2539.662</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:     13954      101 30-120 2681.418 extrapolated 2622.948        2622.221</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4:     13996      101 30-120 2860.245     observed 2839.957        2836.714</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5:     14962      101 30-120 2830.550     observed 2816.375        2816.083</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6:     15006      101 30-120 3121.544     observed 3107.429        3107.229</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    n_stage_days n_observed n_corrected n_interpolated n_extrapolated n_missing</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           &lt;int&gt;      &lt;int&gt;       &lt;int&gt;          &lt;int&gt;          &lt;int&gt;     &lt;int&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1:           76         76          12              0              0         0</span>
@@ -212,16 +215,16 @@ Duroc pigs: I. <em>Journal of Animal Science</em>, 92, 2377-2386.</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">adfi</span><span class="op">$</span><span class="va">daily</span><span class="op">[</span><span class="va">in_stage</span> <span class="op">==</span> <span class="cn">TRUE</span>, <span class="va">state</span><span class="op">]</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> corr elrp  iii  org </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  270   31    1 1903 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  270   31    1 1905 </span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">adfi</span><span class="op">$</span><span class="va">model</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           term      estimate    std_error      p_value</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>         &lt;char&gt;         &lt;num&gt;        &lt;num&gt;        &lt;num&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1: (Intercept)  -1035.578421  306.3299502 7.342478e-04</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2: location102     -1.889851   63.1843059 9.763671e-01</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:          bw     23.307998    0.3581430 0.000000e+00</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:         adg      1.728247    0.2440466 1.607839e-07</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:  pte_fiv_hi -11778.746181 5881.2724788 4.531001e-02</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:  pte_otv_hi  -1924.591140 3367.3410840 5.676801e-01</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1: (Intercept)  -1034.723262  306.8930401 7.585135e-04</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2: location102     -2.797787   63.2856637 9.650757e-01</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:          bw     23.338374    0.3577956 0.000000e+00</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4:         adg      1.725667    0.2444888 1.703038e-07</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5:  pte_fiv_hi -11834.326758 5882.7526284 4.435732e-02</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6:  pte_otv_hi  -1931.619656 3368.2285196 5.663690e-01</span>
 </code></pre></div>
     </div>
   </div>

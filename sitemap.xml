@@ -3,6 +3,7 @@
 <url><loc>https://tony2015116.github.io/tidypptsda/LICENSE-text.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/LICENSE.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/articles/design-zh.html</loc></url>
+<url><loc>https://tony2015116.github.io/tidypptsda/articles/fill-zh.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/articles/get-started.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/articles/index.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/articles/methods-zh.html</loc></url>
@@ -36,6 +37,7 @@
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/validate_adfi.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/validate_adg.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/validate_outliers.html</loc></url>
+<url><loc>https://tony2015116.github.io/tidypptsda/reference/validate_truncation.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/validate_weight_fill.html</loc></url>
 <url><loc>https://tony2015116.github.io/tidypptsda/reference/write_results.html</loc></url>
 </urlset>

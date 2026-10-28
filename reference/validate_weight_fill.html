@@ -20,7 +20,7 @@ the ADG of all records with the settings of weight)."><meta property="og:image" 
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.3.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.4.0</span>
       </span>
     </div>
 
@@ -50,6 +50,9 @@ the ADG of all records with the settings of weight)."><meta property="og:image" 
     </li>
     <li>
       <a href="../articles/methods-zh.html">计算方法说明：从原始记录到料肉比</a>
+    </li>
+    <li>
+      <a href="../articles/fill-zh.html">填充方法：日体重与日采食</a>
     </li>
     <li>
       <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线、体重填充与采食插补</a>
@@ -109,7 +112,7 @@ the ADG of all records with the settings of <code>weight</code>).</p>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">validate_weight_fill</span><span class="op">(</span></span>
 <span>  <span class="va">weight</span>,</span>
 <span>  methods <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"linear"</span>, <span class="st">"poly1"</span>, <span class="st">"poly2"</span>, <span class="st">"poly3"</span>, <span class="st">"gompertz"</span><span class="op">)</span>,</span>
-<span>  extrap <span class="op">=</span> <span class="st">"curve"</span>,</span>
+<span>  extrap <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  scenarios <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"random30"</span>, <span class="st">"blocks3"</span>, <span class="st">"late20"</span>, <span class="st">"early15"</span><span class="op">)</span>,</span>
 <span>  reps <span class="op">=</span> <span class="fl">3</span>,</span>
 <span>  max_pigs <span class="op">=</span> <span class="cn">NULL</span>,</span>
@@ -138,8 +141,9 @@ fitted on the remaining records, for every missing day.</p></li>
 
 <dt id="arg-extrap">extrap<a class="anchor" aria-label="anchor" href="#arg-extrap"></a></dt>
 <dd><p>Extrapolations of the curve beyond the records to compare
-(values of <code>curve_extrap</code>): <code>"curve"</code> (default), <code>"tangent"</code> or both.
-With <code>"tangent"</code>, a method is labelled e.g. <code>"linear+tangent"</code>. It
+(values of <code>curve_extrap</code>): <code>"start"</code>, <code>"curve"</code>, <code>"tangent"</code> or
+several. Default: the one of the settings of <code>weight</code>. Other than
+<code>"curve"</code>, a method is labelled e.g. <code>"linear+tangent"</code>. It
 matters for the days hidden at the ends (<code>"late&lt;d&gt;"</code>, <code>"early&lt;d&gt;"</code>).</p></dd>
 
 

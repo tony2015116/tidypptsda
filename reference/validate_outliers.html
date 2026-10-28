@@ -20,7 +20,7 @@ far ADG moves from the ADG of the clean records."><meta property="og:image" cont
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.3.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.4.0</span>
       </span>
     </div>
 
@@ -50,6 +50,9 @@ far ADG moves from the ADG of the clean records."><meta property="og:image" cont
     </li>
     <li>
       <a href="../articles/methods-zh.html">计算方法说明：从原始记录到料肉比</a>
+    </li>
+    <li>
+      <a href="../articles/fill-zh.html">填充方法：日体重与日采食</a>
     </li>
     <li>
       <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线、体重填充与采食插补</a>
@@ -210,68 +213,69 @@ removes.</p>
 <span class="r-in"><span><span class="va">vo</span> <span class="op">&lt;-</span> <span class="fu">validate_outliers</span><span class="op">(</span><span class="va">visits</span>, reps <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Validating weight outlier methods (1 repetition, 5% artificial errors)</span> <span style="color: #00BBBB;">──────</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Validating outlier methods <span style="color: #00BB00;">■■■■■■■■■                       </span>  25% | ETA:  6s</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Validating outlier methods <span style="color: #00BB00;">■■■■■■■■■■■■■■■■■■■■■■■         </span>  75% | ETA:  2s</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Validating outlier methods <span style="color: #00BB00;">■■■■■■■■■                       </span>  25% | ETA:  5s</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Validating outlier methods <span style="color: #00BB00;">■■■■■■■■■■■■■■■■■■■■            </span>  62% | ETA:  2s</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Validating outlier methods <span style="color: #00BB00;">■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■ </span> 100% | ETA:  0s</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> track+rlm+loess: 93% of errors found, 0.4% of good records removed, ADG error</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> 1.7 g/d</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> track: 68% of errors found, 0.0% of good records removed, ADG error 1.2 g/d</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> track: 68% of errors found, 0.0% of good records removed, ADG error 1.3 g/d</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> rlm: 89% of errors found, 0.1% of good records removed, ADG error 1.5 g/d</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> loess: 91% of errors found, 0.0% of good records removed, ADG error 1.0 g/d</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> rlm+loess: 92% of errors found, 0.1% of good records removed, ADG error 1.5 g/d</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stl: 94% of errors found, 0.7% of good records removed, ADG error 5.3 g/d</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> sd: 59% of errors found, 0.0% of good records removed, ADG error 1.3 g/d</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> sd: 59% of errors found, 0.0% of good records removed, ADG error 1.4 g/d</span>
 <span class="r-in"><span><span class="va">vo</span><span class="op">$</span><span class="va">summary</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>             method sensitivity false_positive_rate precision    adg_bias</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>             &lt;char&gt;       &lt;num&gt;               &lt;num&gt;     &lt;num&gt;       &lt;num&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:            none  0.01443769        0.000000e+00 1.0000000  0.01800469</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2: track+rlm+loess  0.93465046        4.124301e-03 0.9241172  0.55120044</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:           track  0.67705167        3.266773e-04 0.9911012  0.37630942</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:             rlm  0.88753799        1.429213e-03 0.9709061  0.46363604</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:           loess  0.90957447        4.083466e-05 0.9991653  0.10175719</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:       rlm+loess  0.92173252        1.429213e-03 0.9719551  0.41614047</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7:             stl  0.94300912        6.778554e-03 0.8820185  1.37899387</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 8:              sd  0.58890578        0.000000e+00 1.0000000 -0.10296403</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:            none  0.01443769        0.000000e+00 1.0000000  0.06108899</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2: track+rlm+loess  0.93465046        4.124301e-03 0.9241172  0.54009534</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:           track  0.67705167        3.266773e-04 0.9911012  0.41260476</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4:             rlm  0.88753799        1.429213e-03 0.9709061  0.45331158</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5:           loess  0.90957447        4.083466e-05 0.9991653  0.10088837</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6:       rlm+loess  0.92173252        1.429213e-03 0.9719551  0.40581601</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7:             stl  0.94300912        6.778554e-03 0.8820185  1.35989812</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8:              sd  0.58890578        0.000000e+00 1.0000000 -0.06636270</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     adg_rmse adg_spearman n_pigs</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>        &lt;num&gt;        &lt;num&gt;  &lt;num&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1: 1.7574508    0.9995074     29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2: 1.7247197    0.9995074     29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3: 1.2331298    0.9995074     29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4: 1.4954201    0.9995074     29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5: 0.9958011    0.9995074     29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6: 1.4901718    0.9995074     29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7: 5.2541193    0.9995074     29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 8: 1.2924414    0.9995074     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1: 1.8571052    0.9995074     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2: 1.6972381    0.9995074     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3: 1.3304823    0.9995074     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4: 1.4688898    0.9995074     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5: 0.9950114    0.9995074     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6: 1.4635464    0.9995074     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7: 5.2571138    0.9995074     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8: 1.4172103    0.9995074     29</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># 2. growth curve models</span></span></span>
 <span class="r-in"><span><span class="va">va</span> <span class="op">&lt;-</span> <span class="fu"><a href="validate_adg.html">validate_adg</a></span><span class="op">(</span><span class="va">w</span>, models <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"poly1"</span>, <span class="st">"poly2"</span>, <span class="st">"poly3"</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Validating growth curves: 5-fold cross-validation and truncation</span> <span style="color: #00BBBB;">────────────</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> validate_adg: fitting pigs <span style="color: #00BB00;">■■■■■■■■■■■                     </span>  34% | ETA:  2s</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> validate_adg: fitting pigs <span style="color: #00BB00;">■■■■■■■■■                       </span>  28% | ETA:  3s</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> validate_adg: fitting pigs <span style="color: #00BB00;">■■■■■■■■■■■■■■■■■■■■■■■■■■      </span>  83% | ETA:  1s</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> validate_adg: fitting pigs <span style="color: #00BB00;">■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■ </span> 100% | ETA:  0s</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Lowest cross-validation error: <span style="color: #0000BB;">"poly3"</span> (1.39 kg)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Lowest cross-validation error: <span style="color: #0000BB;">"poly3+start"</span> (1.39 kg)</span>
 <span class="r-in"><span><span class="va">va</span><span class="op">$</span><span class="va">summary</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Key: &lt;model&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     model  cv_rmse   cv_mae bias_late10 rmse_late10 spearman_late10 n_late10</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    &lt;char&gt;    &lt;num&gt;    &lt;num&gt;       &lt;num&gt;       &lt;num&gt;           &lt;num&gt;    &lt;int&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:  poly1 1.805056 1.462698    9.003499    16.43372       0.9778325       29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:  poly2 1.588272 1.291637   16.694459    23.73276       0.9881773       29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:  poly3 1.394415 1.113624   16.739049    25.70778       0.9748768       29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    bias_early10 rmse_early10 spearman_early10 n_early10 bias_late20 rmse_late20</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>           &lt;num&gt;        &lt;num&gt;            &lt;num&gt;     &lt;int&gt;       &lt;num&gt;       &lt;num&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:     4.226391     21.33976        0.9955665        29   -1.176214    33.41647</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:     7.104012     22.60490        0.9965517        29   23.968118    36.44918</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:     4.353818     23.52789        0.9970443        29   23.571874    47.94971</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    spearman_late20 n_late20 bias_early20 rmse_early20 spearman_early20</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>              &lt;num&gt;    &lt;int&gt;        &lt;num&gt;        &lt;num&gt;            &lt;num&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:       0.9261084       29    0.5405908     51.56826        0.9689655</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:       0.9522167       29   14.3415209     49.58983        0.9812808</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:       0.8738916       29   -8.3738794     61.82452        0.8965517</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    n_early20</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>        &lt;int&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:        29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:        29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:        29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>          model  cv_rmse   cv_mae bias_late10 rmse_late10 spearman_late10</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>         &lt;char&gt;    &lt;num&gt;    &lt;num&gt;       &lt;num&gt;       &lt;num&gt;           &lt;num&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1: poly1+start 1.801448 1.461067    7.861044    14.33311       0.9871921</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2: poly2+start 1.585093 1.289856   13.950115    20.84924       0.9911330</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3: poly3+start 1.394047 1.113435   14.712207    23.87230       0.9857143</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    n_late10 bias_early10 rmse_early10 spearman_early10 n_early10 bias_late20</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       &lt;int&gt;        &lt;num&gt;        &lt;num&gt;            &lt;num&gt;     &lt;int&gt;       &lt;num&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:       29     4.276987     21.34395        0.9965517        29    8.967406</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:       29     7.139858     22.60199        0.9965517        29   22.561745</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:       29     4.628030     23.47173        0.9965517        29   25.522544</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    rmse_late20 spearman_late20 n_late20 bias_early20 rmse_early20</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>          &lt;num&gt;           &lt;num&gt;    &lt;int&gt;        &lt;num&gt;        &lt;num&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:    25.93636       0.9596059       29    0.5945548     51.57280</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:    32.53357       0.9546798       29   14.3388467     49.62695</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:    37.97922       0.9418719       29   -5.8129621     60.07772</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    spearman_early20 n_early20</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>               &lt;num&gt;     &lt;int&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:        0.9704433        29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:        0.9788177        29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:        0.9201970        29</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># 3. weight fill methods</span></span></span>
 <span class="r-in"><span><span class="va">vw</span> <span class="op">&lt;-</span> <span class="fu"><a href="validate_weight_fill.html">validate_weight_fill</a></span><span class="op">(</span><span class="va">w</span>, methods <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"linear"</span>, <span class="st">"poly2"</span><span class="op">)</span>, scenarios <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"blocks3"</span>, <span class="st">"late20"</span><span class="op">)</span>, reps <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
@@ -279,18 +283,18 @@ removes.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Validating weight fill methods (2 scenarios x 1 repetition)</span> <span style="color: #00BBBB;">─────────────────</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> 29 pigs used</span>
 <span class="r-in"><span><span class="va">vw</span><span class="op">$</span><span class="va">summary</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    scenario method daily_rmse daily_mae daily_bias   adg_bias  adg_rmse</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>      &lt;char&gt; &lt;char&gt;      &lt;num&gt;     &lt;num&gt;      &lt;num&gt;      &lt;num&gt;     &lt;num&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:  blocks3 linear   0.919280 0.6781528 0.09621132 -0.6722546  5.072053</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:  blocks3  poly2   1.385329 1.1087325 0.01978836 -5.5230277  9.213026</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:   late20 linear   1.782874 1.3684745 0.56243766 -6.4527641 25.422201</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:   late20  poly2   2.364725 1.9074251 0.72990519 -6.2759992 32.975855</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    scenario       method daily_rmse daily_mae   daily_bias   adg_bias  adg_rmse</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>      &lt;char&gt;       &lt;char&gt;      &lt;num&gt;     &lt;num&gt;        &lt;num&gt;      &lt;num&gt;     &lt;num&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:  blocks3 linear+start  0.9162838 0.6698479 0.0254289216 -0.5534895  5.020420</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:  blocks3  poly2+start  1.3832123 1.1105714 0.0005577497 -5.4852808  9.153072</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:   late20 linear+start  1.7776154 1.3726958 0.5413000033 -5.8173980 25.230442</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4:   late20  poly2+start  2.3645051 1.9155948 0.7099944000 -5.6406331 32.828249</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    adg_spearman n_pigs</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           &lt;num&gt;  &lt;int&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:    0.9975369     29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:    0.9931034     29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:    0.9472906     29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:    0.9477833     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:    0.9970443     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:    0.9926108     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:    0.9492611     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4:    0.9443350     29</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># 4. feed intake imputation</span></span></span>
 <span class="r-in"><span><span class="va">adfi</span> <span class="op">&lt;-</span> <span class="fu"><a href="calc_adfi.html">calc_adfi</a></span><span class="op">(</span><span class="va">visits</span>, <span class="fu"><a href="calc_adg.html">calc_adg</a></span><span class="op">(</span><span class="va">w</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></span>
@@ -299,22 +303,22 @@ removes.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Validating feed intake imputation (2 scenarios x 2 repetitions)</span> <span style="color: #00BBBB;">─────────────</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> 29 pigs with coverage &gt;= 0.8 used</span>
 <span class="r-in"><span><span class="va">vf</span><span class="op">$</span><span class="va">summary</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    scenario    method mean_abs_error_pct p95_abs_error_pct   bias_pct  spearman</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>      &lt;char&gt;    &lt;char&gt;              &lt;num&gt;             &lt;num&gt;      &lt;num&gt;     &lt;num&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1: random30 loess_pop           1.110214          2.596304  0.1150471 0.9857143</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2: random30  loess_lm           1.054701          2.297831  0.2560204 0.9894089</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3: random30    linear           1.166598          3.787476  0.2764835 0.9869458</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:   late20 loess_pop           1.429133          4.349533 -0.3269003 0.9783251</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:   late20  loess_lm           4.610600          7.003017  4.4140848 0.9551724</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:   late20    linear           4.610600          7.003017  4.4140848 0.9551724</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    daily_rmse n_pigs</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>         &lt;num&gt;  &lt;int&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:   447.2294     29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:   453.4738     29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:   506.4742     29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:   320.7364     29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:   701.6943     29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:   701.6943     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    scenario    method mean_abs_error_pct p95_abs_error_pct    bias_pct</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>      &lt;char&gt;    &lt;char&gt;              &lt;num&gt;             &lt;num&gt;       &lt;num&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1: random30 loess_pop           1.052510          2.811166  0.09432236</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2: random30  loess_lm           1.036762          2.648423  0.10797340</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3: random30    linear           1.055668          3.459460  0.14270497</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4:   late20 loess_pop           1.438628          4.364001 -0.33778910</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5:   late20  loess_lm           4.603676          7.003218  4.40722721</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6:   late20    linear           4.603676          7.003218  4.40722721</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     spearman daily_rmse n_pigs</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>        &lt;num&gt;      &lt;num&gt;  &lt;int&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1: 0.9894089   453.5471     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2: 0.9906404   453.7932     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3: 0.9834975   490.6797     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4: 0.9684729   321.9216     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5: 0.9497537   701.7780     29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6: 0.9497537   701.7780     29</span>
 </code></pre></div>
     </div>
   </div>
