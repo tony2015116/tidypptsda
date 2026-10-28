@@ -27,7 +27,7 @@ test_that("validate_outliers finds artificial errors", {
 
 test_that("validate_adg compares curve models", {
   w <- clean_weight(prep_visits(nedap, verbose = 0), verbose = 0)
-  res <- validate_adg(w, models = c("poly1", "poly2"), trim_days = 10, verbose = 0)
+  res <- validate_adg(w, models = c("poly1", "poly2"), extrap = "curve", trim_days = 10, verbose = 0)
   expect_equal(res$summary$model, c("poly1", "poly2"))
   expect_true(all(c("cv_rmse", "cv_mae", "bias_late10", "rmse_early10",
                     "spearman_late10", "n_early10") %in% names(res$summary)))
@@ -35,14 +35,14 @@ test_that("validate_adg compares curve models", {
   expect_equal(nrow(res$cv), 2L * w$per_pig[status != "removed", .N])
   # same folds whatever the number of cores
   skip_on_os("windows")
-  two <- validate_adg(w, models = c("poly1", "poly2"), trim_days = 10, verbose = 0, cores = 2)
+  two <- validate_adg(w, models = c("poly1", "poly2"), extrap = "curve", trim_days = 10, verbose = 0, cores = 2)
   expect_equal(two$summary, res$summary, check.attributes = FALSE)
   expect_error(validate_adg(w, models = "nope"), "curve_model")
 })
 
 test_that("validate_weight_fill compares weight fill methods", {
   w <- clean_weight(prep_visits(nedap, verbose = 0), verbose = 0)
-  res <- validate_weight_fill(w, methods = c("linear", "poly2"),
+  res <- validate_weight_fill(w, methods = c("linear", "poly2"), extrap = "curve",
                               scenarios = c("random30", "blocks3", "late20"), reps = 1, verbose = 0)
   s <- res$summary
   expect_equal(nrow(s), 6L)
@@ -95,6 +95,8 @@ test_that("validate_adg and validate_weight_fill compare extrapolations", {
   res <- validate_adg(w, models = "poly2", extrap = c("curve", "tangent"), trim_days = 20,
                       max_pigs = 8, verbose = 0)
   expect_equal(res$summary$model, c("poly2", "poly2+tangent"))
+  expect_equal(validate_adg(w, models = "poly2", trim_days = 10, max_pigs = 4, verbose = 0)$summary$model,
+               "poly2+start")
   # cross-validation mostly predicts inside the records: nearly the same
   expect_equal(res$summary$cv_rmse[1], res$summary$cv_rmse[2], tolerance = 0.05)
   fill <- validate_weight_fill(w, methods = "linear", extrap = c("curve", "tangent"),

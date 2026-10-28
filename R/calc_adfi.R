@@ -410,7 +410,12 @@ impute_dfi_one_pig <- function(d, qc, pop = NULL) {
       by_bw(inside & !short)
     }
   }
-  by_bw(outside)
+  # before the first recorded day: population curve; after the last: the
+  # pig's own regression on weight (the population curve underestimates the
+  # late intake of a pig that leaves early)
+  before <- outside & (x < min(x[ok])) %in% TRUE
+  by_bw(before)
+  by_lm(outside & !before)
   done <- need & !is.na(d$dfi)
   d[done, state := data.table::fifelse(inside[done], "iii", "elrp")]
   d[in_stage == TRUE & is.na(state), state := "missing"]
