@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.5.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.6.0</span>
       </span>
     </div>
 
@@ -97,6 +97,21 @@
       <small>Source: <a href="https://github.com/tony2015116/tidypptsda/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="page-header" data-toc-text="1.6.0" id="tidypptsda-160">tidypptsda 1.6.0<a class="anchor" aria-label="anchor" href="#tidypptsda-160"></a></h2>
+<div class="section level3">
+<h3 id="new-write_report-1-6-0">New: write_report()<a class="anchor" aria-label="anchor" href="#new-write_report-1-6-0"></a></h3>
+<ul><li>
+<code>write_report(x, path)</code> writes the result of <code><a href="../reference/run_pipeline.html">run_pipeline()</a></code> as a folder with <code>index.html</code> and the plots, to browse like a book: an overview page (pigs, mean ADG / ADFI / FCR, QC settings, pigs to check, stations) and one page per station with its growth and feed intake plots and a table of its pigs (ADG, ADFI, FCR, status, reason). Arrow keys turn the pages; a pig ID in the search box jumps to its station and highlights the pig. Works offline; printing gives one page per station.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="console-output-1-6-0">Console output<a class="anchor" aria-label="anchor" href="#console-output-1-6-0"></a></h3>
+<ul><li>
+<code><a href="../reference/run_pipeline.html">run_pipeline()</a></code> numbers its steps (<code>[2/6]</code>) and shows how long each took; it starts with a rule and ends with a summary box (pigs, mean +/- SD of ADG, ADFI and FCR, pigs to check). <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> of the result shows the same box. With <code>verbose &gt;= 1</code> the result is returned invisibly, as the box was already shown.</li>
+<li>Counts are aligned, with thousands separators and shares (%); parts of a count are indented under it. Counts of zero are shown with <code>verbose = 2</code> only, and counts of records or pigs lost are highlighted.</li>
+<li>Each step ends with one line: the main result and the run time.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="page-header" data-toc-text="1.5.0" id="tidypptsda-150">tidypptsda 1.5.0<a class="anchor" aria-label="anchor" href="#tidypptsda-150"></a></h2>
 <div class="section level3">

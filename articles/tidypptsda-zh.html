@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.5.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.6.0</span>
       </span>
     </div>
 
@@ -210,6 +210,11 @@
 <td><code><a href="../reference/write_results.html">write_results()</a></code></td>
 <td>把全部结果表导出为 csv</td>
 </tr>
+<tr class="even">
+<td>10</td>
+<td><code><a href="../reference/write_report.html">write_report()</a></code></td>
+<td>生成 HTML 报告：每个测定站一页，可以像翻书一样浏览</td>
+</tr>
 </tbody>
 </table>
 <p>每一步的方法和出处见《计算方法说明》。不需要中间结果时，用
@@ -217,15 +222,22 @@
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="va">res</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; ── <span style="font-weight: bold;">tidypptsda pipeline (NEDAP)</span> ──</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Pigs in the data: 30</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Pigs with weight data kept: 29</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Pigs with ADG: 29</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Pigs with FCR: 29 (23 ok, 6 low confidence)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Removed pigs: 1 (see <span style="color: #00BB00;">$removed</span>)</span></span>
-<span><span class="co">#&gt; Mean ADG 1205 g/d, ADFI 2845 g/d, FCR 2.36</span></span></code></pre></div>
+<span><span class="co">#&gt; ╭  Results NEDAP  ──────────────────────────────────────────────────────────╮</span></span>
+<span><span class="co">#&gt; │ <span style="font-weight: bold;">Pigs   </span>30 in the data · 29 with FCR (23 ok, 6 low confidence) · 1 removed │</span></span>
+<span><span class="co">#&gt; │ <span style="font-weight: bold;">ADG    </span>1205 ± 133 g/d                                                     │</span></span>
+<span><span class="co">#&gt; │ <span style="font-weight: bold;">ADFI   </span>2845 ± 360 g/d                                                     │</span></span>
+<span><span class="co">#&gt; │ <span style="font-weight: bold;">FCR    </span>2.36 ± 0.14                                                        │</span></span>
+<span><span class="co">#&gt; │                                                                           │</span></span>
+<span><span class="co">#&gt; │ <span style="color: #BBBB00; font-weight: bold;">Check</span>                                                                     │</span></span>
+<span><span class="co">#&gt; │   <span style="color: #BBBB00;">13954 (101): weight records cover 5.0 kg of 80-90 kg</span>                    │</span></span>
+<span><span class="co">#&gt; │   <span style="color: #BBBB00;">15961 (101): weight records cover 5.2 kg of 70-80 kg</span>                    │</span></span>
+<span><span class="co">#&gt; │   <span style="color: #BBBB00;">15967 (101): ADG on part of the stage; weight data flagged</span>              │</span></span>
+<span><span class="co">#&gt; │   <span style="color: #BBBB00;">13935 (102): weight records cover 5.0 kg of 60-70 kg</span>                    │</span></span>
+<span><span class="co">#&gt; │   <span style="color: #BBBB00;">14937 (102): weight records cover 5.8 kg of 80-90 kg</span>                    │</span></span>
+<span><span class="co">#&gt; │ <span style="color: #555555;">  ... and 2 more ($fcr$per_pig, $removed)</span>                                 │</span></span>
+<span><span class="co">#&gt; │                                                                           │</span></span>
+<span><span class="co">#&gt; │ <span style="color: #555555;">Next: plot_adg(), plot_adfi(), write_report(), write_results()</span>            │</span></span>
+<span><span class="co">#&gt; ╰───────────────────────────────────────────────────────────────────────────╯</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="数据要求">2. 数据要求<a class="anchor" aria-label="anchor" href="#%E6%95%B0%E6%8D%AE%E8%A6%81%E6%B1%82"></a>
@@ -553,14 +565,12 @@ tangent</td>
 <span><span class="va">visits</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/prep_visits.html">prep_visits</a></span><span class="op">(</span><span class="va">fire</span>, qc <span class="op">=</span> <span class="va">qc_fire</span>, verbose <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Preparing FIRE visits</span> <span style="color: #00BBBB;">───────────────────────────────────────────────────────</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Visits read: <span style="font-weight: bold;">9,794</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Unidentified visits (kept, identified = FALSE): <span style="font-weight: bold;">51</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Visits crossing midnight (exit time corrected): <span style="font-weight: bold;">68</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Body weights of 0 set to NA: <span style="font-weight: bold;">478</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Rows without entry time (dropped): <span style="font-weight: bold;">0</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Duplicated rows (dropped): <span style="font-weight: bold;">0</span></span></span>
+<span><span class="co">#&gt;   Visits read                                9,794</span></span>
+<span><span class="co">#&gt; <span style="color: #555555;">  └ unidentified (kept, identified = FALSE)     51    0.5%</span></span></span>
+<span><span class="co">#&gt; <span style="color: #555555;">  └ crossing midnight (exit time corrected)     68    0.7%</span></span></span>
+<span><span class="co">#&gt; <span style="color: #555555;">  └ body weight 0 (set to NA)                  478    4.9%</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> No pig was seen at more than one station</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> 26 pigs at 2 stations, 9794 visits over 66 days</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> 26 pigs at 2 stations, 9,794 visits over 66 days <span style="color: #555555;">0.1s</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> No <span style="color: #00BB00;">breed</span> column. To use breed in the feed intake model and breed-specific limits, add it with `add_breed()`.</span></span></code></pre></div>
 <ul>
 <li>体重和采食量的单位统一为 kg 和 g，时间统一为 UTC。</li>
@@ -585,13 +595,13 @@ tangent</td>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">w</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/clean_weight.html">clean_weight</a></span><span class="op">(</span><span class="va">visits</span>, qc <span class="op">=</span> <span class="va">qc_fire</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Cleaning body weight (</span><span style="color: #00BB00; font-weight: bold;">rlm + loess</span><span style="font-weight: bold;">)</span> <span style="color: #00BBBB;">──────────────────────────────────────────</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Weight records: <span style="font-weight: bold;">9,310</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Outside weight range: <span style="font-weight: bold;">15</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Adaptation after entry (not used): <span style="font-weight: bold;">1,069</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Outliers: <span style="font-weight: bold;">1,285</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span>  of which removed by tracking: <span style="font-weight: bold;">33</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> Pigs kept: 23, low confidence: 2, removed: 1</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Cleaning body weight (track + rlm + loess)</span> <span style="color: #00BBBB;">──────────────────────────────────</span></span></span>
+<span><span class="co">#&gt;   Weight records                       9,310</span></span>
+<span><span class="co">#&gt; <span style="color: #BBBB00;">  └ outside weight range                  15    0.2%</span></span></span>
+<span><span class="co">#&gt; <span style="color: #555555;">  └ adaptation after entry (not used)  1,069   11.5%</span></span></span>
+<span><span class="co">#&gt; <span style="color: #555555;">  └ outliers                           1,285   13.8%</span></span></span>
+<span><span class="co">#&gt; <span style="color: #555555;">    └ by tracking                         33    0.4%</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> Pigs: 23 kept, 2 low confidence, 1 removed <span style="color: #555555;">0.4s</span></span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">w</span><span class="op">$</span><span class="va">per_pig</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">n_valid</span>, <span class="va">test_days</span>, <span class="va">missing_rate</span>, <span class="va">status</span>, <span class="va">reason</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    responder n_valid test_days missing_rate status reason</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;   &lt;int&gt;     &lt;int&gt;        &lt;num&gt; &lt;char&gt; &lt;char&gt;</span></span>
@@ -629,12 +639,11 @@ LOESS 平滑曲线的 R² 低于 0.99 的猪也降级。详见《质控参数详
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">adg</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calc_adg.html">calc_adg</a></span><span class="op">(</span><span class="va">w</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">ADG over 60-120 kg (</span><span style="color: #00BB00; font-weight: bold;">poly2</span><span style="font-weight: bold;"> curve)</span> <span style="color: #00BBBB;">────────────────────────────────────────────</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Observed (stage inside the records): <span style="font-weight: bold;">13</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Extrapolated: <span style="font-weight: bold;">12</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Partial (stage not fully reached): <span style="font-weight: bold;">0</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> No ADG: <span style="font-weight: bold;">0</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Mean ADG: 1207 g/d (SD 106)</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">ADG over 60-120 kg (poly2 curve)</span> <span style="color: #00BBBB;">────────────────────────────────────────────</span></span></span>
+<span><span class="co">#&gt;   Pigs                                   25</span></span>
+<span><span class="co">#&gt; <span style="color: #555555;">  └ observed (stage inside the records)  13   52.0%</span></span></span>
+<span><span class="co">#&gt; <span style="color: #555555;">  └ extrapolated at the ends             12   48.0%</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> ADG 1207 ± 106 g/d (mean ± SD) <span style="color: #555555;">0.2s</span></span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">adg</span><span class="op">$</span><span class="va">per_pig</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">adg_type</span>, <span class="va">adg</span>, <span class="va">r_squared</span>, <span class="va">n_observed_days</span>, <span class="va">n_interpolated_days</span>, <span class="va">n_curve_days</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    responder     adg_type      adg r_squared n_observed_days</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;       &lt;char&gt;    &lt;num&gt;     &lt;num&gt;           &lt;int&gt;</span></span>
@@ -696,18 +705,18 @@ LOESS 平滑曲线的 R² 低于 0.99 的猪也降级。详见《质控参数详
 <code class="sourceCode R"><span><span class="va">adfi</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calc_adfi.html">calc_adfi</a></span><span class="op">(</span><span class="va">visits</span>, <span class="va">adg</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Flagging feeder errors (Casey et al. 2005)</span> <span style="color: #00BBBB;">──────────────────────────────────</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Visits with at least one error: <span style="font-weight: bold;">2.62%</span> of 9743 identified visits</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> 2.62% of 9,743 identified visits with at least one error <span style="color: #555555;">0.0s</span></span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">ADFI over 60-120 kg</span> <span style="color: #00BBBB;">─────────────────────────────────────────────────────────</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Correction model: 1487 pig-days, 16 error covariates</span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Population curve of intake on body weight: all (25 pigs)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Stage days recorded without error (org): <span style="font-weight: bold;">1,130</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Corrected (corr): <span style="font-weight: bold;">84</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Interpolated (iii): <span style="font-weight: bold;">4</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Extrapolated (elrp): <span style="font-weight: bold;">47</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Missing: <span style="font-weight: bold;">0</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Pig-days outside dfi_range: <span style="font-weight: bold;">7</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Mean ADFI over the stage: 3249 g/d</span></span>
+<span><span class="co">#&gt;   Stage pig-days                     1,265</span></span>
+<span><span class="co">#&gt; <span style="color: #555555;">  └ recorded without error (org)     1,130   89.3%</span></span></span>
+<span><span class="co">#&gt; <span style="color: #555555;">  └ corrected (corr)                    84    6.6%</span></span></span>
+<span><span class="co">#&gt; <span style="color: #555555;">  └ filled between records (iii)         4    0.3%</span></span></span>
+<span><span class="co">#&gt; <span style="color: #555555;">  └ filled at the stage ends (elrp)     47    3.7%</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BBBB00;">  └ outside dfi_range                    7    0.6%</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> ADFI 3249 ± 250 g/d (mean ± SD) <span style="color: #555555;">0.2s</span></span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">adfi</span><span class="op">$</span><span class="va">daily</span><span class="op">[</span><span class="va">in_stage</span> <span class="op">==</span> <span class="cn">TRUE</span>, <span class="va">state</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; corr elrp  iii  org </span></span>
@@ -767,8 +776,10 @@ LOESS 平滑插补；超过 3
 <code class="sourceCode R"><span><span class="va">fcr</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calc_fcr.html">calc_fcr</a></span><span class="op">(</span><span class="va">adg</span>, <span class="va">adfi</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">FCR over 60-120 kg</span> <span style="color: #00BBBB;">──────────────────────────────────────────────────────────</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> FCR for 25 pigs: 21 ok, 4 low confidence</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Mean FCR 2.70 (SD 0.16), ADG 1207 g/d, ADFI 3249 g/d</span></span>
+<span><span class="co">#&gt;   Pigs with FCR     25</span></span>
+<span><span class="co">#&gt; <span style="color: #555555;">  └ ok              21   84.0%</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BBBB00;">  └ low confidence   4   16.0%</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> FCR 2.70 ± 0.16 (mean ± SD) <span style="color: #555555;">0.0s</span></span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">fcr</span><span class="op">$</span><span class="va">per_pig</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">adg</span>, <span class="va">adfi</span>, <span class="va">fcr</span>, <span class="va">fcr_flag</span>, <span class="va">fcr_note</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    responder      adg     adfi      fcr       fcr_flag</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;    &lt;num&gt;    &lt;num&gt;    &lt;num&gt;         &lt;char&gt;</span></span>
@@ -1035,11 +1046,36 @@ ADFI，以及区间内有实测（含校正）采食的天数比例。灰色点�
 <p>文件带有 UTF-8 BOM，用 Excel 直接打开时中文不会乱码。</p>
 </div>
 <div class="section level3">
+<h3 id="生成-html-报告">生成 HTML 报告<a class="anchor" aria-label="anchor" href="#%E7%94%9F%E6%88%90-html-%E6%8A%A5%E5%91%8A"></a>
+</h3>
+<p><code><a href="../reference/write_report.html">write_report()</a></code>
+把结果写成一个文件夹（<code>index.html</code> 和图片目录
+<code>img/</code>），用浏览器打开 <code>index.html</code>
+即可，不需要联网：</p>
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">nedap</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/write_report.html">write_report</a></span><span class="op">(</span><span class="va">res</span>, path <span class="op">=</span> <span class="st">"结果/报告"</span>, cores <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span></code></pre></div>
+<ul>
+<li>第一页是总览：猪数，ADG、ADFI、FCR 的均值 ±
+标准差，所用的质控设置，<strong>需要核查的猪</strong>（低可信度或被剔除，附原因），以及各测定站的汇总表；</li>
+<li>之后每个测定站一页：生长曲线图、采食图，以及该站每头猪的
+ADG、ADFI、FCR、状态和原因；</li>
+<li>用键盘左右方向键（或 Page Up / Page Down）翻页，<code>Home</code>
+回到总览，<code>End</code>
+到最后一个站；左侧的站名列表可以直接跳转，有需要核查的猪的站带黄色数字；</li>
+<li>在右上角输入耳号、按回车，会跳到这头猪所在的站，并高亮它的那一行；</li>
+<li>用浏览器打印（例如另存为 PDF）时，每个站各占一页。</li>
+</ul>
+<p>整个文件夹可以直接拷贝或压缩后发给别人。图片默认
+<code>dpi = 150</code>；用 <code>locations</code>
+可以只生成部分测定站。</p>
+</div>
+<div class="section level3">
 <h3 id="并行计算">并行计算<a class="anchor" aria-label="anchor" href="#%E5%B9%B6%E8%A1%8C%E8%AE%A1%E7%AE%97"></a>
 </h3>
 <p>猪的头数很多时，逐头猪拟合曲线是最耗时的步骤。<code><a href="../reference/clean_weight.html">clean_weight()</a></code>、<code><a href="../reference/calc_adg.html">calc_adg()</a></code>、<code><a href="../reference/calc_adfi.html">calc_adfi()</a></code>
 和 <code><a href="../reference/run_pipeline.html">run_pipeline()</a></code> 都有 <code>cores</code> 参数：</p>
-<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">nedap</span>, cores <span class="op">=</span> <span class="fl">4</span><span class="op">)</span>          <span class="co"># 用 4 个 CPU 核心</span></span>
 <span><span class="fu">parallel</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/parallel/detectCores.html" class="external-link">detectCores</a></span><span class="op">(</span><span class="op">)</span>                         <span class="co"># 查看电脑有几个核心</span></span></code></pre></div>
 <p>并行使用 R 自带的 parallel 包，不增加依赖，结果与
@@ -1053,8 +1089,15 @@ Windows 上，并行要求本包是正式安装的（而不是用
 </h3>
 <p>所有提示都用 cli 的样式在当时显示，<code>verbose</code>
 控制显示多少：<code>0</code>
-不显示，<code>1</code>（默认）显示汇总，<code>2</code>
-显示细节。需要注意的情况（例如部分猪没有达到区间终点）以黄色
+不显示，<code>1</code>（默认）显示汇总，<code>2</code> 显示细节。</p>
+<p><code><a href="../reference/run_pipeline.html">run_pipeline()</a></code> 的每一步带编号和耗时（例如
+<code>[2/6] Cleaning body weight</code> …
+<code>✔ … 1.2s</code>）；各项数量右对齐并给出比例，<code>└</code>
+表示上一项中的一部分；为 0 的项只在 <code>verbose = 2</code>
+时显示，有记录或猪被删掉的项标成黄色。最后的汇总框列出猪数、ADG / ADFI /
+FCR 的均值 ± 标准差和需要核查的猪（最多 5 头，其余见
+<code>$fcr$per_pig</code> 和
+<code>$removed</code>）；打印结果（<code>res</code>）时也显示这个汇总框。需要注意的情况（例如部分猪没有达到区间终点）以黄色
 <code>!</code> 开头的提示给出，不再作为 R
 的”警告信息”攒到最后才打印；相应的猪和原因同时记录在结果的
 <code>$removed</code> 或 <code>adg_type</code>、<code>fcr_note</code>

@@ -18,7 +18,7 @@ pig whether its weight data are good enough for growth analysis."><meta property
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.5.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.6.0</span>
       </span>
     </div>
 
@@ -178,13 +178,12 @@ settings.</p></div>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">visits</span> <span class="op">&lt;-</span> <span class="fu"><a href="prep_visits.html">prep_visits</a></span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">w</span> <span class="op">&lt;-</span> <span class="fu">clean_weight</span><span class="op">(</span><span class="va">visits</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Cleaning body weight (</span><span style="color: #00BB00; font-weight: bold;">rlm + loess</span><span style="font-weight: bold;">)</span> <span style="color: #00BBBB;">──────────────────────────────────────────</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Weight records: <span style="font-weight: bold;">31,472</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Outside weight range: <span style="font-weight: bold;">0</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Adaptation after entry (not used): <span style="font-weight: bold;">3,404</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Outliers: <span style="font-weight: bold;">5,667</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span>  of which removed by tracking: <span style="font-weight: bold;">1,543</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #BBBB00;">!</span> Pigs kept: 28, low confidence: 1, removed: 1</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Cleaning body weight (track + rlm + loess)</span> <span style="color: #00BBBB;">──────────────────────────────────</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   Weight records                       31,472</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #555555;">  └ adaptation after entry (not used)   3,404   10.8%</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #555555;">  └ outliers                            5,667   18.0%</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #555555;">    └ by tracking                       1,543    4.9%</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #BBBB00;">!</span> Pigs: 28 kept, 1 low confidence, 1 removed <span style="color: #555555;">0.6s</span></span>
 <span class="r-in"><span><span class="va">w</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> ── <span style="color: #0000BB; font-weight: bold;">&lt;ppt_weight&gt;</span> ──</span>

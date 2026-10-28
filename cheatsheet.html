@@ -135,7 +135,7 @@
   <div class="step" style="--k: var(--c-weight)"><b>calc_adg()</b>补齐体重 + ADG</div><span class="arrow">→</span>
   <div class="step" style="--k: var(--c-feed)"><b>calc_adfi()</b>校正、补齐采食</div><span class="arrow">→</span>
   <div class="step" style="--k: var(--c-fcr)"><b>calc_fcr()</b>FCR + 可信度</div><span class="arrow">→</span>
-  <div class="step" style="--k: var(--c-out)"><b>plot_* / write_results()</b>出图、导出</div>
+  <div class="step" style="--k: var(--c-out)"><b>plot_* / write_results() / write_report()</b>出图、导出、HTML 报告</div>
   <span class="note">一步到位：<code>run_pipeline()</code>；全部阈值：<code>qc_config()</code></span>
 </div>
 
@@ -151,7 +151,8 @@ raw <- read_station("导出/", station = "nedap")
 res <- run_pipeline(raw)            <span class="c"># 或 run_pipeline(nedap)</span>
 res$fcr$per_pig                     <span class="c"># 最终结果表</span>
 res$removed                         <span class="c"># 被剔除的猪及原因</span>
-write_results(res, dir = "结果", farm = "A01")</code></pre>
+write_results(res, dir = "结果", farm = "A01")
+write_report(res, "结果/报告")       <span class="c"># HTML：每站一页，方向键翻页</span></code></pre>
   <p>示例数据：<code>nedap</code>、<code>fire</code>（测定站原始导出格式）。</p>
 </section>
 

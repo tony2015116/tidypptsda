@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.5.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.6.0</span>
       </span>
     </div>
 
@@ -905,6 +905,8 @@ g/d，日期为 <code>Date</code> 类型。</p>
 <div class="section level2">
 <h2 id="导出文件">8. 导出文件<a class="anchor" aria-label="anchor" href="#%E5%AF%BC%E5%87%BA%E6%96%87%E4%BB%B6"></a>
 </h2>
+<p>想直接浏览结果时，用 <code>write_report(res, path)</code> 生成 HTML
+报告（每个测定站一页，见《使用说明》）。</p>
 <p><code>write_results(res, dir, farm)</code> 把结果写成 csv（UTF-8 带
 BOM，Excel 可以直接打开），文件名为”场名_内容_日期.csv”：</p>
 <table class="table">

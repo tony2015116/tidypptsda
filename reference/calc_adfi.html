@@ -19,7 +19,7 @@ the ADG stage."><meta property="og:image" content="https://tony2015116.github.io
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.5.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.6.0</span>
       </span>
     </div>
 
@@ -175,18 +175,18 @@ Duroc pigs: I. <em>Journal of Animal Science</em>, 92, 2377-2386.</p>
 <span class="r-in"><span><span class="va">adfi</span> <span class="op">&lt;-</span> <span class="fu">calc_adfi</span><span class="op">(</span><span class="va">visits</span>, <span class="va">adg</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Flagging feeder errors (Casey et al. 2005)</span> <span style="color: #00BBBB;">──────────────────────────────────</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Visits with at least one error: <span style="font-weight: bold;">1.58%</span> of 31652 identified visits</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> 1.58% of 31,652 identified visits with at least one error <span style="color: #555555;">0.1s</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">ADFI over 30-120 kg</span> <span style="color: #00BBBB;">─────────────────────────────────────────────────────────</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Correction model: 2575 pig-days, 10 error covariates</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Population curve of intake on body weight: all (29 pigs)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Stage days recorded without error (org): <span style="font-weight: bold;">1,905</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Corrected (corr): <span style="font-weight: bold;">270</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Interpolated (iii): <span style="font-weight: bold;">1</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Extrapolated (elrp): <span style="font-weight: bold;">31</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Missing: <span style="font-weight: bold;">0</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Pig-days outside dfi_range: <span style="font-weight: bold;">1</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Mean ADFI over the stage: 2845 g/d</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   Stage pig-days                     2,207</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #555555;">  └ recorded without error (org)     1,905   86.3%</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #555555;">  └ corrected (corr)                   270   12.2%</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #555555;">  └ filled between records (iii)         1   &lt;0.1%</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #555555;">  └ filled at the stage ends (elrp)     31    1.4%</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #BBBB00;">  └ outside dfi_range                    1   &lt;0.1%</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> ADFI 2845 ± 360 g/d (mean ± SD) <span style="color: #555555;">0.2s</span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">adfi</span><span class="op">$</span><span class="va">per_pig</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    responder location  stage     adfi     adg_type adfi_raw adfi_error_free</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       &lt;char&gt;   &lt;char&gt; &lt;char&gt;    &lt;num&gt;       &lt;char&gt;    &lt;num&gt;           &lt;num&gt;</span>

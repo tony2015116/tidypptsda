@@ -18,7 +18,7 @@ calc_fcr() in a row with the same QC settings."><meta property="og:image" conten
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.5.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.6.0</span>
       </span>
     </div>
 
@@ -148,22 +148,30 @@ calc_fcr() in a row with the same QC settings."><meta property="og:image" conten
     <h2>Value</h2>
     <p>An object of class <code>ppt_pipeline</code>: a list with <code>visits</code>,
 <code>weight</code>, <code>adg</code>, <code>adfi</code> and <code>fcr</code>, plus <code>removed</code> (every pig removed,
-with the step and the reason).</p>
+with the step and the reason). Printing it shows a summary box. With
+<code>verbose &gt;= 1</code> the steps are numbered with their run time, the box is
+shown at the end and the result is returned invisibly.</p>
     </div>
 
     <div id="ref-examples">
     <h2>Examples</h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu">run_pipeline</span><span class="op">(</span><span class="va">fire</span>, qc <span class="op">=</span> <span class="fu"><a href="qc_config.html">qc_config</a></span><span class="op">(</span>stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">60</span>, <span class="fl">120</span><span class="op">)</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">res</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> ── <span style="font-weight: bold;">tidypptsda pipeline (FIRE)</span> ──</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Pigs in the data: 26</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Pigs with weight data kept: 25</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Pigs with ADG: 25</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Pigs with FCR: 25 (21 ok, 4 low confidence)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Removed pigs: 1 (see <span style="color: #00BB00;">$removed</span>)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Mean ADG 1207 g/d, ADFI 3249 g/d, FCR 2.70</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> ╭  Results FIRE  ───────────────────────────────────────────────────────────╮</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> │ <span style="font-weight: bold;">Pigs   </span>26 in the data · 25 with FCR (21 ok, 4 low confidence) · 1 removed │</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> │ <span style="font-weight: bold;">ADG    </span>1207 ± 106 g/d                                                     │</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> │ <span style="font-weight: bold;">ADFI   </span>3249 ± 250 g/d                                                     │</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> │ <span style="font-weight: bold;">FCR    </span>2.70 ± 0.16                                                        │</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> │                                                                           │</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> │ <span style="color: #BBBB00; font-weight: bold;">Check</span>                                                                     │</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> │   <span style="color: #BBBB00;">25822 (101): weight records cover 5.1 kg of 70-80 kg</span>                    │</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> │   <span style="color: #BBBB00;">35858 (102): weight records cover 4.4 kg of 100-110 kg</span>                  │</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> │   <span style="color: #BBBB00;">35892 (102): weight data flagged</span>                                        │</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> │   <span style="color: #BBBB00;">35897 (102): weight data flagged</span>                                        │</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> │   <span style="color: #BBBB00;">35888 (101): removed, test period 9 d &lt; 35 d</span>                            │</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> │                                                                           │</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> │ <span style="color: #555555;">Next: plot_adg(), plot_adfi(), write_report(), write_results()</span>            │</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> ╰───────────────────────────────────────────────────────────────────────────╯</span>
 <span class="r-in"><span><span class="va">res</span><span class="op">$</span><span class="va">fcr</span><span class="op">$</span><span class="va">summary</span><span class="op">[</span><span class="va">group</span> <span class="op">==</span> <span class="st">"all"</span><span class="op">]</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     group        trait     n          min          max       median</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    &lt;char&gt;       &lt;char&gt; &lt;int&gt;        &lt;num&gt;        &lt;num&gt;        &lt;num&gt;</span>
