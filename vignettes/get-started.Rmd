@@ -383,8 +383,7 @@ have no error-free intake and are imputed.
 Use [validate_truncation()] to compare the methods on your own data: it
 removes all visits of some pigs over some days and reruns the whole
 pipeline, so nothing of the hidden days leaks into the result
-([validate_adfi()] is faster but keeps the body weight of the hidden days
-and is optimistic at the stage ends). In such a check on 457 NEDAP pigs,
+([validate_adfi()] is faster and looks at the imputation step alone). In such a check on 457 NEDAP pigs,
 with 20 days missing at the start, the ADFI error was 7.5% with
 `"loess_lm"` and 4.9% with `"loess_pop"` and `curve_extrap = "start"`;
 at the end, `"loess_pop"` keeps the unbiased per-pig regression. Precision
@@ -491,26 +490,31 @@ unlink(file.path(tempdir(), "results"), recursive = TRUE)
 
 # validate_outliers, validate_adg and validate_adfi
 
-Three functions check how well the methods work **on your own data**, by
-hiding or spoiling part of the data on purpose and measuring how close the
-result comes to what is known:
+Four functions check how well the methods of one step work **on your own
+data**, by hiding or spoiling part of the data on purpose and measuring how
+close the result comes to what is known:
 
 - `validate_outliers()` adds artificial errors to clean weight records and
   measures how many each outlier method finds, how many good records it
-  removes, and how much ADG is affected;
+  removes, and how much ADG is affected. The clean records are those that
+  no compared method flags (`reference = "consensus"`), so that no method
+  is favoured;
 - `validate_adg()` compares growth curve models (and, with `extrap`, the
-  curve or tangent extrapolation) by k-fold cross-validation on recorded
-  days, and by how much ADG changes when the first or last days of the test
-  are hidden (late entry, early exit);
+  extrapolation) by blocked k-fold cross-validation (blocks of
+  `block_days` days), and by how much ADG changes when the first or last
+  days of the test are hidden (late entry, early exit);
 - `validate_weight_fill()` hides recorded daily weights of the stage (random
   days, blocks, start or end), fills them again with each weight fill method
   and compares the filled weights and ADG with the recorded ones;
 - `validate_adfi()` hides recorded feed intake days in the same way, imputes
   them again with each method (`"loess_pop"` with leave-one-out population
   curves, `"loess_lm"`, `"linear"`) and compares ADFI with the recorded
-  value.
+  value. With `weight`, the body weight of the hidden days is computed
+  again without them.
 
-
+In all of them, the weight records of the hidden days are removed **before**
+cleaning, and the rest is cleaned again, so the hidden days do not decide
+which of the other records are kept (since 1.5.0).
 
 ```{r example-validate}
 visits <- prep_visits(nedap, verbose = 0)
@@ -525,12 +529,13 @@ va <- validate_adg(w, models = c("poly1", "poly2", "poly3"))
 va$summary
 
 # 3. weight fill methods
-vw <- validate_weight_fill(w, methods = c("linear", "poly2"), scenarios = c("blocks3", "late20"), reps = 1)
+vw <- validate_weight_fill(w, methods = c("linear", "poly2"),
+                           scenarios = c("blocks3", "late20"), reps = 1)
 vw$summary
 
 # 4. feed intake imputation
 adfi <- calc_adfi(visits, calc_adg(w, verbose = 0), verbose = 0)
-vf <- validate_adfi(adfi, scenarios = c("random30", "late20"), reps = 2)
+vf <- validate_adfi(adfi, w, scenarios = c("random30", "late20"), reps = 2)
 vf$summary
 ```
 
@@ -553,13 +558,11 @@ population curves and the correction model still see the whole stage, as in
 a real batch where only some pigs have missing ends. Several QC settings
 can be compared on the same hidden data.
 
-The other validation functions are faster but look at one step at a time,
-with the rest of the data known: `validate_adfi()` keeps the body weight of
-the hidden feed days and the stage of the full data, `validate_adg()` and
-`validate_weight_fill()` use weight records cleaned with all data. They are
-somewhat optimistic, most of all at the stage ends.
-
-
+The other validation functions are faster but look at one step at a time:
+they hide days of one pig at a time and clean the remaining weight records
+again, but keep the other steps as they are (e.g. `validate_adfi()` keeps
+the stage of the full data and the correction of the feed records).
+`validate_truncation()` checks how the steps work together.
 
 ```{r example-validate_truncation}
 visits <- prep_visits(nedap, verbose = 0)

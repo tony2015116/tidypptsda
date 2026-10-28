@@ -23,12 +23,20 @@ test_that("validate_outliers finds artificial errors", {
   expect_gt(down$summary[method == "rlm", sensitivity], 0.5)
   expect_error(validate_outliers(v, methods = list("rlm")), "named list")
   expect_error(validate_outliers(v, methods = list(x = "nope")), "weight_outlier")
+  # the consensus reference has fewer clean records than the qc reference
+  qref <- validate_outliers(v, methods = list(rlm = "rlm", stl = "stl"), reps = 1, verbose = 0,
+                            reference = "qc")
+  cons <- validate_outliers(v, methods = list(rlm = "rlm", stl = "stl"), reps = 1, verbose = 0)
+  expect_lt(cons$settings$n_clean, qref$settings$n_clean)
+  expect_equal(cons$settings$reference, "consensus")
+  expect_error(validate_outliers(v, reference = "x"), "arg")
 })
 
 test_that("validate_adg compares curve models", {
   w <- clean_weight(prep_visits(nedap, verbose = 0), verbose = 0)
   res <- validate_adg(w, models = c("poly1", "poly2"), extrap = "curve", trim_days = 10, verbose = 0)
   expect_equal(res$summary$model, c("poly1", "poly2"))
+  expect_equal(res$settings$block_days, 7)
   expect_true(all(c("cv_rmse", "cv_mae", "bias_late10", "rmse_early10",
                     "spearman_late10", "n_early10") %in% names(res$summary)))
   expect_true(all(res$summary$cv_rmse > 0 & res$summary$cv_rmse < 5))
@@ -38,6 +46,32 @@ test_that("validate_adg compares curve models", {
   two <- validate_adg(w, models = c("poly1", "poly2"), extrap = "curve", trim_days = 10, verbose = 0, cores = 2)
   expect_equal(two$summary, res$summary, check.attributes = FALSE)
   expect_error(validate_adg(w, models = "nope"), "curve_model")
+  expect_error(validate_adg(w, block_days = 0), "block_days")
+})
+
+test_that("validators clean the remaining records again", {
+  w <- clean_weight(prep_visits(nedap, verbose = 0), verbose = 0)
+  pig <- w$per_pig[status != "removed", responder][1]
+  raw <- raw_weight_records(w, pig)
+  # all records again: the same valid records as clean_weight() on all pigs
+  again <- reclean_records(raw, w$settings)
+  expect_equal(again$entry_time, w$records[responder == pig & outlier == FALSE, entry_time])
+  # several pigs in one call, one pig with no record left
+  two <- reclean_records(raw_weight_records(w, w$per_pig$responder[1:2]), w$settings)
+  expect_setequal(unique(two$responder), w$per_pig$responder[1:2])
+  expect_equal(nrow(reclean_records(raw[0], w$settings)), 0L)
+  # blocked folds: consecutive days share a fold
+  set.seed(1)
+  f <- block_folds(as.Date("2024-01-01") + 0:27, k = 2, block_days = 7)
+  expect_equal(f, rep(f[c(1, 8, 15, 22)], each = 7))
+  expect_setequal(f, 1:2)
+  # per-pig data only on the first row
+  x <- first_row_info(c("a", "a", "b"), list(a = 1, b = 2))
+  expect_equal(x, list(1, NULL, 2))
+  # single days give a lower (more optimistic) cross-validation error
+  one <- validate_adg(w, models = "poly2", trim_days = 10, max_pigs = 8, block_days = 1, verbose = 0)
+  seven <- validate_adg(w, models = "poly2", trim_days = 10, max_pigs = 8, verbose = 0)
+  expect_lt(one$summary$cv_rmse, seven$summary$cv_rmse)
 })
 
 test_that("validate_weight_fill compares weight fill methods", {
@@ -58,9 +92,11 @@ test_that("validate_weight_fill compares weight fill methods", {
 test_that("validate_adfi measures imputation error", {
   v <- prep_visits(nedap, verbose = 0)
   a <- calc_adg(clean_weight(v, verbose = 0), verbose = 0)
+  w <- clean_weight(v, verbose = 0)
   f <- calc_adfi(v, a, verbose = 0)
-  res <- validate_adfi(f, scenarios = c("random30", "late20", "blocks3", "early10"),
+  res <- validate_adfi(f, w, scenarios = c("random30", "late20", "blocks3", "early10"),
                        reps = 2, verbose = 0)
+  expect_true(res$settings$weight)
   s <- res$summary
   expect_equal(nrow(s), 12L)
   expect_true(all(s$n_pigs >= 3L))
@@ -69,8 +105,14 @@ test_that("validate_adfi measures imputation error", {
   expect_lt(s[scenario == "random30" & method == "loess_lm", p95_abs_error_pct],
             s[scenario == "late20" & method == "loess_lm", p95_abs_error_pct])
   expect_setequal(unique(s$method), c("loess_pop", "loess_lm", "linear"))
-  expect_error(validate_adfi(f, scenarios = "rand"), "scenario")
-  expect_error(validate_adfi(f, min_coverage = 1.01), "coverage")
+  expect_error(validate_adfi(f, w, scenarios = "rand"), "scenario")
+  expect_error(validate_adfi(f, w, min_coverage = 1.01), "coverage")
+  expect_error(validate_adfi(f, weight = list()), "clean_weight")
+  # without weight: the old behaviour, with a warning
+  expect_warning(old <- validate_adfi(f, scenarios = "late20", reps = 1, verbose = 0), "weight")
+  expect_false(old$settings$weight)
+  # every pig keeps a body weight under every mask
+  expect_true(all(s$n_pigs == s$n_pigs[1]))
 })
 
 test_that("max_pigs uses a sample of pigs", {
@@ -97,8 +139,8 @@ test_that("validate_adg and validate_weight_fill compare extrapolations", {
   expect_equal(res$summary$model, c("poly2", "poly2+tangent"))
   expect_equal(validate_adg(w, models = "poly2", trim_days = 10, max_pigs = 4, verbose = 0)$summary$model,
                "poly2+start")
-  # cross-validation mostly predicts inside the records: nearly the same
-  expect_equal(res$summary$cv_rmse[1], res$summary$cv_rmse[2], tolerance = 0.05)
+  # blocks at the ends of the records are extrapolated: the errors differ
+  expect_true(all(is.finite(res$summary$cv_rmse)))
   fill <- validate_weight_fill(w, methods = "linear", extrap = c("curve", "tangent"),
                                scenarios = "late20", reps = 1, max_pigs = 8, verbose = 0)
   expect_setequal(fill$summary$method, c("linear", "linear+tangent"))

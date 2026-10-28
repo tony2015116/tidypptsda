@@ -9,6 +9,7 @@ validate_adg(
   models = c("poly1", "poly2", "poly3", "gompertz"),
   extrap = NULL,
   k = 5,
+  block_days = 7,
   trim_days = c(10, 20),
   qc = weight$settings,
   max_pigs = NULL,
@@ -24,16 +25,21 @@ validate_adg(
 
 \item{extrap}{Extrapolations to compare (values of \code{curve_extrap}):
 \code{"start"}, \code{"curve"}, \code{"tangent"} or several. Default: the one of
-\code{qc}. Other than \code{"curve"}, a model is labelled e.g. \code{"poly2+tangent"}. Mainly the truncation results differ:
-cross-validation differs only for left-out days at the very ends of the
-records.}
+\code{qc}. Other than \code{"curve"}, a model is labelled e.g. \code{"poly2+tangent"}. Mainly the truncation results differ;
+in cross-validation, only the folds with the first or last block of
+days are extrapolated.}
 
 \item{k}{Number of folds. Default 5.}
+
+\item{block_days}{Length of the blocks of days for the folds. Default 7;
+1 gives single random days (more optimistic: a left-out day is close
+to its neighbours).}
 
 \item{trim_days}{Days hidden at the start or the end of the test.
 Default \code{c(10, 20)}.}
 
-\item{qc}{QC settings; \code{stage_range} and \code{max_extrap_days} are used.}
+\item{qc}{QC settings: the weight cleaning rules and \code{stage_range},
+\code{max_extrap_days}.}
 
 \item{max_pigs}{Use a random sample of at most this many pigs. Default
 \code{NULL}: all.}
@@ -60,11 +66,19 @@ with the full-data ADG, and how many pigs still get an ADG (\code{n});
 Compare growth curve models on the valid weight records of each pig, in
 two ways:
 \itemize{
-\item \strong{k-fold cross-validation}: the recorded days of each pig are split
-into \code{k} groups; each group in turn is left out, the curve is fitted on
-the others and predicts the weights of the left-out days;
+\item \strong{blocked k-fold cross-validation}: the days of each pig are cut into
+blocks of \code{block_days} consecutive days, and the blocks are split into
+\code{k} folds at random; each fold in turn is left out, the curve is fitted
+on the others and predicts the valid weights of the left-out days;
 \item \strong{truncation}: the first (late entry) or last (early exit) \code{trim_days}
 days are hidden, ADG is computed again and compared with the ADG from
 all records of the same model.
 }
+
+In both, all weight records of the hidden days are removed \strong{before}
+cleaning: the remaining records are cleaned again with the settings of
+\code{qc} (\code{\link[=clean_weight]{clean_weight()}}), so the hidden days do not decide which of the
+other records are kept (before 1.5.0 the records were cleaned on all
+days, and folds were single random days, whose neighbours stayed in the
+training data).
 }

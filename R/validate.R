@@ -9,8 +9,8 @@
 #' far ADG moves from the ADG of the clean records.
 #'
 #' @param visits Result of [prep_visits()].
-#' @param qc QC settings from [qc_config()]. They define the clean records
-#'   (records kept by `qc`) and every setting except `weight_outlier`.
+#' @param qc QC settings from [qc_config()]: every setting except
+#'   `weight_outlier` and `weight_track`.
 #' @param methods Named list of outlier method sets to compare. Each element
 #'   holds values of `weight_outlier`, plus `"track"` to track the weight
 #'   back from the end of the test first (`weight_track = TRUE`); sets
@@ -26,15 +26,22 @@
 #' @param max_pigs Use a random sample of at most this many pigs, to save
 #'   time on large data (a few hundred pigs are enough). Default `NULL`: all.
 #' @param seed Random seed, for reproducible results.
+#' @param reference Which records count as clean, i.e. receive the
+#'   artificial errors and give the reference ADG: `"consensus"` (default)
+#'   the records kept by `qc` **and** by every method in `methods`, so that
+#'   no method is favoured; `"qc"` the records kept by `qc` (before 1.5.0),
+#'   which favours the method of `qc`.
 #' @param verbose 0 (silent), 1 (summary and progress, default).
 #' @param cores Number of CPU cores for [clean_weight()] and [calc_adg()].
 #'
 #' @details
-#' The clean records are those that `qc` keeps, so they are not free of error
-#' themselves. A method that disagrees with `qc` therefore gets a higher
-#' `false_positive_rate`; compare methods mainly on `sensitivity` and ADG.
-#' The row `none` shows the result when only `weight_range` is applied
-#' (errors that push a weight outside it are still found).
+#' The clean records are found by the methods themselves, so they are not
+#' free of error. With `reference = "consensus"` a record is clean only when
+#' no method flags it: every method starts from the same records, and a
+#' method is not judged "wrong" for flagging a record that `qc` happened to
+#' keep. The reference ADG is the ADG of the clean records, without any
+#' outlier method. The row `none` shows the result when only `weight_range`
+#' is applied (errors that push a weight outside it are still found).
 #'
 #' Errors placed at random times shift single records but hardly move a
 #' growth curve fitted to hundreds of records, so ADG differences between
@@ -63,12 +70,13 @@
 #' va$summary
 #'
 #' # 3. weight fill methods
-#' vw <- validate_weight_fill(w, methods = c("linear", "poly2"), scenarios = c("blocks3", "late20"), reps = 1)
+#' vw <- validate_weight_fill(w, methods = c("linear", "poly2"),
+#'                            scenarios = c("blocks3", "late20"), reps = 1)
 #' vw$summary
 #'
 #' # 4. feed intake imputation
 #' adfi <- calc_adfi(visits, calc_adg(w, verbose = 0), verbose = 0)
-#' vf <- validate_adfi(adfi, scenarios = c("random30", "late20"), reps = 2)
+#' vf <- validate_adfi(adfi, w, scenarios = c("random30", "late20"), reps = 2)
 #' vf$summary
 validate_outliers <- function(visits, qc = qc_config(),
                               methods = list("track+rlm+loess" = c("track", "rlm", "loess"),
@@ -77,9 +85,11 @@ validate_outliers <- function(visits, qc = qc_config(),
                                              stl = "stl", sd = "sd"),
                               rate = 0.05, size = c(3, 15),
                               direction = c("both", "down", "up"), reps = 3,
-                              max_pigs = NULL, seed = 1, verbose = 1, cores = 1) {
+                              max_pigs = NULL, seed = 1, reference = c("consensus", "qc"),
+                              verbose = 1, cores = 1) {
   local_verbose(verbose)
   direction <- match.arg(direction)
+  reference <- match.arg(reference)
   check_qc(qc)
   if (!is.list(methods) || is.null(names(methods)) || any(!nzchar(names(methods)))) {
     cli::cli_abort("{.arg methods} must be a named list of {.field weight_outlier} values.")
@@ -93,12 +103,23 @@ validate_outliers <- function(visits, qc = qc_config(),
   set.seed(seed)
   ref <- clean_weight(visits, qc, verbose = 0, cores = cores)
   kept <- sample_pigs(ref$per_pig[status != "removed", responder], max_pigs)
-  ref$per_pig <- ref$per_pig[responder %in% kept]
-  ref$records <- ref$records[responder %in% kept]
-  truth <- ref$records[outlier == FALSE & responder %in% kept,
+  clean <- !ref$records$outlier
+  if (reference == "consensus") {
+    # records that no method flags; all runs sort the records the same way
+    for (m in methods) {
+      wm <- clean_weight(visits, outlier_qc(qc, m), verbose = 0, cores = cores)
+      bad <- unique(wm$records[outlier == TRUE, .(responder, entry_time, weight)])
+      hit <- ref$records[bad, on = c("responder", "entry_time", "weight"), which = TRUE, nomatch = NULL]
+      clean[hit] <- FALSE
+    }
+  }
+  truth <- ref$records[clean & responder %in% kept,
                        .(responder, location, date, seq_days, entry_time, weight)]
   truth[, `:=`(identified = TRUE, key = .I)]
-  adg_true <- calc_adg(ref, qc, verbose = 0, cores = cores)$per_pig[, .(responder, adg_true = adg)]
+  # reference ADG: the clean records without any outlier method
+  q_none <- qc_set(outlier_qc(qc, character()), list(adapt_days = 0))
+  adg_true <- calc_adg(clean_weight(truth, q_none, verbose = 0, cores = cores), q_none,
+                       verbose = 0, cores = cores)$per_pig[, .(responder, adg_true = adg)]
 
   spoiled <- lapply(seq_len(reps), function(r) {
     d <- data.table::copy(truth)
@@ -134,7 +155,8 @@ validate_outliers <- function(visits, qc = qc_config(),
   }
   structure(list(summary = summary, per_rep = per_rep,
                  settings = list(qc = qc, methods = methods, rate = rate, size = size,
-                                 direction = direction, reps = reps, seed = seed)),
+                                 direction = direction, reps = reps, seed = seed,
+                                 reference = reference, n_clean = nrow(truth))),
             class = c("ppt_validation", "ppt_result"))
 }
 
@@ -154,6 +176,50 @@ outlier_qc <- function(qc, m) {
     q <- qc_set(q, list(outlier_combine = "any"))
   }
   q
+}
+
+# Clean raw weight records again with all record rules of clean_weight()
+# (range, adaptation, tracking, outlier methods), e.g. after some days were
+# hidden, so that the hidden days do not inform which of the remaining
+# records are kept. The rules work pig by pig, so many pigs can be cleaned
+# in one call. `raw`: responder, location, date, seq_days, entry_time,
+# weight. Returns the result of clean_weight().
+reclean_weight <- function(raw, qc, cores = 1L) {
+  v <- data.table::copy(raw)[, identified := TRUE]
+  clean_weight(v, qc, verbose = 0, cores = cores)
+}
+
+# The valid records of reclean_weight(): responder, date, entry_time, weight.
+reclean_records <- function(raw, qc, cores = 1L) {
+  if (nrow(raw) == 0L) {
+    return(data.table::data.table(responder = raw$responder[0], date = as.Date(character()),
+                                  entry_time = as.POSIXct(character(), tz = "UTC"), weight = numeric()))
+  }
+  reclean_weight(raw, qc, cores)$records[outlier == FALSE, .(responder, date, entry_time, weight)]
+}
+
+# Raw weight records of clean_weight(), as input of reclean_weight().
+raw_weight_records <- function(weight, pigs) {
+  weight$records[responder %in% pigs, .(responder, location, date, seq_days, entry_time, weight)]
+}
+
+# A list column with the element of `info` of each pig on its first row
+# only (NULL on the other rows), so that large per-pig data are not copied
+# to every row when the rows are split or copied.
+first_row_info <- function(responder, info) {
+  out <- vector("list", length(responder))
+  first <- !duplicated(responder)
+  out[first] <- info[as.character(responder[first])]
+  out
+}
+
+# Folds for cross-validation: blocks of `block_days` consecutive days,
+# assigned to `k` folds at random, so that the neighbours of a left-out day
+# are mostly left out too.
+block_folds <- function(dates, k, block_days = 7) {
+  blk <- as.integer(dates - min(dates)) %/% block_days
+  ub <- sort(unique(blk))
+  sample(rep_len(seq_len(k), length(ub)))[match(blk, ub)]
 }
 
 # One repetition x method of validate_outliers().
@@ -190,24 +256,36 @@ validate_outlier_job <- function(job, qc, methods, adg_true, job_cores = 1L) {
 #' @description
 #' Compare growth curve models on the valid weight records of each pig, in
 #' two ways:
-#' - **k-fold cross-validation**: the recorded days of each pig are split
-#'   into `k` groups; each group in turn is left out, the curve is fitted on
-#'   the others and predicts the weights of the left-out days;
+#' - **blocked k-fold cross-validation**: the days of each pig are cut into
+#'   blocks of `block_days` consecutive days, and the blocks are split into
+#'   `k` folds at random; each fold in turn is left out, the curve is fitted
+#'   on the others and predicts the valid weights of the left-out days;
 #' - **truncation**: the first (late entry) or last (early exit) `trim_days`
 #'   days are hidden, ADG is computed again and compared with the ADG from
 #'   all records of the same model.
+#'
+#' In both, all weight records of the hidden days are removed **before**
+#' cleaning: the remaining records are cleaned again with the settings of
+#' `qc` ([clean_weight()]), so the hidden days do not decide which of the
+#' other records are kept (before 1.5.0 the records were cleaned on all
+#' days, and folds were single random days, whose neighbours stayed in the
+#' training data).
 #'
 #' @param weight Result of [clean_weight()].
 #' @param models Curve models to compare (values of `curve_model`).
 #' @param extrap Extrapolations to compare (values of `curve_extrap`):
 #'   `"start"`, `"curve"`, `"tangent"` or several. Default: the one of
-#'   `qc`. Other than `"curve"`, a model is labelled e.g. `"poly2+tangent"`. Mainly the truncation results differ:
-#'   cross-validation differs only for left-out days at the very ends of the
-#'   records.
+#'   `qc`. Other than `"curve"`, a model is labelled e.g. `"poly2+tangent"`. Mainly the truncation results differ;
+#'   in cross-validation, only the folds with the first or last block of
+#'   days are extrapolated.
 #' @param k Number of folds. Default 5.
+#' @param block_days Length of the blocks of days for the folds. Default 7;
+#'   1 gives single random days (more optimistic: a left-out day is close
+#'   to its neighbours).
 #' @param trim_days Days hidden at the start or the end of the test.
 #'   Default `c(10, 20)`.
-#' @param qc QC settings; `stage_range` and `max_extrap_days` are used.
+#' @param qc QC settings: the weight cleaning rules and `stage_range`,
+#'   `max_extrap_days`.
 #' @param max_pigs Use a random sample of at most this many pigs. Default
 #'   `NULL`: all.
 #' @param seed Random seed for the folds.
@@ -225,7 +303,7 @@ validate_outlier_job <- function(job, qc, methods, adg_true, job_cores = 1L) {
 #' @export
 validate_adg <- function(weight, models = c("poly1", "poly2", "poly3", "gompertz"),
                          extrap = NULL,
-                         k = 5, trim_days = c(10, 20), qc = weight$settings,
+                         k = 5, block_days = 7, trim_days = c(10, 20), qc = weight$settings,
                          max_pigs = NULL, seed = 1, verbose = 1, cores = 1) {
   local_verbose(verbose)
   local_cores(cores)
@@ -238,6 +316,9 @@ validate_adg <- function(weight, models = c("poly1", "poly2", "poly3", "gompertz
   for (e in extrap) qc_validate(qc_set(qc, list(curve_extrap = e)))
   configs <- curve_configs(models, extrap)
   if (!is.numeric(k) || length(k) != 1L || k < 2) cli::cli_abort("{.arg k} must be at least 2.")
+  if (!is.numeric(block_days) || length(block_days) != 1L || block_days < 1) {
+    cli::cli_abort("{.arg block_days} must be at least 1.")
+  }
   ppt_msg("Validating growth curves: {k}-fold cross-validation and truncation", "h1")
 
   set.seed(seed)
@@ -245,11 +326,34 @@ validate_adg <- function(weight, models = c("poly1", "poly2", "poly3", "gompertz
   rec <- weight$records[outlier == FALSE & responder %in% kept,
                         .(responder, date, entry_time, weight)]
   data.table::setorder(rec, responder, entry_time)
-  rec[, fold := {
-    days <- unique(date)
-    sample(rep_len(seq_len(k), length(days)))[match(date, days)]
-  }, by = responder]
+  kept <- unique(rec$responder)
+  raw <- raw_weight_records(weight, kept)
+  # folds: blocks of the days of all records
+  days <- unique(raw[, .(responder, date)])
+  data.table::setorder(days, responder, date)
+  days[, fold := block_folds(date, k, block_days), by = responder]
+  rec[days, on = c("responder", "date"), fold := i.fold]
+  raw[days, on = c("responder", "date"), fold := i.fold]
   day0 <- weight$daily[, min(date - seq_days + 1L)]
+
+  # training records: the other folds, cleaned again
+  ppt_msg("Cleaning the remaining records again", "info")
+  cols <- c("responder", "location", "date", "seq_days", "entry_time", "weight")
+  train <- data.table::rbindlist(lapply(seq_len(k), function(f) {
+    reclean_records(raw[fold != f, cols, with = FALSE], qc, cores)[, cv_fold := f]
+  }))
+  # truncated records, cleaned again
+  lim <- rec[, .(first_day = min(date), last_day = max(date)), by = responder]
+  raw[lim, on = "responder", `:=`(first_day = i.first_day, last_day = i.last_day)]
+  trunc <- data.table::rbindlist(lapply(trim_days, function(td) data.table::rbindlist(list(
+    reclean_records(raw[date >= first_day + td, cols, with = FALSE], qc, cores)[, truncation := paste0("late", td)],
+    reclean_records(raw[date <= last_day - td, cols, with = FALSE], qc, cores)[, truncation := paste0("early", td)]))))
+  train_by <- split(train, by = "responder", keep.by = FALSE)
+  trunc_by <- split(trunc, by = "responder", keep.by = FALSE)
+  info <- lapply(stats::setNames(nm = as.character(unique(rec$responder))), function(p) {
+    list(train = train_by[[p]], trunc = trunc_by[[p]])
+  })
+  rec[, info := first_row_info(responder, info)]
 
   fits <- fit_by_pig(rec, validate_adg_one_pig, step = "validate_adg", qc = qc,
                      configs = configs, trim_days = trim_days, day0 = day0)
@@ -278,7 +382,7 @@ validate_adg <- function(weight, models = c("poly1", "poly2", "poly3", "gompertz
   }
   structure(list(summary = summary, cv = cv, truncation = tr, failed = fits$failed,
                  settings = list(qc = qc, models = models, extrap = extrap, k = k,
-                                 trim_days = trim_days, seed = seed)),
+                                 block_days = block_days, trim_days = trim_days, seed = seed)),
             class = c("ppt_validation", "ppt_result"))
 }
 
@@ -291,9 +395,15 @@ curve_configs <- function(models, extrap) {
 
 # Cross-validation and truncation of one pig for validate_adg().
 validate_adg_one_pig <- function(d, qc, configs, trim_days, day0) {
+  info <- d$info[[1L]]
   first_day <- min(d$date)
-  t <- as.numeric(difftime(d$entry_time, as.POSIXct(first_day, tz = "UTC"), units = "days"))
+  tt <- function(x) as.numeric(difftime(x, as.POSIXct(first_day, tz = "UTC"), units = "days"))
+  t <- tt(d$entry_time)
   y <- d$weight
+  empty <- data.table::data.table(cv_fold = integer(), truncation = character(), date = as.Date(character()),
+                                  entry_time = as.POSIXct(character(), tz = "UTC"), weight = numeric())
+  train <- info$train %||% empty
+  trunc <- info$trunc %||% empty
   folds <- sort(unique(d$fold))
   rows <- list()
   for (ci in seq_len(nrow(configs))) {
@@ -304,8 +414,9 @@ validate_adg_one_pig <- function(d, qc, configs, trim_days, day0) {
     err <- rep(NA_real_, length(y))
     for (f in folds) {
       test <- d$fold == f
-      if (sum(!test) < 10L) next
-      curve <- tryCatch(suppressWarnings(fit_growth_curve(t[!test], y[!test], m, ex)),
+      tr <- train[cv_fold == f]
+      if (nrow(tr) < 10L) next
+      curve <- tryCatch(suppressWarnings(fit_growth_curve(tt(tr$entry_time), tr$weight, m, ex)),
                         error = function(e) NULL)
       if (!is.null(curve)) err[test] <- y[test] - curve$pred(t[test])
     }
@@ -318,13 +429,13 @@ validate_adg_one_pig <- function(d, qc, configs, trim_days, day0) {
       if (data.table::uniqueN(dd$date) < 10L) return(NA_real_)
       tryCatch(suppressWarnings(adg_one_pig(dd, q, day0)$adg), error = function(e) NA_real_)
     }
-    full <- adg_of(d)
-    last_day <- max(d$date)
+    full <- adg_of(d[, .(date, entry_time, weight)])
     for (td in trim_days) {
+      ty <- c(paste0("late", td), paste0("early", td))
       rows[[length(rows) + 1L]] <- data.table::data.table(
-        type = c(paste0("late", td), paste0("early", td)), model = lab,
-        rmse = NA_real_, mae = NA_real_,
-        adg = c(adg_of(d[date >= first_day + td]), adg_of(d[date <= last_day - td])),
+        type = ty, model = lab, rmse = NA_real_, mae = NA_real_,
+        adg = vapply(ty, function(x) adg_of(trunc[truncation == x, .(date, entry_time, weight)]),
+                     numeric(1), USE.NAMES = FALSE),
         adg_full = full)
     }
   }
@@ -338,6 +449,11 @@ validate_adg_one_pig <- function(d, qc, configs, trim_days, day0) {
 #' each method and compare with the recorded values. Errors are measured on
 #' the hidden days (filled minus recorded daily weight) and on ADG (against
 #' the ADG of all records with the settings of `weight`).
+#'
+#' All weight records of the hidden days are removed before cleaning, and the
+#' remaining records are cleaned again with the settings of `weight`
+#' ([clean_weight()]), so the hidden days do not decide which of the other
+#' records are kept (before 1.5.0 the records were cleaned on all days).
 #'
 #' @param weight Result of [clean_weight()].
 #' @param methods Fill methods to compare:
@@ -404,9 +520,30 @@ validate_weight_fill <- function(weight, methods = c("linear", "poly1", "poly2",
     list(adg_full = full$adg, days = st$date, observed = st$source == "observed",
          truth = st$weight, masks = make_masks(st$source == "observed", sc, reps))
   })
-  rec[, info := list(masks[responder])]
-  rec <- rec[!vapply(info, is.null, logical(1))]
-  if (nrow(rec) == 0L) cli::cli_abort("No pig with an ADG to validate.")
+  masks <- masks[!vapply(masks, is.null, logical(1))]
+  if (length(masks) == 0L) cli::cli_abort("No pig with an ADG to validate.")
+  rec <- rec[as.character(responder) %in% names(masks)]
+  # remaining records of every mask, cleaned again (one call per mask for all pigs)
+  ppt_msg("Cleaning the remaining records again", "info")
+  raw <- raw_weight_records(weight, unique(rec$responder))
+  n_masks <- length(masks[[1L]]$masks)
+  remain <- data.table::rbindlist(lapply(seq_len(n_masks), function(i) {
+    hid <- data.table::rbindlist(lapply(names(masks), function(p) {
+      m <- masks[[p]]
+      h <- m$masks[[i]]$hide
+      if (!any(h)) return(NULL)
+      data.table::data.table(responder = p, date = m$days[h])
+    }))
+    keep <- raw
+    if (nrow(hid) > 0L) {
+      hid[, responder := raw$responder[match(responder, as.character(raw$responder))]]
+      keep <- raw[!hid, on = c("responder", "date")]
+    }
+    reclean_records(keep, qc, cores)[, mask := i]
+  }))
+  remain_by <- split(remain, by = "responder", keep.by = FALSE)
+  for (p in names(masks)) masks[[p]]$remain <- remain_by[[p]]
+  rec[, info := first_row_info(responder, masks)]
   fits <- fit_by_pig(rec, validate_fill_one_pig, step = "validate_weight_fill", qc = qc,
                      configs = configs, day0 = day0)
   per_pig <- fits$result
@@ -437,11 +574,14 @@ validate_weight_fill <- function(weight, methods = c("linear", "poly1", "poly2",
 # Fill of one pig under every mask and method for validate_weight_fill().
 validate_fill_one_pig <- function(d, qc, configs, day0) {
   info <- d$info[[1L]]
-  d <- d[, .(date, entry_time, weight)]
+  remain <- info$remain %||% data.table::data.table(mask = integer(), date = as.Date(character()),
+                                                    entry_time = as.POSIXct(character(), tz = "UTC"),
+                                                    weight = numeric())
   rows <- list()
-  for (mk in info$masks) {
+  for (i in seq_along(info$masks)) {
+    mk <- info$masks[[i]]
     hidden_days <- info$days[mk$hide]
-    dd <- d[!date %in% hidden_days]
+    dd <- remain[mask == i, .(date, entry_time, weight)]
     truth <- info$truth[mk$hide]
     for (ci in seq_len(nrow(configs))) {
       m <- configs$model[ci]
@@ -480,7 +620,20 @@ validate_fill_one_pig <- function(d, qc, configs, day0) {
 #' with the recorded values. Only pigs whose stage is well covered by records
 #' are used, and errors are measured on the recorded days only.
 #'
+#' The imputation also uses the daily body weight. With `weight`, the weight
+#' records of the hidden days are hidden too, and the daily body weight is
+#' computed again from the remaining records ([clean_weight()] and
+#' [calc_adg()] with the settings of `adfi`), as if the pig really was not
+#' recorded on these days. Without `weight` (as before 1.5.0) the daily
+#' body weight from all records is used, which knows the weight of the
+#' hidden days, so the errors are too optimistic, mostly for `late<d>` and
+#' `early<d>`.
+#'
 #' @param adfi Result of [calc_adfi()].
+#' @param weight Result of [clean_weight()] of the same data, so that the
+#'   daily body weight of the hidden days is computed without them
+#'   (recommended). Default `NULL`: the daily body weight of `adfi`, with a
+#'   warning.
 #' @param methods Imputation methods to compare (values of `impute_method`).
 #'   For `"loess_pop"`, the population curve of each pig is fitted without
 #'   that pig (leave-one-out), so its hidden days do not inform the curve.
@@ -506,7 +659,7 @@ validate_fill_one_pig <- function(d, qc, configs, day0) {
 #' - `per_pig`: the error of every pig, scenario, repetition and method;
 #' - `settings`.
 #' @export
-validate_adfi <- function(adfi, methods = c("loess_pop", "loess_lm", "linear"),
+validate_adfi <- function(adfi, weight = NULL, methods = c("loess_pop", "loess_lm", "linear"),
                           scenarios = c("random30", "blocks3", "late20", "early15"),
                           reps = 5, min_coverage = 0.8, max_pigs = NULL, seed = 1,
                           verbose = 1, cores = 1) {
@@ -514,6 +667,13 @@ validate_adfi <- function(adfi, methods = c("loess_pop", "loess_lm", "linear"),
   local_cores(cores)
   if (!inherits(adfi, "ppt_adfi")) {
     cli::cli_abort("{.arg adfi} must be the result of {.fn calc_adfi}.")
+  }
+  if (!is.null(weight) && !inherits(weight, "ppt_weight")) {
+    cli::cli_abort("{.arg weight} must be the result of {.fn clean_weight} or {.code NULL}.")
+  }
+  if (is.null(weight)) {
+    cli::cli_warn(c("{.arg weight} is not given: the body weight of the hidden days is still known.",
+                    "i" = "Pass the result of {.fn clean_weight} as {.arg weight} for honest errors."))
   }
   qc <- adfi$settings
   for (m in methods) qc_validate(qc_set(qc, list(impute_method = m)))
@@ -542,6 +702,42 @@ validate_adfi <- function(adfi, methods = c("loess_pop", "loess_lm", "linear"),
 
   # hidden days, drawn once so that results do not depend on `cores`
   d[, masks := list(list(make_masks(observed, sc, reps))), by = responder]
+  # daily body weight without the weight records of the hidden days
+  # (one cleaning and ADG run per mask for all pigs)
+  if (!is.null(weight)) {
+    ppt_msg("Computing the body weight again without the hidden days", "info")
+    raw <- raw_weight_records(weight, pigs)
+    n_masks <- length(d$masks[[1L]])
+    for (i in seq_len(n_masks)) {
+      hid <- d[, .(date = date[masks[[1L]][[i]]$hide]), by = responder]
+      keep <- if (nrow(hid) > 0L) raw[!hid, on = c("responder", "date")] else raw
+      w_i <- tryCatch(reclean_weight(keep, qc, cores), error = function(e) NULL)
+      a_i <- if (is.null(w_i)) NULL else tryCatch(calc_adg(w_i, qc, verbose = 0, cores = cores),
+                                                  error = function(e) NULL)
+      col <- paste0("bw_mask", i)
+      d[, (col) := NA_real_]
+      if (!is.null(a_i)) {
+        b <- adg_bw(a_i)
+        d[b, on = c("responder", "date"), (col) := i.bw]
+      }
+      # days that the new daily weight does not cover (e.g. far before the
+      # first remaining record): the growth curve of the remaining records
+      if (!is.null(w_i)) {
+        miss <- unique(d[is.na(get(col)), responder])
+        for (p in miss) {
+          r <- w_i$records[responder == p & outlier == FALSE]
+          if (data.table::uniqueN(r$date) < 10L) next
+          t0 <- as.numeric(min(r$date))
+          curve <- tryCatch(suppressWarnings(fit_growth_curve(
+            as.numeric(r$entry_time) / 86400 - t0, r$weight, qc$curve_model, qc$curve_extrap %||% "curve")),
+            error = function(e) NULL)
+          if (is.null(curve)) next
+          rows <- d[, which(responder == p & is.na(get(col)))]
+          data.table::set(d, rows, col, curve$pred(as.numeric(d$date[rows]) - t0 + 0.5))
+        }
+      }
+    }
+  }
   fits <- fit_by_pig(d, validate_adfi_one_pig, step = "validate_adfi", qc = qc,
                      methods = methods, pop = pop)
   per_pig <- fits$result
@@ -565,7 +761,8 @@ validate_adfi <- function(adfi, methods = c("loess_pop", "loess_lm", "linear"),
   }
   structure(list(summary = summary, per_pig = per_pig, failed = fits$failed,
                  settings = list(qc = qc, methods = methods, scenarios = scenarios,
-                                 reps = reps, min_coverage = min_coverage, seed = seed)),
+                                 reps = reps, min_coverage = min_coverage, seed = seed,
+                                 weight = !is.null(weight))),
             class = c("ppt_validation", "ppt_result"))
 }
 
@@ -640,14 +837,18 @@ validate_adfi_one_pig <- function(d, qc, methods, pop = NULL) {
   truth <- mean(d$dfi_true, na.rm = TRUE)
   rows <- vector("list", length(masks) * length(methods))
   i <- 0L
-  for (mk in masks) {
+  for (k in seq_along(masks)) {
+    mk <- masks[[k]]
     dd <- d[, intersect(c("date", "seq_days", "bw", "in_stage", "dfi_true", "observed", "pop_key"), names(d)), with = FALSE]
+    col <- paste0("bw_mask", k)
+    # body weight without the hidden days; a pig without it is skipped
+    if (col %in% names(d)) dd[, bw := d[[col]]]
     dd[, dfi_check := data.table::fifelse(mk$hide, NA_real_, dfi_true)]
     dd[, state := data.table::fifelse(is.na(dfi_check), NA_character_, "org")]
     for (m in methods) {
       i <- i + 1L
       q <- qc_set(qc, list(impute_method = m))
-      im <- tryCatch(impute_dfi_one_pig(dd, q, pop = pop), error = function(e) NULL)
+      im <- if (anyNA(dd$bw)) NULL else tryCatch(impute_dfi_one_pig(dd, q, pop = pop), error = function(e) NULL)
       est <- if (is.null(im)) NA_real_ else im$dfi
       hidden <- mk$hide & !is.na(est)
       adfi_est <- if (is.null(im) || any(is.na(est[dd$observed]))) NA_real_ else mean(est[dd$observed])

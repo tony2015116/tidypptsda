@@ -6,6 +6,7 @@
 \usage{
 validate_adfi(
   adfi,
+  weight = NULL,
   methods = c("loess_pop", "loess_lm", "linear"),
   scenarios = c("random30", "blocks3", "late20", "early15"),
   reps = 5,
@@ -18,6 +19,11 @@ validate_adfi(
 }
 \arguments{
 \item{adfi}{Result of \code{\link[=calc_adfi]{calc_adfi()}}.}
+
+\item{weight}{Result of \code{\link[=clean_weight]{clean_weight()}} of the same data, so that the
+daily body weight of the hidden days is computed without them
+(recommended). Default \code{NULL}: the daily body weight of \code{adfi}, with a
+warning.}
 
 \item{methods}{Imputation methods to compare (values of \code{impute_method}).
 For \code{"loess_pop"}, the population curve of each pig is fitted without
@@ -60,4 +66,13 @@ recorded ADFI), \code{daily_rmse} (g/d, hidden days) and \code{n_pigs};
 Hide recorded daily feed intake on purpose, impute it again and compare
 with the recorded values. Only pigs whose stage is well covered by records
 are used, and errors are measured on the recorded days only.
+
+The imputation also uses the daily body weight. With \code{weight}, the weight
+records of the hidden days are hidden too, and the daily body weight is
+computed again from the remaining records (\code{\link[=clean_weight]{clean_weight()}} and
+\code{\link[=calc_adg]{calc_adg()}} with the settings of \code{adfi}), as if the pig really was not
+recorded on these days. Without \code{weight} (as before 1.5.0) the daily
+body weight from all records is used, which knows the weight of the
+hidden days, so the errors are too optimistic, mostly for \verb{late<d>} and
+\verb{early<d>}.
 }

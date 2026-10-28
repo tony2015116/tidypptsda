@@ -226,7 +226,8 @@ test_that("calc_adfi fits population curves for all pigs and per breed", {
 
 test_that("validate_adfi compares loess_pop with leave-one-out curves", {
   r <- run_adfi(nedap)
-  res <- validate_adfi(r$adfi, scenarios = "late20", reps = 2, verbose = 0)
+  w <- clean_weight(r$visits, verbose = 0)
+  res <- validate_adfi(r$adfi, w, scenarios = "late20", reps = 2, verbose = 0)
   expect_setequal(res$summary$method, c("loess_pop", "loess_lm", "linear"))
   s <- res$summary
   expect_lt(s[method == "loess_pop", mean_abs_error_pct], s[method == "loess_lm", mean_abs_error_pct])
