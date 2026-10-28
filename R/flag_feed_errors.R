@@ -56,7 +56,7 @@ flag_feed_errors <- function(visits, qc = qc_config(), bw = NULL, verbose = 1) {
                    "exit_time", "duration", "feed_intake", "trough_in",
                    "trough_out"),
              arg = "visits", hint = "Use {.fn prep_visits} first.")
-  ppt_msg("Flagging feeder errors (Casey et al. 2005)", "h1")
+  ppt_step("Flagging feeder errors (Casey et al. 2005)")
   if (dt[identified == FALSE, .N] == 0L) {
     ppt_msg("No unidentified visits in the data: if they were removed before, differences between subsequent visits may be wrong", "warning", level = 2L)
   }
@@ -126,7 +126,8 @@ flag_feed_errors <- function(visits, qc = qc_config(), bw = NULL, verbose = 1) {
   data.table::setattr(dt, "error_rates", rates)
 
   oe <- mean(idv$n_errors > 0)
-  ppt_msg("Visits with at least one error: {.strong {sprintf('%.2f%%', 100 * oe)}} of {nrow(idv)} identified visits", "info")
+  ppt_done("{sprintf('%.2f%%', 100 * oe)} of {fmt_n(nrow(idv))} identified visits with at least one error",
+           if (oe > 0.1) "warning" else "success")
   top <- rates[n > 0][order(-n)]
   if (nrow(top) > 0L) {
     lines <- sprintf("%s: %d (%.2f%%)", top$label, as.integer(top$n), 100 * top$rate)

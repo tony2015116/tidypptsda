@@ -57,7 +57,7 @@ calc_adg <- function(weight, qc = weight$settings, verbose = 1, cores = 1) {
   }
   check_qc(qc)
   stage <- qc$stage_range
-  ppt_msg("ADG over {stage[1]}-{stage[2]} kg ({.field {qc$curve_model}} curve)", "h1")
+  ppt_step("ADG over {stage[1]}-{stage[2]} kg ({qc$curve_model} curve)")
 
   kcols <- intersect(c("responder", "location", "breed", "status", "reason"), names(weight$per_pig))
   kept <- weight$per_pig[status != "removed", kcols, with = FALSE]
@@ -305,12 +305,14 @@ first_cross <- function(pred, target, from, to, step = 0.1) {
 report_adg <- function(per_pig, fits) {
   types <- table(factor(per_pig$adg_type,
                         levels = c("observed", "extrapolated", "partial", "none")))
-  ppt_bullets_counts(c(
-    "Observed (stage inside the records)" = types[["observed"]],
-    "Extrapolated" = types[["extrapolated"]],
-    "Partial (stage not fully reached)" = types[["partial"]],
-    "No ADG" = types[["none"]]
-  ))
+  n_pigs <- sum(types)
+  ppt_rows(
+    ppt_row("Pigs", n_pigs, keep = TRUE),
+    ppt_row("observed (stage inside the records)", types[["observed"]], of = n_pigs, depth = 1L, keep = TRUE),
+    ppt_row("extrapolated at the ends", types[["extrapolated"]], of = n_pigs, depth = 1L),
+    ppt_row("partial (stage not fully reached)", types[["partial"]], of = n_pigs, depth = 1L, warn = TRUE),
+    ppt_row("no ADG", types[["none"]], of = n_pigs, depth = 1L, warn = TRUE)
+  )
   fallback <- per_pig[grepl("failed", curve_used), .N]
   if (fallback > 0L) {
     ppt_msg("Gompertz did not converge for {fallback} pig{?s}: quadratic curve used", "warning")
@@ -319,7 +321,7 @@ report_adg <- function(per_pig, fits) {
     ppt_warn("{types[['partial']]} pig{?s} {?does/do} not reach the whole stage: ADG is based on part of it (adg_type = \"partial\").")
   }
   if (any(!is.na(per_pig$adg))) {
-    ppt_msg("Mean ADG: {round(mean(per_pig$adg, na.rm = TRUE))} g/d (SD {round(stats::sd(per_pig$adg, na.rm = TRUE))})", "success")
+    ppt_done("ADG {round(mean(per_pig$adg, na.rm = TRUE))} \u00b1 {round(stats::sd(per_pig$adg, na.rm = TRUE))} g/d (mean \u00b1 SD)")
   }
   for (i in which(per_pig$adg_type != "observed")) {
     ppt_msg("{.val {per_pig$responder[i]}}: {per_pig$adg_type[i]}, ADG {round(per_pig$adg[i])} g/d", "info", level = 2L)

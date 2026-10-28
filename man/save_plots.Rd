@@ -33,7 +33,9 @@ panels.}
 
 \item{verbose}{0 (silent), 1 (summary, default).}
 
-\item{cores}{Number of CPU cores: stations are saved in parallel whenDefault 1. Saving is mostly ggplot2 drawing time (about 1 s perstation of 15 pigs), so with many stations this is the main speed-up.}
+\item{cores}{Number of CPU cores: stations are saved in parallel when
+more than 1. Default 1. Saving is mostly ggplot2 drawing time (about 1 s per
+station of 15 pigs), so with many stations this is the main speed-up.}
 }
 \value{
 Invisibly, a \code{data.table} with \code{location}, \code{file} and \code{saved}.

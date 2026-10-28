@@ -65,6 +65,87 @@ ppt_warn <- function(msg, .envir = parent.frame()) {
   invisible(NULL)
 }
 
+# ---- step headers, count tables and timing -----------------------------------
+
+# State of the console output: the step counter of run_pipeline() and the
+# start time of the current step.
+.ppt_state <- new.env(parent = emptyenv())
+
+# Number shown with thousands separators: 31863 -> "31,863".
+fmt_n <- function(x, digits = 0) {
+  formatC(round(x, digits), format = "f", digits = digits, big.mark = ",")
+}
+
+# Header of a step. Inside run_pipeline() the steps are numbered ("[2/6]").
+ppt_step <- function(title, .envir = parent.frame()) {
+  .ppt_state$t0 <- Sys.time()
+  if (ppt_verbose() < 1L) return(invisible(NULL))
+  title <- cli::format_inline(title, .envir = .envir)
+  n <- getOption("tidypptsda.steps")
+  if (!is.null(n)) {
+    i <- (.ppt_state$step %||% 0L) + 1L
+    .ppt_state$step <- i
+    title <- sprintf("[%d/%d] %s", i, n, title)
+  }
+  cli::cli_h1("{title}")
+  invisible(NULL)
+}
+
+# Seconds since the start of the current step, e.g. "2.3s".
+step_time <- function() {
+  t0 <- .ppt_state$t0
+  if (is.null(t0)) return("")
+  el <- as.numeric(difftime(Sys.time(), t0, units = "secs"))
+  if (el < 60) sprintf("%.1fs", el) else sprintf("%dm %02ds", el %/% 60, round(el %% 60))
+}
+
+# Last line of a step: the result and the time the step took.
+ppt_done <- function(msg, type = c("success", "warning"), .envir = parent.frame()) {
+  if (ppt_verbose() < 1L) return(invisible(NULL))
+  type <- match.arg(type)
+  msg <- paste0(cli::format_inline(msg, .envir = .envir), " ", cli::col_grey(step_time()))
+  if (type == "success") cli::cli_alert_success("{msg}") else cli::cli_alert_warning("{msg}")
+  invisible(NULL)
+}
+
+# One row of a count table for ppt_rows().
+# - `of`: total for the percentage;
+# - `depth`: 0 for a top row, 1 or 2 for a part of the row above ("|-");
+# - `warn`: highlight when not zero (records or pigs lost, errors);
+# - `keep`: show even when zero; `level`: shown from this verbosity on.
+ppt_row <- function(label, n, of = NULL, depth = 0L, warn = FALSE, keep = FALSE, level = 1L) {
+  if (is.null(n) || length(n) == 0L || is.na(n)) return(NULL)
+  list(label = label, n = n, of = of, depth = depth, warn = warn, keep = keep, level = level)
+}
+
+# Aligned count table: rows that are zero are shown with verbose = 2 only.
+ppt_rows <- function(...) {
+  v <- ppt_verbose()
+  if (v < 1L) return(invisible(NULL))
+  rows <- Filter(Negate(is.null), list(...))
+  rows <- Filter(function(r) v >= r$level && (r$keep || v >= 2L || r$n != 0), rows)
+  if (length(rows) == 0L) return(invisible(NULL))
+  lab <- vapply(rows, function(r) {
+    paste0(strrep("  ", max(0L, r$depth - 1L)), if (r$depth > 0L) "\u2514 " else "", r$label)
+  }, "")
+  num <- vapply(rows, function(r) fmt_n(r$n), "")
+  pct <- vapply(rows, function(r) {
+    if (is.null(r$of) || is.na(r$of) || r$of == 0) return("")
+    x <- 100 * r$n / r$of
+    if (x > 0 && x < 0.05) " <0.1%" else sprintf("%5.1f%%", x)
+  }, "")
+  lw <- max(cli::ansi_nchar(lab))
+  nw <- max(nchar(num))
+  lines <- paste0("  ", cli::ansi_align(lab, lw), "  ", formatC(num, width = nw), "  ", pct)
+  lines <- sub("\\s+$", "", lines)
+  hot <- vapply(rows, function(r) r$warn && r$n != 0, logical(1))
+  lines[hot] <- cli::col_yellow(lines[hot])
+  lines[!hot & vapply(rows, function(r) r$depth > 0L, logical(1))] <-
+    cli::col_grey(lines[!hot & vapply(rows, function(r) r$depth > 0L, logical(1))])
+  cli::cli_verbatim(lines)
+  invisible(NULL)
+}
+
 # ---- input checks -----------------------------------------------------------
 
 # Always return a data.table that is a copy of the input.
@@ -371,7 +452,9 @@ utils::globalVariables(c(
   "n_observed_days", "n_interpolated_days", "n_curve_days", "r_squared", "fill",
   "info", "abs_err", "sum_err", "adg_spearman", "pop_key", "i.pop_key", "label",
   "setting", "scenario", "trait", "truncated", "n_lost", "i.start_date", "i.end_date", "start_date", "end_date",
-  "cv_fold", "i.fold", "last_day", "i.last_day", "mask", "i.bw", "location"
+  "cv_fold", "i.fold", "last_day", "i.last_day", "mask", "i.bw", "location",
+  "fcr", "fcr_flag", "fcr_note", "stage_days", "coverage", "saved", "loc", "n_pigs", "plot",
+  "status", "note", "n_chk", "n_ok", "adfi"
 ))
 
 #' @export

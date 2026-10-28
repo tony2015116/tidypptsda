@@ -224,6 +224,8 @@ res$removed
 
 ## 8. 导出文件
 
+想直接浏览结果时，用 `write_report(res, path)` 生成 HTML 报告（每个测定站一页，见《使用说明》）。
+
 `write_results(res, dir, farm)` 把结果写成 csv（UTF-8 带 BOM，Excel 可以直接打开），文件名为"场名_内容_日期.csv"：
 
 | 文件 | 对应的表 |

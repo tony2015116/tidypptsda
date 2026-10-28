@@ -124,7 +124,7 @@ plot_adfi <- function(adfi, responders = NULL, locations = NULL, ncol = 3,
 #' @param width,height Size in cm. By default computed from the number of
 #'   panels.
 #' @param cores Number of CPU cores: stations are saved in parallel when
-#'   > 1. Default 1. Saving is mostly ggplot2 drawing time (about 1 s per
+#'   more than 1. Default 1. Saving is mostly ggplot2 drawing time (about 1 s per
 #'   station of 15 pigs), so with many stations this is the main speed-up.
 #' @param verbose 0 (silent), 1 (summary, default).
 #'

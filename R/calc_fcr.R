@@ -58,7 +58,7 @@ calc_fcr <- function(adg, adfi, min_coverage = adg$settings$min_coverage,
   if (!identical(adg$settings$stage_range, adfi$settings$stage_range)) {
     cli::cli_abort("{.arg adg} and {.arg adfi} use different {.field stage_range}.")
   }
-  ppt_msg("FCR over {adg$settings$stage_range[1]}-{adg$settings$stage_range[2]} kg", "h1")
+  ppt_step("FCR over {adg$settings$stage_range[1]}-{adg$settings$stage_range[2]} kg")
 
   a <- adg$per_pig[, intersect(c("responder", "location", "breed", "stage", "adg", "adg_type",
                                 "stage_days", "start_weight", "end_weight", "weight_status",
@@ -119,10 +119,16 @@ calc_fcr <- function(adg, adfi, min_coverage = adg$settings$min_coverage,
 
   n_ok <- per_pig[fcr_flag %in% "ok", .N]
   n_low <- per_pig[fcr_flag %in% "low_confidence", .N]
-  ppt_msg("FCR for {sum(!is.na(per_pig$fcr))} pig{?s}: {n_ok} ok, {n_low} low confidence", "info")
+  n_fcr <- sum(!is.na(per_pig$fcr))
+  ppt_rows(
+    ppt_row("Pigs with FCR", n_fcr, keep = TRUE),
+    ppt_row("ok", n_ok, of = n_fcr, depth = 1L, keep = TRUE),
+    ppt_row("low confidence", n_low, of = n_fcr, depth = 1L, warn = TRUE),
+    ppt_row("no FCR", sum(is.na(per_pig$fcr)), depth = 1L, warn = TRUE)
+  )
   s <- summary[group == "all" & trait == "fcr"]
   if (nrow(s) == 1L && s$n > 0) {
-    ppt_msg("Mean FCR {sprintf('%.2f', s$mean)} (SD {sprintf('%.2f', s$sd)}), ADG {round(summary[group == 'all' & trait == 'adg', mean])} g/d, ADFI {round(summary[group == 'all' & trait == 'adfi', mean])} g/d", "success")
+    ppt_done("FCR {sprintf('%.2f', s$mean)} \u00b1 {sprintf('%.2f', s$sd)} (mean \u00b1 SD)")
   }
   if (n_low > 0L) {
     why <- sort(table(unlist(strsplit(per_pig[fcr_flag %in% "low_confidence", fcr_note], "; "))), decreasing = TRUE)

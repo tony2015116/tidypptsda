@@ -1,3 +1,27 @@
+# tidypptsda 1.6.0
+
+## New: write_report()
+
+* `write_report(x, path)` writes the result of `run_pipeline()` as a folder
+  with `index.html` and the plots, to browse like a book: an overview page
+  (pigs, mean ADG / ADFI / FCR, QC settings, pigs to check, stations) and
+  one page per station with its growth and feed intake plots and a table of
+  its pigs (ADG, ADFI, FCR, status, reason). Arrow keys turn the pages; a
+  pig ID in the search box jumps to its station and highlights the pig.
+  Works offline; printing gives one page per station.
+
+## Console output
+
+* `run_pipeline()` numbers its steps (`[2/6]`) and shows how long each took;
+  it starts with a rule and ends with a summary box (pigs, mean +/- SD of
+  ADG, ADFI and FCR, pigs to check). `print()` of the result shows the same
+  box. With `verbose >= 1` the result is returned invisibly, as the box was
+  already shown.
+* Counts are aligned, with thousands separators and shares (%); parts of a
+  count are indented under it. Counts of zero are shown with `verbose = 2`
+  only, and counts of records or pigs lost are highlighted.
+* Each step ends with one line: the main result and the run time.
+
 # tidypptsda 1.5.0
 
 ## Validation functions without information leaking from hidden data

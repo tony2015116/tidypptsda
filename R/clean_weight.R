@@ -75,7 +75,7 @@ clean_weight <- function(visits, qc = qc_config(), verbose = 1, cores = 1) {
                    "entry_time", "weight"),
              arg = "visits", hint = "Use {.fn prep_visits} first.")
 
-  ppt_msg("Cleaning body weight ({.field {paste(qc$weight_outlier, collapse = ' + ')}})", "h1")
+  ppt_step("Cleaning body weight ({paste(c(if (isTRUE(qc$weight_track)) 'track', qc$weight_outlier), collapse = ' + ')})")
 
   main_loc <- main_location(dt, attr(visits, "stations", exact = TRUE))
   rec <- dt[identified == TRUE & !is.na(weight),
@@ -409,16 +409,18 @@ report_clean_weight <- function(rec, per_pig, n_range, fits, qc) {
   method_counts <- vapply(qc$weight_outlier, function(m) {
     rec[grepl(paste0("(^|;)", m, "(;|$)"), qc_flag), .N]
   }, numeric(1))
-  ppt_bullets_counts(c(
-    "Weight records" = n_rec,
-    "Outside weight range" = n_range,
-    "Adaptation after entry (not used)" = rec[qc_flag == "adaptation", .N],
-    "Outliers" = n_out,
-    "  of which removed by tracking" = if (isTRUE(qc$weight_track)) rec[qc_flag == "track", .N] else NULL
-  ))
-  if (length(qc$weight_outlier) > 1L) {
-    ppt_bullets_counts(stats::setNames(method_counts, paste0("  flagged by ", names(method_counts))), level = 2L)
+  by_method <- if (length(qc$weight_outlier) > 1L) {
+    lapply(names(method_counts), function(m) {
+      ppt_row(paste("flagged by", m), method_counts[[m]], of = n_rec, depth = 2L, level = 2L)
+    })
   }
+  do.call(ppt_rows, c(list(
+    ppt_row("Weight records", n_rec, keep = TRUE),
+    ppt_row("outside weight range", n_range, of = n_rec, depth = 1L, warn = TRUE),
+    ppt_row("adaptation after entry (not used)", rec[qc_flag == "adaptation", .N], of = n_rec, depth = 1L),
+    ppt_row("outliers", n_out, of = n_rec, depth = 1L, keep = TRUE),
+    if (isTRUE(qc$weight_track)) ppt_row("by tracking", rec[qc_flag == "track", .N], of = n_rec, depth = 2L)
+  ), by_method))
   if (nrow(fits$warnings) > 0L) {
     ppt_msg("{nrow(fits$warnings)} curve fit warning{?s} (pigs: {.val {unique(fits$warnings$responder)}})", "warning", level = 2L)
   }
@@ -426,8 +428,8 @@ report_clean_weight <- function(rec, per_pig, n_range, fits, qc) {
   n_keep <- status[status == "keep", sum(N)]
   n_low <- status[status == "low_confidence", sum(N)]
   n_rm <- status[status == "removed", sum(N)]
-  ppt_msg("Pigs kept: {n_keep}, low confidence: {n_low}, removed: {n_rm}",
-          if (n_rm > 0L) "warning" else "success")
+  ppt_done("Pigs: {n_keep} kept, {n_low} low confidence, {n_rm} removed",
+           if (n_rm > 0L) "warning" else "success")
   if (n_rm > 0L) {
     rm <- per_pig[status == "removed"]
     for (i in seq_len(nrow(rm))) {

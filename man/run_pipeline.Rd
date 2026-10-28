@@ -30,7 +30,9 @@ run_pipeline(
 \value{
 An object of class \code{ppt_pipeline}: a list with \code{visits},
 \code{weight}, \code{adg}, \code{adfi} and \code{fcr}, plus \code{removed} (every pig removed,
-with the step and the reason).
+with the step and the reason). Printing it shows a summary box. With
+\code{verbose >= 1} the steps are numbered with their run time, the box is
+shown at the end and the result is returned invisibly.
 }
 \description{
 Run \code{\link[=prep_visits]{prep_visits()}}, \code{\link[=clean_weight]{clean_weight()}}, \code{\link[=calc_adg]{calc_adg()}}, \code{\link[=calc_adfi]{calc_adfi()}} and
