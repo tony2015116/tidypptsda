@@ -7,7 +7,7 @@
 validate_weight_fill(
   weight,
   methods = c("linear", "poly1", "poly2", "poly3", "gompertz"),
-  extrap = "curve",
+  extrap = NULL,
   scenarios = c("random30", "blocks3", "late20", "early15"),
   reps = 3,
   max_pigs = NULL,
@@ -29,8 +29,9 @@ fitted on the remaining records, for every missing day.
 }}
 
 \item{extrap}{Extrapolations of the curve beyond the records to compare
-(values of \code{curve_extrap}): \code{"curve"} (default), \code{"tangent"} or both.
-With \code{"tangent"}, a method is labelled e.g. \code{"linear+tangent"}. It
+(values of \code{curve_extrap}): \code{"start"}, \code{"curve"}, \code{"tangent"} or
+several. Default: the one of the settings of \code{weight}. Other than
+\code{"curve"}, a method is labelled e.g. \code{"linear+tangent"}. It
 matters for the days hidden at the ends (\code{"late<d>"}, \code{"early<d>"}).}
 
 \item{scenarios}{Patterns of hidden days, as in \code{\link[=validate_adfi]{validate_adfi()}}:

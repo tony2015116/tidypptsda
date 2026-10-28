@@ -59,7 +59,7 @@ qc_config(entry_weight_max = 90)         # 进站体重上限不小于出栏体�
 | 跨站与测定中断 | `misread_max_visits`、`max_gap_days`、`max_jump_kg` | 2、3、10 | `prep_visits()`、`clean_weight()` |
 | 体重记录 | `weight_range`、`adapt_days`、`weight_track`、`track_tol`、`weight_outlier`、`outlier_combine`、`rlm_cutoff`、`sd_max`、`loess_span` | 15–150、7、TRUE、0.08、rlm + loess、any、0.5、3、0.75 | `clean_weight()` |
 | 个体判定 | `min_records`、`min_test_days`、`max_missing_rate`、`entry_weight_max`、`exit_weight_min`、`track_flag_share`、`smooth_r2_min` | 20、35、0.30、65、85、0.4、0.99 | `clean_weight()` |
-| 生长曲线与体重填充 | `stage_range`、`curve_model`、`max_extrap_days`、`curve_extrap` | 30–120、poly2、30、curve | `calc_adg()` |
+| 生长曲线与体重填充 | `stage_range`、`curve_model`、`max_extrap_days`、`curve_extrap` | 30–120、poly2、30、start | `calc_adg()` |
 | 采食错误 | `fiv_range`、`fiv0_abs_max`、`duration_max`、`speed_fiv_lo_max`、`speed_strict_max`、`speed_range`、`idle_duration_max`、`trough_diff_range`、`max_unidentified_feed_kg`、`fiv_max_by_weight` | −20–2000、20、3600、500、110、2–170、500、−20–1800、90、NULL | `flag_feed_errors()` |
 | 日采食 | `dfi_range`、`dfi_quantile`、`dfi_correct`、`impute_method`、`long_gap_days` | 0–6、NULL、lmm、loess_pop、3 | `calc_adfi()` |
 | 可信度 | `max_edge_extrap_days`、`min_coverage`、`bin_width`、`min_bin_coverage_kg`、`bin_fcr_limits` | 15、0.7、10、6、NULL | `calc_fcr()` |
@@ -189,7 +189,7 @@ summary(w_n$per_pig$r2)
 | `stage_range` | 计算 ADG、ADFI、FCR 的体重区间 | kg | 30–120 | 必须落在 `weight_range` 之内 |
 | `curve_model` | 生长曲线：`"poly2"`（二次）、`"poly1"`（直线）、`"poly3"`（三次）、`"gompertz"`。用来确定区间的起止时间，并填充首条记录之前、末条记录之后的体重 | — | `"poly2"` | 见左 |
 | `max_extrap_days` | 曲线在首条记录之前、末条记录之后最多外推的天数 | 天 | 30 | ≥ 0 |
-| `curve_extrap` | 首条记录之前、末条记录之后怎么外推：`"curve"` 沿生长曲线本身；`"tangent"` 从曲线在首/末条记录处的值出发画直线，斜率取首/末 14 天记录的稳健回归斜率（限制在 0.2–1.5 kg/d） | — | `"curve"` | curve / tangent |
+| `curve_extrap` | 记录范围之外怎么外推。`"start"`：首条记录之前从曲线在首条记录处的值出发画直线，斜率取首 14 天记录的稳健回归斜率（限制在 0.2–1.5 kg/d），末条记录之后沿生长曲线；`"tangent"`：两端都用直线；`"curve"`：两端都沿生长曲线 | — | `"start"` | start / curve / tangent |
 
 计算分三步：
 
@@ -197,7 +197,7 @@ summary(w_n$per_pig$r2)
 2. **把区间内每一天的体重补齐**：有有效体重的日子用当天中位数（`source = "observed"`）；两个有记录的日子之间缺失的日子，用前后两天**线性插值**（`"interpolated"`）；首条记录之前、末条记录之后的日子，用**生长曲线**的值（`"curve"`）。结果在 `adg$daily$weight_filled`。
 3. **日增重** = 区间内全部日体重（实测 + 填充）对日期做直线回归的斜率（`adg`，g/d），可靠性看 `r_squared`。各来源的天数在 `n_observed_days`、`n_interpolated_days`、`n_curve_days` 中。
 
-**切线外推**：二次、三次曲线往记录范围外推几周时容易弯折，例如末期增重稍慢时，曲线外推后会提前"封顶"。`curve_extrap = "tangent"` 时，记录范围内仍用原来的曲线，范围之外改为直线。在示例数据上隐藏开头或结尾 10–30 天记录时，poly2 加切线后 ADG 误差在多数场景下变小（例如 NEDAP 开头缺 30 天：53 → 38 g/d；FIRE 开头缺 30 天：344 → 173 g/d），但 FIRE 开头缺 20 天时略差（123 → 129 g/d）。所以默认仍是 `"curve"`，建议先用 `validate_adg(extrap = c("curve", "tangent"))` 在自己的数据上比较。
+**切线外推**：二次、三次曲线往记录范围外推几周时容易弯折，例如末期增重稍慢时，曲线外推后会提前"封顶"。切线外推时，记录范围内仍用原来的曲线，范围之外改为直线。在 457 头 NEDAP 猪的无泄露检验中（《方法验证》中的 `validate_truncation()`），开头用切线使 ADG 误差在开头缺 20 天时从 81 降到 66 g/d、FCR 排名相关从 0.82 升到 0.86；末端用切线虽然 ADG 也更准，但末端的采食是按外推的体重填充的，FCR 排名反而变差（结尾缺 30 天时，前 20% 一致率从 0.70 降到 0.44）。所以默认 `"start"`：只在首条记录之前用切线。示意图见《填充方法》。
 
 `adg_curve` 是生长曲线在区间两端的体重差 ÷ 天数，只用来对照。`r_squared` 受体重跨度影响，只在同一批次、同一区间内比较才有意义。`gompertz` 用 `nls(SSgompertz)` 拟合，不收敛时自动改用二次曲线，实际使用的曲线记录在 `curve_used` 列中。
 
@@ -306,7 +306,7 @@ rbindlist(lapply(c(1800, 3600), function(d) {
 | `dfi_range` | 校正后日采食量的合理范围，超出的日子视为缺失、交给插补 | kg | 0–6 | 两个递增的非负数 |
 | `dfi_quantile` | 可选规则：按全部猪日的分位数截断，例如 `c(0.025, 0.99)` 表示低于 2.5% 分位或高于 99% 分位的日子视为缺失 | — | NULL（关闭） | 0–1 |
 | `dfi_correct` | `"lmm"`：按 Jiao 等（2014）用混合模型校正；`"none"`：不校正，直接用原始记录 | — | `"lmm"` | lmm / none |
-| `impute_method` | 两个有记录的日子之间，连续缺失不超过 `long_gap_days` 天时用 LOESS 平滑插补（`"loess_pop"`、`"loess_lm"`）。更长的缺失和区间两端（首个有记录日之前、末个有记录日之后）：`"loess_pop"` 用全群（有品种时按品种）"日采食 ~ 体重"二次曲线 × 这头猪的采食水平；`"loess_lm"` 用这头猪自己的"日采食 ~ 体重"线性回归；`"linear"` 中间一律线性插值，两端用这头猪自己的回归 | — | `"loess_pop"` | loess_pop / loess_lm / linear |
+| `impute_method` | 两个有记录的日子之间，连续缺失不超过 `long_gap_days` 天时用 LOESS 平滑插补（`"loess_pop"`、`"loess_lm"`）。`"loess_pop"`：更长的缺失和首个有记录日之前用全群（有品种时按品种）"日采食 ~ 体重"二次曲线 × 这头猪的采食水平，末个有记录日之后用这头猪自己的"日采食 ~ 体重"线性回归；`"loess_lm"`：这些位置都用这头猪自己的回归；`"linear"`：中间一律线性插值，两端用这头猪自己的回归 | — | `"loess_pop"` | loess_pop / loess_lm / linear |
 | `long_gap_days` | 区分短缺失和长缺失的天数 | 天 | 3 | ≥ 1 |
 
 回归中的体重是 `calc_adg()` 补齐后的日体重（`weight_filled`）。校正模型的形式是 `无错误日采食 ~ 站 + 品种 + 当天体重 + ADG + 31 个错误协变量 + (1|猪)`（品种只在数据中有 `breed` 列、且不止一个品种时加入），校正值 = 无错误日采食 − Σ(系数 × 错误协变量)。没有错误的日子不受影响。
@@ -314,7 +314,7 @@ rbindlist(lapply(c(1800, 3600), function(d) {
 **调整建议**
 
 - 公猪后期日采食量可能超过 4 kg，`dfi_range` 的上限不宜低于 5 kg。
-- 三种插补方法在随机缺失时结果几乎相同，差别主要在区间两端和成段缺失。`loess_pop` 在两端缺失时误差约为 `loess_lm` 的一半（见《方法验证》），可以用 `validate_adfi()` 在自己的数据上比较。
+- 三种插补方法在随机缺失时结果几乎相同，差别主要在区间开头和成段缺失：开头缺 20 天时，`loess_pop` 的 ADFI 误差比 `loess_lm` 小约三分之一（457 头猪的无泄露检验：7.5% → 4.9%）；末端两者相同。比较时请用 `validate_truncation()`，`validate_adfi()` 保留了被隐藏日子的体重，结果偏乐观（见《方法验证》）。
 - `loess_pop` 的群体曲线来自本批次的猪，批次里的猪太少（少于约 10 头）或体重跨度太窄时，曲线不可靠，可以改用 `loess_lm`。各曲线的猪数、天数和系数见 `adfi$pop_curve`。
 
 ## 9. 可信度参数

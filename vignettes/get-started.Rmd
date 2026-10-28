@@ -238,10 +238,11 @@ table(w_sd$per_pig$status)
    lower stage weight before that. A curve that dips back below 30 kg (for
    example after noisy early records) therefore starts the stage only once
    the pig has really entered it. The search runs up to `max_extrap_days`
-   before the first and after the last record. Beyond the records the
-   curve itself is used (`curve_extrap = "curve"`), or a straight tangent
-   line with the slope of the first / last 14 days of records
-   (`curve_extrap = "tangent"`);
+   before the first and after the last record. Before the first record the
+   curve is continued by a straight tangent line with the slope of the
+   first 14 days of records, after the last record by the curve itself
+   (`curve_extrap = "start"`, default); `"tangent"` uses the line at both
+   ends, `"curve"` the curve at both ends;
 3. every day of the stage gets a body weight: the daily median of the valid
    records (`"observed"`); a day without valid weight between two recorded
    days is filled by linear interpolation (`"interpolated"`); a day before
@@ -355,8 +356,8 @@ have no error-free intake and are imputed.
 - a gap of up to `long_gap_days` (3) days between recorded days is filled
   from a robust LOESS smooth of the daily intake over the days;
 - `impute_method = "loess_pop"` (default): a longer gap, and the days
-  before the first or after the last recorded day, are filled from the
-  **population curve** of daily intake on body weight, scaled to the pig:
+  before the first recorded day, are filled from the **population curve**
+  of daily intake on body weight, scaled to the pig:
   `dfi = r * f(bw)`. `f` is a quadratic regression of daily intake on body
   weight over the recorded stage days of all pigs (of each breed with at
   least 10 pigs when there is a `breed` column; other pigs use the curve
@@ -366,7 +367,12 @@ have no error-free intake and are imputed.
   `n` recorded days. A single pig rarely covers the whole stage, so its
   own regression on weight is often flat or steep where it has data and
   goes wrong far from it (a late entry gets the intake of 60 kg at 30
-  kg); the population curve gives the shape, the pig its level;
+  kg); the population curve gives the shape, the pig its level. The days
+  **after the last recorded day** are filled by the pig's own linear
+  regression of daily intake on body weight: a pig that leaves early has
+  recorded its late trend itself, while the population curve flattens at
+  high weights and underestimated its late intake (by 43-129 g/d when 20-30
+  days were missing at the end, in a leakage-free check on 457 pigs);
 - `impute_method = "loess_lm"`: the longer gaps and the ends by a
   per-pig linear regression of daily intake on body weight (the method
   before version 1.3.0);
@@ -374,12 +380,16 @@ have no error-free intake and are imputed.
   (whatever the gap length), the per-pig regression on body weight at
   the ends.
 
-Use [validate_adfi()] to compare the methods on your own data. On the
-example data, `"loess_pop"` halved the ADFI error when 10 to 30 days were
-hidden at the stage ends (e.g. 30 days at the start: 9.7% to 2.3%
-(NEDAP), 15.6% to 3.8% (FIRE)) and changed nothing when days were missing
-at random. Precision still depends mainly on how many days are missing at
-the stage ends, which is why such pigs are flagged by [calc_fcr()].
+Use [validate_truncation()] to compare the methods on your own data: it
+removes all visits of some pigs over some days and reruns the whole
+pipeline, so nothing of the hidden days leaks into the result
+([validate_adfi()] is faster but keeps the body weight of the hidden days
+and is optimistic at the stage ends). In such a check on 457 NEDAP pigs,
+with 20 days missing at the start, the ADFI error was 7.5% with
+`"loess_lm"` and 4.9% with `"loess_pop"` and `curve_extrap = "start"`;
+at the end, `"loess_pop"` keeps the unbiased per-pig regression. Precision
+still depends mainly on how many days are missing at the stage ends, which
+is why such pigs are flagged by [calc_fcr()].
 
 Day states: `"org"` (no error, recorded value), `"corr"` (corrected),
 `"iii"` (filled between recorded days), `"elrp"` (filled before the first or

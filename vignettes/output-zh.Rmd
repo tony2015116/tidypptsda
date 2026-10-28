@@ -118,7 +118,7 @@ res$weight$records[, .N, by = qc_flag]
 | `r_squared` | 这个回归的 R² |
 | `n_observed_days`、`n_interpolated_days`、`n_curve_days` | 区间内日体重为实测、线性插值、生长曲线填充的天数 |
 | `adg_curve` | 对照用：生长曲线在区间两端的体重差 ÷ 天数 |
-| `curve_used`、`curve_r2` | 实际使用的生长曲线和它的 R²；切线外推时注明 `+ tangent`，如 `poly2 + tangent` |
+| `curve_used`、`curve_r2` | 实际使用的生长曲线和它的 R²；切线外推时注明，如 `poly2 + tangent (start)`（只在开头，默认）或 `poly2 + tangent`（两端） |
 | `adg_type` | `observed`：区间两端都在测定期内；`extrapolated`：需要外推，但不超过 `max_extrap_days`；`partial`：外推后仍到不了端点，只算覆盖到的部分；`none`：覆盖不足 7 天，没有日增重 |
 | `start_date`、`end_date` | 曲线到达区间下限、上限的日期（区间的起止） |
 | `start_weight`、`end_weight` | 起止处的体重 |
@@ -158,7 +158,7 @@ res$weight$records[, .N, by = qc_flag]
 | `org` | 实测，当天没有错误访问 |
 | `corr` | 当天有错误访问，用模型校正 |
 | `iii` | 两个有记录的日子之间缺失：≤ 3 天用 LOESS，> 3 天用群体曲线 × 个体比例（`loess_lm` 时为单猪回归，`linear` 时为线性插值） |
-| `elrp` | 区间两端缺失，用群体曲线 × 个体比例（`loess_lm`、`linear` 时为单猪回归） |
+| `elrp` | 区间两端缺失：首个记录日之前用群体曲线 × 个体比例，末个记录日之后用单猪回归（`loess_lm`、`linear` 时两端都是单猪回归） |
 | `missing` | 无法估计 |
 | `NA` | 区间外的日子，不需要插补 |
 

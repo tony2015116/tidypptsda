@@ -164,9 +164,9 @@ qc$stage_range
 | `max_missing_rate` | 最大缺失率（无有效体重的天数比例） | 0.30 |
 | `entry_weight_max` / `exit_weight_min` | 进站体重上限 / 出栏体重下限（kg），不满足时标记为低可信度 | 65 / 85 |
 | `curve_model` | 填充区间两端体重的生长曲线：poly2、poly1、poly3、gompertz | poly2 |
-| `impute_method` | 采食填充：loess_pop（≤ 3 天 LOESS，其余群体曲线 × 个体比例）、loess_lm（其余用单猪回归）或 linear | loess_pop |
+| `impute_method` | 采食填充：loess_pop（≤ 3 天 LOESS；长缺口和开头用群体曲线 × 个体比例；末端用单猪回归）、loess_lm（都用单猪回归）或 linear | loess_pop |
 | `max_extrap_days` | 生长曲线最多外推的天数 | 30 |
-| `curve_extrap` | 记录范围外沿生长曲线（curve）还是切线（tangent）外推 | curve |
+| `curve_extrap` | 记录范围外怎么外推：start（开头切线、末端曲线）、curve 或 tangent | start |
 | `max_edge_extrap_days` | 区间两端填充超过此天数的猪标记为低可信度 | 15 |
 | `duration_max` | 单次访问时长上限（s），对应错误类型 OTV-hi | 3600 |
 
@@ -243,7 +243,7 @@ table(adfi$daily[in_stage == TRUE, state])
 日采食量的校正分两步：
 
 1. **校正**：对每头猪的每一天，先求"无错误访问的采食量之和" Y，再用混合模型扣除错误项的影响（Jiao 等，2014）。没有错误的日子保持原值不变。
-2. **填充**：只在与 ADG 相同的体重区间内进行。两个有记录的日子之间，连续缺失不超过 3 天的用 LOESS 平滑插补；超过 3 天的、以及区间两端缺失的日子，用全群（有品种时按品种）的"日采食 ~ 体重"曲线乘以这头猪自己的采食水平。曲线提供采食随体重变化的形状，个体比例保留这头猪吃得多还是少。体重用的是上一步补齐后的日体重。`qc_config(impute_method = "loess_lm")` 改用每头猪自己的"日采食 ~ 体重"线性回归；`"linear"` 时，中间改用线性插值。
+2. **填充**：只在与 ADG 相同的体重区间内进行。两个有记录的日子之间，连续缺失不超过 3 天的用 LOESS 平滑插补；超过 3 天的、以及区间开头缺失的日子，用全群（有品种时按品种）的"日采食 ~ 体重"曲线乘以这头猪自己的采食水平：曲线提供采食随体重变化的形状，个体比例保留这头猪吃得多还是少。区间末端缺失的日子，用这头猪自己的"日采食 ~ 体重"线性回归。每个位置用什么方法、由哪个参数控制，见《填充方法》中的逐步演示。体重用的是上一步补齐后的日体重。`qc_config(impute_method = "loess_lm")` 改用每头猪自己的"日采食 ~ 体重"线性回归；`"linear"` 时，中间改用线性插值。
 
 `state` 列标明每一天的来源：
 
@@ -322,7 +322,7 @@ h$plot[[1]]
 | 蓝色点 | error-free | 当天没有错误访问，直接使用记录值（`state = "org"`） |
 | 橙色点 | corrected | 当天有错误访问，用混合模型校正后的值（`corr`） |
 | 绿色点 | filled (between records) | 两个有记录的日子之间缺失：≤ 3 天 LOESS，> 3 天用群体曲线 × 个体比例（`iii`） |
-| 紫红色点 | filled (stage ends) | 区间两端缺失，用群体曲线 × 个体比例（`elrp`） |
+| 紫红色点 | filled (stage ends) | 区间两端缺失：开头用群体曲线 × 个体比例，末端用单猪回归（`elrp`） |
 | 细灰线 | — | 把最终使用的日采食量（彩色点）按日期连起来 |
 | 灰色水平虚线 | — | 这头猪的 ADFI（区间内日采食量的平均值） |
 

@@ -204,7 +204,7 @@ run_pipeline(raw, qc = qc)</code></pre>
     <tr><td><code>min_test_days</code></td><td>35</td><td>最短测定期（剔除）</td></tr>
     <tr><td><code>curve_model</code></td><td>poly2</td><td>区间两端体重的填充曲线</td></tr>
     <tr><td><code>impute_method</code></td><td>loess_pop</td><td>采食填充：群体曲线 × 个体比例；或 loess_lm、linear</td></tr>
-    <tr><td><code>curve_extrap</code></td><td>curve</td><td>记录范围外的外推：曲线，或 tangent（切线）</td></tr>
+    <tr><td><code>curve_extrap</code></td><td>start</td><td>记录外推：开头切线、末端曲线；或 curve、tangent</td></tr>
     <tr><td><code>max_edge_extrap_days</code></td><td>15</td><td>两端填充超过即低可信度</td></tr>
     <tr><td><code>duration_max</code></td><td>3600</td><td>单次访问时长上限（s）</td></tr>
   </table>
@@ -241,7 +241,7 @@ run_pipeline(raw, qc = qc)</code></pre>
     <tr><th><code>source</code></th><th>来源</th></tr>
     <tr><td><code>observed</code></td><td>当天有效体重的中位数</td></tr>
     <tr><td><code>interpolated</code></td><td>两个有记录日之间：线性插值</td></tr>
-    <tr><td><code>curve</code></td><td>首个记录前 / 末个记录后：生长曲线（<code>curve_extrap = "tangent"</code> 时为切线）</td></tr>
+    <tr><td><code>curve</code></td><td>首个记录前：切线；末个记录后：生长曲线（<code>curve_extrap</code>）</td></tr>
   </table>
   <p>3. <b>ADG = 区间内全部日体重对日期回归的斜率</b>（g/d），附 <code>r_squared</code>。</p>
   <table>
@@ -258,14 +258,14 @@ run_pipeline(raw, qc = qc)</code></pre>
   <ul>
     <li><b>错误判定</b>：Casey 等（2005）16 条规则（单次采食量、停留时间、采食速度、料槽重差…），<code>calc_adfi()</code> 内部自动调用。</li>
     <li><b>校正</b>：Jiao 等（2014）混合模型，扣除错误协变量的影响；无错误的日子不变。</li>
-    <li><b>补齐</b>：只在 ADG 的同一区间内；体重用补齐后的日体重。长缺口和两端：<b>全群（或品种）"采食 ~ 体重"曲线 × 个体采食水平</b>，曲线见 <code>adfi$pop_curve</code>。</li>
+    <li><b>补齐</b>：只在 ADG 的同一区间内；体重用补齐后的日体重。长缺口和开头：<b>全群（或品种）"采食 ~ 体重"曲线 × 个体采食水平</b>（<code>adfi$pop_curve</code>）；末端：这头猪自己的回归。详见文章《填充方法》。</li>
   </ul>
   <table>
     <tr><th><code>state</code></th><th>这一天的采食来自</th></tr>
     <tr><td><code>org</code></td><td>记录值，当天无错误访问</td></tr>
     <tr><td><code>corr</code></td><td>模型校正值</td></tr>
     <tr><td><code>iii</code></td><td>中间缺失：≤ 3 天 LOESS，&gt; 3 天群体曲线 × 个体比例</td></tr>
-    <tr><td><code>elrp</code></td><td>区间两端缺失：群体曲线 × 个体比例</td></tr>
+    <tr><td><code>elrp</code></td><td>区间开头：群体曲线 × 个体比例；末端：单猪回归</td></tr>
     <tr><td><code>missing</code></td><td>无法估计</td></tr>
   </table>
   <p><b>ADFI</b> = 区间内日采食的平均值；<code>coverage</code> = 有实测（含校正）的天数比例。</p>

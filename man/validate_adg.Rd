@@ -7,7 +7,7 @@
 validate_adg(
   weight,
   models = c("poly1", "poly2", "poly3", "gompertz"),
-  extrap = "curve",
+  extrap = NULL,
   k = 5,
   trim_days = c(10, 20),
   qc = weight$settings,
@@ -23,8 +23,8 @@ validate_adg(
 \item{models}{Curve models to compare (values of \code{curve_model}).}
 
 \item{extrap}{Extrapolations to compare (values of \code{curve_extrap}):
-\code{"curve"} (default), \code{"tangent"} or both. With \code{"tangent"}, a model is
-labelled e.g. \code{"poly2+tangent"}. Mainly the truncation results differ:
+\code{"start"}, \code{"curve"}, \code{"tangent"} or several. Default: the one of
+\code{qc}. Other than \code{"curve"}, a model is labelled e.g. \code{"poly2+tangent"}. Mainly the truncation results differ:
 cross-validation differs only for left-out days at the very ends of the
 records.}
 
