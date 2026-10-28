@@ -1,0 +1,324 @@
+---
+title: "填充方法：日体重与日采食"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{填充方法：日体重与日采食}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r setup, message = FALSE}
+library(tidypptsda)
+library(data.table)
+```
+
+测定站的记录几乎不可能每天都有：猪某天没进站、耳标没读到、设备故障，或者进站晚、出栏早。tidypptsda 不绕开缺失，而是先把计算区间（默认 30–120 kg）内的**每一天**都补上体重和采食量，再计算日增重（ADG）、日采食量（ADFI）和料肉比（FCR）。补的方法取决于缺失的**位置**：在两个有记录的日子之间，还是在首个记录之前、末个记录之后。
+
+本文用一头示例猪逐步演示每一种填充，说明它由哪个参数控制、结果里用什么标签标出。
+
+## 1. 逐步演示
+
+下面这头猪来自示例数据 `nedap`。为了让每种情况都出现，人为删掉了它的一部分访问：区间开头 12 天（晚进站）、中间 2 天（短缺口）、中间 6 天（长缺口）和结尾 8 天（早出栏）。图中所有的点和线都是包实际算出来的结果。点 **▶ 播放** 自动演示，也可以用 **上一步 / 下一步** 逐步查看。
+
+```{r demo-data, echo = FALSE}
+v <- prep_visits(nedap, verbose = 0)
+pig <- "13913"
+full <- calc_adg(clean_weight(v, verbose = 0), verbose = 0)$per_pig[responder == pig]
+s0 <- full$start_date
+e0 <- full$end_date
+drop <- v$responder %in% pig &
+  (v$date < s0 + 12 | v$date > e0 - 8 |
+   (v$date >= s0 + 25 & v$date < s0 + 27) |
+   (v$date >= s0 + 42 & v$date < s0 + 48))
+v2 <- v[!drop]
+qc <- qc_config()
+w <- clean_weight(v2, qc, verbose = 0)
+a <- calc_adg(w, qc, verbose = 0)
+f <- calc_adfi(v2, a, qc, verbose = 0)
+pp <- a$per_pig[responder == pig]
+dw <- a$daily[responder == pig]
+rec <- w$records[responder == pig]
+fd <- f$daily[responder == pig]
+fp <- f$per_pig[responder == pig]
+fcr <- calc_fcr(a, f, verbose = 0)$per_pig[responder == pig]
+```
+
+```{r demo, echo = FALSE, results = "asis"}
+# ---- geometry ---------------------------------------------------------------
+W <- 900; H <- 650
+L <- 70; R <- 880
+top <- c(46, 300)       # weight panel (y from, y to)
+bot <- c(370, 610)      # feed panel
+d0 <- min(c(dw$date, fd$date)) - 1
+d1 <- max(c(dw$date, fd$date)) + 1
+x_of <- function(d) L + (as.numeric(d - d0) + 0.5) / as.numeric(d1 - d0) * (R - L)
+wmax <- 135
+y_w <- function(kg) top[2] - kg / wmax * (top[2] - top[1])
+fmax <- ceiling(max(fd$dfi, fd$dfi_raw, na.rm = TRUE) / 500) * 500
+y_f <- function(g) bot[2] - g / fmax * (bot[2] - bot[1])
+f2 <- function(z) sprintf("%.1f", z)
+col <- c(observed = "#0072B2", interpolated = "#009E73", curve = "#CC79A7",
+         org = "#0072B2", corr = "#E69F00", short = "#009E73", long = "#009E73",
+         before = "#CC79A7", after = "#CC79A7", grey = "#999999")
+el <- character()
+add <- function(step, x) el[length(el) + 1L] <<- sprintf('<g class="fs s%d">%s</g>', step, x)
+circles <- function(x, y, fill, r = 3.4, hollow = FALSE) {
+  paste(sprintf('<circle cx="%s" cy="%s" r="%s" fill="%s" stroke="%s" stroke-width="1.2"/>',
+                f2(x), f2(y), r, if (hollow) "none" else fill, fill), collapse = "")
+}
+pline <- function(x, y, stroke, width = 2, dash = NULL, opacity = 1) {
+  sprintf('<polyline points="%s" fill="none" stroke="%s" stroke-width="%s"%s opacity="%s"/>',
+          paste(f2(x), f2(y), sep = ",", collapse = " "), stroke, width,
+          if (is.null(dash)) "" else sprintf(' stroke-dasharray="%s"', dash), opacity)
+}
+label <- function(x, y, txt, anchor = "start", size = 12, fill = "currentColor", weight = "normal") {
+  sprintf('<text x="%s" y="%s" font-size="%s" text-anchor="%s" fill="%s" font-weight="%s">%s</text>',
+          f2(x), f2(y), size, anchor, fill, weight, txt)
+}
+
+# ---- axes (always shown) ---------------------------------------------------
+ax <- character()
+for (kg in seq(0, 120, by = 30)) {
+  ax <- c(ax, sprintf('<line x1="%d" x2="%d" y1="%s" y2="%s" stroke="currentColor" stroke-opacity="0.12"/>', L, R, f2(y_w(kg)), f2(y_w(kg))),
+          label(L - 8, y_w(kg) + 4, kg, "end", 11))
+}
+for (g in seq(0, fmax, by = 1000)) {
+  ax <- c(ax, sprintf('<line x1="%d" x2="%d" y1="%s" y2="%s" stroke="currentColor" stroke-opacity="0.12"/>', L, R, f2(y_f(g)), f2(y_f(g))),
+          label(L - 8, y_f(g) + 4, g, "end", 11))
+}
+months <- seq(as.Date(format(d0, "%Y-%m-01")), d1, by = "month")
+months <- months[months >= d0]
+for (m in months) {
+  m <- as.Date(m, origin = "1970-01-01")
+  ax <- c(ax, label(x_of(m), bot[2] + 18, format(m, "%m月"), "middle", 11))
+}
+ax <- c(ax, label(L - 50, (top[1] + top[2]) / 2, "体重 (kg)", "middle", 12),
+        label(L - 50, (bot[1] + bot[2]) / 2, "日采食 (g)", "middle", 12))
+ax[length(ax) - 1L] <- sub("<text ", sprintf('<text transform="rotate(-90 %s %s)" ', L - 50, (top[1] + top[2]) / 2), ax[length(ax) - 1L])
+ax[length(ax)] <- sub("<text ", sprintf('<text transform="rotate(-90 %s %s)" ', L - 50, (bot[1] + bot[2]) / 2), ax[length(ax)])
+
+# ---- weight ------------------------------------------------------------------
+st <- dw[in_stage == TRUE]
+first_w <- min(dw[source == "observed", date])
+last_w <- max(dw[source == "observed", date])
+# 1. recorded daily weights; excluded records (adaptation, outliers) hollow grey
+ex <- rec[outlier == TRUE]
+add(1, paste0(circles(x_of(ex$date), y_w(ex$weight), col[["grey"]], 2.2, hollow = TRUE),
+              circles(x_of(dw[source == "observed", date]), y_w(dw[source == "observed", weight]), col[["observed"]])))
+# 2. growth curve over the recorded period
+cv <- dw[date >= first_w & date <= last_w]
+add(2, pline(x_of(cv$date), y_w(cv$predicted), col[["grey"]], 2.5))
+# 3. stage: 30 / 120 kg and the start / end
+lo <- qc$stage_range[1]; hi <- qc$stage_range[2]
+xs <- x_of(pp$start_date); xe <- x_of(pp$end_date)
+add(3, paste0(
+  sprintf('<rect x="%s" y="%d" width="%s" height="%d" fill="currentColor" fill-opacity="0.05"/>', f2(xs), top[1], f2(xe - xs), bot[2] - top[1]),
+  sprintf('<line x1="%d" x2="%d" y1="%s" y2="%s" stroke="currentColor" stroke-dasharray="6 4" stroke-opacity="0.6"/>', L, R, f2(y_w(lo)), f2(y_w(lo))),
+  sprintf('<line x1="%d" x2="%d" y1="%s" y2="%s" stroke="currentColor" stroke-dasharray="6 4" stroke-opacity="0.6"/>', L, R, f2(y_w(hi)), f2(y_w(hi))),
+  sprintf('<line x1="%s" x2="%s" y1="%d" y2="%d" stroke="currentColor" stroke-opacity="0.5"/>', f2(xs), f2(xs), top[1], bot[2]),
+  sprintf('<line x1="%s" x2="%s" y1="%d" y2="%d" stroke="currentColor" stroke-opacity="0.5"/>', f2(xe), f2(xe), top[1], bot[2]),
+  label(L + 4, y_w(hi) - 5, sprintf("%d kg", hi), "start", 11), label(R - 4, y_w(lo) + 14, sprintf("%d kg", lo), "end", 11),
+  label(xs, top[1] - 8, "区间起点", "start", 11), label(xe, top[1] - 8, "区间终点", "end", 11)))
+# 4. interpolated
+ip <- st[source == "interpolated"]
+add(4, circles(x_of(ip$date), y_w(ip$weight_filled), col[["interpolated"]]))
+# 5. before the first record: tangent; dashed grey: what poly2 would give
+bf <- st[source == "curve" & date < first_w]
+if (nrow(bf) > 0L) {
+  vr <- w$records[responder == pig & outlier == FALSE]
+  t <- as.numeric(difftime(vr$entry_time, as.POSIXct(min(vr$date), tz = "UTC"), units = "days"))
+  p2 <- tidypptsda:::fit_growth_curve(t, vr$weight, qc$curve_model, "curve")
+  xx <- as.numeric(c(bf$date, first_w) - min(vr$date)) + 0.5
+  add(5, paste0(pline(x_of(c(bf$date, first_w)), y_w(p2$pred(xx)), col[["grey"]], 1.5, "4 3", 0.8),
+                circles(x_of(bf$date), y_w(bf$weight_filled), col[["curve"]])))
+}
+# 6. after the last record: the curve
+af <- st[source == "curve" & date > last_w]
+if (nrow(af) > 0L) add(6, circles(x_of(af$date), y_w(af$weight_filled), col[["curve"]]))
+# 7. ADG: regression of the stage weights on the date
+fit <- lm(weight_filled ~ as.numeric(date), data = st)
+xr <- range(st$date)
+yr <- predict(fit, newdata = data.frame(date = xr))
+add(7, paste0(pline(x_of(xr), y_w(yr), "currentColor", 2, "10 5"),
+              label(x_of(mean(xr)) + 30, y_w(mean(yr)) + 30, sprintf("ADG = %.0f g/d（回归斜率）", pp$adg), "start", 13, weight = "bold")))
+
+# ---- feed --------------------------------------------------------------------
+sf <- fd[in_stage == TRUE]
+rec_days <- sf[state %in% c("org", "corr"), date]
+first_f <- min(rec_days); last_f <- max(rec_days)
+gap_len <- function(dates, all) {
+  miss <- !(all %in% dates)
+  r <- rle(miss); len <- rep(r$lengths, r$lengths); len[!miss] <- 0L; len
+}
+sf[, gap := gap_len(rec_days, date)]
+add(8, paste0(circles(x_of(sf[state == "org", date]), y_f(sf[state == "org", dfi]), col[["org"]]),
+              circles(x_of(sf[state == "corr", date]), y_f(sf[state == "corr", dfi]), col[["corr"]]),
+              circles(x_of(sf[state == "corr", date]), y_f(sf[state == "corr", dfi_raw]), col[["grey"]], 2.2, hollow = TRUE)))
+short <- sf[state == "iii" & gap <= qc$long_gap_days]
+long <- sf[state == "iii" & gap > qc$long_gap_days]
+add(9, circles(x_of(short$date), y_f(short$dfi), col[["short"]]))
+add(10, circles(x_of(long$date), y_f(long$dfi), col[["long"]], 3.4, hollow = TRUE))
+fb <- sf[state == "elrp" & date < first_f]
+fa <- sf[state == "elrp" & date > last_f]
+add(11, circles(x_of(fb$date), y_f(fb$dfi), col[["before"]], 3.4, hollow = TRUE))
+add(12, circles(x_of(fa$date), y_f(fa$dfi), col[["after"]]))
+add(13, paste0(pline(x_of(range(sf$date)), y_f(rep(fp$adfi, 2)), "currentColor", 2, "10 5"),
+               label(x_of(max(sf$date)) - 6, y_f(fp$adfi) - 8,
+                     sprintf("ADFI = %.0f g/d　FCR = %.2f", fp$adfi, fcr$fcr), "end", 13, weight = "bold")))
+
+# ---- captions ----------------------------------------------------------------
+cap <- c(
+  "<b>① 实测日体重</b>：当天有效体重记录的中位数，<code>source = \"observed\"</code>。空心灰点是不用的记录：进站后 <code>adapt_days</code>（7）天的适应期、超出 <code>weight_range</code> 的读数、逐日回溯追踪和 <code>weight_outlier</code> 判出的异常值（<code>clean_weight()</code>）。",
+  "<b>② 生长曲线</b>：用这头猪的有效记录拟合，<code>curve_model</code>（默认 <code>\"poly2\"</code> 二次曲线）。它只用来确定区间起止，并填补首个记录之前、末个记录之后的体重。",
+  "<b>③ 计算区间</b>：曲线第一次到达 <code>stage_range</code> 上限（120 kg）的时刻为终点；终点之前最后一次越过下限（30 kg）的时刻为起点。曲线最多往记录外延伸 <code>max_extrap_days</code>（30）天。ADG、ADFI、FCR 都只在这个区间内计算。",
+  "<b>④ 中间缺失的体重</b>：前后两个有记录日子之间<b>线性插值</b>，<code>source = \"interpolated\"</code>。这一步没有参数：中间缺失时，前后两天的实测最能代表这头猪当时的体重。",
+  "<b>⑤ 首个记录之前的体重</b>：从曲线在首个记录处的值出发画直线，斜率取首 14 天记录的稳健斜率（0.2–1.5 kg/d），<code>curve_extrap = \"start\"</code>（默认），<code>source = \"curve\"</code>。灰色虚线是沿二次曲线外推（<code>\"curve\"</code>）的结果：这头猪长得很直，两者几乎重合；生长曲线弯曲时，外推几周后二次曲线容易弯折，直线更稳。",
+  "<b>⑥ 末个记录之后的体重</b>：沿生长曲线（<code>curve_model</code>）继续，<code>source = \"curve\"</code>。<code>curve_extrap = \"tangent\"</code> 时这里也改用直线。",
+  "<b>⑦ 日增重</b>：区间内全部日体重（实测 + 填充）对日期做直线回归，<b>斜率 = ADG</b>，可靠性看 <code>r_squared</code>。填充的天数在 <code>n_interpolated_days</code>、<code>n_curve_days</code> 中。",
+  "<b>⑧ 实测与校正的日采食</b>：蓝点为当天没有错误访问（<code>state = \"org\"</code>）；橙点为有错误访问、经混合模型校正（<code>\"corr\"</code>，<code>dfi_correct = \"lmm\"</code>），空心灰点是校正前的记录值。校正后超出 <code>dfi_range</code>（0–6 kg）的日子视为缺失。",
+  "<b>⑨ 短缺口的采食</b>：两个有记录日子之间连续缺失不超过 <code>long_gap_days</code>（3）天，用稳健 LOESS 平滑插补（<code>loess_span</code>），<code>state = \"iii\"</code>。",
+  "<b>⑩ 长缺口的采食</b>：连续缺失超过 3 天，用<b>群体曲线 × 个体比例</b>：全群（有品种时按品种）\"日采食 ~ 体重\"二次曲线，乘以这头猪的采食水平，<code>impute_method = \"loess_pop\"</code>（默认），<code>state = \"iii\"</code>（空心绿点）。",
+  "<b>⑪ 首个记录之前的采食</b>：同样用群体曲线 × 个体比例（<code>\"loess_pop\"</code>），<code>state = \"elrp\"</code>（空心紫点）。晚进站的猪自己没有前期数据，借用全群曲线的形状最可靠。",
+  "<b>⑫ 末个记录之后的采食</b>：用这头猪<b>自己的</b>\"日采食 ~ 体重\"线性回归，<code>state = \"elrp\"</code>（实心紫点）。早出栏的猪末期的采食趋势它自己已经有了；群体曲线在高体重段变平，会低估。<code>impute_method = \"loess_lm\"</code> 时⑩⑪也用这个回归。",
+  "<b>⑬ 日采食量与料肉比</b>：ADFI = 区间内全部日采食（实测、校正、填充）的平均值；FCR = ADFI ÷ ADG。区间两端连续填充超过 <code>max_edge_extrap_days</code>（15）天、或实测采食比例低于 <code>min_coverage</code>（0.7）的猪，在 <code>calc_fcr()</code> 中标为低可信度。"
+)
+n_steps <- length(cap)
+# captions as a JSON array of strings (no extra dependency)
+jsonlite_lite <- function(x) {
+  x <- gsub("\\\\", "\\\\\\\\", x)
+  x <- gsub('"', '\\\\"', x)
+  x <- gsub("\n", " ", x)
+  paste0("[", paste0('"', x, '"', collapse = ","), "]")
+}
+
+legend <- paste0(
+  '<div class="fz-legend">',
+  '<span><i style="background:#0072B2"></i>实测 / 无错误</span>',
+  '<span><i style="background:#E69F00"></i>校正</span>',
+  '<span><i style="background:#009E73"></i>中间填充</span>',
+  '<span><i style="background:#CC79A7"></i>首尾填充</span>',
+  '<span><i class="hollow"></i>空心：不用的记录 / 群体曲线</span>',
+  '</div>')
+
+svg <- paste0('<svg viewBox="0 0 ', W, ' ', H, '" role="img" aria-label="填充方法逐步演示" style="width:100%;height:auto;display:block">',
+              paste(ax, collapse = ""), paste(el, collapse = ""), '</svg>')
+html <- paste0(
+  '<div class="fz" id="fz">',
+  '<style>',
+  '.fz{border:1px solid rgba(127,127,127,.35);border-radius:8px;padding:12px 14px;margin:1em 0;}',
+  '.fz .fs{opacity:0;transition:opacity .45s;} .fz .fs.on{opacity:.9;} .fz .fs.cur{opacity:1;}',
+  '.fz .fs.cur circle{filter:drop-shadow(0 0 2px rgba(0,0,0,.35));}',
+  '.fz-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;}',
+  '.fz-bar button{font:inherit;padding:3px 12px;border-radius:5px;border:1px solid rgba(127,127,127,.5);background:transparent;color:inherit;cursor:pointer;}',
+  '.fz-bar button:hover{background:rgba(127,127,127,.15);} .fz-n{margin-left:auto;opacity:.75;font-size:.9em;}',
+  '.fz-cap{min-height:4.6em;font-size:.95em;line-height:1.55;}',
+  '.fz-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.85em;opacity:.85;margin-top:4px;}',
+  '.fz-legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px;}',
+  '.fz-legend i.hollow{border:1.5px solid #999;background:transparent;}',
+  '</style>',
+  '<div class="fz-bar"><button data-a="prev">◀ 上一步</button><button data-a="play">▶ 播放</button>',
+  '<button data-a="next">下一步 ▶</button><button data-a="reset">重置</button><span class="fz-n"></span></div>',
+  '<div class="fz-cap"></div>', svg, legend,
+  '<script>(function(){',
+  'var root=document.getElementById("fz");var caps=', jsonlite_lite(cap), ';var n=', n_steps, ';var k=1,timer=null;',
+  'function show(){for(var i=1;i<=n;i++){var g=root.querySelectorAll(".s"+i);for(var j=0;j<g.length;j++){g[j].classList.toggle("on",i<=k);g[j].classList.toggle("cur",i===k);}}',
+  'root.querySelector(".fz-cap").innerHTML=caps[k-1];root.querySelector(".fz-n").textContent="第 "+k+" / "+n+" 步";}',
+  'function stop(){if(timer){clearInterval(timer);timer=null;root.querySelector("[data-a=play]").textContent="▶ 播放";}}',
+  'root.querySelector(".fz-bar").addEventListener("click",function(e){var a=e.target.getAttribute("data-a");if(!a)return;',
+  'if(a==="play"){if(timer){stop();return;}e.target.textContent="❚❚ 暂停";if(k>=n)k=0;timer=setInterval(function(){k=k>=n?1:k+1;show();if(k>=n)stop();},3800);k=k+1;show();return;}',
+  'stop();if(a==="prev")k=Math.max(1,k-1);if(a==="next")k=Math.min(n,k+1);if(a==="reset")k=1;show();});',
+  'show();})();</script></div>')
+cat(gsub("\n", " ", html))
+```
+
+## 2. 位置、方法与参数一览
+
+| 缺失位置 | 体重：方法 | 体重：参数 | `source` | 采食：方法 | 采食：参数 | `state` |
+|---|---|---|---|---|---|---|
+| 有记录的日子 | 当天有效记录的中位数 | `weight_range`、`adapt_days`、`weight_track`、`weight_outlier` | `observed` | 记录值；有错误访问时混合模型校正 | `dfi_correct`、`dfi_range`、`dfi_quantile` | `org` / `corr` |
+| 两个有记录的日子之间，≤ 3 天 | 线性插值 | — | `interpolated` | 稳健 LOESS | `long_gap_days`、`loess_span` | `iii` |
+| 两个有记录的日子之间，> 3 天 | 线性插值 | — | `interpolated` | 群体曲线 × 个体比例 | `impute_method = "loess_pop"` | `iii` |
+| 首个记录之前（晚进站） | 切线外推 | `curve_extrap = "start"`、`max_extrap_days` | `curve` | 群体曲线 × 个体比例 | `impute_method = "loess_pop"` | `elrp` |
+| 末个记录之后（早出栏） | 生长曲线 | `curve_model`、`max_extrap_days` | `curve` | 这头猪自己的"日采食 ~ 体重"回归 | `impute_method` | `elrp` |
+| 外推后仍到不了 30 或 120 kg | 不填，只算覆盖到的部分 | `max_extrap_days` | — | 只在覆盖到的部分计算 | — | — |
+
+几点说明：
+
+- **"有记录"对体重和采食分别判断**。进站后 7 天的适应期内，体重不用，但采食照常计入；所以同一天可能体重是填充的，采食是实测的。
+- **体重的"首尾"以有效体重记录为界，采食的"首尾"以有采食记录的日子为界**，两者不一定是同一天。
+- 采食插补用的体重，是上一步补齐后的日体重（`adg$daily$weight_filled`）。所以体重填充的方法也会影响采食的填充。
+- 所有填充只在计算区间内进行，区间之外的日子不补。
+
+## 3. 每种方法的细节
+
+### 体重：线性插值
+
+前后两个有记录日子的日体重之间连成直线。中间缺失时，前后两天的实测最能说明这头猪当时的状态；在示例数据上，人为隐藏中间的日子再填回，线性插值的日体重误差约 0.8 kg，用生长曲线约 1.1–1.6 kg（见《方法验证》）。
+
+### 体重：首尾外推
+
+| `curve_extrap` | 首个记录之前 | 末个记录之后 |
+|---|---|---|
+| `"start"`（默认） | 切线：首 14 天记录的稳健斜率 | 生长曲线 |
+| `"tangent"` | 切线 | 切线：末 14 天记录的稳健斜率 |
+| `"curve"` | 生长曲线 | 生长曲线 |
+
+切线的斜率限制在 0.2–1.5 kg/d。二次、三次曲线往记录外推几周时容易弯折；在 457 头 NEDAP 猪的无泄露检验中，开头缺 20 天时，开头用切线使 ADG 误差从 81 降到 66 g/d、FCR 排名相关从 0.82 升到 0.86。末端用切线虽然 ADG 更准，但采食是按体重外推的，FCR 排名反而变差，所以默认只在开头用切线。
+
+### 采食：群体曲线 × 个体比例
+
+```
+日采食 = r × f(体重)
+```
+
+- `f`：全部猪区间内有记录日子的二次回归 `日采食 ~ 体重 + 体重²`；有 `breed` 列时，不少于 10 头的品种各拟合一条，其余的猪用全群曲线；超出拟合时的体重范围，取端点的值。曲线系数在 `adfi$pop_curve` 中。
+- `r`：这头猪有记录日子的采食之和 ÷ 同样日子上 `f` 之和，再按记录天数 `n` 向 1 收缩（权重 `n / (n + 10)`）。
+- 曲线提供采食随体重变化的**形状**，`r` 保留这头猪自己的**水平**。
+
+### 采食：末端用单猪回归
+
+末个记录之后，用这头猪全部有记录日子的 `日采食 ~ 体重` 线性回归外推（结果不小于 0）。早出栏的猪，末期采食的上升趋势已经在它自己的数据里；群体二次曲线在高体重段变平，在无泄露检验中平均每天低估 43–129 g，会让早出栏的猪显得更省料。
+
+### 采食：短缺口 LOESS
+
+两个有记录日子之间不超过 `long_gap_days` 天的缺口，用日采食对日期的稳健 LOESS 平滑（`loess_span`，默认 0.75）插补。缺口短时，前后几天的采食最能代表当时的水平。
+
+## 4. 改用其他方法
+
+```{r alternatives, eval = FALSE}
+# 两端都用生长曲线外推（1.4.0 之前的做法）
+qc_config(curve_extrap = "curve")
+# 长缺口和两端都用这头猪自己的回归（1.3.0 之前的做法）
+qc_config(impute_method = "loess_lm")
+# 晚进站多、记录短的批次：直线生长曲线
+qc_config(curve_model = "poly1", stage_range = c(60, 120))
+```
+
+换方法之前，先用 `validate_truncation()` 在自己的数据上比较：它删掉一部分猪若干天的全部访问后重跑整个流程，与全部数据的结果比较，不会有被隐藏的信息泄露回来（见《方法验证》）。
+
+```{r validate, eval = FALSE}
+res <- validate_truncation(
+  visits,
+  settings = list(default = qc_config(),
+                  curve   = qc_config(curve_extrap = "curve"),
+                  lm      = qc_config(impute_method = "loess_lm")),
+  scenarios = c("late20", "early20", "gap10")
+)
+res$summary[trait == "fcr"]
+```
+
+## 5. 填了多少，怎么查
+
+```{r check}
+a$per_pig[responder == pig, .(adg, adg_type, n_observed_days, n_interpolated_days,
+                              n_curve_days, extrap_days_start, extrap_days_end)]
+f$per_pig[responder == pig, .(adfi, coverage, n_observed, n_interpolated, n_extrapolated,
+                              n_extrap_start, n_extrap_end)]
+```
+
+- `a$daily$source` 和 `f$daily$state` 标出每一天的来源；`plot_adg()` 和 `plot_adfi()` 用不同的颜色画出来。
+- 填充的天数越多，结果越依赖模型。`calc_fcr()` 会把两端连续填充超过 `max_edge_extrap_days`（15）天、或采食实测比例低于 `min_coverage`（0.7）的猪标为 `low_confidence`。

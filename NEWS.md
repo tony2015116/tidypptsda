@@ -1,3 +1,48 @@
+# tidypptsda 1.4.0
+
+## Defaults changed by a leakage-free validation
+
+* **(changes results)** `impute_method = "loess_pop"`: the days **after the
+  last recorded day** are now filled by the pig's own regression of daily
+  intake on body weight. The population curve flattens at high weights and
+  underestimated the late intake of pigs that leave early (by 43-129 g/d
+  when 20-30 days were missing, in a check on 457 NEDAP pigs), which made
+  them look more efficient. Long gaps and the days before the first
+  recorded day keep the population curve.
+* **(changes results)** New `curve_extrap = "start"`, the new default: the
+  growth curve is continued by the tangent line only **before the first
+  record**, by the curve itself after the last. In the same check, the
+  tangent at the start lowered the ADG error with 20 days missing at the
+  start from 81 to 66 g/d and raised the FCR rank correlation from 0.82 to
+  0.86; at the end it gave better ADG but a worse FCR ranking. `"curve"`
+  (before 1.4.0) and `"tangent"` remain available.
+* `validate_adg()` and `validate_weight_fill()` compare the extrapolation of
+  the settings by default (`extrap = NULL`).
+
+## New: validate_truncation()
+
+* `validate_truncation(visits, settings, scenarios, reps)` checks the whole
+  pipeline without information leaking back from hidden data: it removes
+  all visits (weights and feed) of half of the pigs over the first
+  (`"late<d>"`), last (`"early<d>"`) or middle (`"gap<d>"`) days of the
+  stage, reruns `clean_weight()` to `calc_fcr()` for every QC setting, and
+  compares ADG, ADFI and FCR with the full-data result: `bias`, `rmse`,
+  `mae_pct`, `pearson`, `spearman`, `slope` and `top_agree` (agreement on
+  the best 20%), with their SD over repetitions.
+* The other validation functions use part of the hidden information
+  (`validate_adfi()` keeps the body weight of hidden feed days; weight
+  records are cleaned with all data before hiding) and are optimistic at
+  the stage ends; the documentation now says so, and the claim of 1.3.0
+  that `"loess_pop"` halved the error at both stage ends is corrected: it
+  held at the start, not at the end.
+
+## Documentation
+
+* New article *填充方法：日体重与日采食*: a step-by-step animated diagram
+  of one pig showing which method fills which days, the parameter that
+  controls it and the `source` / `state` label, plus a table of all
+  positions, methods and parameters.
+
 # tidypptsda 1.3.0
 
 ## Feed intake imputation

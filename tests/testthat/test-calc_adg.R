@@ -192,16 +192,32 @@ test_that("curve_extrap = 'tangent' continues the curve by straight lines", {
   expect_equal(unname(flat$tangent_slopes), c(0.2, 0.2))
 })
 
-test_that("calc_adg uses the tangent only when asked", {
+test_that("calc_adg extrapolates as asked", {
   w <- clean_weight(prep_visits(fire, verbose = 0), verbose = 0)
   q <- qc_config(stage_range = c(60, 120))
-  a <- calc_adg(w, q, verbose = 0)
+  a <- calc_adg(w, qc_set(q, list(curve_extrap = "curve")), verbose = 0)
   b <- calc_adg(w, qc_set(q, list(curve_extrap = "tangent")), verbose = 0)
-  expect_true(all(grepl("tangent", b$per_pig[!is.na(curve_used), curve_used])))
+  s <- calc_adg(w, q, verbose = 0)                         # default: "start"
+  expect_true(all(grepl("tangent$", b$per_pig[!is.na(curve_used), curve_used])))
+  expect_true(all(grepl("tangent \\(start\\)", s$per_pig[!is.na(curve_used), curve_used])))
   expect_false(any(grepl("tangent", a$per_pig$curve_used)))
   # pigs that need no extrapolation keep their ADG
   same <- a$per_pig$adg_type == "observed" & b$per_pig$adg_type == "observed"
   expect_equal(a$per_pig$adg[same], b$per_pig$adg[same])
   expect_false(isTRUE(all.equal(a$per_pig$adg, b$per_pig$adg)))
   expect_equal(b$settings$curve_extrap, "tangent")
+  expect_equal(s$settings$curve_extrap, "start")
+})
+
+test_that("curve_extrap = 'start' changes only the days before the first record", {
+  set.seed(3)
+  t <- sort(runif(600, 0, 60))
+  y <- 50 + 1.2 * t - 0.006 * t^2 + rnorm(600, 0, 0.5)
+  cv <- fit_growth_curve(t, y, "poly2")
+  st <- fit_growth_curve(t, y, "poly2", "start")
+  tg <- fit_growth_curve(t, y, "poly2", "tangent")
+  expect_equal(st$name, "poly2 + tangent (start)")
+  expect_equal(st$pred(c(70, 90)), cv$pred(c(70, 90)))     # after the last record: the curve
+  expect_equal(st$pred(c(-20, -5)), tg$pred(c(-20, -5)))   # before the first: the tangent
+  expect_true(is.na(st$tangent_slopes["end"]))
 })

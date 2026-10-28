@@ -209,7 +209,8 @@ adg_one_pig <- function(d, qc, day0, fill = "linear") {
 
 # Fit a growth curve. Returns a prediction function, the fitted values,
 # the residual SD, R2 and the name of the model actually used. With
-# extrap = "tangent", the prediction beyond the records is a straight line.
+# extrap = "tangent", the prediction beyond the records is a straight line;
+# with extrap = "start", only before the first record.
 fit_growth_curve <- function(t, y, model, extrap = "curve") {
   fit_poly <- function(k, name = paste0("poly", k)) {
     f <- stats::lm(y ~ poly(t, k, raw = TRUE))
@@ -237,14 +238,18 @@ fit_growth_curve <- function(t, y, model, extrap = "curve") {
   res <- y - curve$fitted
   curve$sigma <- stats::sd(res)
   curve$r2 <- 1 - sum(res^2) / sum((y - mean(y))^2)
-  if (extrap == "tangent") curve <- tangent_ends(curve, t, y)
+  if (extrap %in% c("tangent", "start")) {
+    curve <- tangent_ends(curve, t, y, ends = if (extrap == "start") "start" else "both")
+  }
   curve
 }
 
 # Continue the curve beyond the records by straight lines: from the curve at
 # the first / last record, with the robust slope of the records of the first
 # / last `window` days, limited to `slope_range` kg/d.
-tangent_ends <- function(curve, t, y, window = 14, slope_range = c(0.2, 1.5)) {
+tangent_ends <- function(curve, t, y, ends = c("both", "start"), window = 14,
+                         slope_range = c(0.2, 1.5)) {
+  ends <- match.arg(ends)
   tmin <- min(t)
   tmax <- max(t)
   win <- min(window, (tmax - tmin) / 2)
@@ -256,7 +261,7 @@ tangent_ends <- function(curve, t, y, window = 14, slope_range = c(0.2, 1.5)) {
     min(slope_range[2L], max(slope_range[1L], unname(g)))
   }
   g_start <- slope(t <= tmin + win)
-  g_end <- slope(t >= tmax - win)
+  g_end <- if (ends == "both") slope(t >= tmax - win) else NA_real_
   p <- curve$pred
   p_start <- p(tmin)
   p_end <- p(tmax)
@@ -268,7 +273,7 @@ tangent_ends <- function(curve, t, y, window = 14, slope_range = c(0.2, 1.5)) {
     out[hi] <- p_end + g_end * (x[hi] - tmax)
     out
   }
-  curve$name <- paste0(curve$name, " + tangent")
+  curve$name <- paste0(curve$name, if (ends == "both") " + tangent" else " + tangent (start)")
   curve$tangent_slopes <- c(start = g_start, end = g_end)
   curve
 }

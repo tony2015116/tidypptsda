@@ -79,13 +79,17 @@
 #'   to `"poly2"` when it does not converge). Missing days between recorded
 #'   days are always filled by linear interpolation.
 #' - `max_extrap_days`: maximum extrapolation of the curve, days. Default 30.
-#' - `curve_extrap`: how the curve continues before the first and after the
-#'   last record. `"curve"` (default): the fitted curve itself;
-#'   `"tangent"`: a straight line from the curve at the first / last
-#'   record, with the robust slope of the records of the first / last 14
-#'   days (limited to 0.2-1.5 kg/d). A polynomial bends away from the data
-#'   when it is extrapolated for weeks; the tangent does not. Compare both
-#'   on your data with `validate_adg(extrap = c("curve", "tangent"))`.
+#' - `curve_extrap`: how the curve continues beyond the records.
+#'   `"start"` (default): before the first record a straight line from the
+#'   curve at the first record, with the robust slope of the records of the
+#'   first 14 days (limited to 0.2-1.5 kg/d); after the last record the
+#'   fitted curve itself. `"tangent"`: such a line at both ends; `"curve"`:
+#'   the fitted curve at both ends (before version 1.4.0). A polynomial
+#'   bends away from the data when it is extrapolated for weeks; the
+#'   tangent does not. At the end the tangent gave better ADG but a worse
+#'   FCR ranking (the feed of the extrapolated days follows the higher
+#'   weights), hence `"start"`. Compare them on your data with
+#'   [validate_truncation()].
 #'
 #' **Feeder errors** (Casey et al. 2005, Table 3)
 #' - `fiv_range`: FIV-lo / FIV-hi, feed intake per visit, g.
@@ -116,11 +120,13 @@
 #'   recorded days of up to `long_gap_days` days are filled from a robust
 #'   LOESS smooth of the daily intake (`"loess_pop"`, `"loess_lm"`); longer
 #'   gaps and the days before the first / after the last recorded day:
-#'   `"loess_pop"` (default): from the population curve of daily intake on
-#'   body weight (all pigs, or each breed), scaled to the intake level of
-#'   the pig; `"loess_lm"`: from a linear regression of the pig's own daily
-#'   intake on body weight; `"linear"`: linear interpolation between
-#'   recorded days whatever the gap, the per-pig regression at the ends.
+#'   `"loess_pop"` (default): longer gaps and the days before the first
+#'   recorded day from the population curve of daily intake on body weight
+#'   (all pigs, or each breed), scaled to the intake level of the pig; the
+#'   days after the last recorded day from a linear regression of the pig's
+#'   own daily intake on body weight; `"loess_lm"`: the pig's own regression
+#'   for all of these; `"linear"`: linear interpolation between recorded
+#'   days whatever the gap, the per-pig regression at the ends.
 #' - `long_gap_days`: default 3.
 #'
 #' **Confidence flags** (used by [calc_fcr()])
@@ -288,7 +294,7 @@ qc_defaults <- function() {
     stage_range = c(30, 120),
     curve_model = "poly2",
     max_extrap_days = 30,
-    curve_extrap = "curve",
+    curve_extrap = "start",
     # feeder errors, Casey et al. (2005) Table 3
     fiv_range = c(-20, 2000),
     fiv0_abs_max = 20,
@@ -362,7 +368,7 @@ qc_spec <- function() {
     entry_weight_max = num(0), exit_weight_min = num(0), track_flag_share = num(0, 1),
     smooth_r2_min = num(0, 1, null = TRUE),
     stage_range = rng(0), curve_model = chc(c("poly1", "poly2", "poly3", "gompertz")),
-    max_extrap_days = num(0), curve_extrap = chc(c("curve", "tangent")),
+    max_extrap_days = num(0), curve_extrap = chc(c("start", "curve", "tangent")),
     fiv_range = rng(), fiv0_abs_max = num(0), duration_max = num(0),
     speed_fiv_lo_max = num(0), speed_strict_max = num(0), speed_range = rng(0),
     idle_duration_max = num(0), trough_diff_range = rng(),

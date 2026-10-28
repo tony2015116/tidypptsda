@@ -200,8 +200,8 @@ validate_outlier_job <- function(job, qc, methods, adg_true, job_cores = 1L) {
 #' @param weight Result of [clean_weight()].
 #' @param models Curve models to compare (values of `curve_model`).
 #' @param extrap Extrapolations to compare (values of `curve_extrap`):
-#'   `"curve"` (default), `"tangent"` or both. With `"tangent"`, a model is
-#'   labelled e.g. `"poly2+tangent"`. Mainly the truncation results differ:
+#'   `"start"`, `"curve"`, `"tangent"` or several. Default: the one of
+#'   `qc`. Other than `"curve"`, a model is labelled e.g. `"poly2+tangent"`. Mainly the truncation results differ:
 #'   cross-validation differs only for left-out days at the very ends of the
 #'   records.
 #' @param k Number of folds. Default 5.
@@ -224,7 +224,7 @@ validate_outlier_job <- function(job, qc, methods, adg_true, job_cores = 1L) {
 #' - `settings`.
 #' @export
 validate_adg <- function(weight, models = c("poly1", "poly2", "poly3", "gompertz"),
-                         extrap = "curve",
+                         extrap = NULL,
                          k = 5, trim_days = c(10, 20), qc = weight$settings,
                          max_pigs = NULL, seed = 1, verbose = 1, cores = 1) {
   local_verbose(verbose)
@@ -234,6 +234,7 @@ validate_adg <- function(weight, models = c("poly1", "poly2", "poly3", "gompertz
   }
   check_qc(qc)
   for (m in models) qc_validate(qc_set(qc, list(curve_model = m)))
+  extrap <- extrap %||% qc$curve_extrap %||% "curve"
   for (e in extrap) qc_validate(qc_set(qc, list(curve_extrap = e)))
   configs <- curve_configs(models, extrap)
   if (!is.numeric(k) || length(k) != 1L || k < 2) cli::cli_abort("{.arg k} must be at least 2.")
@@ -346,8 +347,9 @@ validate_adg_one_pig <- function(d, qc, configs, trim_days, day0) {
 #'   - `"poly1"`, `"poly2"`, `"poly3"`, `"gompertz"`: that growth curve,
 #'     fitted on the remaining records, for every missing day.
 #' @param extrap Extrapolations of the curve beyond the records to compare
-#'   (values of `curve_extrap`): `"curve"` (default), `"tangent"` or both.
-#'   With `"tangent"`, a method is labelled e.g. `"linear+tangent"`. It
+#'   (values of `curve_extrap`): `"start"`, `"curve"`, `"tangent"` or
+#'   several. Default: the one of the settings of `weight`. Other than
+#'   `"curve"`, a method is labelled e.g. `"linear+tangent"`. It
 #'   matters for the days hidden at the ends (`"late<d>"`, `"early<d>"`).
 #' @param scenarios Patterns of hidden days, as in [validate_adfi()]:
 #'   `"random<p>"`, `"blocks<n>"`, `"late<d>"`, `"early<d>"`. Only recorded
@@ -368,7 +370,7 @@ validate_adg_one_pig <- function(d, qc, configs, trim_days, day0) {
 #' - `settings`.
 #' @export
 validate_weight_fill <- function(weight, methods = c("linear", "poly1", "poly2", "poly3", "gompertz"),
-                                 extrap = "curve",
+                                 extrap = NULL,
                                  scenarios = c("random30", "blocks3", "late20", "early15"),
                                  reps = 3, max_pigs = NULL, seed = 1, verbose = 1, cores = 1) {
   local_verbose(verbose)
@@ -381,6 +383,7 @@ validate_weight_fill <- function(weight, methods = c("linear", "poly1", "poly2",
   if (!is.character(methods) || length(methods) == 0L || !all(methods %in% ok_methods)) {
     cli::cli_abort("{.arg methods} must be one or more of {.val {ok_methods}}.")
   }
+  extrap <- extrap %||% qc$curve_extrap %||% "curve"
   for (e in extrap) qc_validate(qc_set(qc, list(curve_extrap = e)))
   configs <- curve_configs(methods, extrap)
   sc <- parse_scenarios(scenarios)

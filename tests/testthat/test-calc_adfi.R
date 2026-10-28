@@ -182,6 +182,20 @@ test_that("loess_pop scales the population curve to the pig", {
   expect_equal(out2$dfi[1:10], (nrec / (nrec + 10) * 2.2 + 10 / (nrec + 10)) * f(d$bw[1:10]) / 2)
 })
 
+test_that("loess_pop uses the pig's own regression after the last record", {
+  curve <- list(coef = c(500, 40, -0.1), range = c(30, 120), n_pigs = 10L, n_days = 500L)
+  n <- 60
+  d <- data.table::data.table(seq_days = 1:n, bw = 30 + 1.2 * (1:n), in_stage = TRUE)
+  d[, dfi_check := 800 + 25 * bw]
+  d[c(1:5, 51:60), dfi_check := NA]             # start and end
+  d[, state := data.table::fifelse(is.na(dfi_check), NA_character_, "org")]
+  out <- impute_dfi_one_pig(d, qc_config(), pop = list(all = curve))
+  fit <- stats::lm(dfi_check ~ bw, data = d[!is.na(dfi_check)])
+  expect_equal(out$dfi[51:60], unname(stats::predict(fit, newdata = d[51:60])))
+  expect_false(isTRUE(all.equal(out$dfi[1:5], unname(stats::predict(fit, newdata = d[1:5])))))
+  expect_true(all(out$state[c(1:5, 51:60)] == "elrp"))
+})
+
 test_that("calc_adfi fits population curves for all pigs and per breed", {
   r <- run_adfi(nedap)
   pc <- r$adfi$pop_curve
@@ -199,7 +213,15 @@ test_that("calc_adfi fits population curves for all pigs and per breed", {
   # other methods: no curve
   fl <- calc_adfi(r$visits, r$adg, qc = qc_set(r$adg$settings, list(impute_method = "loess_lm")), verbose = 0)
   expect_equal(nrow(fl$pop_curve), 0L)
-  expect_false(isTRUE(all.equal(fl$per_pig$adfi, r$adfi$per_pig$adfi)))
+  # a late entry: the days before the first record differ between the methods
+  v <- r$visits
+  pig <- r$adg$per_pig[adg_type == "observed", responder][1L]
+  start <- r$adg$per_pig[responder == pig, start_date]
+  v <- v[!(responder %in% pig & date < start + 20)]
+  a <- calc_adg(clean_weight(v, verbose = 0), verbose = 0)
+  pop <- calc_adfi(v, a, verbose = 0)$per_pig[responder == pig, adfi]
+  lm <- calc_adfi(v, a, qc = qc_set(a$settings, list(impute_method = "loess_lm")), verbose = 0)$per_pig[responder == pig, adfi]
+  expect_false(isTRUE(all.equal(pop, lm)))
 })
 
 test_that("validate_adfi compares loess_pop with leave-one-out curves", {

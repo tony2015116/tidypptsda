@@ -69,8 +69,9 @@ test_that("the removed max_overlap_days says what to use", {
   expect_equal(qc_config()$misread_max_visits, 2)
 })
 
-test_that("curve_extrap defaults to the curve", {
-  expect_equal(qc_config()$curve_extrap, "curve")
+test_that("curve_extrap defaults to the tangent at the start", {
+  expect_equal(qc_config()$curve_extrap, "start")
+  expect_equal(qc_config(curve_extrap = "curve")$curve_extrap, "curve")
   expect_equal(qc_config(curve_extrap = "tangent")$curve_extrap, "tangent")
   expect_error(qc_config(curve_extrap = "line"), "curve_extrap")
 })
