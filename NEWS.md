@@ -1,3 +1,21 @@
+# tidypptsda 1.6.1
+
+## Progress and messages of the validation functions
+
+* `validate_outliers()`, `validate_adg()`, `validate_weight_fill()`,
+  `validate_adfi()` and `validate_truncation()` start with one line about
+  the data and the design (pigs, methods, scenarios, repetitions), then show
+  numbered phases (`[1/3]`, ...). The long phases, such as cleaning the
+  remaining records again for every fold, truncation or mask, now have a
+  progress bar with the count done and the ETA from the start; before they
+  ran silently. Each phase ends with one line and its run time, and the
+  function ends with the total time.
+* The results are printed as an aligned table, with the best value of each
+  column in green and marked with `*`, e.g. the ADFI error per method and
+  scenario.
+* Progress bars are shorter, so the count and the ETA fit on an 80-column
+  console.
+
 # tidypptsda 1.6.0
 
 ## New: write_report()

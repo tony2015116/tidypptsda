@@ -49,6 +49,42 @@ test_that("validate_adg compares curve models", {
   expect_error(validate_adg(w, block_days = 0), "block_days")
 })
 
+test_that("validation phases show numbered steps and a results table", {
+  withr::local_options(tidypptsda.verbose = 1L)
+  out <- cli::ansi_strip(cli::cli_fmt({
+    ph <- ppt_phases(2L)
+    x <- ph$run("Squares", 3L, function(i) i^2, unit = "item")
+    y <- ph$do("Sum", function() sum(unlist(x)))
+    ph$finish()
+  }))
+  expect_true(any(grepl("[1/2] Squares (3 items)", out, fixed = TRUE)))
+  expect_true(any(grepl("[2/2] Sum", out, fixed = TRUE)))
+  expect_true(any(grepl("^. Done in", out)))
+  tab <- cli::ansi_strip(cli::cli_fmt(ppt_result_table(
+    "t", c("none", "a", "b"), list(err = c(0, 2, 1), bias = c(0, -1, 3), found = c(0.1, 0.9, 0.5)),
+    higher = "found", zero = "bias", pct = "found", exclude = "none")))
+  expect_match(tab[grepl("^  b", tab)], "1\\.0\\*")        # lowest error, none excluded
+  expect_match(tab[grepl("^  a", tab)], "-1\\.0\\*")       # bias closest to 0
+  expect_match(tab[grepl("^  a", tab)], "90\\.0%\\*")      # highest share found
+  expect_false(grepl("\\*", tab[grepl("^  none", tab)]))
+  # silent with verbose = 0
+  w <- clean_weight(prep_visits(nedap, verbose = 0), verbose = 0)
+  expect_length(cli::cli_fmt(validate_adg(w, models = "poly2", trim_days = 10, max_pigs = 4, verbose = 0)), 0L)
+})
+
+test_that("a parallel worker that dies is reported and its items fail", {
+  skip_on_os("windows")
+  withr::local_options(tidypptsda.verbose = 0L)
+  f <- function(x) {
+    if (x == 3) tools::pskill(Sys.getpid(), tools::SIGKILL)
+    x
+  }
+  msg <- cli::cli_fmt(r <- run_with_progress(as.list(1:6), f, cores = 2))
+  expect_true(any(grepl("stopped without a result", msg)))
+  failed <- vapply(r, function(z) is.list(z) && inherits(z$res, "error"), logical(1))
+  expect_equal(failed, rep(c(TRUE, FALSE), 3))
+})
+
 test_that("validators clean the remaining records again", {
   w <- clean_weight(prep_visits(nedap, verbose = 0), verbose = 0)
   pig <- w$per_pig[status != "removed", responder][1]

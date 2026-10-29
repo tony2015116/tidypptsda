@@ -97,8 +97,11 @@ validate_truncation <- function(visits, settings = qc_config(),
   }
   cores <- check_cores(cores)
 
-  ppt_msg("Validating the pipeline by truncation ({length(settings)} setting{?s} x {length(scenarios)} scenario{?s} x {reps} repetition{?s})", "h1")
-  full <- lapply(settings, function(q) pipeline_run(dt, q))
+  ppt_step("Validating the pipeline by truncation")
+  ph <- ppt_phases(2L)
+  full <- ph$run("Full-data run of each setting", length(settings), unit = "setting",
+                 fun = function(j) pipeline_run(dt, settings[[j]]))
+  names(full) <- names(settings)
   stage <- full[[1L]]$stage
   ok <- stage[adg_type == "observed" & !is.na(start_date) & !is.na(end_date), responder]
   ok <- intersect(ok, full[[1L]]$traits[!is.na(fcr), responder])
@@ -118,8 +121,16 @@ validate_truncation <- function(visits, settings = qc_config(),
   for (s in names(settings)) for (nm in names(sc)) for (r in seq_len(reps)) for (g in splits[[r]]) {
     jobs[[length(jobs) + 1L]] <- list(setting = s, scenario = nm, rep = r, pigs = g)
   }
-  res <- run_with_progress(jobs, truncation_job, cores = cores, label = "Truncated runs",
+  ppt_context(paste(length(pigs), "pigs with a fully covered stage"),
+              paste(length(settings), if (length(settings) == 1L) "setting" else "settings"),
+              paste(length(scenarios), if (length(scenarios) == 1L) "scenario" else "scenarios"),
+              paste(reps, if (reps == 1) "repetition" else "repetitions"),
+              paste(length(jobs), "runs of the pipeline"))
+  lab <- ph$label("Truncated runs")
+  t0 <- Sys.time()
+  res <- run_with_progress(jobs, truncation_job, cores = cores, label = lab,
                            visits = dt, settings = settings, sc = sc, stage = stage)
+  ph$done(lab, t0, sprintf(" (%d runs)", length(jobs)))
   bad <- vapply(res, inherits, logical(1), "error")
   if (any(bad)) {
     cli::cli_abort(c("{sum(bad)} truncated run{?s} failed.", "x" = conditionMessage(res[[which(bad)[1L]]])))
@@ -147,9 +158,12 @@ validate_truncation <- function(visits, settings = qc_config(),
                            match(setting, names(settings)))]
   data.table::setcolorder(summary, c("setting", "scenario", "trait", meas, "n", "n_lost"))
 
-  if (ppt_verbose() >= 1L) {
-    ppt_msg("{length(pigs)} pig{?s} truncated in {length(jobs)} run{?s} of the pipeline", "info")
-  }
+  ph$finish()
+  fs <- summary[trait == "fcr"]
+  ppt_wide_table("FCR: rank correlation with the full-data FCR", fs, "setting", "scenario", "spearman",
+                 digits = 3, higher = TRUE, row_order = names(settings), col_order = scenarios)
+  ppt_wide_table("FCR: mean absolute error (%)", fs, "setting", "scenario", "mae_pct",
+                 digits = 2, row_order = names(settings), col_order = scenarios)
   structure(list(summary = summary, per_rep = per_rep, per_pig = per_pig,
                  settings = list(qc = settings, scenarios = scenarios, share = share, reps = reps,
                                  top = top, pigs = pigs, seed = seed)),

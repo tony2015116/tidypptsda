@@ -146,6 +146,156 @@ ppt_rows <- function(...) {
   invisible(NULL)
 }
 
+# ---- phases of long computations (validation) ------------------------------
+
+# A 15-character progress bar: "\u25a0\u25a0\u25a0\u25a0   ..." (k of n done).
+short_bar <- function(k, n, width = 15L) {
+  f <- if (n > 0) round(width * k / n) else 0L
+  if (cli::num_ansi_colors() > 1L) {
+    paste0(cli::col_green(strrep("\u25a0", f)), cli::col_grey(strrep("\u25a0", width - f)))
+  } else {
+    paste0(strrep("\u25a0", f), strrep("\u00b7", width - f))
+  }
+}
+
+# Time since t0: "2.3s", "1m 05s".
+fmt_secs <- function(t0) {
+  el <- as.numeric(difftime(Sys.time(), t0, units = "secs"))
+  if (el < 60) sprintf("%.1fs", el) else sprintf("%dm %02ds", as.integer(el %/% 60), as.integer(round(el %% 60)))
+}
+
+# Numbered phases "[i/n]" of a long function. Each phase shows a progress
+# bar or a running message while it works, then one done line with its run
+# time:
+# - run(label, k, fun, unit): fun(1), ..., fun(k) with a bar (k items);
+# - do(label, fun): one call, with a running message;
+# - label(label) and done(label, t0, detail): for a phase that shows its
+#   own bar (e.g. fit_by_pig() with `.label`).
+# finish(): last line with the total time.
+ppt_phases <- function(n) {
+  i <- 0L
+  t_all <- Sys.time()
+  show <- function() ppt_verbose() >= 1L
+  label <- function(x) {
+    i <<- i + 1L
+    sprintf("[%d/%d] %s", i, n, x)
+  }
+  done <- function(x, t0, detail = "") {
+    if (show()) {
+      msg <- paste0(x, detail, " ", cli::col_grey(fmt_secs(t0)))
+      cli::cli_alert_success("{msg}")
+    }
+    invisible(NULL)
+  }
+  run <- function(x, k, fun, unit = "run") {
+    x <- label(x)
+    t0 <- Sys.time()
+    out <- vector("list", k)
+    if (show() && k > 0L) {
+      old <- options(cli.progress_show_after = 0)
+      on.exit(options(old), add = TRUE)
+      sb <- short_bar(0, k)
+      bar <- cli::cli_progress_bar(
+        total = k, clear = TRUE, .envir = environment(),
+        format = paste0("{cli::pb_spin} ", x, " {sb} {cli::pb_current}/{cli::pb_total} | ETA {cli::pb_eta}"))
+      cli::cli_progress_update(id = bar, set = 0, force = TRUE, .envir = environment())
+    }
+    for (j in seq_len(k)) {
+      out[j] <- list(fun(j))
+      if (show()) {
+        sb <- short_bar(j, k)
+        cli::cli_progress_update(id = bar, set = j, force = TRUE, .envir = environment())
+      }
+    }
+    if (show() && k > 0L) cli::cli_progress_done(id = bar, .envir = environment())
+    done(x, t0, sprintf(" (%d %s%s)", k, unit, if (k == 1L) "" else "s"))
+    out
+  }
+  do <- function(x, fun) {
+    x <- label(x)
+    t0 <- Sys.time()
+    if (show()) {
+      # removed when done (in consoles that can redraw lines)
+      id <- cli::cli_progress_message("{cli::symbol$arrow_right} {x} ...", .envir = environment())
+    }
+    out <- fun()
+    if (show()) cli::cli_progress_done(id = id, .envir = environment())
+    done(x, t0)
+    out
+  }
+  finish <- function(what = "$summary") {
+    if (show()) {
+      msg <- paste0("Done in ", fmt_secs(t_all), cli::col_grey(paste0(" \u00b7 details in ", what)))
+      cli::cli_alert_success("{msg}")
+    }
+    invisible(NULL)
+  }
+  list(label = label, done = done, run = run, do = do, finish = finish)
+}
+
+# One context line under the header of a validation, e.g.
+# "457 pigs \u00b7 4 models \u00b7 5-fold CV".
+ppt_context <- function(...) {
+  if (ppt_verbose() < 1L) return(invisible(NULL))
+  parts <- unlist(list(...))
+  msg <- paste(parts[nzchar(parts)], collapse = " \u00b7 ")
+  cli::cli_alert_info("{msg}")
+  invisible(NULL)
+}
+
+# Aligned table of results: `rows` are the row labels, `cols` a named list
+# of numeric columns. In each column the best value is green and marked
+# with "*": the lowest, the highest for the columns named in `higher`, the
+# closest to 0 for those in `zero`. Rows in `exclude` (e.g. a baseline) are
+# never marked.
+ppt_result_table <- function(title, rows, cols, digits = 1, higher = character(), pct = character(),
+                             zero = character(), exclude = character()) {
+  if (ppt_verbose() < 1L || length(rows) == 0L || length(cols) == 0L) return(invisible(NULL))
+  digits <- rep_len(digits, length(cols))
+  cells <- lapply(seq_along(cols), function(k) {
+    v <- cols[[k]]
+    nm <- names(cols)[k]
+    txt <- ifelse(is.na(v), "-", formatC(if (nm %in% pct) 100 * v else v, format = "f",
+                                          digits = digits[k], big.mark = ","))
+    if (nm %in% pct) txt[!is.na(v)] <- paste0(txt[!is.na(v)], "%")
+    score <- if (nm %in% higher) -v else if (nm %in% zero) abs(v) else v
+    score[rows %in% exclude] <- NA
+    best <- if (sum(!is.na(score)) < 2L) integer() else which(score == min(score, na.rm = TRUE))
+    list(txt = txt, best = best)
+  })
+  w_row <- max(nchar(rows), 0L)
+  w <- vapply(seq_along(cols), function(k) max(nchar(names(cols)[k]), nchar(cells[[k]]$txt) + 1L), 0L)
+  head <- paste0("  ", formatC("", width = -w_row),
+                 paste0("  ", mapply(formatC, names(cols), width = w), collapse = ""))
+  lines <- vapply(seq_along(rows), function(r) {
+    body <- vapply(seq_along(cols), function(k) {
+      t <- cells[[k]]$txt[r]
+      if (r %in% cells[[k]]$best) cli::col_green(formatC(paste0(t, "*"), width = w[k]))
+      else formatC(paste0(t, " "), width = w[k])
+    }, "")
+    paste0("  ", formatC(rows[r], width = -w_row), paste0("  ", body, collapse = ""))
+  }, "")
+  cli::cli_text(cli::style_bold(title))
+  cli::cli_verbatim(c(cli::col_grey(head), lines))
+  invisible(NULL)
+}
+
+# Wide table of one measure: methods in rows, scenarios in columns.
+ppt_wide_table <- function(title, d, row, col, value, digits = 1, higher = FALSE, pct = FALSE,
+                           row_order = NULL, col_order = NULL) {
+  if (ppt_verbose() < 1L || nrow(d) == 0L) return(invisible(NULL))
+  rows <- row_order %||% unique(d[[row]])
+  cs <- col_order %||% unique(d[[col]])
+  cols <- stats::setNames(lapply(cs, function(cc) {
+    vapply(rows, function(rr) {
+      v <- d[[value]][d[[row]] == rr & d[[col]] == cc]
+      if (length(v) == 0L) NA_real_ else v[1L]
+    }, numeric(1))
+  }), cs)
+  ppt_result_table(title, rows, cols, digits = digits, higher = if (higher) cs else character(),
+                   pct = if (pct) cs else character())
+}
+
 # ---- input checks -----------------------------------------------------------
 
 # Always return a data.table that is a copy of the input.
@@ -193,7 +343,7 @@ local_cores <- function(cores, envir = parent.frame()) {
 # skipped; warnings are recorded in `warnings` and muffled.
 # `fun` must return a data.frame (or NULL to drop the pig silently).
 # Pigs are processed in parallel when option tidypptsda.cores > 1.
-fit_by_pig <- function(data, fun, step, by = "responder", ...) {
+fit_by_pig <- function(data, fun, step, by = "responder", ..., .label = NULL) {
   groups <- split(data, by = by, keep.by = TRUE, sorted = TRUE)
   n <- length(groups)
   args <- list(...)
@@ -202,7 +352,7 @@ fit_by_pig <- function(data, fun, step, by = "responder", ...) {
 
   cores <- min(getOption("tidypptsda.cores", 1L), n)
   runs <- run_with_progress(groups, one_pig, cores = cores,
-                            label = paste0(step, ": fitting pigs"))
+                            label = .label %||% paste0(step, ": fitting pigs"))
 
   out <- vector("list", n)
   failed <- vector("list", n)
@@ -275,10 +425,16 @@ run_with_progress <- function(x, fun, cores = 1L, label = "Working", ...) {
   n <- length(x)
   if (n == 0L) return(list())
   show <- ppt_verbose() >= 1L && n > 1L
+  sb <- short_bar(0, n)
   bar <- if (show) {
-    cli::cli_progress_bar(label, total = n, clear = TRUE, .envir = environment())
+    cli::cli_progress_bar(total = n, clear = TRUE, .envir = environment(),
+                          format = paste0(label, " {sb} {cli::pb_current}/{cli::pb_total} | ETA {cli::pb_eta}"))
   }
-  set_bar <- function(k) if (show) cli::cli_progress_update(set = k, id = bar, .envir = environment())
+  env <- environment()
+  set_bar <- function(k) if (show) {
+    assign("sb", short_bar(k, n), envir = env)
+    cli::cli_progress_update(set = k, id = bar, .envir = env)
+  }
   out <- if (cores > 1L && .Platform$OS.type != "windows") {
     run_forked(x, fun, cores, set_bar, ...)
   } else {
@@ -348,7 +504,8 @@ run_forked <- function(x, fun, cores, set_bar, ...) {
     parallel::mccollect(jobs[left], wait = TRUE)   # reap them (no zombies)
   }, add = TRUE)
   while (length(left) > 0L) {
-    r <- parallel::mccollect(jobs[left], wait = FALSE, timeout = 0.25)
+    # a worker that died (e.g. killed when memory ran out) is reported below
+    r <- suppressWarnings(parallel::mccollect(jobs[left], wait = FALSE, timeout = 0.25))
     if (!is.null(r)) {
       for (nm in names(r)) {
         k <- match(as.integer(nm), pids)
@@ -359,6 +516,15 @@ run_forked <- function(x, fun, cores, set_bar, ...) {
     set_bar(sum(file.size(files), na.rm = TRUE))
   }
   out <- vector("list", n)
+  dead <- which(vapply(got, is.null, logical(1)))
+  if (length(dead) > 0L) {
+    n_lost <- sum(lengths(share[dead]))
+    # shown even inside silent (verbose = 0) steps: results are missing
+    n_w <- length(dead)
+    cli::cli_bullets(c(
+      "!" = "{n_w} of {length(share)} parallel worker{?s} stopped without a result: {n_lost} item{?s} not computed (recorded as failed).",
+      "i" = "This usually means the computer ran out of memory: use fewer {.arg cores}, or {.code cores = 1}."))
+  }
   for (k in seq_along(share)) {
     res <- got[[k]]
     if (inherits(res, "try-error") || is.null(res)) {

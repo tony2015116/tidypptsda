@@ -284,6 +284,156 @@ ppt_rows <- function(...) {
   invisible(NULL)
 }
 
+# ---- phases of long computations (validation) ------------------------------
+
+# A 15-character progress bar: "\u25a0\u25a0\u25a0\u25a0   ..." (k of n done).
+short_bar <- function(k, n, width = 15L) {
+  f <- if (n > 0) round(width * k / n) else 0L
+  if (cli::num_ansi_colors() > 1L) {
+    paste0(cli::col_green(strrep("\u25a0", f)), cli::col_grey(strrep("\u25a0", width - f)))
+  } else {
+    paste0(strrep("\u25a0", f), strrep("\u00b7", width - f))
+  }
+}
+
+# Time since t0: "2.3s", "1m 05s".
+fmt_secs <- function(t0) {
+  el <- as.numeric(difftime(Sys.time(), t0, units = "secs"))
+  if (el < 60) sprintf("%.1fs", el) else sprintf("%dm %02ds", as.integer(el %/% 60), as.integer(round(el %% 60)))
+}
+
+# Numbered phases "[i/n]" of a long function. Each phase shows a progress
+# bar or a running message while it works, then one done line with its run
+# time:
+# - run(label, k, fun, unit): fun(1), ..., fun(k) with a bar (k items);
+# - do(label, fun): one call, with a running message;
+# - label(label) and done(label, t0, detail): for a phase that shows its
+#   own bar (e.g. fit_by_pig() with `.label`).
+# finish(): last line with the total time.
+ppt_phases <- function(n) {
+  i <- 0L
+  t_all <- Sys.time()
+  show <- function() ppt_verbose() >= 1L
+  label <- function(x) {
+    i <<- i + 1L
+    sprintf("[%d/%d] %s", i, n, x)
+  }
+  done <- function(x, t0, detail = "") {
+    if (show()) {
+      msg <- paste0(x, detail, " ", cli::col_grey(fmt_secs(t0)))
+      cli::cli_alert_success("{msg}")
+    }
+    invisible(NULL)
+  }
+  run <- function(x, k, fun, unit = "run") {
+    x <- label(x)
+    t0 <- Sys.time()
+    out <- vector("list", k)
+    if (show() && k > 0L) {
+      old <- options(cli.progress_show_after = 0)
+      on.exit(options(old), add = TRUE)
+      sb <- short_bar(0, k)
+      bar <- cli::cli_progress_bar(
+        total = k, clear = TRUE, .envir = environment(),
+        format = paste0("{cli::pb_spin} ", x, " {sb} {cli::pb_current}/{cli::pb_total} | ETA {cli::pb_eta}"))
+      cli::cli_progress_update(id = bar, set = 0, force = TRUE, .envir = environment())
+    }
+    for (j in seq_len(k)) {
+      out[j] <- list(fun(j))
+      if (show()) {
+        sb <- short_bar(j, k)
+        cli::cli_progress_update(id = bar, set = j, force = TRUE, .envir = environment())
+      }
+    }
+    if (show() && k > 0L) cli::cli_progress_done(id = bar, .envir = environment())
+    done(x, t0, sprintf(" (%d %s%s)", k, unit, if (k == 1L) "" else "s"))
+    out
+  }
+  do <- function(x, fun) {
+    x <- label(x)
+    t0 <- Sys.time()
+    if (show()) {
+      # removed when done (in consoles that can redraw lines)
+      id <- cli::cli_progress_message("{cli::symbol$arrow_right} {x} ...", .envir = environment())
+    }
+    out <- fun()
+    if (show()) cli::cli_progress_done(id = id, .envir = environment())
+    done(x, t0)
+    out
+  }
+  finish <- function(what = "$summary") {
+    if (show()) {
+      msg <- paste0("Done in ", fmt_secs(t_all), cli::col_grey(paste0(" \u00b7 details in ", what)))
+      cli::cli_alert_success("{msg}")
+    }
+    invisible(NULL)
+  }
+  list(label = label, done = done, run = run, do = do, finish = finish)
+}
+
+# One context line under the header of a validation, e.g.
+# "457 pigs \u00b7 4 models \u00b7 5-fold CV".
+ppt_context <- function(...) {
+  if (ppt_verbose() < 1L) return(invisible(NULL))
+  parts <- unlist(list(...))
+  msg <- paste(parts[nzchar(parts)], collapse = " \u00b7 ")
+  cli::cli_alert_info("{msg}")
+  invisible(NULL)
+}
+
+# Aligned table of results: `rows` are the row labels, `cols` a named list
+# of numeric columns. In each column the best value is green and marked
+# with "*": the lowest, the highest for the columns named in `higher`, the
+# closest to 0 for those in `zero`. Rows in `exclude` (e.g. a baseline) are
+# never marked.
+ppt_result_table <- function(title, rows, cols, digits = 1, higher = character(), pct = character(),
+                             zero = character(), exclude = character()) {
+  if (ppt_verbose() < 1L || length(rows) == 0L || length(cols) == 0L) return(invisible(NULL))
+  digits <- rep_len(digits, length(cols))
+  cells <- lapply(seq_along(cols), function(k) {
+    v <- cols[[k]]
+    nm <- names(cols)[k]
+    txt <- ifelse(is.na(v), "-", formatC(if (nm %in% pct) 100 * v else v, format = "f",
+                                          digits = digits[k], big.mark = ","))
+    if (nm %in% pct) txt[!is.na(v)] <- paste0(txt[!is.na(v)], "%")
+    score <- if (nm %in% higher) -v else if (nm %in% zero) abs(v) else v
+    score[rows %in% exclude] <- NA
+    best <- if (sum(!is.na(score)) < 2L) integer() else which(score == min(score, na.rm = TRUE))
+    list(txt = txt, best = best)
+  })
+  w_row <- max(nchar(rows), 0L)
+  w <- vapply(seq_along(cols), function(k) max(nchar(names(cols)[k]), nchar(cells[[k]]$txt) + 1L), 0L)
+  head <- paste0("  ", formatC("", width = -w_row),
+                 paste0("  ", mapply(formatC, names(cols), width = w), collapse = ""))
+  lines <- vapply(seq_along(rows), function(r) {
+    body <- vapply(seq_along(cols), function(k) {
+      t <- cells[[k]]$txt[r]
+      if (r %in% cells[[k]]$best) cli::col_green(formatC(paste0(t, "*"), width = w[k]))
+      else formatC(paste0(t, " "), width = w[k])
+    }, "")
+    paste0("  ", formatC(rows[r], width = -w_row), paste0("  ", body, collapse = ""))
+  }, "")
+  cli::cli_text(cli::style_bold(title))
+  cli::cli_verbatim(c(cli::col_grey(head), lines))
+  invisible(NULL)
+}
+
+# Wide table of one measure: methods in rows, scenarios in columns.
+ppt_wide_table <- function(title, d, row, col, value, digits = 1, higher = FALSE, pct = FALSE,
+                           row_order = NULL, col_order = NULL) {
+  if (ppt_verbose() < 1L || nrow(d) == 0L) return(invisible(NULL))
+  rows <- row_order %||% unique(d[[row]])
+  cs <- col_order %||% unique(d[[col]])
+  cols <- stats::setNames(lapply(cs, function(cc) {
+    vapply(rows, function(rr) {
+      v <- d[[value]][d[[row]] == rr & d[[col]] == cc]
+      if (length(v) == 0L) NA_real_ else v[1L]
+    }, numeric(1))
+  }), cs)
+  ppt_result_table(title, rows, cols, digits = digits, higher = if (higher) cs else character(),
+                   pct = if (pct) cs else character())
+}
+
 # ---- input checks -----------------------------------------------------------
 
 # Always return a data.table that is a copy of the input.
@@ -331,7 +481,7 @@ local_cores <- function(cores, envir = parent.frame()) {
 # skipped; warnings are recorded in `warnings` and muffled.
 # `fun` must return a data.frame (or NULL to drop the pig silently).
 # Pigs are processed in parallel when option tidypptsda.cores > 1.
-fit_by_pig <- function(data, fun, step, by = "responder", ...) {
+fit_by_pig <- function(data, fun, step, by = "responder", ..., .label = NULL) {
   groups <- split(data, by = by, keep.by = TRUE, sorted = TRUE)
   n <- length(groups)
   args <- list(...)
@@ -340,7 +490,7 @@ fit_by_pig <- function(data, fun, step, by = "responder", ...) {
 
   cores <- min(getOption("tidypptsda.cores", 1L), n)
   runs <- run_with_progress(groups, one_pig, cores = cores,
-                            label = paste0(step, ": fitting pigs"))
+                            label = .label %||% paste0(step, ": fitting pigs"))
 
   out <- vector("list", n)
   failed <- vector("list", n)
@@ -413,10 +563,16 @@ run_with_progress <- function(x, fun, cores = 1L, label = "Working", ...) {
   n <- length(x)
   if (n == 0L) return(list())
   show <- ppt_verbose() >= 1L && n > 1L
+  sb <- short_bar(0, n)
   bar <- if (show) {
-    cli::cli_progress_bar(label, total = n, clear = TRUE, .envir = environment())
+    cli::cli_progress_bar(total = n, clear = TRUE, .envir = environment(),
+                          format = paste0(label, " {sb} {cli::pb_current}/{cli::pb_total} | ETA {cli::pb_eta}"))
   }
-  set_bar <- function(k) if (show) cli::cli_progress_update(set = k, id = bar, .envir = environment())
+  env <- environment()
+  set_bar <- function(k) if (show) {
+    assign("sb", short_bar(k, n), envir = env)
+    cli::cli_progress_update(set = k, id = bar, .envir = env)
+  }
   out <- if (cores > 1L && .Platform$OS.type != "windows") {
     run_forked(x, fun, cores, set_bar, ...)
   } else {
@@ -486,7 +642,8 @@ run_forked <- function(x, fun, cores, set_bar, ...) {
     parallel::mccollect(jobs[left], wait = TRUE)   # reap them (no zombies)
   }, add = TRUE)
   while (length(left) > 0L) {
-    r <- parallel::mccollect(jobs[left], wait = FALSE, timeout = 0.25)
+    # a worker that died (e.g. killed when memory ran out) is reported below
+    r <- suppressWarnings(parallel::mccollect(jobs[left], wait = FALSE, timeout = 0.25))
     if (!is.null(r)) {
       for (nm in names(r)) {
         k <- match(as.integer(nm), pids)
@@ -497,6 +654,15 @@ run_forked <- function(x, fun, cores, set_bar, ...) {
     set_bar(sum(file.size(files), na.rm = TRUE))
   }
   out <- vector("list", n)
+  dead <- which(vapply(got, is.null, logical(1)))
+  if (length(dead) > 0L) {
+    n_lost <- sum(lengths(share[dead]))
+    # shown even inside silent (verbose = 0) steps: results are missing
+    n_w <- length(dead)
+    cli::cli_bullets(c(
+      "!" = "{n_w} of {length(share)} parallel worker{?s} stopped without a result: {n_lost} item{?s} not computed (recorded as failed).",
+      "i" = "This usually means the computer ran out of memory: use fewer {.arg cores}, or {.code cores = 1}."))
+  }
   for (k in seq_along(share)) {
     res <- got[[k]]
     if (inherits(res, "try-error") || is.null(res)) {
@@ -6968,28 +7134,39 @@ validate_outliers <- function(visits, qc = qc_config(),
   if (!is.numeric(rate) || length(rate) != 1L || rate <= 0 || rate >= 1) {
     cli::cli_abort("{.arg rate} must be a number between 0 and 1.")
   }
-  ppt_msg("Validating weight outlier methods ({reps} repetition{?s}, {round(100 * rate)}% artificial errors)", "h1")
+  ppt_step("Validating weight outlier methods")
+  ppt_context(paste(length(methods), "methods"), paste0(round(100 * rate), "% artificial errors of ",
+              size[1L], "-", size[2L], " kg (", direction, ")"), paste(reps, if (reps == 1) "repetition" else "repetitions"),
+              paste("reference:", reference))
+  ph <- ppt_phases(3L)
 
   set.seed(seed)
-  ref <- clean_weight(visits, qc, verbose = 0, cores = cores)
-  kept <- sample_pigs(ref$per_pig[status != "removed", responder], max_pigs)
-  clean <- !ref$records$outlier
-  if (reference == "consensus") {
-    # records that no method flags; all runs sort the records the same way
-    for (m in methods) {
-      wm <- clean_weight(visits, outlier_qc(qc, m), verbose = 0, cores = cores)
+  ref <- NULL
+  clean <- NULL
+  # the clean records: kept by qc (and by every method for "consensus")
+  runs <- c(list(qc), if (reference == "consensus") lapply(methods, function(m) outlier_qc(qc, m)))
+  ph$run("Clean records", length(runs), function(j) {
+    if (j == 1L) {
+      ref <<- clean_weight(visits, qc, verbose = 0, cores = cores)
+      clean <<- !ref$records$outlier
+    } else {
+      wm <- clean_weight(visits, runs[[j]], verbose = 0, cores = cores)
       bad <- unique(wm$records[outlier == TRUE, .(responder, entry_time, weight)])
       hit <- ref$records[bad, on = c("responder", "entry_time", "weight"), which = TRUE, nomatch = NULL]
-      clean[hit] <- FALSE
+      clean[hit] <<- FALSE
     }
-  }
+    NULL
+  }, unit = "cleaning")
+  kept <- sample_pigs(ref$per_pig[status != "removed", responder], max_pigs)
   truth <- ref$records[clean & responder %in% kept,
                        .(responder, location, date, seq_days, entry_time, weight)]
   truth[, `:=`(identified = TRUE, key = .I)]
   # reference ADG: the clean records without any outlier method
   q_none <- qc_set(outlier_qc(qc, character()), list(adapt_days = 0))
-  adg_true <- calc_adg(clean_weight(truth, q_none, verbose = 0, cores = cores), q_none,
-                       verbose = 0, cores = cores)$per_pig[, .(responder, adg_true = adg)]
+  adg_true <- ph$do("Reference ADG of the clean records", function() {
+    calc_adg(clean_weight(truth, q_none, verbose = 0, cores = cores), q_none,
+             verbose = 0, cores = cores)$per_pig[, .(responder, adg_true = adg)]
+  })
 
   spoiled <- lapply(seq_len(reps), function(r) {
     d <- data.table::copy(truth)
@@ -7006,9 +7183,12 @@ validate_outliers <- function(visits, qc = qc_config(),
       list(rep = r, method = m, d = spoiled[[r]]))), recursive = FALSE)
   )
   # jobs run in parallel, so each job fits its pigs on one core
-  res <- run_with_progress(jobs, validate_outlier_job, label = "Validating outlier methods",
+  lab <- ph$label("Spoiled data, each method")
+  t0 <- Sys.time()
+  res <- run_with_progress(jobs, validate_outlier_job, label = lab,
                            qc = qc, methods = methods, adg_true = adg_true, cores = cores,
                            job_cores = 1L)
+  ph$done(lab, t0, sprintf(" (%d runs)", length(jobs)))
   per_rep <- data.table::rbindlist(res)
   per_rep[, method := factor(method, levels = c("none", names(methods)))]
   data.table::setorder(per_rep, method, rep)
@@ -7017,12 +7197,14 @@ validate_outliers <- function(visits, qc = qc_config(),
   summary[, method := as.character(method)]
   per_rep[, method := as.character(method)]
 
-  if (ppt_verbose() >= 1L) {
-    ms <- summary[method != "none"]
-    ppt_msg(sprintf("%s: %.0f%% of errors found, %.1f%% of good records removed, ADG error %.1f g/d",
-                    ms$method, 100 * ms$sensitivity, 100 * ms$false_positive_rate, ms$adg_rmse),
-            "bullets")
-  }
+  ph$finish()
+  ppt_result_table(
+    sprintf("%s clean records of %d pigs, %d%% spoiled", fmt_n(nrow(truth)), length(kept), round(100 * rate)),
+    summary$method,
+    list("errors found" = summary$sensitivity, "good removed" = summary$false_positive_rate,
+         "ADG bias g/d" = summary$adg_bias, "ADG RMSE g/d" = summary$adg_rmse),
+    digits = c(1, 2, 1, 1), higher = "errors found", pct = c("errors found", "good removed"),
+    zero = "ADG bias g/d", exclude = "none")
   structure(list(summary = summary, per_rep = per_rep,
                  settings = list(qc = qc, methods = methods, rate = rate, size = size,
                                  direction = direction, reps = reps, seed = seed,
@@ -7189,7 +7371,8 @@ validate_adg <- function(weight, models = c("poly1", "poly2", "poly3", "gompertz
   if (!is.numeric(block_days) || length(block_days) != 1L || block_days < 1) {
     cli::cli_abort("{.arg block_days} must be at least 1.")
   }
-  ppt_msg("Validating growth curves: {k}-fold cross-validation and truncation", "h1")
+  ppt_step("Validating growth curves")
+  ph <- ppt_phases(3L)
 
   set.seed(seed)
   kept <- sample_pigs(weight$per_pig[status != "removed", responder], max_pigs)
@@ -7205,19 +7388,25 @@ validate_adg <- function(weight, models = c("poly1", "poly2", "poly3", "gompertz
   rec[days, on = c("responder", "date"), fold := i.fold]
   raw[days, on = c("responder", "date"), fold := i.fold]
   day0 <- weight$daily[, min(date - seq_days + 1L)]
+  ppt_context(paste(length(kept), "pigs"), paste(nrow(configs), if (nrow(configs) == 1L) "model" else "models"),
+              sprintf("%d-fold CV in %d-day blocks", as.integer(k), as.integer(block_days)),
+              paste0("truncation ", paste(trim_days, collapse = ", "), " days"))
 
   # training records: the other folds, cleaned again
-  ppt_msg("Cleaning the remaining records again", "info")
   cols <- c("responder", "location", "date", "seq_days", "entry_time", "weight")
-  train <- data.table::rbindlist(lapply(seq_len(k), function(f) {
+  train <- data.table::rbindlist(ph$run("Re-cleaning CV folds", k, function(f) {
     reclean_records(raw[fold != f, cols, with = FALSE], qc, cores)[, cv_fold := f]
-  }))
+  }, unit = "fold"))
   # truncated records, cleaned again
   lim <- rec[, .(first_day = min(date), last_day = max(date)), by = responder]
   raw[lim, on = "responder", `:=`(first_day = i.first_day, last_day = i.last_day)]
-  trunc <- data.table::rbindlist(lapply(trim_days, function(td) data.table::rbindlist(list(
-    reclean_records(raw[date >= first_day + td, cols, with = FALSE], qc, cores)[, truncation := paste0("late", td)],
-    reclean_records(raw[date <= last_day - td, cols, with = FALSE], qc, cores)[, truncation := paste0("early", td)]))))
+  tj <- data.table::CJ(td = trim_days, side = c("late", "early"), sorted = FALSE)
+  trunc <- data.table::rbindlist(ph$run("Re-cleaning truncations", nrow(tj), function(j) {
+    td <- tj$td[j]
+    keep <- if (tj$side[j] == "late") raw[date >= first_day + td, cols, with = FALSE] else
+      raw[date <= last_day - td, cols, with = FALSE]
+    reclean_records(keep, qc, cores)[, truncation := paste0(tj$side[j], td)]
+  }, unit = "truncation"))
   train_by <- split(train, by = "responder", keep.by = FALSE)
   trunc_by <- split(trunc, by = "responder", keep.by = FALSE)
   info <- lapply(stats::setNames(nm = as.character(unique(rec$responder))), function(p) {
@@ -7225,8 +7414,11 @@ validate_adg <- function(weight, models = c("poly1", "poly2", "poly3", "gompertz
   })
   rec[, info := first_row_info(responder, info)]
 
+  lab <- ph$label("Fitting the curves")
+  t0 <- Sys.time()
   fits <- fit_by_pig(rec, validate_adg_one_pig, step = "validate_adg", qc = qc,
-                     configs = configs, trim_days = trim_days, day0 = day0)
+                     configs = configs, trim_days = trim_days, day0 = day0, .label = lab)
+  ph$done(lab, t0, sprintf(" (%d pigs x %d models)", length(kept), nrow(configs)))
   out <- fits$result
   cv <- out[type == "cv", .(responder, model, rmse, mae)]
   tr <- out[type != "cv", .(responder, model, truncation = type, adg, adg_full)]
@@ -7246,9 +7438,14 @@ validate_adg <- function(weight, models = c("poly1", "poly2", "poly3", "gompertz
   data.table::setcolorder(summary, c("model", "cv_rmse", "cv_mae", intersect(ord, names(summary))))
   summary <- summary[match(configs$label, model)]
 
-  if (ppt_verbose() >= 1L && nrow(summary) > 0L) {
-    best <- summary[which.min(cv_rmse)]
-    ppt_msg("Lowest cross-validation error: {.val {best$model}} ({round(best$cv_rmse, 2)} kg)", "success")
+  ph$finish()
+  if (nrow(summary) > 0L) {
+    rc <- grep("^rmse_", names(summary), value = TRUE)
+    ppt_result_table("Cross-validation error (kg) and ADG error after truncation (RMSE, g/d)",
+                     summary$model,
+                     c(list("CV kg" = summary$cv_rmse),
+                       stats::setNames(lapply(rc, function(x) summary[[x]]), sub("^rmse_", "", rc))),
+                     digits = c(2, rep(1, length(rc))))
   }
   structure(list(summary = summary, cv = cv, truncation = tr, failed = fits$failed,
                  settings = list(qc = qc, models = models, extrap = extrap, k = k,
@@ -7373,7 +7570,8 @@ validate_weight_fill <- function(weight, methods = c("linear", "poly1", "poly2",
   for (e in extrap) qc_validate(qc_set(qc, list(curve_extrap = e)))
   configs <- curve_configs(methods, extrap)
   sc <- parse_scenarios(scenarios)
-  ppt_msg("Validating weight fill methods ({length(scenarios)} scenario{?s} x {reps} repetition{?s})", "h1")
+  ppt_step("Validating weight fill methods")
+  ph <- ppt_phases(4L)
 
   set.seed(seed)
   kept <- sample_pigs(weight$per_pig[status != "removed", responder], max_pigs)
@@ -7383,21 +7581,27 @@ validate_weight_fill <- function(weight, methods = c("linear", "poly1", "poly2",
   day0 <- weight$daily[, min(date - seq_days + 1L)]
   # hidden days, drawn once per pig so that results do not depend on `cores`
   pigs <- split(rec, by = "responder")
-  masks <- lapply(pigs, function(d) {
+  ppt_context(paste(length(pigs), "pigs"), paste(nrow(configs), "methods"),
+              paste(length(scenarios), if (length(scenarios) == 1L) "scenario" else "scenarios"),
+              paste(reps, if (reps == 1) "repetition" else "repetitions"))
+  lab <- ph$label("Reference ADG and hidden days")
+  t0 <- Sys.time()
+  masks <- run_with_progress(pigs, label = lab, fun = function(d) {
     full <- tryCatch(suppressWarnings(adg_one_pig(d, qc, day0)), error = function(e) NULL)
     if (is.null(full) || is.na(full$adg)) return(NULL)
     st <- full$daily[[1L]][in_stage == TRUE]
     list(adg_full = full$adg, days = st$date, observed = st$source == "observed",
          truth = st$weight, masks = make_masks(st$source == "observed", sc, reps))
   })
+  names(masks) <- names(pigs)
+  ph$done(lab, t0, sprintf(" (%d pigs)", length(pigs)))
   masks <- masks[!vapply(masks, is.null, logical(1))]
   if (length(masks) == 0L) cli::cli_abort("No pig with an ADG to validate.")
   rec <- rec[as.character(responder) %in% names(masks)]
   # remaining records of every mask, cleaned again (one call per mask for all pigs)
-  ppt_msg("Cleaning the remaining records again", "info")
   raw <- raw_weight_records(weight, unique(rec$responder))
   n_masks <- length(masks[[1L]]$masks)
-  remain <- data.table::rbindlist(lapply(seq_len(n_masks), function(i) {
+  remain <- data.table::rbindlist(ph$run("Re-cleaning masks", n_masks, unit = "mask", fun = function(i) {
     hid <- data.table::rbindlist(lapply(names(masks), function(p) {
       m <- masks[[p]]
       h <- m$masks[[i]]$hide
@@ -7414,8 +7618,11 @@ validate_weight_fill <- function(weight, methods = c("linear", "poly1", "poly2",
   remain_by <- split(remain, by = "responder", keep.by = FALSE)
   for (p in names(masks)) masks[[p]]$remain <- remain_by[[p]]
   rec[, info := first_row_info(responder, masks)]
+  lab <- ph$label("Filling the hidden days")
+  t0 <- Sys.time()
   fits <- fit_by_pig(rec, validate_fill_one_pig, step = "validate_weight_fill", qc = qc,
-                     configs = configs, day0 = day0)
+                     configs = configs, day0 = day0, .label = lab)
+  ph$done(lab, t0, sprintf(" (%d pigs x %d masks x %d methods)", length(masks), n_masks, nrow(configs)))
   per_pig <- fits$result
   summary <- per_pig[, .(
     daily_rmse = sqrt(sum(sq_err, na.rm = TRUE) / sum(n_hidden)),
@@ -7432,9 +7639,11 @@ validate_weight_fill <- function(weight, methods = c("linear", "poly1", "poly2",
   data.table::setcolorder(summary, c("scenario", "method", "daily_rmse", "daily_mae", "daily_bias",
                                      "adg_bias", "adg_rmse", "adg_spearman", "n_pigs"))
   summary <- summary[order(match(scenario, scenarios), match(method, configs$label))]
-  if (ppt_verbose() >= 1L) {
-    ppt_msg("{data.table::uniqueN(per_pig$responder)} pig{?s} used", "info")
-  }
+  ph$finish()
+  ppt_wide_table("Daily weight error on the hidden days (RMSE, kg)", summary, "method", "scenario",
+                 "daily_rmse", digits = 2, row_order = configs$label, col_order = scenarios)
+  ppt_wide_table("ADG error (RMSE, g/d)", summary, "method", "scenario", "adg_rmse",
+                 digits = 1, row_order = configs$label, col_order = scenarios)
   structure(list(summary = summary, per_pig = per_pig, failed = fits$failed,
                  settings = list(qc = qc, methods = methods, extrap = extrap,
                                  scenarios = scenarios, reps = reps, seed = seed)),
@@ -7548,7 +7757,7 @@ validate_adfi <- function(adfi, weight = NULL, methods = c("loess_pop", "loess_l
   qc <- adfi$settings
   for (m in methods) qc_validate(qc_set(qc, list(impute_method = m)))
   sc <- parse_scenarios(scenarios)
-  ppt_msg("Validating feed intake imputation ({length(scenarios)} scenario{?s} x {reps} repetition{?s})", "h1")
+  ppt_step("Validating feed intake imputation")
 
   pigs <- adfi$per_pig[coverage >= min_coverage, responder]
   if (length(pigs) < 3L) {
@@ -7561,12 +7770,18 @@ validate_adfi <- function(adfi, weight = NULL, methods = c("loess_pop", "loess_l
   d[, observed := state %in% c("org", "corr")]
   d[, dfi_true := data.table::fifelse(observed, dfi, NA_real_)]
   data.table::setorder(d, responder, date)
+  ppt_context(paste(length(pigs), "pigs with coverage >=", min_coverage), paste(length(methods), "methods"),
+              paste(length(scenarios), if (length(scenarios) == 1L) "scenario" else "scenarios"),
+              paste(reps, if (reps == 1) "repetition" else "repetitions"),
+              if (is.null(weight)) "body weight of all days" else "body weight without the hidden days")
+  ph <- ppt_phases(1L + ("loess_pop" %in% methods) + !is.null(weight))
   # leave-one-out population curves, keyed by pig
   pop <- NULL
   if ("loess_pop" %in% methods) {
     breeds <- if ("breed" %in% names(adfi$per_pig)) adfi$per_pig[, .(responder, breed)] else NULL
-    pop <- pop_curves_loo(d[observed == TRUE & !is.na(bw), .(responder, dfi = dfi_true, bw)],
-                          pigs, breeds)
+    pop <- ph$do("Leave-one-out population curves", function() {
+      pop_curves_loo(d[observed == TRUE & !is.na(bw), .(responder, dfi = dfi_true, bw)], pigs, breeds)
+    })
     d[, pop_key := responder]
   }
 
@@ -7575,17 +7790,17 @@ validate_adfi <- function(adfi, weight = NULL, methods = c("loess_pop", "loess_l
   # daily body weight without the weight records of the hidden days
   # (one cleaning and ADG run per mask for all pigs)
   if (!is.null(weight)) {
-    ppt_msg("Computing the body weight again without the hidden days", "info")
     raw <- raw_weight_records(weight, pigs)
     n_masks <- length(d$masks[[1L]])
-    for (i in seq_len(n_masks)) {
+    # columns created here, so that the runs below only fill them by reference
+    for (i in seq_len(n_masks)) d[, (paste0("bw_mask", i)) := NA_real_]
+    ph$run("Body weight per mask", n_masks, unit = "mask", fun = function(i) {
       hid <- d[, .(date = date[masks[[1L]][[i]]$hide]), by = responder]
       keep <- if (nrow(hid) > 0L) raw[!hid, on = c("responder", "date")] else raw
       w_i <- tryCatch(reclean_weight(keep, qc, cores), error = function(e) NULL)
       a_i <- if (is.null(w_i)) NULL else tryCatch(calc_adg(w_i, qc, verbose = 0, cores = cores),
                                                   error = function(e) NULL)
       col <- paste0("bw_mask", i)
-      d[, (col) := NA_real_]
       if (!is.null(a_i)) {
         b <- adg_bw(a_i)
         d[b, on = c("responder", "date"), (col) := i.bw]
@@ -7606,10 +7821,15 @@ validate_adfi <- function(adfi, weight = NULL, methods = c("loess_pop", "loess_l
           data.table::set(d, rows, col, curve$pred(as.numeric(d$date[rows]) - t0 + 0.5))
         }
       }
-    }
+      NULL
+    })
   }
+  lab <- ph$label("Imputing the hidden days")
+  t0 <- Sys.time()
   fits <- fit_by_pig(d, validate_adfi_one_pig, step = "validate_adfi", qc = qc,
-                     methods = methods, pop = pop)
+                     methods = methods, pop = pop, .label = lab)
+  ph$done(lab, t0, sprintf(" (%d pigs x %d masks x %d methods)", length(pigs),
+                           length(d$masks[[1L]]), length(methods)))
   per_pig <- fits$result
   summary <- per_pig[!is.na(err_pct), .(
     mean_abs_error_pct = mean(abs(err_pct)),
@@ -7626,9 +7846,11 @@ validate_adfi <- function(adfi, weight = NULL, methods = c("loess_pop", "loess_l
                                      "p95_abs_error_pct", "bias_pct", "spearman"))
   summary <- summary[order(match(scenario, scenarios), match(method, methods))]
 
-  if (ppt_verbose() >= 1L) {
-    ppt_msg("{length(pigs)} pig{?s} with coverage >= {min_coverage} used", "info")
-  }
+  ph$finish()
+  ppt_wide_table("ADFI error (mean absolute error, % of the recorded ADFI)", summary, "method",
+                 "scenario", "mean_abs_error_pct", digits = 2, row_order = methods, col_order = scenarios)
+  ppt_wide_table("Rank correlation of ADFI with the recorded ADFI", summary, "method", "scenario",
+                 "spearman", digits = 3, higher = TRUE, row_order = methods, col_order = scenarios)
   structure(list(summary = summary, per_pig = per_pig, failed = fits$failed,
                  settings = list(qc = qc, methods = methods, scenarios = scenarios,
                                  reps = reps, min_coverage = min_coverage, seed = seed,
@@ -7816,6 +8038,42 @@ test_that("validate_adg compares curve models", {
   expect_equal(two$summary, res$summary, check.attributes = FALSE)
   expect_error(validate_adg(w, models = "nope"), "curve_model")
   expect_error(validate_adg(w, block_days = 0), "block_days")
+})
+
+test_that("validation phases show numbered steps and a results table", {
+  withr::local_options(tidypptsda.verbose = 1L)
+  out <- cli::ansi_strip(cli::cli_fmt({
+    ph <- ppt_phases(2L)
+    x <- ph$run("Squares", 3L, function(i) i^2, unit = "item")
+    y <- ph$do("Sum", function() sum(unlist(x)))
+    ph$finish()
+  }))
+  expect_true(any(grepl("[1/2] Squares (3 items)", out, fixed = TRUE)))
+  expect_true(any(grepl("[2/2] Sum", out, fixed = TRUE)))
+  expect_true(any(grepl("^. Done in", out)))
+  tab <- cli::ansi_strip(cli::cli_fmt(ppt_result_table(
+    "t", c("none", "a", "b"), list(err = c(0, 2, 1), bias = c(0, -1, 3), found = c(0.1, 0.9, 0.5)),
+    higher = "found", zero = "bias", pct = "found", exclude = "none")))
+  expect_match(tab[grepl("^  b", tab)], "1\\.0\\*")        # lowest error, none excluded
+  expect_match(tab[grepl("^  a", tab)], "-1\\.0\\*")       # bias closest to 0
+  expect_match(tab[grepl("^  a", tab)], "90\\.0%\\*")      # highest share found
+  expect_false(grepl("\\*", tab[grepl("^  none", tab)]))
+  # silent with verbose = 0
+  w <- clean_weight(prep_visits(nedap, verbose = 0), verbose = 0)
+  expect_length(cli::cli_fmt(validate_adg(w, models = "poly2", trim_days = 10, max_pigs = 4, verbose = 0)), 0L)
+})
+
+test_that("a parallel worker that dies is reported and its items fail", {
+  skip_on_os("windows")
+  withr::local_options(tidypptsda.verbose = 0L)
+  f <- function(x) {
+    if (x == 3) tools::pskill(Sys.getpid(), tools::SIGKILL)
+    x
+  }
+  msg <- cli::cli_fmt(r <- run_with_progress(as.list(1:6), f, cores = 2))
+  expect_true(any(grepl("stopped without a result", msg)))
+  failed <- vapply(r, function(z) is.list(z) && inherits(z$res, "error"), logical(1))
+  expect_equal(failed, rep(c(TRUE, FALSE), 3))
 })
 
 test_that("validators clean the remaining records again", {
@@ -8025,8 +8283,11 @@ validate_truncation <- function(visits, settings = qc_config(),
   }
   cores <- check_cores(cores)
 
-  ppt_msg("Validating the pipeline by truncation ({length(settings)} setting{?s} x {length(scenarios)} scenario{?s} x {reps} repetition{?s})", "h1")
-  full <- lapply(settings, function(q) pipeline_run(dt, q))
+  ppt_step("Validating the pipeline by truncation")
+  ph <- ppt_phases(2L)
+  full <- ph$run("Full-data run of each setting", length(settings), unit = "setting",
+                 fun = function(j) pipeline_run(dt, settings[[j]]))
+  names(full) <- names(settings)
   stage <- full[[1L]]$stage
   ok <- stage[adg_type == "observed" & !is.na(start_date) & !is.na(end_date), responder]
   ok <- intersect(ok, full[[1L]]$traits[!is.na(fcr), responder])
@@ -8046,8 +8307,16 @@ validate_truncation <- function(visits, settings = qc_config(),
   for (s in names(settings)) for (nm in names(sc)) for (r in seq_len(reps)) for (g in splits[[r]]) {
     jobs[[length(jobs) + 1L]] <- list(setting = s, scenario = nm, rep = r, pigs = g)
   }
-  res <- run_with_progress(jobs, truncation_job, cores = cores, label = "Truncated runs",
+  ppt_context(paste(length(pigs), "pigs with a fully covered stage"),
+              paste(length(settings), if (length(settings) == 1L) "setting" else "settings"),
+              paste(length(scenarios), if (length(scenarios) == 1L) "scenario" else "scenarios"),
+              paste(reps, if (reps == 1) "repetition" else "repetitions"),
+              paste(length(jobs), "runs of the pipeline"))
+  lab <- ph$label("Truncated runs")
+  t0 <- Sys.time()
+  res <- run_with_progress(jobs, truncation_job, cores = cores, label = lab,
                            visits = dt, settings = settings, sc = sc, stage = stage)
+  ph$done(lab, t0, sprintf(" (%d runs)", length(jobs)))
   bad <- vapply(res, inherits, logical(1), "error")
   if (any(bad)) {
     cli::cli_abort(c("{sum(bad)} truncated run{?s} failed.", "x" = conditionMessage(res[[which(bad)[1L]]])))
@@ -8075,9 +8344,12 @@ validate_truncation <- function(visits, settings = qc_config(),
                            match(setting, names(settings)))]
   data.table::setcolorder(summary, c("setting", "scenario", "trait", meas, "n", "n_lost"))
 
-  if (ppt_verbose() >= 1L) {
-    ppt_msg("{length(pigs)} pig{?s} truncated in {length(jobs)} run{?s} of the pipeline", "info")
-  }
+  ph$finish()
+  fs <- summary[trait == "fcr"]
+  ppt_wide_table("FCR: rank correlation with the full-data FCR", fs, "setting", "scenario", "spearman",
+                 digits = 3, higher = TRUE, row_order = names(settings), col_order = scenarios)
+  ppt_wide_table("FCR: mean absolute error (%)", fs, "setting", "scenario", "mae_pct",
+                 digits = 2, row_order = names(settings), col_order = scenarios)
   structure(list(summary = summary, per_rep = per_rep, per_pig = per_pig,
                  settings = list(qc = settings, scenarios = scenarios, share = share, reps = reps,
                                  top = top, pigs = pigs, seed = seed)),
