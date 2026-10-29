@@ -1,0 +1,441 @@
+---
+title: "验证函数使用指南：参数详解与示例"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{验证函数使用指南：参数详解与示例}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+options(width = 100)
+```
+
+```{r setup, message = FALSE}
+library(tidypptsda)
+library(data.table)
+```
+
+tidypptsda 有五个验证函数，用来在**自己的数据上**比较各种方法和参数设置。本文逐个介绍它们的每个参数、默认值、什么时候需要改，以及结果中每一列的含义，并给出可以直接照抄的例子。各方法的原理和在示例数据上的结论，见《方法验证》。
+
+## 1. 先选函数
+
+| 想回答的问题 | 用哪个函数 | 输入 |
+|---|---|---|
+| 哪种体重异常值检测方法更好？ | `validate_outliers()` | `prep_visits()` 的结果 |
+| 哪种生长曲线更适合本批次？外推用曲线还是切线？ | `validate_adg()` | `clean_weight()` 的结果 |
+| 缺失的日体重用线性插值还是生长曲线填？ | `validate_weight_fill()` | `clean_weight()` 的结果 |
+| 缺失的日采食用哪种插补方法？ | `validate_adfi()` | `calc_adfi()` 和 `clean_weight()` 的结果 |
+| 几套完整的质控设置，哪套在猪缺数据时最稳？ | `validate_truncation()` | `prep_visits()` 的结果 |
+
+前四个函数各看一个步骤，快；`validate_truncation()` 重跑整条流程，慢，但最接近实际，**最终决定用哪套设置时以它为准**。
+
+五个函数的思路相同：故意破坏或隐藏一部分数据，再看各方法能把结果恢复到什么程度。被隐藏的日子会先删掉，再对剩下的记录重新清洗，被隐藏的数据不会以任何方式参与计算（1.5.0 起）。
+
+下面的例子都用包里的示例数据，先准备好输入：
+
+```{r data}
+visits <- prep_visits(nedap, verbose = 0)          # 访问记录
+weight <- clean_weight(visits, verbose = 0)        # 体重质控
+adg    <- calc_adg(weight, verbose = 0)            # 日增重
+adfi   <- calc_adfi(visits, adg, verbose = 0)      # 日采食
+
+# 汇总表保留 3 位有效数字，方便阅读
+tidy <- function(x) x$summary[, lapply(.SD, function(v) if (is.double(v)) signif(v, 3) else v)]
+```
+
+## 2. 共同的参数
+
+五个函数都有下面这几个参数，含义相同：
+
+| 参数 | 默认 | 含义 | 什么时候改 |
+|---|---|---|---|
+| `reps` | 3 或 5 | 重复次数。每次重新随机加误差或隐藏日子，结果取平均 | 猪少（几十头）时增加到 5–10，猪多（几百头）时 1–2 次就够 |
+| `max_pigs` | `NULL`（全部） | 随机抽取最多这么多头猪参与验证（`validate_truncation()` 用 `pigs` 指定） | 数据量大、只想快速看结论时，用 300 左右 |
+| `seed` | 1 | 随机种子。同样的数据和参数，结果完全相同 | 想看结果对随机性是否敏感时，换几个种子比较 |
+| `cores` | 1 | 并行的 CPU 核数 | 电脑核数多、内存充足时用 2–4；内存不够时子进程会被系统杀掉，会有提示 |
+| `verbose` | 1 | 0：不显示；1：显示概况、进度条和结果表 | 写在脚本里批量运行时用 0 |
+
+### 场景的写法
+
+隐藏数据的方式用一个字符串描述，字母表示类型，数字表示多少。`validate_weight_fill()` 和 `validate_adfi()` 用前四种，`validate_truncation()` 用后三种：
+
+| 写法 | 含义 | 模拟的情况 |
+|---|---|---|
+| `"random30"` | 随机隐藏 30% 有记录的日子 | 零散缺测 |
+| `"blocks3"` | 隐藏 3 段连续的日子，每段 3–10 天 | 几次短期不进站、耳标读取失败 |
+| `"late20"` | 隐藏区间开头的 20 天 | 晚进站 |
+| `"early15"` | 隐藏区间结尾的 15 天 | 早出栏 |
+| `"gap10"` | 隐藏区间中间连续 10 天（只用于 `validate_truncation()`） | 测定中断 |
+
+数字可以随意改，例如 `"random50"`、`"blocks6"`、`"late10"`、`"early30"`；可以一次给几个场景，例如 `scenarios = c("late10", "late20", "late30")`，看缺得越多误差怎么变化。
+
+### 返回的结果
+
+五个函数都返回 `ppt_validation` 对象，是一个列表：
+
+- `$summary`：汇总表，每种方法（和场景）一行，**主要看这个**；
+- `$per_pig`、`$per_rep`、`$cv`、`$truncation` 等：每头猪、每次重复的明细，用来找出误差大的猪；
+- `$settings`：本次验证用的全部参数，保存结果时一起保存，方便以后复查。
+
+直接打印对象会显示汇总表：
+
+```{r print, eval = FALSE}
+vf <- validate_adfi(adfi, weight)
+vf              # 汇总表
+vf$summary      # 同上，是 data.table，可以排序、筛选、导出
+vf$per_pig      # 每头猪的误差
+```
+
+### 运行时的输出
+
+`verbose = 1` 时，先显示一行概况，然后按 `[1/3]`、`[2/3]` 编号显示各个阶段，最后打印结果表：
+
+```
+── Validating feed intake imputation ───────────────────────────────
+ℹ 29 pigs with coverage >= 0.8 · 3 methods · 2 scenarios · 2 repetitions · body weight without the hidden days
+⠼ [2/3] Body weight per mask ■■■■■■■■······· 11/20 | ETA 1m
+✔ [1/3] Leave-one-out population curves 0.0s
+✔ [2/3] Body weight per mask (4 masks) 2.8s
+✔ [3/3] Imputing the hidden days (29 pigs x 4 masks x 3 methods) 1.3s
+✔ Done in 4.1s · details in $summary
+ADFI error (mean absolute error, % of the recorded ADFI)
+             random30  late20
+  loess_pop     1.05    1.34*
+  loess_lm      1.05*   4.49
+  linear        1.06    4.49
+```
+
+- 进行中的阶段显示进度条、已完成数和预计剩余时间（ETA）；
+- 完成的阶段留下一行，带耗时；
+- 结果表中，每列最好的值标绿并带 `*`。"最好"指误差最小、相关最高、偏差最接近 0；对照行（例如 `none`）不参与比较；一列的值全部相同时不标。
+
+### 大概要多久
+
+在一个约 700 头猪的 NEDAP 批次上，用 2 个核心、全部默认参数：
+
+| 函数 | 耗时 | 最慢的阶段 |
+|---|---|---|
+| `validate_outliers()` | 约 4.5 分钟 | 用每种方法清洗加了误差的数据 |
+| `validate_adg()` | 约 3 分钟 | 拟合曲线；重新清洗 5 个折约 1 分钟 |
+| `validate_weight_fill()` | 约 5 分钟 | 填充；重新清洗 12 个隐藏方案约 1.5 分钟 |
+| `validate_adfi()` | 约 5.5 分钟 | 20 个隐藏方案的体重重算约 4 分钟 |
+| `validate_truncation()` | 与 设置数 × 场景数 × 重复次数 成正比 | 每次重跑整条流程约 20–40 秒 |
+
+想快一些：减少 `reps`、减少场景或方法、用 `max_pigs` 抽样，或者增加 `cores`。
+
+## 3. `validate_outliers()`：体重异常值检测方法
+
+**做法**：找出各方法都认为没有问题的"干净记录"，随机挑一部分加上人为误差，再用每种方法清洗，看人为误差被找出多少、好记录被误删多少、ADG 偏了多少。
+
+```r
+validate_outliers(visits, qc = qc_config(), methods = list(...), rate = 0.05,
+                  size = c(3, 15), direction = c("both", "down", "up"), reps = 3,
+                  max_pigs = NULL, seed = 1, reference = c("consensus", "qc"),
+                  verbose = 1, cores = 1)
+```
+
+| 参数 | 默认 | 含义 | 什么时候改 |
+|---|---|---|---|
+| `visits` | — | `prep_visits()` 的结果 | — |
+| `qc` | `qc_config()` | 除异常值方法以外的所有质控设置（体重范围、适应期等） | 你的批次用了非默认设置时，传入同一套设置 |
+| `methods` | 7 种组合 | 要比较的方法，**带名字的列表**，名字是结果中显示的方法名，值是 `weight_outlier` 的取值；加上 `"track"` 表示先做逐日回溯追踪 | 只想比较几种方法时，列出这几种 |
+| `rate` | 0.05 | 加误差的干净记录比例 | 想模拟误差多的秤时，用 0.1 或 0.2 |
+| `size` | `c(3, 15)` | 误差大小的范围（kg），在其中均匀随机 | 只关心大误差时用 `c(10, 30)`；关心小误差时用 `c(1, 5)` |
+| `direction` | `"both"` | `"both"`：随机加或减；`"down"`：只偏低（猪只有前腿站在秤上）；`"up"`：只偏高（两头猪同时上秤） | 实际误差多数偏低，可以单独用 `"down"` 检验一次 |
+| `reference` | `"consensus"` | 干净记录怎么定：`"consensus"` 是所有被比较方法都保留的记录，哪种方法都不占便宜；`"qc"` 是只按 `qc` 的方法判定（1.5.0 之前的做法） | 一般不改 |
+
+默认比较的 7 种方法：
+
+| 名字 | 内容 |
+|---|---|
+| `track+rlm+loess` | 默认设置：先逐日回溯追踪，再用稳健回归和 LOESS |
+| `track` | 只做追踪 |
+| `rlm`、`loess`、`stl`、`sd` | 只用这一种方法（不追踪） |
+| `rlm+loess` | 稳健回归和 LOESS（不追踪） |
+
+结果中还有一行 `none`：只做体重范围检查、不做异常值检测，作为对照。
+
+**例子**
+
+```{r outliers}
+# 只比较三种方法，误差偏低，重复 1 次（示例；实际用默认的 3 次）
+vo <- validate_outliers(visits,
+                        methods = list(default = c("track", "rlm", "loess"),
+                                       loess   = "loess",
+                                       stl     = "stl"),
+                        direction = "down", reps = 1, verbose = 0)
+tidy(vo)
+```
+
+自己组合方法时，列表的每个元素是一组方法：
+
+```{r outliers-methods, eval = FALSE}
+methods = list(
+  "追踪+loess" = c("track", "loess"),   # 先追踪，再用 LOESS
+  "rlm+stl"    = c("rlm", "stl"),       # 任一方法判为异常即剔除（outlier_combine = "any"，默认）
+  "只追踪"      = "track"
+)
+```
+
+**结果中的列**
+
+| 列 | 含义 | 怎么看 |
+|---|---|---|
+| `sensitivity` | 人为误差中被找出的比例 | 越高越好 |
+| `false_positive_rate` | 干净记录中被误删的比例 | 越低越好 |
+| `precision` | 被判为异常的记录中，确实是人为误差的比例 | 越高越好 |
+| `adg_bias`、`adg_rmse` | ADG 与干净记录算出的 ADG 之差的平均值、均方根（g/d） | 越接近 0 越好 |
+| `adg_spearman` | ADG 排名与参照的相关 | 越接近 1 越好 |
+| `n_pigs` | 参与比较的猪数 | |
+
+`$settings$n_clean` 是干净记录的条数。
+
+**怎么用结果做决定**：先看 `sensitivity` 和 `false_positive_rate` 的平衡，再看 `adg_rmse`。零散的随机误差对 ADG 影响很小，各方法 ADG 的差别主要来自误删了哪些好记录；集中出现的误差（例如秤漂移）这个检验看不出来，要结合 `plot_adg()` 的图检查。
+
+## 4. `validate_adg()`：生长曲线与外推方式
+
+**做法**：两种检验。**交叉验证**：把每头猪的日子按连续几天切成块，轮流留出一部分块，用其余的记录拟合曲线，预测留出的体重；**截断检验**：隐藏测定开头或结尾若干天，重新算 ADG，与同一模型用全部记录算出的 ADG 比较。
+
+```r
+validate_adg(weight, models = c("poly1", "poly2", "poly3", "gompertz"), extrap = NULL,
+             k = 5, block_days = 7, cv_limit = 10, trim_days = c(10, 20),
+             qc = weight$settings, max_pigs = NULL, seed = 1, verbose = 1, cores = 1)
+```
+
+| 参数 | 默认 | 含义 | 什么时候改 |
+|---|---|---|---|
+| `weight` | — | `clean_weight()` 的结果 | — |
+| `models` | 4 种 | 要比较的曲线：`"poly1"`（直线）、`"poly2"`（二次）、`"poly3"`（三次）、`"gompertz"` | 只想比较两三种时列出来，省时间 |
+| `extrap` | `NULL` | 记录范围之外怎么外推：`"start"`（只在首个记录之前用切线）、`"curve"`（沿曲线）、`"tangent"`（两端都用切线），可以给几个。`NULL` 表示用 `weight` 的设置 | 想比较外推方式时，例如 `c("start", "curve", "tangent")` |
+| `k` | 5 | 交叉验证的折数 | 一般不改 |
+| `block_days` | 7 | 交叉验证中每块的天数 | `1` 表示按单天留出，留出日子两边都有记录，误差会偏小，只用于和 1.5.0 之前的结果对比 |
+| `cv_limit` | 10 | 交叉验证误差超过多少 kg 的猪算"预测失败"，计入 `cv_share_over` | 一般不改 |
+| `trim_days` | `c(10, 20)` | 截断检验隐藏开头或结尾的天数，每个数字都会做开头（`late`）和结尾（`early`）两种 | 想看缺得更多时用 `c(10, 20, 30)` |
+| `qc` | `weight$settings` | 体重清洗规则和区间（重新清洗时用） | 一般不改 |
+
+比较外推方式时，模型名后面会加上外推方式，例如 `poly2+tangent`；`"curve"` 不加后缀。
+
+**例子**
+
+```{r adg}
+va <- validate_adg(weight, models = c("poly1", "poly2", "gompertz"), trim_days = 20, verbose = 0)
+tidy(va)
+```
+
+比较外推方式：
+
+```{r adg-extrap}
+va_t <- validate_adg(weight, models = "poly2", extrap = c("start", "curve", "tangent"),
+                     trim_days = c(10, 20), verbose = 0)
+tidy(va_t)[, .(model, cv_rmse, rmse_late10, rmse_late20, rmse_early10, rmse_early20)]
+```
+
+**结果中的列**
+
+| 列 | 含义 | 怎么看 |
+|---|---|---|
+| `cv_rmse`、`cv_mae` | 交叉验证中，每头猪留出体重的预测误差（kg）的**中位数** | 越小越好；反映曲线描述数据的能力 |
+| `cv_share_over` | 误差超过 `cv_limit` 的猪的比例 | 越低越好；灵活的曲线（poly3）可能在个别猪身上外推出离谱的值，看这一列 |
+| `bias_late10`、`rmse_late10` | 隐藏开头 10 天后，ADG 的平均偏差、均方根误差（g/d） | 越接近 0 越好；反映外推的稳定性 |
+| `spearman_late10` | ADG 排名与全部数据的相关 | 越接近 1 越好 |
+| `n_late10` | 截断后仍有 ADG 的猪数 | |
+| `..._early10` 等 | 同上，隐藏结尾 | |
+
+明细：`$cv` 是每头猪、每个模型的交叉验证误差；`$truncation` 是每头猪截断前后的 ADG。
+
+**怎么用结果做决定**：交叉验证总是偏向灵活的模型，但差别通常只有零点几公斤；**测定期没有覆盖整个体重区间的猪多时，更应该看截断检验**。先看 `calc_adg()` 结果中 `adg_type` 的分布：大多数猪是 `observed` 时，选哪种曲线影响很小。
+
+找出交叉验证误差大的猪，检查它们的图：
+
+```{r adg-worst}
+va$cv[order(-rmse)][1:5]
+```
+
+## 5. `validate_weight_fill()`：日体重的填充方法
+
+**做法**：先用全部记录算出每头猪的区间和 ADG 作为参照，再隐藏区间内一部分有记录的日子（删掉这些日子的全部体重记录，剩下的重新清洗），用每种方法重新填充，比较填充的日体重和 ADG。
+
+```r
+validate_weight_fill(weight, methods = c("linear", "poly1", "poly2", "poly3", "gompertz"),
+                     extrap = NULL, scenarios = c("random30", "blocks3", "late20", "early15"),
+                     reps = 3, max_pigs = NULL, seed = 1, verbose = 1, cores = 1)
+```
+
+| 参数 | 默认 | 含义 | 什么时候改 |
+|---|---|---|---|
+| `weight` | — | `clean_weight()` 的结果，它的设置（`$settings`）用于所有计算 | — |
+| `methods` | 5 种 | `"linear"`：`calc_adg()` 的做法，两个有记录的日子之间线性插值，首尾用 `curve_model` 的曲线；`"poly1"`…`"gompertz"`：所有缺失的日子都用该曲线 | 一般保留 `"linear"`，再加一两种曲线对比 |
+| `extrap` | `NULL` | 同 `validate_adg()`，主要影响 `late`、`early` 场景 | 比较外推方式时 |
+| `scenarios` | 4 种 | 隐藏方式，见第 2 节 | 按实际缺失情况选，例如晚进站多就用 `c("late10", "late20", "late30")` |
+
+**例子**
+
+```{r fill}
+vw <- validate_weight_fill(weight, methods = c("linear", "poly2"),
+                           scenarios = c("blocks3", "late20", "early15"), reps = 1, verbose = 0)
+tidy(vw)
+```
+
+**结果中的列**
+
+| 列 | 含义 | 怎么看 |
+|---|---|---|
+| `daily_rmse`、`daily_mae` | 被隐藏日子的填充体重与实测日体重之差的均方根、平均绝对值（kg） | 越小越好 |
+| `daily_bias` | 平均差（kg） | 越接近 0 越好 |
+| `adg_bias`、`adg_rmse` | ADG 与参照 ADG 之差（g/d） | 越接近 0 越好 |
+| `adg_spearman` | ADG 排名与参照的相关 | 越接近 1 越好 |
+| `n_pigs` | 有结果的猪数 | |
+
+`$per_pig` 中每头猪、每个场景、每次重复各一行。
+
+**怎么用结果做决定**：区间中间的零散缺失，线性插值通常最好；开头、结尾缺失时，各方法都只能靠曲线，差别不大，而误差远大于中间缺失——**保证区间两端有记录，比选择填充方法更重要**。
+
+## 6. `validate_adfi()`：日采食的插补方法
+
+**做法**：只用区间内记录比较完整的猪。隐藏一部分有记录的日子，用每种方法重新插补，在原本有记录的日子上算 ADFI，与实测的 ADFI 比较。
+
+```r
+validate_adfi(adfi, weight = NULL, methods = c("loess_pop", "loess_lm", "linear"),
+              scenarios = c("random30", "blocks3", "late20", "early15"), reps = 5,
+              min_coverage = 0.8, max_pigs = NULL, seed = 1, verbose = 1, cores = 1)
+```
+
+| 参数 | 默认 | 含义 | 什么时候改 |
+|---|---|---|---|
+| `adfi` | — | `calc_adfi()` 的结果，它的设置用于所有计算 | — |
+| `weight` | `NULL` | `clean_weight()` 的结果。**建议总是传入**：被隐藏日子的体重记录也一并删掉，日体重用剩下的记录重新计算，和猪真的没进站时一样；不传时沿用全部数据的日体重，会给出警告，结果偏乐观 | — |
+| `methods` | 3 种 | `"loess_pop"`：短缺口 LOESS，长缺口和开头用群体曲线 × 个体比例（验证时群体曲线不含被验证的猪）；`"loess_lm"`：LOESS + 单猪体重回归；`"linear"`：线性插值 + 单猪回归 | 一般不改 |
+| `scenarios` | 4 种 | 隐藏方式，见第 2 节 | 按实际缺失情况选 |
+| `reps` | 5 | 重复次数 | 猪多时 2 次就够 |
+| `min_coverage` | 0.8 | 区间内有记录日子的比例不低于这个值的猪才参与 | 合格的猪太少（少于 3 头会报错）时降到 0.7 |
+
+**例子**
+
+```{r adfi}
+vf <- validate_adfi(adfi, weight, scenarios = c("random30", "late20"), reps = 2, verbose = 0)
+tidy(vf)
+```
+
+**结果中的列**
+
+| 列 | 含义 | 怎么看 |
+|---|---|---|
+| `mean_abs_error_pct` | 个体 ADFI 误差绝对值的平均，占实测 ADFI 的百分比 | 越小越好 |
+| `p95_abs_error_pct` | 同上，95% 分位数：误差最大的那 5% 的猪 | 越小越好 |
+| `bias_pct` | 平均偏差（%） | 越接近 0 越好；偏差会让缺数据的猪在排名中系统性占便宜或吃亏 |
+| `spearman` | ADFI 排名与实测的相关 | 越接近 1 越好 |
+| `daily_rmse` | 被隐藏日子的日采食误差（g/d） | 越小越好 |
+| `n_pigs` | 参与比较的猪数 | |
+
+**怎么用结果做决定**：开头缺失时 `loess_pop` 通常明显更好；结尾缺失时三种方法相同（末个记录之后都用这头猪自己的回归）。
+
+## 7. `validate_truncation()`：整条流程
+
+**做法**：先用每套设置跑一遍全部数据作参照。选出测定区间被完整覆盖的猪，随机分组；每次删掉一组猪在开头、结尾或中间若干天的**全部访问**（体重和采食），其余猪保持完整，从 `clean_weight()` 起重跑整条流程，再换下一组。比较这些猪截断后与全部数据的 ADG、ADFI、FCR。
+
+```r
+validate_truncation(visits, settings = qc_config(),
+                    scenarios = c("late10", "late20", "early10", "early20", "gap10"),
+                    share = 0.5, reps = 5, top = 0.2, pigs = NULL, seed = 1,
+                    verbose = 1, cores = 1)
+```
+
+| 参数 | 默认 | 含义 | 什么时候改 |
+|---|---|---|---|
+| `visits` | — | `prep_visits()` 的结果 | — |
+| `settings` | `qc_config()` | 要比较的质控设置：一个 `qc_config()`，或**带名字的列表**，名字是结果中显示的设置名 | 比较几套设置时，见下面的例子 |
+| `scenarios` | 5 种 | `"late<d>"`、`"early<d>"`、`"gap<d>"`，按第一套设置的区间计算 | 按实际缺失情况选 |
+| `share` | 0.5 | 每次截断的猪的比例。猪分成 `round(1 / share)` 组，轮流截断，每次重复中每头猪恰好被截断一次 | 想模拟"只有少数猪缺数据"时用 0.25（分 4 组，重跑次数加倍） |
+| `reps` | 5 | 重复次数，每次重新随机分组 | 几百头猪时 1–2 次就够；二三十头猪时 5–10 次 |
+| `top` | 0.2 | 计算 `top_agree` 时的"最好的猪"的比例 | 选留比例不同时改，例如 0.1 |
+| `pigs` | `NULL` | 只截断这些猪 | 只关心某些猪时；默认是区间被完整覆盖、有 FCR 的猪 |
+
+总的重跑次数 = 设置数 × 场景数 × 重复次数 × 组数，决定了耗时。
+
+**例子**
+
+```{r truncation}
+vt <- validate_truncation(
+  visits,
+  settings = list(default = qc_config(),
+                  curve   = qc_config(curve_extrap = "curve")),
+  scenarios = c("late20", "early20"), reps = 1, verbose = 0
+)
+vt$summary[trait == "fcr", .(setting, scenario, mae_pct = signif(mae_pct, 3),
+                             spearman = signif(spearman, 3), slope = signif(slope, 3),
+                             top_agree, n, n_lost)]
+```
+
+**结果中的列**（每个设置、场景和性状 `adg`、`adfi`、`fcr` 一行，取各次重复的平均）
+
+| 列 | 含义 | 怎么看 |
+|---|---|---|
+| `bias` | 截断后 − 全部数据的平均差 | 越接近 0 越好 |
+| `rmse`、`mae_pct` | 均方根误差、平均相对误差（%） | 越小越好 |
+| `pearson`、`spearman` | 与全部数据结果的相关、排名相关 | 越接近 1 越好 |
+| `slope` | 截断后对全部数据的回归斜率 | 越接近 1 越好；小于 1 表示个体差异被压缩 |
+| `top_agree` | 全部数据下最好的 `top` 的猪，截断后仍在最好之列的比例 | 越高越好；猪少时很粗 |
+| `n`、`n_lost` | 有结果的猪数；截断后失去结果的猪数 | 截断太多时，猪会因测定期太短被剔除 |
+| `..._sd` | 各次重复之间的标准差 | 差别小于标准差时不可信 |
+
+明细：`$per_rep` 是每次重复的指标；`$per_pig` 是每头猪的全部数据值和截断值。
+
+**怎么用结果做决定**：育种上最关心 FCR 的 `spearman`、`slope` 和 `top_agree`，其次是 `bias`。几套设置的差别小于 `_sd` 时，说明差别不可信，增加 `reps` 再看。
+
+## 8. 推荐的工作流程
+
+一个新的测定站或新的批次，建议按下面的顺序：
+
+```{r workflow, eval = FALSE}
+visits <- prep_visits(read_station("数据/"))
+weight <- clean_weight(visits, cores = 4)
+adg    <- calc_adg(weight, cores = 4)
+adfi   <- calc_adfi(visits, adg, cores = 4)
+table(adg$per_pig$adg_type)          # 有多少猪的区间要靠外推
+
+# 1. 各步骤分别看（快，可以抽样）
+vo <- validate_outliers(visits, max_pigs = 300, cores = 4)
+va <- validate_adg(weight, extrap = c("start", "curve"), max_pigs = 300, cores = 4)
+vw <- validate_weight_fill(weight, max_pigs = 300, cores = 4)
+vf <- validate_adfi(adfi, weight, max_pigs = 300, cores = 4)
+
+# 2. 根据上面的结果，挑两三套候选设置，用整条流程比较
+vt <- validate_truncation(visits,
+                          settings = list(default = qc_config(),
+                                          poly1   = qc_config(curve_model = "poly1")),
+                          reps = 2, cores = 4)
+
+# 3. 保存结果和所用参数
+saveRDS(list(vo = vo, va = va, vw = vw, vf = vf, vt = vt), "验证结果.rds")
+fwrite(vt$summary, "验证_整体截断.csv", bom = TRUE)
+```
+
+确定设置之后，同一个育种群体固定使用这套设置，不要逐批更换，否则年度之间的差异可能来自方法而不是猪。
+
+## 9. 常见问题
+
+**太慢了怎么办？**
+用 `max_pigs = 300` 抽样；减少 `reps`、场景或方法；增加 `cores`。几百头猪时，重复 1–2 次的结果已经很稳定（各次重复的标准差接近 0）。
+
+**用了多核反而卡住或报错？**
+每个子进程都要占用内存，内存不够时子进程会被系统杀掉，提示 "parallel worker stopped without a result"。减少 `cores`，或用 `cores = 1`。在 Windows 上，多核要求本包是正式安装的（不是用 `devtools::load_all()` 加载的）。
+
+**每次运行结果不同？**
+结果由 `seed` 决定，同样的数据、参数和种子，结果完全相同。换种子后差别很大，说明猪太少或重复次数太少，增加 `reps`。
+
+**`validate_adfi()` 提示 "Only n pigs with coverage >= 0.8"？**
+区间记录完整的猪太少，降低 `min_coverage`，例如 0.7。
+
+**`validate_truncation()` 提示 "at least 6 are needed"？**
+区间被完整覆盖的猪不到 6 头，无法分组比较。这类批次可以用前四个函数，或把几个批次合在一起验证。
+
+**`validate_adfi()` 警告 "`weight` is not given"？**
+传入 `clean_weight()` 的结果：`validate_adfi(adfi, weight)`。
+
+**`validate_outliers()` 报错 "must be a named list"？**
+`methods` 的每个元素都要有名字，例如 `list(rlm = "rlm")`，而不是 `list("rlm")`。
+
+**结果和《方法验证》里的数字不一样？**
+那篇文章用的是包里的示例数据（二三十头猪）；你的批次猪数、站型、进站体重都不同，结论可能不同，这正是要在自己的数据上验证的原因。
