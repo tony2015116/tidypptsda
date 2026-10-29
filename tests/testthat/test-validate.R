@@ -37,9 +37,13 @@ test_that("validate_adg compares curve models", {
   res <- validate_adg(w, models = c("poly1", "poly2"), extrap = "curve", trim_days = 10, verbose = 0)
   expect_equal(res$summary$model, c("poly1", "poly2"))
   expect_equal(res$settings$block_days, 7)
-  expect_true(all(c("cv_rmse", "cv_mae", "bias_late10", "rmse_early10",
+  expect_true(all(c("cv_rmse", "cv_mae", "cv_share_over", "bias_late10", "rmse_early10",
                     "spearman_late10", "n_early10") %in% names(res$summary)))
   expect_true(all(res$summary$cv_rmse > 0 & res$summary$cv_rmse < 5))
+  # median over pigs; share of pigs above cv_limit
+  expect_equal(res$summary$cv_rmse, res$cv[, stats::median(rmse, na.rm = TRUE), by = model]$V1)
+  expect_equal(res$summary$cv_share_over, res$cv[, mean(rmse > 10, na.rm = TRUE), by = model]$V1)
+  expect_error(validate_adg(w, cv_limit = 0), "cv_limit")
   expect_equal(nrow(res$cv), 2L * w$per_pig[status != "removed", .N])
   # same folds whatever the number of cores
   skip_on_os("windows")

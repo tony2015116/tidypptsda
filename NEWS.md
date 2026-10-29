@@ -1,3 +1,15 @@
+# tidypptsda 1.6.2
+
+* `validate_adg()`: `cv_rmse` and `cv_mae` are now the **median** over pigs
+  of each pig's cross-validation error (they were the mean). A few pigs with
+  an absurd extrapolation over a left-out block, mostly with `poly3`, could
+  make the mean meaningless (on one large batch, tens of kg against a
+  median of 2.5 kg, from four pigs with errors of thousands of kg). New column
+  `cv_share_over`: the share of pigs with an error above the new argument
+  `cv_limit` (default 10 kg), to see this risk separately.
+* Result tables of the validation functions no longer mark every row as
+  the best when all values of a column are equal.
+
 # tidypptsda 1.6.1
 
 ## Progress and messages of the validation functions

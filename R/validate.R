@@ -298,6 +298,8 @@ validate_outlier_job <- function(job, qc, methods, adg_true, job_cores = 1L) {
 #' @param block_days Length of the blocks of days for the folds. Default 7;
 #'   1 gives single random days (more optimistic: a left-out day is close
 #'   to its neighbours).
+#' @param cv_limit Cross-validation error (kg) above which a pig counts as
+#'   badly predicted, in `cv_share_over`. Default 10.
 #' @param trim_days Days hidden at the start or the end of the test.
 #'   Default `c(10, 20)`.
 #' @param qc QC settings: the weight cleaning rules and `stage_range`,
@@ -309,8 +311,12 @@ validate_outlier_job <- function(job, qc, methods, adg_true, job_cores = 1L) {
 #' @param cores Number of CPU cores. Default 1.
 #'
 #' @return A list of class `ppt_validation` with
-#' - `summary`: one row per model (and extrapolation): `cv_rmse` and `cv_mae` (kg, weight of the
-#'   left-out records), and for each truncation (`late10`, `early10`, ...)
+#' - `summary`: one row per model (and extrapolation): `cv_rmse` and
+#'   `cv_mae`, the **median** over pigs of each pig's prediction error (kg,
+#'   weight of the left-out records; a few pigs with an absurd
+#'   extrapolation, e.g. poly3 over a left-out block, would dominate a
+#'   mean), `cv_share_over` the share of pigs with an error above
+#'   `cv_limit` kg, and for each truncation (`late10`, `early10`, ...)
 #'   the ADG `bias`, `rmse` (g/d) and Spearman rank correlation `spearman`
 #'   with the full-data ADG, and how many pigs still get an ADG (`n`);
 #' - `cv`: cross-validation error of every pig and model;
@@ -319,7 +325,7 @@ validate_outlier_job <- function(job, qc, methods, adg_true, job_cores = 1L) {
 #' @export
 validate_adg <- function(weight, models = c("poly1", "poly2", "poly3", "gompertz"),
                          extrap = NULL,
-                         k = 5, block_days = 7, trim_days = c(10, 20), qc = weight$settings,
+                         k = 5, block_days = 7, cv_limit = 10, trim_days = c(10, 20), qc = weight$settings,
                          max_pigs = NULL, seed = 1, verbose = 1, cores = 1) {
   local_verbose(verbose)
   local_cores(cores)
@@ -387,7 +393,11 @@ validate_adg <- function(weight, models = c("poly1", "poly2", "poly3", "gompertz
   cv <- out[type == "cv", .(responder, model, rmse, mae)]
   tr <- out[type != "cv", .(responder, model, truncation = type, adg, adg_full)]
 
-  cv_sum <- cv[, .(cv_rmse = mean(rmse, na.rm = TRUE), cv_mae = mean(mae, na.rm = TRUE)),
+  if (!is.numeric(cv_limit) || length(cv_limit) != 1L || is.na(cv_limit) || cv_limit <= 0) {
+    cli::cli_abort("{.arg cv_limit} must be a positive number (kg).")
+  }
+  cv_sum <- cv[, .(cv_rmse = stats::median(rmse, na.rm = TRUE), cv_mae = stats::median(mae, na.rm = TRUE),
+                   cv_share_over = mean(rmse > cv_limit, na.rm = TRUE)),
                by = model]
   tr_sum <- tr[!is.na(adg_full), .(
     bias = mean(adg - adg_full, na.rm = TRUE),
@@ -399,21 +409,23 @@ validate_adg <- function(weight, models = c("poly1", "poly2", "poly3", "gompertz
                             sep = "_")
   summary <- merge(cv_sum, wide, by = "model", all = TRUE)
   ord <- unlist(lapply(unique(tr$truncation), function(t) paste0(c("bias_", "rmse_", "spearman_", "n_"), t)))
-  data.table::setcolorder(summary, c("model", "cv_rmse", "cv_mae", intersect(ord, names(summary))))
+  data.table::setcolorder(summary, c("model", "cv_rmse", "cv_mae", "cv_share_over", intersect(ord, names(summary))))
   summary <- summary[match(configs$label, model)]
 
   ph$finish()
   if (nrow(summary) > 0L) {
     rc <- grep("^rmse_", names(summary), value = TRUE)
-    ppt_result_table("Cross-validation error (kg) and ADG error after truncation (RMSE, g/d)",
+    over <- sprintf("CV > %g kg", cv_limit)
+    ppt_result_table("Cross-validation error (median over pigs, kg) and ADG error after truncation (RMSE, g/d)",
                      summary$model,
-                     c(list("CV kg" = summary$cv_rmse),
+                     c(stats::setNames(list(summary$cv_rmse, summary$cv_share_over), c("CV kg", over)),
                        stats::setNames(lapply(rc, function(x) summary[[x]]), sub("^rmse_", "", rc))),
-                     digits = c(2, rep(1, length(rc))))
+                     digits = c(2, 1, rep(1, length(rc))), pct = over)
   }
   structure(list(summary = summary, cv = cv, truncation = tr, failed = fits$failed,
                  settings = list(qc = qc, models = models, extrap = extrap, k = k,
-                                 block_days = block_days, trim_days = trim_days, seed = seed)),
+                                 block_days = block_days, cv_limit = cv_limit, trim_days = trim_days,
+                                 seed = seed)),
             class = c("ppt_validation", "ppt_result"))
 }
 

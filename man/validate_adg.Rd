@@ -10,6 +10,7 @@ validate_adg(
   extrap = NULL,
   k = 5,
   block_days = 7,
+  cv_limit = 10,
   trim_days = c(10, 20),
   qc = weight$settings,
   max_pigs = NULL,
@@ -35,6 +36,9 @@ days are extrapolated.}
 1 gives single random days (more optimistic: a left-out day is close
 to its neighbours).}
 
+\item{cv_limit}{Cross-validation error (kg) above which a pig counts as
+badly predicted, in \code{cv_share_over}. Default 10.}
+
 \item{trim_days}{Days hidden at the start or the end of the test.
 Default \code{c(10, 20)}.}
 
@@ -53,8 +57,12 @@ Default \code{c(10, 20)}.}
 \value{
 A list of class \code{ppt_validation} with
 \itemize{
-\item \code{summary}: one row per model (and extrapolation): \code{cv_rmse} and \code{cv_mae} (kg, weight of the
-left-out records), and for each truncation (\code{late10}, \code{early10}, ...)
+\item \code{summary}: one row per model (and extrapolation): \code{cv_rmse} and
+\code{cv_mae}, the \strong{median} over pigs of each pig's prediction error (kg,
+weight of the left-out records; a few pigs with an absurd
+extrapolation, e.g. poly3 over a left-out block, would dominate a
+mean), \code{cv_share_over} the share of pigs with an error above
+\code{cv_limit} kg, and for each truncation (\code{late10}, \code{early10}, ...)
 the ADG \code{bias}, \code{rmse} (g/d) and Spearman rank correlation \code{spearman}
 with the full-data ADG, and how many pigs still get an ADG (\code{n});
 \item \code{cv}: cross-validation error of every pig and model;

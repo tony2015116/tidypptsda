@@ -260,7 +260,8 @@ ppt_result_table <- function(title, rows, cols, digits = 1, higher = character()
     if (nm %in% pct) txt[!is.na(v)] <- paste0(txt[!is.na(v)], "%")
     score <- if (nm %in% higher) -v else if (nm %in% zero) abs(v) else v
     score[rows %in% exclude] <- NA
-    best <- if (sum(!is.na(score)) < 2L) integer() else which(score == min(score, na.rm = TRUE))
+    best <- if (sum(!is.na(score)) < 2L || length(unique(stats::na.omit(score))) < 2L) integer() else
+      which(score == min(score, na.rm = TRUE))
     list(txt = txt, best = best)
   })
   w_row <- max(nchar(rows), 0L)
@@ -610,7 +611,7 @@ utils::globalVariables(c(
   "label", "lower", "upper", "kind",
   # validation
   "injected", "key", "method", "adg_true", "adg_rmse", "fold", "type", "model",
-  "rmse", "mae", "adg_full", "truncation", "cv_rmse", "observed", "dfi_true",
+  "rmse", "mae", "adg_full", "truncation", "cv_rmse", "cv_share_over", "observed", "dfi_true",
   "masks", "err_pct", "sq_err", "n_hidden", "adfi_est", "adfi_true", "scenario",
   "spearman", "track_removed", "tt", "first_day", "i.first_day", "adg_source",
   "adg_curve", "rlm_w", "i.rlm_w", "feed_missing", "r2_daily", "w_obs",
