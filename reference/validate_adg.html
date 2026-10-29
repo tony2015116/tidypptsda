@@ -33,7 +33,7 @@ training data)."><meta property="og:image" content="https://tony2015116.github.i
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.6.1</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.6.2</span>
       </span>
     </div>
 
@@ -138,6 +138,7 @@ training data).</p>
 <span>  extrap <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  k <span class="op">=</span> <span class="fl">5</span>,</span>
 <span>  block_days <span class="op">=</span> <span class="fl">7</span>,</span>
+<span>  cv_limit <span class="op">=</span> <span class="fl">10</span>,</span>
 <span>  trim_days <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">10</span>, <span class="fl">20</span><span class="op">)</span>,</span>
 <span>  qc <span class="op">=</span> <span class="va">weight</span><span class="op">$</span><span class="va">settings</span>,</span>
 <span>  max_pigs <span class="op">=</span> <span class="cn">NULL</span>,</span>
@@ -177,6 +178,11 @@ days are extrapolated.</p></dd>
 to its neighbours).</p></dd>
 
 
+<dt id="arg-cv-limit">cv_limit<a class="anchor" aria-label="anchor" href="#arg-cv-limit"></a></dt>
+<dd><p>Cross-validation error (kg) above which a pig counts as
+badly predicted, in <code>cv_share_over</code>. Default 10.</p></dd>
+
+
 <dt id="arg-trim-days">trim_days<a class="anchor" aria-label="anchor" href="#arg-trim-days"></a></dt>
 <dd><p>Days hidden at the start or the end of the test.
 Default <code>c(10, 20)</code>.</p></dd>
@@ -206,8 +212,12 @@ Default <code>c(10, 20)</code>.</p></dd>
 </dl></div>
     <div id="value">
     <h2>Value</h2>
-    <p>A list of class <code>ppt_validation</code> with</p><ul><li><p><code>summary</code>: one row per model (and extrapolation): <code>cv_rmse</code> and <code>cv_mae</code> (kg, weight of the
-left-out records), and for each truncation (<code>late10</code>, <code>early10</code>, ...)
+    <p>A list of class <code>ppt_validation</code> with</p><ul><li><p><code>summary</code>: one row per model (and extrapolation): <code>cv_rmse</code> and
+<code>cv_mae</code>, the <strong>median</strong> over pigs of each pig's prediction error (kg,
+weight of the left-out records; a few pigs with an absurd
+extrapolation, e.g. poly3 over a left-out block, would dominate a
+mean), <code>cv_share_over</code> the share of pigs with an error above
+<code>cv_limit</code> kg, and for each truncation (<code>late10</code>, <code>early10</code>, ...)
 the ADG <code>bias</code>, <code>rmse</code> (g/d) and Spearman rank correlation <code>spearman</code>
 with the full-data ADG, and how many pigs still get an ADG (<code>n</code>);</p></li>
 <li><p><code>cv</code>: cross-validation error of every pig and model;</p></li>

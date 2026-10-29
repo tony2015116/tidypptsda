@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.6.1</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.6.2</span>
       </span>
     </div>
 
@@ -97,6 +97,12 @@
       <small>Source: <a href="https://github.com/tony2015116/tidypptsda/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="page-header" data-toc-text="1.6.2" id="tidypptsda-162">tidypptsda 1.6.2<a class="anchor" aria-label="anchor" href="#tidypptsda-162"></a></h2>
+<ul><li>
+<code><a href="../reference/validate_adg.html">validate_adg()</a></code>: <code>cv_rmse</code> and <code>cv_mae</code> are now the <strong>median</strong> over pigs of each pig’s cross-validation error (they were the mean). A few pigs with an absurd extrapolation over a left-out block, mostly with <code>poly3</code>, could make the mean meaningless (on one large batch, tens of kg against a median of 2.5 kg, from four pigs with errors of thousands of kg). New column <code>cv_share_over</code>: the share of pigs with an error above the new argument <code>cv_limit</code> (default 10 kg), to see this risk separately.</li>
+<li>Result tables of the validation functions no longer mark every row as the best when all values of a column are equal.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="page-header" data-toc-text="1.6.1" id="tidypptsda-161">tidypptsda 1.6.1<a class="anchor" aria-label="anchor" href="#tidypptsda-161"></a></h2>
 <div class="section level3">

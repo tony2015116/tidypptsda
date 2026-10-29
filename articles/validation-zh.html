@@ -36,7 +36,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.6.1</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.6.2</span>
       </span>
     </div>
 
@@ -374,7 +374,12 @@ ADG 视为”真值”。这样哪种方法都不占便宜；<code>reference = "
 <code>block_days</code> 天（默认 7 天）切成块，再把块随机分成
 <code>k</code> 组（默认 5
 组），轮流留出一组，用其余各组拟合曲线，预测留出日子的体重。<code>cv_rmse</code>、<code>cv_mae</code>
-是预测误差（kg），反映曲线<strong>描述数据</strong>的能力。按块留出，留出日子的邻近几天也不在训练集里，更接近真实的成段缺失；<code>block_days = 1</code>
+是预测误差（kg）在各头猪之间的<strong>中位数</strong>，反映曲线<strong>描述数据</strong>的能力；<code>cv_share_over</code>
+是误差超过 <code>cv_limit</code>（默认 10
+kg）的猪的比例。用中位数是因为灵活的曲线（如
+poly3）在个别猪身上可能外推出离谱的值（上万公斤），一两头这样的猪就会把平均值拉得面目全非；这类风险单独看
+<code>cv_share_over</code>（1.6.1
+之前用的是平均值）。按块留出，留出日子的邻近几天也不在训练集里，更接近真实的成段缺失；<code>block_days = 1</code>
 是 1.5.0 之前按单天分折的做法，误差会明显偏小。</li>
 <li>
 <strong>截断检验</strong>：隐藏测定开头（<code>late</code>，模拟晚进站）或结尾（<code>early</code>，模拟早出栏）的
@@ -389,57 +394,60 @@ ADG，与同一模型用全部数据算出的 ADG
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">va_n</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_adg.html">validate_adg</a></span><span class="op">(</span><span class="va">w_n</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="fu">tidy</span><span class="op">(</span><span class="va">va_n</span><span class="op">)</span></span>
-<span><span class="co">#&gt;             model cv_rmse cv_mae bias_late10 rmse_late10 spearman_late10 n_late10 bias_early10</span></span>
-<span><span class="co">#&gt;            &lt;char&gt;   &lt;num&gt;  &lt;num&gt;       &lt;num&gt;       &lt;num&gt;           &lt;num&gt;    &lt;int&gt;        &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:    poly1+start    1.95   1.59        11.4        23.6           0.960       29         4.30</span></span>
-<span><span class="co">#&gt; 2:    poly2+start    1.93   1.52        24.0        31.3           0.969       29         7.43</span></span>
-<span><span class="co">#&gt; 3:    poly3+start    1.81   1.40        26.1        37.2           0.959       29         4.83</span></span>
-<span><span class="co">#&gt; 4: gompertz+start    1.72   1.35        17.4        26.8           0.963       29         5.70</span></span>
-<span><span class="co">#&gt;    rmse_early10 spearman_early10 n_early10 bias_late20 rmse_late20 spearman_late20 n_late20</span></span>
-<span><span class="co">#&gt;           &lt;num&gt;            &lt;num&gt;     &lt;int&gt;       &lt;num&gt;       &lt;num&gt;           &lt;num&gt;    &lt;int&gt;</span></span>
-<span><span class="co">#&gt; 1:         21.5            0.997        29       -5.10        29.0           0.939       29</span></span>
-<span><span class="co">#&gt; 2:         23.0            0.996        29        9.87        28.2           0.947       29</span></span>
-<span><span class="co">#&gt; 3:         23.9            0.996        29       17.00        36.2           0.915       29</span></span>
-<span><span class="co">#&gt; 4:         22.5            0.999        29        5.83        26.8           0.937       29</span></span>
-<span><span class="co">#&gt;    bias_early20 rmse_early20 spearman_early20 n_early20</span></span>
-<span><span class="co">#&gt;           &lt;num&gt;        &lt;num&gt;            &lt;num&gt;     &lt;int&gt;</span></span>
-<span><span class="co">#&gt; 1:        0.236         51.9            0.971        29</span></span>
-<span><span class="co">#&gt; 2:       14.100         49.9            0.976        29</span></span>
-<span><span class="co">#&gt; 3:       -3.190         60.1            0.933        29</span></span>
-<span><span class="co">#&gt; 4:       -0.114         52.0            0.981        29</span></span></code></pre></div>
+<span><span class="co">#&gt;             model cv_rmse cv_mae cv_share_over bias_late10 rmse_late10 spearman_late10 n_late10</span></span>
+<span><span class="co">#&gt;            &lt;char&gt;   &lt;num&gt;  &lt;num&gt;         &lt;num&gt;       &lt;num&gt;       &lt;num&gt;           &lt;num&gt;    &lt;int&gt;</span></span>
+<span><span class="co">#&gt; 1:    poly1+start    1.76   1.41             0        11.4        23.6           0.960       29</span></span>
+<span><span class="co">#&gt; 2:    poly2+start    1.75   1.40             0        24.0        31.3           0.969       29</span></span>
+<span><span class="co">#&gt; 3:    poly3+start    1.61   1.26             0        26.1        37.2           0.959       29</span></span>
+<span><span class="co">#&gt; 4: gompertz+start    1.54   1.21             0        17.4        26.8           0.963       29</span></span>
+<span><span class="co">#&gt;    bias_early10 rmse_early10 spearman_early10 n_early10 bias_late20 rmse_late20 spearman_late20</span></span>
+<span><span class="co">#&gt;           &lt;num&gt;        &lt;num&gt;            &lt;num&gt;     &lt;int&gt;       &lt;num&gt;       &lt;num&gt;           &lt;num&gt;</span></span>
+<span><span class="co">#&gt; 1:         4.30         21.5            0.997        29       -5.10        29.0           0.939</span></span>
+<span><span class="co">#&gt; 2:         7.43         23.0            0.996        29        9.87        28.2           0.947</span></span>
+<span><span class="co">#&gt; 3:         4.83         23.9            0.996        29       17.00        36.2           0.915</span></span>
+<span><span class="co">#&gt; 4:         5.70         22.5            0.999        29        5.83        26.8           0.937</span></span>
+<span><span class="co">#&gt;    n_late20 bias_early20 rmse_early20 spearman_early20 n_early20</span></span>
+<span><span class="co">#&gt;       &lt;int&gt;        &lt;num&gt;        &lt;num&gt;            &lt;num&gt;     &lt;int&gt;</span></span>
+<span><span class="co">#&gt; 1:       29        0.236         51.9            0.971        29</span></span>
+<span><span class="co">#&gt; 2:       29       14.100         49.9            0.976        29</span></span>
+<span><span class="co">#&gt; 3:       29       -3.190         60.1            0.933        29</span></span>
+<span><span class="co">#&gt; 4:       29       -0.114         52.0            0.981        29</span></span></code></pre></div>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">va_f</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_adg.html">validate_adg</a></span><span class="op">(</span><span class="va">w_f</span>, qc <span class="op">=</span> <span class="va">qc_f</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="fu">tidy</span><span class="op">(</span><span class="va">va_f</span><span class="op">)</span></span>
-<span><span class="co">#&gt;             model cv_rmse cv_mae bias_late10 rmse_late10 spearman_late10 n_late10 bias_early10</span></span>
-<span><span class="co">#&gt;            &lt;char&gt;   &lt;num&gt;  &lt;num&gt;       &lt;num&gt;       &lt;num&gt;           &lt;num&gt;    &lt;int&gt;        &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:    poly1+start    2.09   1.73       -16.7        78.4           0.796       25       -17.00</span></span>
-<span><span class="co">#&gt; 2:    poly2+start    1.99   1.63       -49.1       109.0           0.638       25        -6.77</span></span>
-<span><span class="co">#&gt; 3:    poly3+start    2.21   1.75       -72.6       126.0           0.508       25        17.10</span></span>
-<span><span class="co">#&gt; 4: gompertz+start    1.99   1.64       -48.2       108.0           0.657       25        -9.18</span></span>
-<span><span class="co">#&gt;    rmse_early10 spearman_early10 n_early10 bias_late20 rmse_late20 spearman_late20 n_late20</span></span>
-<span><span class="co">#&gt;           &lt;num&gt;            &lt;num&gt;     &lt;int&gt;       &lt;num&gt;       &lt;num&gt;           &lt;num&gt;    &lt;int&gt;</span></span>
-<span><span class="co">#&gt; 1:         40.2            0.963        25         144         167           0.812       24</span></span>
-<span><span class="co">#&gt; 2:         30.7            0.938        25         147         184           0.811       24</span></span>
-<span><span class="co">#&gt; 3:         44.3            0.856        25         134         170           0.795       25</span></span>
-<span><span class="co">#&gt; 4:         40.6            0.937        25         147         184           0.814       24</span></span>
-<span><span class="co">#&gt;    bias_early20 rmse_early20 spearman_early20 n_early20</span></span>
-<span><span class="co">#&gt;           &lt;num&gt;        &lt;num&gt;            &lt;num&gt;     &lt;int&gt;</span></span>
-<span><span class="co">#&gt; 1:        -66.2         90.6            0.891        25</span></span>
-<span><span class="co">#&gt; 2:        -93.3        129.0            0.762        25</span></span>
-<span><span class="co">#&gt; 3:         34.5        116.0            0.592        25</span></span>
-<span><span class="co">#&gt; 4:        -91.0        124.0            0.802        25</span></span></code></pre></div>
+<span><span class="co">#&gt;             model cv_rmse cv_mae cv_share_over bias_late10 rmse_late10 spearman_late10 n_late10</span></span>
+<span><span class="co">#&gt;            &lt;char&gt;   &lt;num&gt;  &lt;num&gt;         &lt;num&gt;       &lt;num&gt;       &lt;num&gt;           &lt;num&gt;    &lt;int&gt;</span></span>
+<span><span class="co">#&gt; 1:    poly1+start    2.01   1.63             0       -16.7        78.4           0.796       25</span></span>
+<span><span class="co">#&gt; 2:    poly2+start    1.90   1.54             0       -49.1       109.0           0.638       25</span></span>
+<span><span class="co">#&gt; 3:    poly3+start    1.83   1.47             0       -72.6       126.0           0.508       25</span></span>
+<span><span class="co">#&gt; 4: gompertz+start    1.89   1.53             0       -48.2       108.0           0.657       25</span></span>
+<span><span class="co">#&gt;    bias_early10 rmse_early10 spearman_early10 n_early10 bias_late20 rmse_late20 spearman_late20</span></span>
+<span><span class="co">#&gt;           &lt;num&gt;        &lt;num&gt;            &lt;num&gt;     &lt;int&gt;       &lt;num&gt;       &lt;num&gt;           &lt;num&gt;</span></span>
+<span><span class="co">#&gt; 1:       -17.00         40.2            0.963        25         144         167           0.812</span></span>
+<span><span class="co">#&gt; 2:        -6.77         30.7            0.938        25         147         184           0.811</span></span>
+<span><span class="co">#&gt; 3:        17.10         44.3            0.856        25         134         170           0.795</span></span>
+<span><span class="co">#&gt; 4:        -9.18         40.6            0.937        25         147         184           0.814</span></span>
+<span><span class="co">#&gt;    n_late20 bias_early20 rmse_early20 spearman_early20 n_early20</span></span>
+<span><span class="co">#&gt;       &lt;int&gt;        &lt;num&gt;        &lt;num&gt;            &lt;num&gt;     &lt;int&gt;</span></span>
+<span><span class="co">#&gt; 1:       24        -66.2         90.6            0.891        25</span></span>
+<span><span class="co">#&gt; 2:       24        -93.3        129.0            0.762        25</span></span>
+<span><span class="co">#&gt; 3:       25         34.5        116.0            0.592        25</span></span>
+<span><span class="co">#&gt; 4:       24        -91.0        124.0            0.802        25</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="怎么看-1">怎么看<a class="anchor" aria-label="anchor" href="#%E6%80%8E%E4%B9%88%E7%9C%8B-1"></a>
 </h3>
 <ul>
 <li>
-<strong>交叉验证偏向灵活的模型，但分块之后没那么明显</strong>：按单天分折时（<code>block_days = 1</code>），NEDAP
-上 poly3 和 gompertz 的误差最小（约 1.46 kg，poly2 约 1.63
-kg），因为它们能贴合生长曲线上的小起伏，而留出的日子两边都有记录；按 7
-天分块后，NEDAP 上仍是 gompertz 最小（1.72 kg），FIRE 上 poly3
-反而最差（2.21 kg，poly2 和 gompertz 1.99
-kg）：留出一整段时，灵活的曲线在段内容易走偏。</li>
+<strong>交叉验证偏向灵活的模型，但差别很小</strong>：按 7
+天分块时，NEDAP 上 gompertz 和 poly3 的误差中位数最小（1.54、1.61
+kg，poly2 1.75 kg），FIRE 上 poly3 最小（1.83 kg，poly2 1.90
+kg），各模型只差零点几公斤；按单天分折时（<code>block_days = 1</code>）误差全面更小（NEDAP
+gompertz 1.39 kg、poly2 1.50
+kg），因为留出的日子两边都有记录。灵活模型的风险不在中位数上，而在少数猪身上：留出一整段时，poly3
+可能外推出离谱的值，这时看
+<code>cv_share_over</code>。示例数据中各模型都没有误差超过 10 kg
+的猪。</li>
 <li>
 <strong>截断检验的结论却常常相反</strong>：灵活的模型外推往往不稳定。区间中间有实测时，曲线只影响起止时间，ADG
 对曲线形式不敏感；隐藏开头或结尾后，那一段要靠曲线填充，差别就出来了。</li>
@@ -472,12 +480,12 @@ g/d，poly3 最差（约 36 g/d）；FIRE 的猪进站时已在区间下限附�
 <span><span class="co">#&gt; Key: &lt;model&gt;</span></span>
 <span><span class="co">#&gt;            model cv_rmse rmse_late10 rmse_early10 rmse_late20 rmse_early20 rmse_late30 rmse_early30</span></span>
 <span><span class="co">#&gt;           &lt;char&gt;   &lt;num&gt;       &lt;num&gt;        &lt;num&gt;       &lt;num&gt;        &lt;num&gt;       &lt;num&gt;        &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:         poly1    2.01        27.0         21.5        51.2         51.9        82.6         64.0</span></span>
-<span><span class="co">#&gt; 2:   poly1+start    1.95        23.6         21.5        29.0         51.9        84.5         64.0</span></span>
-<span><span class="co">#&gt; 3: poly1+tangent    1.92        23.5         21.0        28.9         51.3        84.4         66.2</span></span>
-<span><span class="co">#&gt; 4:         poly2    2.10        33.9         23.0        44.8         49.9        69.2         75.0</span></span>
-<span><span class="co">#&gt; 5:   poly2+start    1.93        31.3         23.0        28.2         49.9        86.8         74.8</span></span>
-<span><span class="co">#&gt; 6: poly2+tangent    1.89        31.4         22.0        28.4         50.0        86.9         64.5</span></span></code></pre></div>
+<span><span class="co">#&gt; 1:         poly1    1.83        27.0         21.5        51.2         51.9        82.6         64.0</span></span>
+<span><span class="co">#&gt; 2:   poly1+start    1.76        23.6         21.5        29.0         51.9        84.5         64.0</span></span>
+<span><span class="co">#&gt; 3: poly1+tangent    1.73        23.5         21.0        28.9         51.3        84.4         66.2</span></span>
+<span><span class="co">#&gt; 4:         poly2    1.85        33.9         23.0        44.8         49.9        69.2         75.0</span></span>
+<span><span class="co">#&gt; 5:   poly2+start    1.75        31.3         23.0        28.2         49.9        86.8         74.8</span></span>
+<span><span class="co">#&gt; 6: poly2+tangent    1.72        31.4         22.0        28.4         50.0        86.9         64.5</span></span></code></pre></div>
 <p>在示例 NEDAP 数据上，开头缺 10–20 天时，开头切线明显改善 ADG（poly2
 开头缺 20 天：45 → 28 g/d）；开头缺 30 天时反而变差（69 → 87
 g/d），外推太远时直线不如曲线。末端切线在结尾缺 30 天时改善 poly2（75 →
