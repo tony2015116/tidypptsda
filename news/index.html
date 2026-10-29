@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.6.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.6.1</span>
       </span>
     </div>
 
@@ -97,6 +97,16 @@
       <small>Source: <a href="https://github.com/tony2015116/tidypptsda/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="page-header" data-toc-text="1.6.1" id="tidypptsda-161">tidypptsda 1.6.1<a class="anchor" aria-label="anchor" href="#tidypptsda-161"></a></h2>
+<div class="section level3">
+<h3 id="progress-and-messages-of-the-validation-functions-1-6-1">Progress and messages of the validation functions<a class="anchor" aria-label="anchor" href="#progress-and-messages-of-the-validation-functions-1-6-1"></a></h3>
+<ul><li>
+<code><a href="../reference/validate_outliers.html">validate_outliers()</a></code>, <code><a href="../reference/validate_adg.html">validate_adg()</a></code>, <code><a href="../reference/validate_weight_fill.html">validate_weight_fill()</a></code>, <code><a href="../reference/validate_adfi.html">validate_adfi()</a></code> and <code><a href="../reference/validate_truncation.html">validate_truncation()</a></code> start with one line about the data and the design (pigs, methods, scenarios, repetitions), then show numbered phases (<code>[1/3]</code>, …). The long phases, such as cleaning the remaining records again for every fold, truncation or mask, now have a progress bar with the count done and the ETA from the start; before they ran silently. Each phase ends with one line and its run time, and the function ends with the total time.</li>
+<li>The results are printed as an aligned table, with the best value of each column in green and marked with <code>*</code>, e.g. the ADFI error per method and scenario.</li>
+<li>Progress bars are shorter, so the count and the ETA fit on an 80-column console.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="page-header" data-toc-text="1.6.0" id="tidypptsda-160">tidypptsda 1.6.0<a class="anchor" aria-label="anchor" href="#tidypptsda-160"></a></h2>
 <div class="section level3">
