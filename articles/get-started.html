@@ -315,7 +315,7 @@ built-in format as a template to start from.</p>
 <span></span>
 <span><span class="co"># The built-in format, written as a template for other exports</span></span>
 <span><span class="fu"><a href="../reference/station_format.html">station_format</a></span><span class="op">(</span><span class="st">"fire"</span>, file <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">folder</span>, <span class="st">"fire_format.txt"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Station format written to <span style="color: #0000BB;">/tmp/RtmpmEY02p/fire_export/fire_format.txt</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Station format written to <span style="color: #0000BB;">/tmp/RtmpUJqsUI/fire_export/fire_format.txt</span></span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">folder</span>, recursive <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
 </div>
@@ -355,7 +355,7 @@ other exports.</p>
 <span><span class="co"># Write a template, edit it, and use it</span></span>
 <span><span class="va">f</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".txt"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/station_format.html">station_format</a></span><span class="op">(</span><span class="st">"fire"</span>, file <span class="op">=</span> <span class="va">f</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Station format written to <span style="color: #0000BB;">/tmp/RtmpmEY02p/file1e7b15c329ef.txt</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Station format written to <span style="color: #0000BB;">/tmp/RtmpUJqsUI/file1f1e28accd4b.txt</span></span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/readLines.html" class="external-link">readLines</a></span><span class="op">(</span><span class="va">f</span><span class="op">)</span>, sep <span class="op">=</span> <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; # tidypptsda station format: FIRE</span></span>
 <span><span class="co">#&gt; # One line per field, separated by tabs: field, column, unit.</span></span>
@@ -908,7 +908,7 @@ the last recorded day), <code>"missing"</code>.</p>
 <span><span class="co">#&gt; <span style="color: #555555;">  └ filled between records (iii)         1   &lt;0.1%</span></span></span>
 <span><span class="co">#&gt; <span style="color: #555555;">  └ filled at the stage ends (elrp)     31    1.4%</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00;">  └ outside dfi_range                    1   &lt;0.1%</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> ADFI 2845 ± 360 g/d (mean ± SD) <span style="color: #555555;">0.1s</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> ADFI 2845 ± 360 g/d (mean ± SD) <span style="color: #555555;">0.2s</span></span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">adfi</span><span class="op">$</span><span class="va">per_pig</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    responder location  stage     adfi     adg_type adfi_raw adfi_error_free</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;   &lt;char&gt; &lt;char&gt;    &lt;num&gt;       &lt;char&gt;    &lt;num&gt;           &lt;num&gt;</span></span>
@@ -1038,7 +1038,7 @@ colour-blind safe palette (Okabe-Ito) without extra packages.</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span></span>
 <span><span class="va">out</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/save_plots.html">save_plots</a></span><span class="op">(</span><span class="va">g</span>, path <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, prefix <span class="op">=</span> <span class="st">"loc"</span>, suffix <span class="op">=</span> <span class="st">"growth"</span>, device <span class="op">=</span> <span class="st">"pdf"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Saved 1 of 1 plot to <span style="color: #0000BB;">/tmp/RtmpmEY02p</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Saved 1 of 1 plot to <span style="color: #0000BB;">/tmp/RtmpUJqsUI</span></span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.exists</a></span><span class="op">(</span><span class="va">out</span><span class="op">$</span><span class="va">file</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] TRUE</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">out</span><span class="op">$</span><span class="va">file</span><span class="op">)</span></span></code></pre></div>
@@ -1099,11 +1099,11 @@ turn the pages; a pig ID in the search box jumps to its station.</p>
 <span><span class="fu"><a href="../reference/write_report.html">write_report</a></span><span class="op">(</span><span class="va">res</span>, <span class="va">dir</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Writing the HTML report</span> <span style="color: #00BBBB;">─────────────────────────────────────────────────────</span></span></span>
-<span><span class="co">#&gt; Saving plots <span style="color: #00BB00;">■■■■</span><span style="color: #555555;">■■■■■■■■■■■</span> 1/4 | ETA  3s</span></span>
+<span><span class="co">#&gt; Saving plots <span style="color: #00BB00;">■■■■</span><span style="color: #555555;">■■■■■■■■■■■</span> 1/4 | ETA  4s</span></span>
 <span><span class="co">#&gt; Saving plots <span style="color: #00BB00;">■■■■■■■■■■■</span><span style="color: #555555;">■■■■</span> 3/4 | ETA  1s</span></span>
 <span><span class="co">#&gt; Saving plots <span style="color: #00BB00;">■■■■■■■■■■■■■■■</span> 4/4 | ETA  0s</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Saved 4 of 4 plots to <span style="color: #0000BB;">/tmp/RtmpmEY02p/report/img</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Report of 2 stations written to <span style="color: #0000BB;">/tmp/RtmpmEY02p/report/index.html</span> <span style="color: #555555;">4.5s</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Saved 4 of 4 plots to <span style="color: #0000BB;">/tmp/RtmpUJqsUI/report/img</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Report of 2 stations written to <span style="color: #0000BB;">/tmp/RtmpUJqsUI/report/index.html</span> <span style="color: #555555;">4.9s</span></span></span>
 <span><span class="co"># then open file.path(dir, "index.html") in a web browser</span></span></code></pre></div>
 </div>
 <div class="section level2">
@@ -1116,19 +1116,19 @@ mark so that Excel shows Chinese text correctly.</p>
 <div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="va">out</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/write_results.html">write_results</a></span><span class="op">(</span><span class="va">res</span>, dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"results"</span><span class="op">)</span>, farm <span class="op">=</span> <span class="st">"demo"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Wrote 9 files to <span style="color: #0000BB;">/tmp/RtmpmEY02p/results</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Wrote 9 files to <span style="color: #0000BB;">/tmp/RtmpUJqsUI/results</span></span></span>
 <span><span class="va">out</span></span>
 <span><span class="co">#&gt;           table                                                   file  rows</span></span>
 <span><span class="co">#&gt;          &lt;char&gt;                                                 &lt;char&gt; &lt;int&gt;</span></span>
-<span><span class="co">#&gt; 1:          fcr          /tmp/RtmpmEY02p/results/demo_fcr_20261030.csv    29</span></span>
-<span><span class="co">#&gt; 2:       by_bin       /tmp/RtmpmEY02p/results/demo_by_bin_20261030.csv   258</span></span>
-<span><span class="co">#&gt; 3:   daily_feed   /tmp/RtmpmEY02p/results/demo_daily_feed_20261030.csv  2820</span></span>
-<span><span class="co">#&gt; 4: daily_weight /tmp/RtmpmEY02p/results/demo_daily_weight_20261030.csv  2607</span></span>
-<span><span class="co">#&gt; 5:  weight_pigs  /tmp/RtmpmEY02p/results/demo_weight_pigs_20261030.csv    30</span></span>
-<span><span class="co">#&gt; 6:   feed_model   /tmp/RtmpmEY02p/results/demo_feed_model_20261030.csv    14</span></span>
-<span><span class="co">#&gt; 7:      summary      /tmp/RtmpmEY02p/results/demo_summary_20261030.csv    14</span></span>
-<span><span class="co">#&gt; 8:      removed      /tmp/RtmpmEY02p/results/demo_removed_20261030.csv     1</span></span>
-<span><span class="co">#&gt; 9:     settings     /tmp/RtmpmEY02p/results/demo_settings_20261030.csv    43</span></span>
+<span><span class="co">#&gt; 1:          fcr          /tmp/RtmpUJqsUI/results/demo_fcr_20261030.csv    29</span></span>
+<span><span class="co">#&gt; 2:       by_bin       /tmp/RtmpUJqsUI/results/demo_by_bin_20261030.csv   258</span></span>
+<span><span class="co">#&gt; 3:   daily_feed   /tmp/RtmpUJqsUI/results/demo_daily_feed_20261030.csv  2820</span></span>
+<span><span class="co">#&gt; 4: daily_weight /tmp/RtmpUJqsUI/results/demo_daily_weight_20261030.csv  2607</span></span>
+<span><span class="co">#&gt; 5:  weight_pigs  /tmp/RtmpUJqsUI/results/demo_weight_pigs_20261030.csv    30</span></span>
+<span><span class="co">#&gt; 6:   feed_model   /tmp/RtmpUJqsUI/results/demo_feed_model_20261030.csv    14</span></span>
+<span><span class="co">#&gt; 7:      summary      /tmp/RtmpUJqsUI/results/demo_summary_20261030.csv    14</span></span>
+<span><span class="co">#&gt; 8:      removed      /tmp/RtmpUJqsUI/results/demo_removed_20261030.csv     1</span></span>
+<span><span class="co">#&gt; 9:     settings     /tmp/RtmpUJqsUI/results/demo_settings_20261030.csv    43</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"results"</span><span class="op">)</span>, recursive <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
@@ -1178,7 +1178,7 @@ hidden days do not decide which of the other records are kept (since
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Validating weight outlier methods</span> <span style="color: #00BBBB;">───────────────────────────────────────────</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> 7 methods · 5% artificial errors of 3-15 kg (both) · 1 repetition · reference: consensus</span></span>
 <span><span class="co">#&gt; ⠙ [1/3] Clean records <span style="color: #555555;">■■■■■■■■■■■■■■■</span> 0/8 | ETA ?</span></span>
-<span><span class="co">#&gt; ⠹ [1/3] Clean records <span style="color: #00BB00;">■■</span><span style="color: #555555;">■■■■■■■■■■■■■</span> 1/8 | ETA  4s</span></span>
+<span><span class="co">#&gt; ⠹ [1/3] Clean records <span style="color: #00BB00;">■■</span><span style="color: #555555;">■■■■■■■■■■■■■</span> 1/8 | ETA  5s</span></span>
 <span><span class="co">#&gt; ⠸ [1/3] Clean records <span style="color: #00BB00;">■■■■</span><span style="color: #555555;">■■■■■■■■■■■</span> 2/8 | ETA  4s</span></span>
 <span><span class="co">#&gt; ⠼ [1/3] Clean records <span style="color: #00BB00;">■■■■■■</span><span style="color: #555555;">■■■■■■■■■</span> 3/8 | ETA  3s</span></span>
 <span><span class="co">#&gt; ⠴ [1/3] Clean records <span style="color: #00BB00;">■■■■■■■■</span><span style="color: #555555;">■■■■■■■</span> 4/8 | ETA  2s</span></span>
@@ -1189,11 +1189,11 @@ hidden days do not decide which of the other records are kept (since
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> [1/3] Clean records (8 cleanings) <span style="color: #555555;">4.2s</span></span></span>
 <span><span class="co">#&gt; → [2/3] Reference ADG of the clean records ...</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> [2/3] Reference ADG of the clean records <span style="color: #555555;">0.7s</span></span></span>
-<span><span class="co">#&gt; [3/3] Spoiled data, each method <span style="color: #00BB00;">■■■■</span><span style="color: #555555;">■■■■■■■■■■■</span> 2/8 | ETA  5s</span></span>
-<span><span class="co">#&gt; [3/3] Spoiled data, each method <span style="color: #00BB00;">■■■■■■■■■</span><span style="color: #555555;">■■■■■■</span> 5/8 | ETA  2s</span></span>
+<span><span class="co">#&gt; [3/3] Spoiled data, each method <span style="color: #00BB00;">■■■■</span><span style="color: #555555;">■■■■■■■■■■■</span> 2/8 | ETA  6s</span></span>
+<span><span class="co">#&gt; [3/3] Spoiled data, each method <span style="color: #00BB00;">■■■■■■■■</span><span style="color: #555555;">■■■■■■■</span> 4/8 | ETA  4s</span></span>
 <span><span class="co">#&gt; [3/3] Spoiled data, each method <span style="color: #00BB00;">■■■■■■■■■■■■■■■</span> 8/8 | ETA  0s</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> [3/3] Spoiled data, each method (8 runs) <span style="color: #555555;">5.8s</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Done in 10.7s<span style="color: #555555;"> · details in $summary</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> [3/3] Spoiled data, each method (8 runs) <span style="color: #555555;">6.4s</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Done in 11.3s<span style="color: #555555;"> · details in $summary</span></span></span>
 <span><span class="co">#&gt; <span style="font-weight: bold;">25,579 clean records of 29 pigs, 5% spoiled</span></span></span>
 <span><span class="co">#&gt; <span style="color: #555555;">                   errors found  good removed  ADG bias g/d  ADG RMSE g/d</span></span></span>
 <span><span class="co">#&gt;   none                    1.1%         0.00%          -0.1           1.0 </span></span>
@@ -1232,7 +1232,7 @@ hidden days do not decide which of the other records are kept (since
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Validating growth curves</span> <span style="color: #00BBBB;">────────────────────────────────────────────────────</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> 29 pigs · 3 models · 5-fold CV in 7-day blocks · truncation 10, 20 days</span></span>
 <span><span class="co">#&gt; ⠙ [1/3] Re-cleaning CV folds <span style="color: #555555;">■■■■■■■■■■■■■■■</span> 0/5 | ETA ?</span></span>
-<span><span class="co">#&gt; ⠹ [1/3] Re-cleaning CV folds <span style="color: #00BB00;">■■■</span><span style="color: #555555;">■■■■■■■■■■■■</span> 1/5 | ETA  3s</span></span>
+<span><span class="co">#&gt; ⠹ [1/3] Re-cleaning CV folds <span style="color: #00BB00;">■■■</span><span style="color: #555555;">■■■■■■■■■■■■</span> 1/5 | ETA  2s</span></span>
 <span><span class="co">#&gt; ⠸ [1/3] Re-cleaning CV folds <span style="color: #00BB00;">■■■■■■</span><span style="color: #555555;">■■■■■■■■■</span> 2/5 | ETA  2s</span></span>
 <span><span class="co">#&gt; ⠼ [1/3] Re-cleaning CV folds <span style="color: #00BB00;">■■■■■■■■■</span><span style="color: #555555;">■■■■■■</span> 3/5 | ETA  1s</span></span>
 <span><span class="co">#&gt; ⠴ [1/3] Re-cleaning CV folds <span style="color: #00BB00;">■■■■■■■■■■■■</span><span style="color: #555555;">■■■</span> 4/5 | ETA  1s</span></span>
@@ -1243,11 +1243,12 @@ hidden days do not decide which of the other records are kept (since
 <span><span class="co">#&gt; ⠸ [2/3] Re-cleaning truncations <span style="color: #00BB00;">■■■■■■■■</span><span style="color: #555555;">■■■■■■■</span> 2/4 | ETA  1s</span></span>
 <span><span class="co">#&gt; ⠼ [2/3] Re-cleaning truncations <span style="color: #00BB00;">■■■■■■■■■■■</span><span style="color: #555555;">■■■■</span> 3/4 | ETA  1s</span></span>
 <span><span class="co">#&gt; ⠼ [2/3] Re-cleaning truncations <span style="color: #00BB00;">■■■■■■■■■■■■■■■</span> 4/4 | ETA  0s</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> [2/3] Re-cleaning truncations (4 truncations) <span style="color: #555555;">2.2s</span></span></span>
-<span><span class="co">#&gt; [3/3] Fitting the curves <span style="color: #00BB00;">■■■■■■</span><span style="color: #555555;">■■■■■■■■■</span> 11/29 | ETA  3s</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> [2/3] Re-cleaning truncations (4 truncations) <span style="color: #555555;">2.4s</span></span></span>
+<span><span class="co">#&gt; [3/3] Fitting the curves <span style="color: #00BB00;">■■■</span><span style="color: #555555;">■■■■■■■■■■■■</span> 6/29 | ETA  4s</span></span>
+<span><span class="co">#&gt; [3/3] Fitting the curves <span style="color: #00BB00;">■■■■■■■■■</span><span style="color: #555555;">■■■■■■</span> 18/29 | ETA  2s</span></span>
 <span><span class="co">#&gt; [3/3] Fitting the curves <span style="color: #00BB00;">■■■■■■■■■■■■■■■</span> 29/29 | ETA  0s</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> [3/3] Fitting the curves (29 pigs x 3 models) <span style="color: #555555;">5.0s</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Done in 10.0s<span style="color: #555555;"> · details in $summary</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> [3/3] Fitting the curves (29 pigs x 3 models) <span style="color: #555555;">5.5s</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Done in 10.9s<span style="color: #555555;"> · details in $summary</span></span></span>
 <span><span class="co">#&gt; <span style="font-weight: bold;">Cross-validation error (median over pigs, kg) and ADG error after truncation</span></span></span>
 <span><span class="co">#&gt; <span style="font-weight: bold;">(RMSE, g/d)</span></span></span>
 <span><span class="co">#&gt; <span style="color: #555555;">               CV kg  CV &gt; 10 kg  late10  early10  late20  early20</span></span></span>
@@ -1283,13 +1284,13 @@ hidden days do not decide which of the other records are kept (since
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Validating weight fill methods</span> <span style="color: #00BBBB;">──────────────────────────────────────────────</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> 29 pigs · 2 methods · 2 scenarios · 1 repetition</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> [1/4] Reference ADG and hidden days (29 pigs) <span style="color: #555555;">0.2s</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> [1/4] Reference ADG and hidden days (29 pigs) <span style="color: #555555;">0.3s</span></span></span>
 <span><span class="co">#&gt; ⠙ [2/4] Re-cleaning masks <span style="color: #555555;">■■■■■■■■■■■■■■■</span> 0/2 | ETA ?</span></span>
 <span><span class="co">#&gt; ⠹ [2/4] Re-cleaning masks <span style="color: #00BB00;">■■■■■■■■</span><span style="color: #555555;">■■■■■■■</span> 1/2 | ETA  1s</span></span>
 <span><span class="co">#&gt; ⠹ [2/4] Re-cleaning masks <span style="color: #00BB00;">■■■■■■■■■■■■■■■</span> 2/2 | ETA  0s</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> [2/4] Re-cleaning masks (2 masks) <span style="color: #555555;">1.1s</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> [3/4] Filling the hidden days (29 pigs x 2 masks x 2 methods) <span style="color: #555555;">0.9s</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Done in 2.3s<span style="color: #555555;"> · details in $summary</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> [2/4] Re-cleaning masks (2 masks) <span style="color: #555555;">1.3s</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> [3/4] Filling the hidden days (29 pigs x 2 masks x 2 methods) <span style="color: #555555;">1.2s</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Done in 2.8s<span style="color: #555555;"> · details in $summary</span></span></span>
 <span><span class="co">#&gt; <span style="font-weight: bold;">Daily weight error on the hidden days (RMSE, kg)</span></span></span>
 <span><span class="co">#&gt; <span style="color: #555555;">                blocks3  late20</span></span></span>
 <span><span class="co">#&gt;   linear+start  <span style="color: #00BB00;">  0.93*</span>  <span style="color: #00BB00;"> 2.43*</span></span></span>
@@ -1321,13 +1322,13 @@ hidden days do not decide which of the other records are kept (since
 <span><span class="co">#&gt; → [1/3] Leave-one-out population curves ...</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> [1/3] Leave-one-out population curves <span style="color: #555555;">0.0s</span></span></span>
 <span><span class="co">#&gt; ⠙ [2/3] Body weight per mask <span style="color: #555555;">■■■■■■■■■■■■■■■</span> 0/4 | ETA ?</span></span>
-<span><span class="co">#&gt; ⠹ [2/3] Body weight per mask <span style="color: #00BB00;">■■■■</span><span style="color: #555555;">■■■■■■■■■■■</span> 1/4 | ETA  3s</span></span>
+<span><span class="co">#&gt; ⠹ [2/3] Body weight per mask <span style="color: #00BB00;">■■■■</span><span style="color: #555555;">■■■■■■■■■■■</span> 1/4 | ETA  2s</span></span>
 <span><span class="co">#&gt; ⠸ [2/3] Body weight per mask <span style="color: #00BB00;">■■■■■■■■</span><span style="color: #555555;">■■■■■■■</span> 2/4 | ETA  2s</span></span>
 <span><span class="co">#&gt; ⠼ [2/3] Body weight per mask <span style="color: #00BB00;">■■■■■■■■■■■</span><span style="color: #555555;">■■■■</span> 3/4 | ETA  1s</span></span>
 <span><span class="co">#&gt; ⠼ [2/3] Body weight per mask <span style="color: #00BB00;">■■■■■■■■■■■■■■■</span> 4/4 | ETA  0s</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> [2/3] Body weight per mask (4 masks) <span style="color: #555555;">3.2s</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> [3/3] Imputing the hidden days (29 pigs x 4 masks x 3 methods) <span style="color: #555555;">1.8s</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Done in 5.0s<span style="color: #555555;"> · details in $summary</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> [2/3] Body weight per mask (4 masks) <span style="color: #555555;">3.5s</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> [3/3] Imputing the hidden days (29 pigs x 4 masks x 3 methods) <span style="color: #555555;">2.0s</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Done in 5.6s<span style="color: #555555;"> · details in $summary</span></span></span>
 <span><span class="co">#&gt; <span style="font-weight: bold;">ADFI error (mean absolute error, % of the recorded ADFI)</span></span></span>
 <span><span class="co">#&gt; <span style="color: #555555;">             random30  late20</span></span></span>
 <span><span class="co">#&gt;   loess_pop     1.05   <span style="color: #00BB00;"> 1.34*</span></span></span>
@@ -1392,12 +1393,12 @@ res <- validate_truncation(
 #> ⠙ [1/2] Full-data run of each setting  [90m■■■■■■■■■■■■■■■ [39m 0/2 | ETA ?
 #> ⠹ [1/2] Full-data run of each setting  [32m■■■■■■■■ [39m [90m■■■■■■■ [39m 1/2 | ETA  1s
 #> ⠹ [1/2] Full-data run of each setting  [32m■■■■■■■■■■■■■■■ [39m 2/2 | ETA  0s
-#>  [32m✔ [39m [1/2] Full-data run of each setting (2 settings)  [90m2.3s [39m
+#>  [32m✔ [39m [1/2] Full-data run of each setting (2 settings)  [90m2.7s [39m
 #>  [36mℹ [39m 21 pigs with a fully covered stage · 2 settings · 1 scenario · 1 repetition · 4 runs of the pipeline
-#> [2/2] Truncated runs  [32m■■■■■■■■ [39m [90m■■■■■■■ [39m 2/4 | ETA  2s
+#> [2/2] Truncated runs  [32m■■■■ [39m [90m■■■■■■■■■■■ [39m 1/4 | ETA  3s
 #> [2/2] Truncated runs  [32m■■■■■■■■■■■■■■■ [39m 4/4 | ETA  0s
-#>  [32m✔ [39m [2/2] Truncated runs (4 runs)  [90m4.3s [39m
-#>  [32m✔ [39m Done in 6.6s [90m · details in $summary [39m
+#>  [32m✔ [39m [2/2] Truncated runs (4 runs)  [90m4.5s [39m
+#>  [32m✔ [39m Done in 7.3s [90m · details in $summary [39m
 #>  [1mFCR: rank correlation with the full-data FCR [22m
 #>  [90m       late20 [39m
 #>   lm   0.916 

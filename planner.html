@@ -44,9 +44,6 @@
 }
 * { box-sizing: border-box; }
 body { margin: 0; }
-img { max-width: 100%; }
-.home { color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 500; }
-.home:hover { text-decoration: underline; }
 [hidden] { display: none !important; }
 .field.wide { grid-template-columns: 1fr 136px; }
 body {
@@ -168,9 +165,12 @@ table.years { border-collapse: collapse; font-size: 13px; }
 .years tr.partial td { color: var(--muted); }
 .cols2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
 @media (max-width: 1000px) { .cols2 { grid-template-columns: minmax(0, 1fr); } }
+.home { color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 500; }
+.home:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
+
 <header class="top">
   <div>
     <a class="home" href="index.html">← tidypptsda</a>
@@ -244,6 +244,7 @@ table.years { border-collapse: collapse; font-size: 13px; }
       <div class="field" id="row-batch"><label for="p-batch">每批上测头数</label><input id="p-batch" type="number" min="1" value="400"></div>
       <div class="field"><label for="p-groups">分组数<small>0 = 自动</small></label><input id="p-groups" type="number" min="0" max="30" value="0"></div>
       <div class="field"><label for="p-fault">设备故障预留<small>%</small></label><input id="p-fault" type="number" min="0" max="50" step="1" value="0"></div>
+      <div class="field"><label for="p-maxwait">保育最多多等几天<small>测定站没空时，等几天以内就等，再长就跳过这批</small></label><input id="p-maxwait" type="number" min="0" max="60" step="1" value="7"></div>
     </div>
 
     <div class="row-btns"><button id="btn-reset" type="button">恢复示例参数</button></div>
@@ -264,8 +265,8 @@ table.years { border-collapse: collapse; font-size: 13px; }
   ];
   var DEFAULTS = { start: "2024-11-01", months: 24, n: 45, t: 90, w: 10, r: 7, wn: 7, mindown: 21, stations: 120, perst: 15,
                    loss: 3, tloss: 0, q: 90, w0: 7, adg: 0.45, wmin: 15, wstage: 30, delay: 14, ea: 3200, rule: "back",
-                   interval: "21", dir: "stations", batch: 400, groups: 0, fault: 0 };
-  var NUMS = ["months", "n", "t", "w", "r", "wn", "mindown", "stations", "perst", "loss", "tloss", "q", "w0", "adg", "wmin", "wstage", "delay", "batch", "groups", "fault"];
+                   interval: "21", dir: "stations", batch: 400, groups: 0, fault: 0, maxwait: 7 };
+  var NUMS = ["months", "n", "t", "w", "r", "wn", "mindown", "stations", "perst", "loss", "tloss", "q", "w0", "adg", "wmin", "wstage", "delay", "batch", "groups", "fault", "maxwait"];
   var GL = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
   var state = { tab: "A", view: "batch" };
   function el(id) { return document.getElementById(id); }
@@ -283,7 +284,7 @@ table.years { border-collapse: collapse; font-size: 13px; }
               dir: el("p-dir-b").checked ? "batch" : "stations", interval: +el("p-interval").value || 21 };
     NUMS.forEach(function (k) { var e = el("p-" + k), v = +e.value; p[k] = e.value !== "" && isFinite(v) ? v : DEFAULTS[k]; });
     var ea = el("p-ea").value; p.ea = ea === "" || !isFinite(+ea) ? DEFAULTS.ea : Math.max(1, Math.round(+ea));
-    ["n", "t", "w", "r", "wn", "ret", "delay", "groups", "mindown"].forEach(function (k) { p[k] = Math.max(0, Math.round(p[k])); });
+    ["n", "t", "w", "r", "wn", "delay", "groups", "mindown", "maxwait"].forEach(function (k) { p[k] = Math.max(0, Math.round(p[k])); });
     p.n = Math.max(1, p.n); p.t = Math.max(1, p.t); p.months = Math.min(60, Math.max(6, Math.round(p.months)));
     p.stations = Math.max(1, Math.round(p.stations)); p.perst = Math.max(1, Math.round(p.perst)); p.batch = Math.max(1, Math.round(p.batch));
     p.ct = p.stations * p.perst;
@@ -303,9 +304,9 @@ table.years { border-collapse: collapse; font-size: 13px; }
   function save(p) {
     var o = { start: p.start, rule: p.rule, dir: p.dir, interval: String(p.interval), ea: p.ea };
     NUMS.forEach(function (k) { o[k] = p[k]; });
-    try { localStorage.setItem("station-planner-v4", JSON.stringify(o)); } catch (e) {}
+    try { localStorage.setItem("station-planner-v5", JSON.stringify(o)); } catch (e) {}
   }
-  function load() { try { return JSON.parse(localStorage.getItem("station-planner-v4") || "null"); } catch (e) { return null; } }
+  function load() { try { return JSON.parse(localStorage.getItem("station-planner-v5") || "null"); } catch (e) { return null; } }
 
   // ---------------------------------------------------------------- weekly-batch rolling: groups and stations
   function rolling(p) {
@@ -348,11 +349,32 @@ table.years { border-collapse: collapse; font-size: 13px; }
       }
       cycle = Math.max(room, N + p.wn); perYear = 365 / cycle;
     } else {
-      k = ro.G; cycle = ro.I * ro.G;
-      for (var q = 0; start + q * ro.I < end; q++) { var t2 = start + N + q * ro.I; list.push(mk(q, q % ro.G, t2 - N, t2, t2 + T)); }
-      perYear = 365 / ro.I;
+      // each sow-farm batch arrives every I days; it goes on test in the group that is free first,
+      // waits up to maxwait days in the nursery for a group, or is skipped (not brought in)
+      k = ro.G;
+      var ready = [], skipped = [], lastUse = [], gaps = [], idx = 0, nSow = 0;
+      for (var g0 = 0; g0 < ro.G; g0++) { ready.push(-1e9); lastUse.push(null); }
+      for (var q = 0; start + q * ro.I < end; q++) {
+        nSow++;
+        var due = start + N + q * ro.I, g = 0;
+        for (var gg = 1; gg < ro.G; gg++) if (ready[gg] < ready[g]) g = gg;
+        var tin2;
+        if (ready[g] <= due) tin2 = due;
+        else if (ready[g] - due <= p.maxwait) tin2 = ready[g];
+        else { skipped.push({ q: q, nIn: due - N, due: due, free: ready[g], room: g }); continue; }
+        var b2 = mk(idx, g, due - N, tin2, tin2 + T); b2.q = q; list.push(b2); idx++;
+        if (lastUse[g] !== null) gaps.push(tin2 - lastUse[g]);
+        lastUse[g] = tin2; ready[g] = tin2 + room;
+      }
+      var span = list.length > 1 ? list[list.length - 1].tIn - list[0].tIn : 0;
+      perYear = list.length > 1 ? (list.length - 1) * 365 / span : 365 / ro.I;
+      cycle = ro.G * 365 / perYear;
+      var effMargin = gaps.length ? Math.min.apply(null, gaps) - room : ro.margin;
+      var waits = list.filter(function (b) { return b.tIn - b.nIn > N; }).length;
     }
-    return { mode: mode, list: list, start: start, end: end, k: k, cycle: cycle, perYear: perYear };
+    return { mode: mode, list: list, start: start, end: end, k: k, cycle: cycle, perYear: perYear,
+             skipped: mode === "C" ? skipped : [], nSow: mode === "C" ? nSow : 0,
+             effMargin: mode === "C" ? effMargin : 0, waits: mode === "C" ? waits : 0 };
   }
 
   // ---------------------------------------------------------------- evaluation
@@ -366,7 +388,7 @@ table.years { border-collapse: collapse; font-size: 13px; }
     var len = Math.max(d1, last) - d0 + 1, stayMax = 0;
     L.forEach(function (b) { var st = b.tIn - b.nIn; if (b.i > 0 && st > stayMax) stayMax = st; });
     if (!stayMax && L.length) stayMax = L[0].tIn - L[0].nIn;
-    var wait = mode === "A" ? 0 : mode === "B" ? p.delay : Math.max(0, p.delay - Math.max(0, ro.margin));
+    var wait = mode === "A" ? 0 : mode === "B" ? p.delay : Math.max(0, p.delay - Math.max(0, s.effMargin));
     var wTest = wAt(stayMax), wLate = wAt(stayMax + wait);
     var E = mode === "A" ? p.ea : Math.ceil(seats / ((1 - p.l) * p.qq));
     var T_ = Math.max(0, Math.min(Math.floor(seats), Math.floor(E * (1 - p.l) * (mode === "A" ? 1 : p.qq))));
@@ -403,7 +425,7 @@ table.years { border-collapse: collapse; font-size: 13px; }
       sel: tested / Math.max(1, entries * (1 - p.l)),
       perYear: s.perYear, perYearPigs: perYearPigs, perYearIn: s.perYear * entries,
       perYearOther: s.perYear * Math.max(0, entries * (1 - p.l) - tested),
-      timeUtil: p.t / s.cycle, seatUtil: perYearPigs * p.t / Math.max(1, seatsTotal * 365), seatsTotal: seatsTotal,
+      timeUtil: mode === "C" ? s.perYear * p.t / (365 * ro.G) : p.t / s.cycle, seatUtil: perYearPigs * p.t / Math.max(1, seatsTotal * 365), seatsTotal: seatsTotal,
       peakN: st.pk.N, peakT: st.pk.T, peakR: st.pk.R, peakTot: st.pk.tot,
       wTest: wTest, wLate: wLate, stay: stayMax, wait: wait, nP: st.nP, rP: st.rP, tP: st.tP, len: len,
       down: p.w + p.r, years: years, firstFull: firstFull, lastFull: lastFull,
@@ -414,8 +436,10 @@ table.years { border-collapse: collapse; font-size: 13px; }
   function alertsOf(r, p) {
     var a = r.notes.slice();
     if (r.mode === "C") {
-      if (r.ro.margin < 0) a.push(["bad", "分组数不够：同一组测定站上一批还没洗消静置完，下一批就要进（差 " + (-r.ro.margin) + " 天）。增加分组数或缩短周转。"]);
-      else if (r.ro.margin === 0) a.push(["warn", "安全裕度为 0：测定站推迟一天清空，下一批就进不去。"]);
+      var sk = r.s.skipped.length, used = r.s.list.length;
+      if (sk > 0) a.push(["warn", r.ro.G + " 组测定站接不住每一批：每组从上测到洗消静置完要 " + r.ro.cyc + " 天，母猪场每 " + r.ro.I + " 天一批。规划期内母猪场 " + r.s.nSow + " 批，只有 " + used + " 批能上测，跳过 " + sk + " 批（排程表里灰色）。分成 " + r.ro.auto + " 组可以每批都上测。"]);
+      if (r.s.waits > 0) a.push(["warn", r.s.waits + " 批要在保育多等测定站空出来（最多 " + p.maxwait + " 天），上测更大。"]);
+      if (sk === 0 && r.s.effMargin === 0) a.push(["warn", "安全裕度为 0：测定站推迟一天清空，下一批就进不去。"]);
       if (p.dir === "stations" && r.ro.usable < 1) a.push(["bad", "测定站太少：分成 " + r.ro.G + " 组后每组不到 1 台。"]);
       if (p.dir === "batch" && r.ro.spare < 0) a.push(["bad", "需要 " + nf(r.ro.total) + " 台测定站，现有 " + nf(p.stations) + " 台，还差 " + nf(-r.ro.spare) + " 台。"]);
     }
@@ -538,12 +562,25 @@ table.years { border-collapse: collapse; font-size: 13px; }
 
   function scheduleRows(r) {
     var L = r.s.list, ret = false, grp = r.mode === "C";
-    var head = ["批次"].concat(grp ? ["测定站组"] : [], ["进保育", "上测", "保育天数"], ret ? ["未入选猪离场"] : [], ["结测出栏", "洗消完成", "静置完成", "进苗", "上测", "结测"]);
-    var rows = L.map(function (b) {
-      return ["第 " + (b.i + 1) + " 批"].concat(grp ? [groupName(r, b.room)] : [], [fmt(b.nIn), fmt(b.tIn), b.tIn - b.nIn], ret ? [fmt(b.retEnd)] : [],
+    var head = [grp ? "上测批次" : "批次"].concat(grp ? ["测定站组"] : [], ["进保育", "上测", "保育天数"], ret ? ["未入选猪离场"] : [], ["结测出栏", "洗消完成", "静置完成", "进苗", "上测", "结测"]);
+    var items = L.map(function (b) { return { d: b.nIn, b: b }; });
+    if (grp) (r.s.skipped || []).forEach(function (k) { items.push({ d: k.nIn, k: k }); });
+    items.sort(function (x, y) { return x.d - y.d; });
+    if (grp) head = ["母猪场批次"].concat(head);
+    var skip = [];
+    var rows = items.map(function (it) {
+      if (it.k) {
+        skip.push(true);
+        var row = ["第 " + (it.k.q + 1) + " 批", "跳过", "测定站没空", fmt(it.k.nIn) + " 本应进保育", "", "", "最早 " + fmt(it.k.free) + " 有空"];
+        while (row.length < head.length) row.push("");
+        return row;
+      }
+      skip.push(false);
+      var b = it.b;
+      return (grp ? ["第 " + (b.q + 1) + " 批"] : []).concat(["第 " + (b.i + 1) + " 批"], grp ? [groupName(r, b.room)] : [], [fmt(b.nIn), fmt(b.tIn), b.tIn - b.nIn], ret ? [fmt(b.retEnd)] : [],
         [fmt(b.tOut), fmt(b.wEnd), fmt(b.rEnd), r.entries, r.tested, r.out]);
     });
-    return { head: head, rows: rows, numFrom: head.length - 3 };
+    return { head: head, rows: rows, numFrom: head.length - 3, skip: skip };
   }
 
   // ---------------------------------------------------------------- KPI tiles per scheme
@@ -557,12 +594,14 @@ table.years { border-collapse: collapse; font-size: 13px; }
       t.push(tile("分组数", ro.G, "组", p.groups > 0 ? "手动设定（自动为 " + ro.auto + " 组）" : "⌈" + ro.cyc + " ÷ " + ro.I + "⌉" + (ro.exact ? " + 1，整除时多留一组" : "") + " = " + ro.auto));
       t.push(tile("每组测定站", nf(ro.upg), "台", p.dir === "stations" ? nf(p.stations) + " 台 ÷ " + ro.G + " 组" + (p.ff > 0 ? "，其中 " + nf(ro.upg - ro.usable) + " 台预留故障" : "") : "⌈" + nf(p.batch) + " ÷ " + p.perst + "⌉" + (p.ff > 0 ? " × (1 + " + p.fault + "%)" : "")));
       t.push(tile(p.dir === "stations" ? "使用测定站" : "需要测定站", nf(ro.total), "台", ro.spare >= 0 ? "现有 " + nf(p.stations) + " 台，空余 " + nf(ro.spare) + " 台" : "现有 " + nf(p.stations) + " 台，还差 " + nf(-ro.spare) + " 台", ro.spare < 0 ? "bad" : ""));
-      t.push(tile("安全裕度", ro.margin, "天", ro.I + " × " + ro.G + " − " + ro.cyc + "；测定站推迟清空不超过这些天，不影响下一批", ro.margin < 0 ? "bad" : ro.margin === 0 ? "warn" : "good"));
+      var em = r.s.effMargin;
+      t.push(tile("上测批次", nf(r.s.list.length) + " / " + nf(r.s.nSow), "批", r.s.skipped.length ? "母猪场批次中能上测的；跳过 " + r.s.skipped.length + " 批" : "母猪场每一批都能上测", r.s.skipped.length ? "warn" : "good"));
+      t.push(tile("安全裕度", em, "天", (r.s.skipped.length || r.s.waits ? "同一组相邻两批之间多出的天数（最少）" : ro.I + " × " + ro.G + " − " + ro.cyc) + "；测定站推迟清空不超过这些天，不影响下一批", em < 0 ? "bad" : em === 0 ? "warn" : "good"));
     }
     t.push(tile("每批进苗", nf(r.entries), "头", r.mode === "A" ? "进满全场" : "上测 ÷ (1 − 保育死淘) ÷ 入选比例"));
     t.push(tile("每批上测", nf(r.tested), "头", "入选比例 " + pct(r.sel) + (p.tl > 0 ? "；结测 " + nf(r.out) + " 头" : "")));
     t.push(tile("年测定头数", nf(r.perYearPigs), "头", r.perYear.toFixed(2) + " 批 × " + nf(r.out) + " 头（长期平均）"));
-    t.push(tile("测定站时间利用率", pct(r.timeUtil), "", "测定 " + p.t + " 天 ÷ " + (r.mode === "C" ? "每组周期 " + r.s.cycle : "周期 " + r.s.cycle) + " 天"));
+    t.push(tile("测定站时间利用率", pct(r.timeUtil), "", "测定 " + p.t + " 天 ÷ " + (r.mode === "C" ? "同组两批平均间隔 " + r.s.cycle.toFixed(0) : "周期 " + r.s.cycle) + " 天"));
     t.push(tile("上测体重", r.wTest.toFixed(1), "kg", r.mode === "A" ? "测定站推迟清空不影响" : r.wait > 0 ? "推迟 " + p.delay + " 天清空时 " + r.wLate.toFixed(1) + " kg" : "推迟 " + p.delay + " 天在裕度内，不受影响",
       (r.wTest < p.wmin || r.wTest > p.wstage) ? "warn" : (r.wait > 0 && r.wLate > p.wstage ? "warn" : "")));
     t.push(tile("全场头数峰值", nf(r.peakTot), "头", "保育阶段 + 测定 + 未入选，栋舍怎么放由场里安排"));
@@ -603,17 +642,17 @@ table.years { border-collapse: collapse; font-size: 13px; }
       '<div class="kpis">' + tilesOf(r, p) + "</div>" +
       (al.length ? '<div class="alerts" style="margin-top:12px">' + al.map(function (a) { return '<div class="alert' + (a[0] === "bad" ? " bad" : "") + '">' + a[1] + "</div>"; }).join("") + "</div>" : "") +
       "</section>" +
-      '<section class="card" aria-labelledby="h-gantt"><div class="card-head"><div><h2 id="h-gantt">时间线</h2><p>' + r.s.list.length + " 批，" + fmt(r.s.start) + " 至 " + fmt(r.s.end - 1) + "。阴影部分在规划期之后，只为画完最后几批。</p></div>" +
+      '<section class="card" aria-labelledby="h-gantt"><div class="card-head"><div><h2 id="h-gantt">时间线</h2><p>' + r.s.list.length + " 批" + (r.s.skipped && r.s.skipped.length ? "上测（母猪场 " + r.s.nSow + " 批，跳过 " + r.s.skipped.length + " 批）" : "") + "，" + fmt(r.s.start) + " 至 " + fmt(r.s.end - 1) + "。阴影部分在规划期之后，只为画完最后几批。</p></div>" +
       '<div class="tabs" role="tablist" aria-label="时间线视图"><button type="button" data-view="batch" class="' + (state.view === "batch" ? "on" : "") + '" role="tab" aria-selected="' + (state.view === "batch") + '">按批次</button>' +
       '<button type="button" data-view="station" class="' + (state.view === "station" ? "on" : "") + '" role="tab" aria-selected="' + (state.view === "station") + '">按测定站</button></div></div>' +
       '<div class="scroll" id="gantt"></div></section>' +
       '<div class="cols2"><section class="card" aria-labelledby="h-years"><h2 id="h-years">按年份统计</h2><p class="sub">按排程表逐年计数；灰色的年份不满一年。</p>' + yearsTable(r) + "</section>" +
       '<section class="card" aria-labelledby="h-notes"><h2 id="h-notes">计算方法</h2><ul class="notes">' + NOTES[r.mode].concat(COMMON).map(function (s) { return "<li>" + s + "</li>"; }).join("") + "</ul></section></div>" +
       '<section class="card" aria-labelledby="h-stock"><div class="card-head"><div><h2 id="h-stock">存栏</h2><p>每天的头数，按去向叠加：测定站（黄）、未入选继续养到出栏的猪（斜线，在保育舍或其他栋舍）、保育阶段的猪（红）。栋舍怎么放由场里安排，这里只给出头数供核对。</p></div></div><div class="scroll" id="stock"></div></section>' +
-      '<section class="card" aria-labelledby="h-sched"><div class="card-head"><div><h2 id="h-sched">排程表</h2><p>规划期内 ' + r.s.list.length + " 批进保育，其中 " + r.finished + " 批在规划期内结测。</p></div>" +
+      '<section class="card" aria-labelledby="h-sched"><div class="card-head"><div><h2 id="h-sched">排程表</h2><p>规划期内 ' + r.s.list.length + " 批进保育，其中 " + r.finished + " 批在规划期内结测。" + (r.s.skipped && r.s.skipped.length ? "灰色行是母猪场这批因测定站没空而跳过的。" : "") + "</p></div>" +
       '<div><button type="button" id="btn-copy">复制到 Excel</button><span class="toast" id="toast" role="status"></span></div></div>' +
       '<div class="scroll" style="max-height:460px;overflow-y:auto"><table class="sched"><thead><tr>' + sch.head.map(function (h, i) { return "<th" + (i >= sch.numFrom ? ' class="n"' : "") + ">" + h + "</th>"; }).join("") + "</tr></thead><tbody>" +
-      sch.rows.map(function (row) { return "<tr>" + row.map(function (c, i) { return "<td" + (i >= sch.numFrom ? ' class="n"' : /^\d{4}-/.test(c) ? ' class="num"' : "") + ">" + (typeof c === "number" ? nf(c) : esc(c)) + "</td>"; }).join("") + "</tr>"; }).join("") +
+      sch.rows.map(function (row, ri) { return "<tr" + (sch.skip && sch.skip[ri] ? ' class="past"' : "") + ">" + row.map(function (c, i) { return "<td" + (i >= sch.numFrom ? ' class="n"' : /^\d{4}-/.test(c) ? ' class="num"' : "") + ">" + (typeof c === "number" ? nf(c) : esc(c)) + "</td>"; }).join("") + "</tr>"; }).join("") +
       "</tbody></table></div></section>";
   }
 
