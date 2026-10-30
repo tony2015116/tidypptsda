@@ -56,27 +56,46 @@
   </a>
   <ul class="dropdown-menu" role="menu">
 <li class="divider"></li>
-    <li class="dropdown-header">中文文档</li>
+    <li class="dropdown-header">入门</li>
     <li>
-      <a href="../articles/tidypptsda-zh.html">中文使用说明</a>
+      <a href="../articles/tidypptsda-zh.html">快速入门</a>
     </li>
     <li>
       <a href="../articles/design-zh.html">设计思路</a>
     </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">数据与参数</li>
+    <li>
+      <a href="../articles/data-zh.html">数据准备：读取、格式与品种</a>
+    </li>
     <li>
       <a href="../articles/qc-parameters-zh.html">质控参数详解：qc_config()</a>
     </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">计算方法</li>
     <li>
       <a href="../articles/methods-zh.html">计算方法说明：从原始记录到料肉比</a>
     </li>
     <li>
       <a href="../articles/fill-zh.html">填充方法：日体重与日采食</a>
     </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">结果</li>
     <li>
-      <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线、体重填充与采食插补</a>
+      <a href="../articles/output-zh.html">结果、图表与报告</a>
+    </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">方法验证</li>
+    <li>
+      <a href="../articles/validation-guide-zh.html">验证函数使用指南：参数详解与示例</a>
     </li>
     <li>
-      <a href="../articles/output-zh.html">输出结果说明</a>
+      <a href="../articles/validation-zh.html">方法验证：做法与示例数据上的结果</a>
+    </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">运行</li>
+    <li>
+      <a href="../articles/run-zh.html">运行提示、并行与速度</a>
     </li>
     <li class="divider"></li>
     <li>
@@ -293,7 +312,7 @@ g/d（回归斜率）</text></g><g class="fs s8"><circle cx="171.2" cy="541.4" r
 <h3 id="体重线性插值">体重：线性插值<a class="anchor" aria-label="anchor" href="#%E4%BD%93%E9%87%8D%E7%BA%BF%E6%80%A7%E6%8F%92%E5%80%BC"></a>
 </h3>
 <p>前后两个有记录日子的日体重之间连成直线。中间缺失时，前后两天的实测最能说明这头猪当时的状态；在示例数据上，人为隐藏中间的日子再填回，线性插值的日体重误差约
-0.8 kg，用生长曲线约 1.1–1.6 kg（见《方法验证》）。</p>
+0.8 kg，用生长曲线约 1.1–1.6 kg（见<a href="validation-zh.html">《方法验证》</a>）。</p>
 </div>
 <div class="section level3">
 <h3 id="体重首尾外推">体重：首尾外推<a class="anchor" aria-label="anchor" href="#%E4%BD%93%E9%87%8D%E9%A6%96%E5%B0%BE%E5%A4%96%E6%8E%A8"></a>
@@ -376,7 +395,7 @@ g/d、FCR 排名相关从 0.82 升到 0.86。末端用切线虽然 ADG
 <span><span class="co"># 晚进站多、记录短的批次：直线生长曲线</span></span>
 <span><span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>curve_model <span class="op">=</span> <span class="st">"poly1"</span>, stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">60</span>, <span class="fl">120</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p>换方法之前，先用 <code><a href="../reference/validate_truncation.html">validate_truncation()</a></code>
-在自己的数据上比较：它删掉一部分猪若干天的全部访问后重跑整个流程，与全部数据的结果比较，不会有被隐藏的信息泄露回来（见《方法验证》）。</p>
+在自己的数据上比较：它删掉一部分猪若干天的全部访问后重跑整个流程，与全部数据的结果比较，不会有被隐藏的信息泄露回来（见<a href="validation-zh.html">《方法验证》</a>）。</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_truncation.html">validate_truncation</a></span><span class="op">(</span></span>
 <span>  <span class="va">visits</span>,</span>

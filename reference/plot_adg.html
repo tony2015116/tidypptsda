@@ -40,27 +40,46 @@ the regression whose slope is the ADG."><meta property="og:image" content="https
     <span class="caret"></span>
   </a>
   <ul class="dropdown-menu" role="menu"><li class="divider"></li>
-    <li class="dropdown-header">中文文档</li>
+    <li class="dropdown-header">入门</li>
     <li>
-      <a href="../articles/tidypptsda-zh.html">中文使用说明</a>
+      <a href="../articles/tidypptsda-zh.html">快速入门</a>
     </li>
     <li>
       <a href="../articles/design-zh.html">设计思路</a>
     </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">数据与参数</li>
+    <li>
+      <a href="../articles/data-zh.html">数据准备：读取、格式与品种</a>
+    </li>
     <li>
       <a href="../articles/qc-parameters-zh.html">质控参数详解：qc_config()</a>
     </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">计算方法</li>
     <li>
       <a href="../articles/methods-zh.html">计算方法说明：从原始记录到料肉比</a>
     </li>
     <li>
       <a href="../articles/fill-zh.html">填充方法：日体重与日采食</a>
     </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">结果</li>
     <li>
-      <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线、体重填充与采食插补</a>
+      <a href="../articles/output-zh.html">结果、图表与报告</a>
+    </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">方法验证</li>
+    <li>
+      <a href="../articles/validation-guide-zh.html">验证函数使用指南：参数详解与示例</a>
     </li>
     <li>
-      <a href="../articles/output-zh.html">输出结果说明</a>
+      <a href="../articles/validation-zh.html">方法验证：做法与示例数据上的结果</a>
+    </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">运行</li>
+    <li>
+      <a href="../articles/run-zh.html">运行提示、并行与速度</a>
     </li>
     <li class="divider"></li>
     <li>
@@ -173,7 +192,7 @@ to files.</p>
 <span class="r-plt img"><img src="plot_adg-2.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="va">out</span> <span class="op">&lt;-</span> <span class="fu"><a href="save_plots.html">save_plots</a></span><span class="op">(</span><span class="va">g</span>, path <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, prefix <span class="op">=</span> <span class="st">"loc"</span>, suffix <span class="op">=</span> <span class="st">"growth"</span>, device <span class="op">=</span> <span class="st">"pdf"</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Saved 1 of 1 plot to <span style="color: #0000BB;">/tmp/RtmpWoVk5E</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Saved 1 of 1 plot to <span style="color: #0000BB;">/tmp/RtmpVFMwac</span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.exists</a></span><span class="op">(</span><span class="va">out</span><span class="op">$</span><span class="va">file</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] TRUE</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">out</span><span class="op">$</span><span class="va">file</span><span class="op">)</span></span></span>

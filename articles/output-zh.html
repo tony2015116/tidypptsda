@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>输出结果说明 • tidypptsda</title>
+<title>结果、图表与报告 • tidypptsda</title>
 <!-- favicons --><link rel="icon" type="image/png" sizes="48x48" href="../favicon-48x48.png">
 <link rel="icon" type="”image/svg+xml”" href="../favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
@@ -15,7 +15,7 @@
 <script src="../bootstrap-toc.js"></script><!-- Font Awesome icons --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/all.min.css" integrity="sha256-mmgLkCYLUQbXn0B1SRqzHar6dCnv9oZFPEC1g1cwlkk=" crossorigin="anonymous">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/v4-shims.min.css" integrity="sha256-wZjR52fzng1pJHwx4aV2AO3yyTOXrcDW7jBpJtTwVxw=" crossorigin="anonymous">
 <!-- clipboard.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.6/clipboard.min.js" integrity="sha256-inc5kl9MA1hkeYUt+EC3BhlIgyp/2jDIyBLS6k3UxPI=" crossorigin="anonymous"></script><!-- headroom.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/headroom.min.js" integrity="sha256-AsUX4SJE1+yuDu5+mAVzJbuYNPHj/WroHuZ8Ir/CkE0=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/jQuery.headroom.min.js" integrity="sha256-ZX/yNShbjqsohH1k95liqY9Gd8uOiE1S4vZc+9KQ1K4=" crossorigin="anonymous"></script><!-- pkgdown --><link href="../pkgdown.css" rel="stylesheet">
-<script src="../pkgdown.js"></script><meta property="og:title" content="输出结果说明">
+<script src="../pkgdown.js"></script><meta property="og:title" content="结果、图表与报告">
 <!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js" integrity="sha256-nvJJv9wWKEm88qvoQl9ekL2J+k/RWIsaSScxxlsrv8k=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/config/TeX-AMS-MML_HTMLorMML.js" integrity="sha256-84DKXVJXs0/F8OTMzX4UR909+jtl4G7SPypPavF+GfA=" crossorigin="anonymous"></script><!--[if lt IE 9]>
 <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
 <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
@@ -56,27 +56,46 @@
   </a>
   <ul class="dropdown-menu" role="menu">
 <li class="divider"></li>
-    <li class="dropdown-header">中文文档</li>
+    <li class="dropdown-header">入门</li>
     <li>
-      <a href="../articles/tidypptsda-zh.html">中文使用说明</a>
+      <a href="../articles/tidypptsda-zh.html">快速入门</a>
     </li>
     <li>
       <a href="../articles/design-zh.html">设计思路</a>
     </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">数据与参数</li>
+    <li>
+      <a href="../articles/data-zh.html">数据准备：读取、格式与品种</a>
+    </li>
     <li>
       <a href="../articles/qc-parameters-zh.html">质控参数详解：qc_config()</a>
     </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">计算方法</li>
     <li>
       <a href="../articles/methods-zh.html">计算方法说明：从原始记录到料肉比</a>
     </li>
     <li>
       <a href="../articles/fill-zh.html">填充方法：日体重与日采食</a>
     </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">结果</li>
     <li>
-      <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线、体重填充与采食插补</a>
+      <a href="../articles/output-zh.html">结果、图表与报告</a>
+    </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">方法验证</li>
+    <li>
+      <a href="../articles/validation-guide-zh.html">验证函数使用指南：参数详解与示例</a>
     </li>
     <li>
-      <a href="../articles/output-zh.html">输出结果说明</a>
+      <a href="../articles/validation-zh.html">方法验证：做法与示例数据上的结果</a>
+    </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">运行</li>
+    <li>
+      <a href="../articles/run-zh.html">运行提示、并行与速度</a>
     </li>
     <li class="divider"></li>
     <li>
@@ -123,7 +142,7 @@
       </header><div class="row">
   <div class="col-md-9 contents">
     <div class="page-header toc-ignore">
-      <h1 data-toc-skip>输出结果说明</h1>
+      <h1 data-toc-skip>结果、图表与报告</h1>
             
       
       <small class="dont-index">Source: <a href="https://github.com/tony2015116/tidypptsda/blob/main/vignettes/output-zh.Rmd" class="external-link"><code>vignettes/output-zh.Rmd</code></a></small>
@@ -137,7 +156,9 @@
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://tony2015116.github.io/tidypptsda/">tidypptsda</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://r-datatable.com" class="external-link">data.table</a></span><span class="op">)</span></span>
 <span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></code></pre></div>
-<p>本文逐一说明 tidypptsda 输出的每一张表、每一列的含义。体重单位为
+<p>本文逐一说明 tidypptsda
+输出的每一张表、每一列的含义，以及怎么出图、导出 csv 和生成 HTML
+报告。体重单位为
 kg，日增重（ADG）和日采食量（ADFI、<code>dfi_*</code>）单位为
 g/d，日期为 <code>Date</code> 类型。</p>
 <div class="section level2">
@@ -903,56 +924,265 @@ g/d，日期为 <code>Date</code> 类型。</p>
 <span><span class="co">#&gt; 1:     15964      101 clean_weight 0 valid weights &lt; 20</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="导出文件">8. 导出文件<a class="anchor" aria-label="anchor" href="#%E5%AF%BC%E5%87%BA%E6%96%87%E4%BB%B6"></a>
+<h2 id="导出为-csv">8. 导出为 csv<a class="anchor" aria-label="anchor" href="#%E5%AF%BC%E5%87%BA%E4%B8%BA-csv"></a>
 </h2>
-<p>想直接浏览结果时，用 <code>write_report(res, path)</code> 生成 HTML
-报告（每个测定站一页，见《使用说明》）。</p>
-<p><code>write_results(res, dir, farm)</code> 把结果写成 csv（UTF-8 带
-BOM，Excel 可以直接打开），文件名为”场名_内容_日期.csv”：</p>
+<p><code>write_results(res, dir, farm)</code> 把结果写成 csv：</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">fire</span>, qc <span class="op">=</span> <span class="fu"><a href="../reference/qc_config.html">qc_config</a></span><span class="op">(</span>stage_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">60</span>, <span class="fl">120</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/write_results.html">write_results</a></span><span class="op">(</span><span class="va">res</span>, dir <span class="op">=</span> <span class="st">"结果"</span>, farm <span class="op">=</span> <span class="st">"A01"</span><span class="op">)</span></span></code></pre></div>
+<p>文件按”场名_内容_日期.csv”命名，例如
+<code>A01_fcr_20261022.csv</code>。全部文件如下：</p>
 <table class="table">
+<colgroup>
+<col width="33%">
+<col width="33%">
+<col width="33%">
+</colgroup>
 <thead><tr class="header">
 <th>文件</th>
+<th>内容</th>
 <th>对应的表</th>
 </tr></thead>
 <tbody>
 <tr class="odd">
 <td><code>fcr</code></td>
+<td>每头猪的 ADG、ADFI、FCR 和可信度标记</td>
 <td><code>res$fcr$per_pig</code></td>
 </tr>
 <tr class="even">
 <td><code>by_bin</code></td>
+<td>每个体重段的采食、增重和分段料肉比</td>
 <td><code>res$fcr$by_bin</code></td>
 </tr>
 <tr class="odd">
 <td><code>daily_feed</code></td>
+<td>每天的采食量（原始、校正、插补）</td>
 <td><code>res$adfi$daily</code></td>
 </tr>
 <tr class="even">
 <td><code>daily_weight</code></td>
+<td>每天的体重（实测、填充和生长曲线）</td>
 <td><code>res$adg$daily</code></td>
 </tr>
 <tr class="odd">
 <td><code>weight_pigs</code></td>
+<td>每头猪的体重质控结果</td>
 <td><code>res$weight$per_pig</code></td>
 </tr>
 <tr class="even">
 <td><code>feed_model</code></td>
+<td>采食校正模型的系数</td>
 <td><code>res$adfi$model</code></td>
 </tr>
 <tr class="odd">
 <td><code>summary</code></td>
+<td>性状汇总统计</td>
 <td><code>res$fcr$summary</code></td>
 </tr>
 <tr class="even">
 <td><code>removed</code></td>
+<td>被剔除的猪及原因</td>
 <td><code>res$removed</code></td>
 </tr>
 <tr class="odd">
 <td><code>settings</code></td>
 <td>本次使用的全部质控参数，每个参数一行</td>
+<td>—</td>
 </tr>
 </tbody>
 </table>
+<p>文件带有 UTF-8 BOM，用 Excel 直接打开时中文不会乱码。</p>
+</div>
+<div class="section level2">
+<h2 id="作图">9. 作图<a class="anchor" aria-label="anchor" href="#%E4%BD%9C%E5%9B%BE"></a>
+</h2>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">g</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/plot_adg.html">plot_adg</a></span><span class="op">(</span><span class="va">res</span><span class="op">$</span><span class="va">adg</span>, weight <span class="op">=</span> <span class="va">res</span><span class="op">$</span><span class="va">weight</span>, responders <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"13913"</span>, <span class="st">"13954"</span>, <span class="st">"15967"</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
+<span><span class="va">g</span><span class="op">$</span><span class="va">plot</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span></span></code></pre></div>
+<p><img src="output-zh_files/figure-html/plots-1.png" class="r-plt" alt="" width="100%"></p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">h</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/plot_adfi.html">plot_adfi</a></span><span class="op">(</span><span class="va">res</span><span class="op">$</span><span class="va">adfi</span>, responders <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"13913"</span>, <span class="st">"13954"</span>, <span class="st">"15967"</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
+<span><span class="va">h</span><span class="op">$</span><span class="va">plot</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span></span></code></pre></div>
+<p><img src="output-zh_files/figure-html/plot-adfi-1.png" class="r-plt" alt="" width="100%"></p>
+<div class="section level3">
+<h3 id="生长曲线图怎么看">生长曲线图怎么看<a class="anchor" aria-label="anchor" href="#%E7%94%9F%E9%95%BF%E6%9B%B2%E7%BA%BF%E5%9B%BE%E6%80%8E%E4%B9%88%E7%9C%8B"></a>
+</h3>
+<p>每个测定站一张图，每头猪一个分面：</p>
+<table class="table">
+<colgroup>
+<col width="33%">
+<col width="33%">
+<col width="33%">
+</colgroup>
+<thead><tr class="header">
+<th>图中元素</th>
+<th>图例</th>
+<th>含义</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td>浅灰色小点</td>
+<td>weight record</td>
+<td>有效的原始体重记录（传入 <code>weight = res$weight</code>
+时才画）</td>
+</tr>
+<tr class="even">
+<td>深灰色小叉</td>
+<td>outlier</td>
+<td>被剔除的原始记录：适应期、超出体重范围、追踪剔除、rlm 或 LOESS
+判为异常，原因见 <code>res$weight$records$qc_flag</code>
+</td>
+</tr>
+<tr class="odd">
+<td>蓝色点</td>
+<td>daily weight (observed)</td>
+<td>实测日体重：当天有效记录的中位数</td>
+</tr>
+<tr class="even">
+<td>橙黄色点</td>
+<td>daily weight (interpolated)</td>
+<td>两个有记录的日子之间缺失的日子，线性插值</td>
+</tr>
+<tr class="odd">
+<td>紫红色点</td>
+<td>daily weight (growth curve)</td>
+<td>首个有记录日之前、末个有记录日之后缺失的日子，用生长曲线填充</td>
+</tr>
+<tr class="even">
+<td>绿色实线和浅绿色带</td>
+<td>growth curve</td>
+<td>生长曲线及其约 95% 范围（±1.96 倍残差标准差）</td>
+</tr>
+<tr class="odd">
+<td>黑色长虚线</td>
+<td>ADG regression line</td>
+<td>区间内全部日体重（蓝、橙黄、紫红点）对日期的回归线，斜率就是
+ADG</td>
+</tr>
+<tr class="even">
+<td>灰色水平虚线</td>
+<td>—</td>
+<td>分析区间的上下限（<code>stage_range</code>）</td>
+</tr>
+</tbody>
+</table>
+<p>左上角的文字是日增重、回归
+R²、<code>adg_type</code>，以及区间从下限长到上限用了多少天。看图时重点看：紫红色点多（区间两端靠曲线填充）、橙黄色点成段出现（中间长时间缺记录）、深灰色叉成片出现（追踪剔除较多，可能是几头猪同时上秤或秤的问题）。</p>
+</div>
+<div class="section level3">
+<h3 id="采食量图怎么看">采食量图怎么看<a class="anchor" aria-label="anchor" href="#%E9%87%87%E9%A3%9F%E9%87%8F%E5%9B%BE%E6%80%8E%E4%B9%88%E7%9C%8B"></a>
+</h3>
+<p>只画区间内的日子：</p>
+<table class="table">
+<colgroup>
+<col width="33%">
+<col width="33%">
+<col width="33%">
+</colgroup>
+<thead><tr class="header">
+<th>图中元素</th>
+<th>图例</th>
+<th>含义</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td>浅灰色点</td>
+<td>recorded</td>
+<td>记录的日采食量（全部访问相加，未校正）</td>
+</tr>
+<tr class="even">
+<td>蓝色点</td>
+<td>error-free</td>
+<td>当天没有错误访问，直接使用记录值（<code>state = "org"</code>）</td>
+</tr>
+<tr class="odd">
+<td>橙色点</td>
+<td>corrected</td>
+<td>当天有错误访问，用混合模型校正后的值（<code>corr</code>）</td>
+</tr>
+<tr class="even">
+<td>绿色点</td>
+<td>filled (between records)</td>
+<td>两个有记录的日子之间缺失：≤ 3 天 LOESS，&gt; 3 天用群体曲线 ×
+个体比例（<code>iii</code>）</td>
+</tr>
+<tr class="odd">
+<td>紫红色点</td>
+<td>filled (stage ends)</td>
+<td>区间两端缺失：开头用群体曲线 ×
+个体比例，末端用单猪回归（<code>elrp</code>）</td>
+</tr>
+<tr class="even">
+<td>细灰线</td>
+<td>—</td>
+<td>把最终使用的日采食量（彩色点）按日期连起来</td>
+</tr>
+<tr class="odd">
+<td>灰色水平虚线</td>
+<td>—</td>
+<td>这头猪的 ADFI（区间内日采食量的平均值）</td>
+</tr>
+</tbody>
+</table>
+<p>左上角的文字是
+ADFI，以及区间内有实测（含校正）采食的天数比例。灰色点和彩色点离得远的日子，说明当天的错误访问多、校正幅度大；紫红色点连成一长段，说明进站晚或出栏早，ADFI
+有一部分是推算的。</p>
+</div>
+<div class="section level3">
+<h3 id="保存图片">保存图片<a class="anchor" aria-label="anchor" href="#%E4%BF%9D%E5%AD%98%E5%9B%BE%E7%89%87"></a>
+</h3>
+<p>每个测定站输出一张图，每头猪一个分面。保存为图片：</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/save_plots.html">save_plots</a></span><span class="op">(</span><span class="va">g</span>, path <span class="op">=</span> <span class="st">"结果/生长曲线"</span>, prefix <span class="op">=</span> <span class="st">"站"</span>, suffix <span class="op">=</span> <span class="st">"growth"</span>, device <span class="op">=</span> <span class="st">"png"</span><span class="op">)</span></span></code></pre></div>
+<p>保存图片的时间几乎都花在 ggplot2 绘图上：每个测定站（15 头猪左右）约
+1–1.5 秒，与图片格式关系不大。测定站多时可以：</p>
+<ul>
+<li>用 <code>cores</code> 并行保存，例如
+<code>save_plots(g, path = "结果", cores = 4)</code>，耗时大致按核心数缩短；</li>
+<li>只在屏幕上查看时，用 <code>dpi = 150</code>，约快
+20%，文件大小约为原来的 1/4；</li>
+<li>用 <code>locations</code> 或 <code>responders</code>
+只画需要核查的测定站或猪。</li>
+</ul>
+</div>
+</div>
+<div class="section level2">
+<h2 id="html-报告">10. HTML 报告<a class="anchor" aria-label="anchor" href="#html-%E6%8A%A5%E5%91%8A"></a>
+</h2>
+<p><code><a href="../reference/write_report.html">write_report()</a></code>
+把结果写成一个文件夹（<code>index.html</code> 和图片目录
+<code>img/</code>），用浏览器打开 <code>index.html</code>
+即可，不需要联网：</p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">nedap</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/write_report.html">write_report</a></span><span class="op">(</span><span class="va">res</span>, path <span class="op">=</span> <span class="st">"结果/报告"</span>, cores <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span></code></pre></div>
+<ul>
+<li>第一页是总览：猪数，ADG、ADFI、FCR 的均值 ±
+标准差，所用的质控设置，<strong>需要核查的猪</strong>（低可信度或被剔除，附原因），以及各测定站的汇总表；</li>
+<li>之后每个测定站一页：生长曲线图、采食图，以及该站每头猪的
+ADG、ADFI、FCR、状态和原因；</li>
+<li>用键盘左右方向键（或 Page Up / Page Down）翻页，<code>Home</code>
+回到总览，<code>End</code>
+到最后一个站；左侧的站名列表可以直接跳转，有需要核查的猪的站带黄色数字；</li>
+<li>在右上角输入耳号、按回车，会跳到这头猪所在的站，并高亮它的那一行；</li>
+<li>用浏览器打印（例如另存为 PDF）时，每个站各占一页。</li>
+</ul>
+<p>整个文件夹可以直接拷贝或压缩后发给别人。图片默认
+<code>dpi = 150</code>；用 <code>locations</code>
+可以只生成部分测定站。</p>
+</div>
+<div class="section level2">
+<h2 id="结果怎么用">11. 结果怎么用<a class="anchor" aria-label="anchor" href="#%E7%BB%93%E6%9E%9C%E6%80%8E%E4%B9%88%E7%94%A8"></a>
+</h2>
+<ul>
+<li>
+<strong>最终结果</strong>：<code>res$fcr$per_pig</code>，包含每头猪的
+ADG、ADFI、FCR 及可信度标记。</li>
+<li>
+<strong>被剔除的猪及原因</strong>：<code>res$removed</code>。</li>
+<li>在育种评估中，建议<strong>优先使用 <code>fcr_flag = "ok"</code>
+的个体</strong>。低可信度的个体可以单独核查，或在模型中加以区分。</li>
+</ul>
 </div>
   </div>
 

@@ -56,27 +56,46 @@
   </a>
   <ul class="dropdown-menu" role="menu">
 <li class="divider"></li>
-    <li class="dropdown-header">中文文档</li>
+    <li class="dropdown-header">入门</li>
     <li>
-      <a href="../articles/tidypptsda-zh.html">中文使用说明</a>
+      <a href="../articles/tidypptsda-zh.html">快速入门</a>
     </li>
     <li>
       <a href="../articles/design-zh.html">设计思路</a>
     </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">数据与参数</li>
+    <li>
+      <a href="../articles/data-zh.html">数据准备：读取、格式与品种</a>
+    </li>
     <li>
       <a href="../articles/qc-parameters-zh.html">质控参数详解：qc_config()</a>
     </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">计算方法</li>
     <li>
       <a href="../articles/methods-zh.html">计算方法说明：从原始记录到料肉比</a>
     </li>
     <li>
       <a href="../articles/fill-zh.html">填充方法：日体重与日采食</a>
     </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">结果</li>
     <li>
-      <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线、体重填充与采食插补</a>
+      <a href="../articles/output-zh.html">结果、图表与报告</a>
+    </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">方法验证</li>
+    <li>
+      <a href="../articles/validation-guide-zh.html">验证函数使用指南：参数详解与示例</a>
     </li>
     <li>
-      <a href="../articles/output-zh.html">输出结果说明</a>
+      <a href="../articles/validation-zh.html">方法验证：做法与示例数据上的结果</a>
+    </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">运行</li>
+    <li>
+      <a href="../articles/run-zh.html">运行提示、并行与速度</a>
     </li>
     <li class="divider"></li>
     <li>
@@ -140,7 +159,7 @@
 <code><a href="../reference/qc_config.html">qc_config()</a></code> 返回的一个对象里。各分析函数通过
 <code>qc</code> 参数接收这个对象，结果中的 <code>$settings</code>
 也会原样保存这份设置，方便复现。本文逐一说明全部 43
-个参数；每一步用的是什么方法、方法出自哪里，见《计算方法说明》。</p>
+个参数；每一步用的是什么方法、方法出自哪里，见<a href="methods-zh.html">《计算方法说明》</a>。</p>
 <div class="section level2">
 <h2 id="基本用法">1. 基本用法<a class="anchor" aria-label="anchor" href="#%E5%9F%BA%E6%9C%AC%E7%94%A8%E6%B3%95"></a>
 </h2>
@@ -600,7 +619,7 @@ loess）复核，去掉追踪容差以内、但仍明显偏离曲线的零散读
 <code>weight_range</code> 的下限调高，例如
 <code>c(20, 150)</code>。</li>
 <li>各方法的检出率和误删率可以用 <code><a href="../reference/validate_outliers.html">validate_outliers()</a></code>
-在自己的数据上比较，见《方法验证》。</li>
+在自己的数据上比较，见<a href="validation-zh.html">《方法验证》</a>。</li>
 </ul>
 </div>
 </div>
@@ -777,12 +796,12 @@ kg、又掉回去时，起点取之后真正进入区间的那一次）。搜索
 中。</li>
 </ol>
 <p><strong>切线外推</strong>：二次、三次曲线往记录范围外推几周时容易弯折，例如末期增重稍慢时，曲线外推后会提前”封顶”。切线外推时，记录范围内仍用原来的曲线，范围之外改为直线。在
-457 头 NEDAP 猪的无泄露检验中（《方法验证》中的
+457 头 NEDAP 猪的无泄露检验中（<a href="validation-zh.html">《方法验证》</a>中的
 <code><a href="../reference/validate_truncation.html">validate_truncation()</a></code>），开头用切线使 ADG 误差在开头缺 20
 天时从 81 降到 66 g/d、FCR 排名相关从 0.82 升到 0.86；末端用切线虽然 ADG
 也更准，但末端的采食是按外推的体重填充的，FCR 排名反而变差（结尾缺 30
 天时，前 20% 一致率从 0.70 降到 0.44）。所以默认
-<code>"start"</code>：只在首条记录之前用切线。示意图见《填充方法》。</p>
+<code>"start"</code>：只在首条记录之前用切线。示意图见<a href="fill-zh.html">《填充方法》</a>。</p>
 <p><code>adg_curve</code> 是生长曲线在区间两端的体重差 ÷
 天数，只用来对照。<code>r_squared</code>
 受体重跨度影响，只在同一批次、同一区间内比较才有意义。<code>gompertz</code>
@@ -790,7 +809,7 @@ kg、又掉回去时，起点取之后真正进入区间的那一次）。搜索
 拟合，不收敛时自动改用二次曲线，实际使用的曲线记录在
 <code>curve_used</code> 列中。</p>
 <p>哪种曲线填充两端更准，可以用 <code><a href="../reference/validate_weight_fill.html">validate_weight_fill()</a></code>
-在自己的数据上比较（见《方法验证》）：</p>
+在自己的数据上比较（见<a href="validation-zh.html">《方法验证》</a>）：</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">w_n</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/clean_weight.html">clean_weight</a></span><span class="op">(</span><span class="fu"><a href="../reference/prep_visits.html">prep_visits</a></span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/data.table/man/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"poly1"</span>, <span class="st">"poly2"</span>, <span class="st">"poly3"</span>, <span class="st">"gompertz"</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">m</span><span class="op">)</span> <span class="op">{</span></span>
@@ -976,8 +995,7 @@ YY、LL、DD 三个品种和 20–140 kg 的体重段：</p>
 <span>  by_weight_fitted_bw <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">fit_bw</span><span class="op">$</span><span class="va">fiv_hi</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;         fixed_2000g    by_weight_raw_bw by_weight_fitted_bw </span></span>
 <span><span class="co">#&gt;                   3                   1                   2</span></span></code></pre></div>
-<p>按品种使用时，先用 <code><a href="../reference/add_breed.html">add_breed()</a></code>
-把品种列加进访问表（见《中文使用说明》）。</p>
+<p>按品种使用时，先用 <code><a href="../reference/add_breed.html">add_breed()</a></code> 把品种列加进访问表（见<a href="tidypptsda-zh.html">《快速入门》</a>）。</p>
 </div>
 <div class="section level3">
 <h3 id="示例duration_max-对-fire-错误率的影响">示例：<code>duration_max</code> 对 FIRE 错误率的影响<a class="anchor" aria-label="anchor" href="#%E7%A4%BA%E4%BE%8Bduration_max-%E5%AF%B9-fire-%E9%94%99%E8%AF%AF%E7%8E%87%E7%9A%84%E5%BD%B1%E5%93%8D"></a>
@@ -1087,7 +1105,7 @@ YY、LL、DD 三个品种和 20–140 kg 的体重段：</p>
 小约三分之一（457 头猪的无泄露检验：7.5% →
 4.9%）；末端两者相同。比较整条流程时请用
 <code><a href="../reference/validate_truncation.html">validate_truncation()</a></code>；<code><a href="../reference/validate_adfi.html">validate_adfi()</a></code>
-只看插补这一步（见《方法验证》）。</li>
+只看插补这一步（见<a href="validation-zh.html">《方法验证》</a>）。</li>
 <li>
 <code>loess_pop</code>
 的群体曲线来自本批次的猪，批次里的猪太少（少于约 10

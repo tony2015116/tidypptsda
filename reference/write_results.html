@@ -36,27 +36,46 @@ calc_fcr()) to CSV files."><meta property="og:image" content="https://tony201511
     <span class="caret"></span>
   </a>
   <ul class="dropdown-menu" role="menu"><li class="divider"></li>
-    <li class="dropdown-header">中文文档</li>
+    <li class="dropdown-header">入门</li>
     <li>
-      <a href="../articles/tidypptsda-zh.html">中文使用说明</a>
+      <a href="../articles/tidypptsda-zh.html">快速入门</a>
     </li>
     <li>
       <a href="../articles/design-zh.html">设计思路</a>
     </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">数据与参数</li>
+    <li>
+      <a href="../articles/data-zh.html">数据准备：读取、格式与品种</a>
+    </li>
     <li>
       <a href="../articles/qc-parameters-zh.html">质控参数详解：qc_config()</a>
     </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">计算方法</li>
     <li>
       <a href="../articles/methods-zh.html">计算方法说明：从原始记录到料肉比</a>
     </li>
     <li>
       <a href="../articles/fill-zh.html">填充方法：日体重与日采食</a>
     </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">结果</li>
     <li>
-      <a href="../articles/validation-zh.html">方法验证：异常值检测、生长曲线、体重填充与采食插补</a>
+      <a href="../articles/output-zh.html">结果、图表与报告</a>
+    </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">方法验证</li>
+    <li>
+      <a href="../articles/validation-guide-zh.html">验证函数使用指南：参数详解与示例</a>
     </li>
     <li>
-      <a href="../articles/output-zh.html">输出结果说明</a>
+      <a href="../articles/validation-zh.html">方法验证：做法与示例数据上的结果</a>
+    </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">运行</li>
+    <li>
+      <a href="../articles/run-zh.html">运行提示、并行与速度</a>
     </li>
     <li class="divider"></li>
     <li>
@@ -167,19 +186,19 @@ directory.</p></dd>
     <h2>Examples</h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="run_pipeline.html">run_pipeline</a></span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">out</span> <span class="op">&lt;-</span> <span class="fu">write_results</span><span class="op">(</span><span class="va">res</span>, dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"results"</span><span class="op">)</span>, farm <span class="op">=</span> <span class="st">"demo"</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Wrote 9 files to <span style="color: #0000BB;">/tmp/RtmpWoVk5E/results</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Wrote 9 files to <span style="color: #0000BB;">/tmp/RtmpVFMwac/results</span></span>
 <span class="r-in"><span><span class="va">out</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           table                                                   file  rows</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>          &lt;char&gt;                                                 &lt;char&gt; &lt;int&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:          fcr          /tmp/RtmpWoVk5E/results/demo_fcr_20261029.csv    29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:       by_bin       /tmp/RtmpWoVk5E/results/demo_by_bin_20261029.csv   258</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:   daily_feed   /tmp/RtmpWoVk5E/results/demo_daily_feed_20261029.csv  2820</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4: daily_weight /tmp/RtmpWoVk5E/results/demo_daily_weight_20261029.csv  2607</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:  weight_pigs  /tmp/RtmpWoVk5E/results/demo_weight_pigs_20261029.csv    30</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:   feed_model   /tmp/RtmpWoVk5E/results/demo_feed_model_20261029.csv    14</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7:      summary      /tmp/RtmpWoVk5E/results/demo_summary_20261029.csv    14</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 8:      removed      /tmp/RtmpWoVk5E/results/demo_removed_20261029.csv     1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 9:     settings     /tmp/RtmpWoVk5E/results/demo_settings_20261029.csv    43</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:          fcr          /tmp/RtmpVFMwac/results/demo_fcr_20261030.csv    29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:       by_bin       /tmp/RtmpVFMwac/results/demo_by_bin_20261030.csv   258</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:   daily_feed   /tmp/RtmpVFMwac/results/demo_daily_feed_20261030.csv  2820</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4: daily_weight /tmp/RtmpVFMwac/results/demo_daily_weight_20261030.csv  2607</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5:  weight_pigs  /tmp/RtmpVFMwac/results/demo_weight_pigs_20261030.csv    30</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6:   feed_model   /tmp/RtmpVFMwac/results/demo_feed_model_20261030.csv    14</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7:      summary      /tmp/RtmpVFMwac/results/demo_summary_20261030.csv    14</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8:      removed      /tmp/RtmpVFMwac/results/demo_removed_20261030.csv     1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9:     settings     /tmp/RtmpVFMwac/results/demo_settings_20261030.csv    43</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"results"</span><span class="op">)</span>, recursive <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 </code></pre></div>
     </div>
