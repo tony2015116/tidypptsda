@@ -82,9 +82,12 @@ average daily gain (ADG) over a body weight stage."><meta property="og:image" co
       <a href="../articles/index.html">More articles...</a>
     </li>
   </ul></li>
+<li>
+  <a href="../planner.html">Planner</a>
+</li>
 <li class="dropdown">
   <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-    速查表 / Cheatsheet
+    Cheatsheet
 
     <span class="caret"></span>
   </a>
@@ -189,7 +192,7 @@ or curve weight, kg), <code>source</code> (<code>"observed"</code>, <code>"inter
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #555555;">  └ extrapolated at the ends              7   24.1%</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #BBBB00;">  └ partial (stage not fully reached)     1    3.4%</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #BBBB00;">!</span> 1 pig does not reach the whole stage: ADG is based on part of it (adg_type = "partial").</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> ADG 1205 ± 133 g/d (mean ± SD) <span style="color: #555555;">0.2s</span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> ADG 1205 ± 133 g/d (mean ± SD) <span style="color: #555555;">0.3s</span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">adg</span><span class="op">$</span><span class="va">per_pig</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">adg_type</span>, <span class="va">start_date</span>, <span class="va">end_date</span>, <span class="va">stage_days</span>, <span class="va">adg</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    responder     adg_type start_date   end_date stage_days      adg</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       &lt;char&gt;       &lt;char&gt;     &lt;Date&gt;     &lt;Date&gt;      &lt;num&gt;    &lt;num&gt;</span>

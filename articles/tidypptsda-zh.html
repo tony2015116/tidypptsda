@@ -103,9 +103,12 @@
     </li>
   </ul>
 </li>
+<li>
+  <a href="../planner.html">Planner</a>
+</li>
 <li class="dropdown">
   <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-    速查表 / Cheatsheet
+    Cheatsheet
 
     <span class="caret"></span>
   </a>
@@ -375,7 +378,7 @@ tangent</td>
 <span><span class="co">#&gt; <span style="color: #555555;">  └ crossing midnight (exit time corrected)     68    0.7%</span></span></span>
 <span><span class="co">#&gt; <span style="color: #555555;">  └ body weight 0 (set to NA)                  478    4.9%</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> No pig was seen at more than one station</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> 26 pigs at 2 stations, 9,794 visits over 66 days <span style="color: #555555;">0.0s</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> 26 pigs at 2 stations, 9,794 visits over 66 days <span style="color: #555555;">0.1s</span></span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> No <span style="color: #00BB00;">breed</span> column. To use breed in the feed intake model and breed-specific limits, add it with `add_breed()`.</span></span></code></pre></div>
 <ul>
 <li>体重和采食量的单位统一为 kg 和 g，时间统一为 UTC。</li>
@@ -397,7 +400,7 @@ tangent</td>
 <span><span class="co">#&gt; <span style="color: #555555;">  └ adaptation after entry (not used)  1,069   11.5%</span></span></span>
 <span><span class="co">#&gt; <span style="color: #555555;">  └ outliers                           1,285   13.8%</span></span></span>
 <span><span class="co">#&gt; <span style="color: #555555;">    └ by tracking                         33    0.4%</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> Pigs: 23 kept, 2 low confidence, 1 removed <span style="color: #555555;">0.3s</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> Pigs: 23 kept, 2 low confidence, 1 removed <span style="color: #555555;">0.4s</span></span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">w</span><span class="op">$</span><span class="va">per_pig</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">responder</span>, <span class="va">n_valid</span>, <span class="va">test_days</span>, <span class="va">missing_rate</span>, <span class="va">status</span>, <span class="va">reason</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    responder n_valid test_days missing_rate status reason</span></span>
 <span><span class="co">#&gt;       &lt;char&gt;   &lt;int&gt;     &lt;int&gt;        &lt;num&gt; &lt;char&gt; &lt;char&gt;</span></span>
@@ -688,6 +691,10 @@ LOESS 平滑插补；超过 3
 <tr class="odd">
 <td>这个包为什么这样设计</td>
 <td><a href="design-zh.html">《设计思路》</a></td>
+</tr>
+<tr class="even">
+<td>安排测定站进苗：全进全出、衔接进苗、分组滚动</td>
+<td><a href="../planner.html">进苗规划工具</a></td>
 </tr>
 </tbody>
 </table>
