@@ -1,3 +1,16 @@
+# tidypptsda (development)
+
+## Documentation
+
+* The Chinese articles are grouped by topic on the website: 入门, 数据与参数,
+  计算方法, 结果, 方法验证, 运行.
+* New articles: 《数据准备》 (reading files, formats, breed, data quality,
+  moved from the usage guide), 《运行提示、并行与速度》, and
+  《验证函数使用指南》 (every parameter of the validation functions, with
+  examples). The usage guide is now a shorter 《快速入门》; plots, CSV
+  export and the HTML report moved to 《结果、图表与报告》.
+* Mentions of other articles are links.
+
 # tidypptsda 1.6.2
 
 * `validate_adg()`: `cv_rmse` and `cv_mae` are now the **median** over pigs
