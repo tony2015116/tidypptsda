@@ -1,0 +1,724 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>测定站进苗规划</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&display=swap">
+<style>
+/* Layout: a parameter panel on the left (stacks on top on phones), on the right the
+   comparison of the three entry modes, then the timeline, the stock curve and the schedule. */
+:root {
+  --bg: #f3f5f3;
+  --panel: #ffffff;
+  --ink: #1d2622;
+  --muted: #5d6b65;
+  --line: #dde3df;
+  --accent: #1f6f66;
+  --accent-soft: #e2efec;
+  --nursery: #d4675c;
+  --test: #d8a92b;
+  --wash: #6a78d4;
+  --rest: #a46bd6;
+  --good: #23824f;
+  --warn: #a8620a;
+  --warn-soft: #fbf0de;
+  --bad: #b3352c;
+  --font-display: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121815; --panel: #1a221e; --ink: #e5ece8; --muted: #9aaaa3; --line: #2c3833;
+    --accent: #5fc0b2; --accent-soft: #1c332f; --nursery: #e07a6f; --test: #e3b845; --wash: #8592e6;
+    --rest: #b98ae6; --good: #5cc98d; --warn: #e9a94f; --warn-soft: #3a2d18; --bad: #ef7d73; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121815; --panel: #1a221e; --ink: #e5ece8; --muted: #9aaaa3; --line: #2c3833;
+  --accent: #5fc0b2; --accent-soft: #1c332f; --nursery: #e07a6f; --test: #e3b845; --wash: #8592e6;
+  --rest: #b98ae6; --good: #5cc98d; --warn: #e9a94f; --warn-soft: #3a2d18; --bad: #ef7d73; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+img { max-width: 100%; }
+.home { color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 500; }
+.home:hover { text-decoration: underline; }
+[hidden] { display: none !important; }
+.field.wide { grid-template-columns: 1fr 136px; }
+body {
+  background: var(--bg); color: var(--ink); font: 14px/1.55 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 48px;
+}
+.num, td.n, .metric b { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+header.top { max-width: 1440px; margin: 0 auto 18px; display: flex; flex-wrap: wrap; align-items: end; gap: 8px 24px; }
+header.top h1 { font: 700 24px/1.2 var(--font-display); margin: 0; letter-spacing: .02em; text-wrap: balance; }
+header.top p { margin: 0; color: var(--muted); max-width: 68ch; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--muted); font-size: 13px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 18px; height: 8px; border-radius: 4px; display: inline-block; }
+.sw.nursery { background: var(--nursery); } .sw.test { background: var(--test); }
+.sw.wash { background: var(--wash); } .sw.rest { background: var(--rest); }
+.layout { max-width: 1440px; margin: 0 auto; display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+aside.params { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; position: sticky; top: 12px; }
+@media (max-width: 900px) { aside.params { position: static; } }
+aside h2 { font: 600 13px/1.3 var(--font-display); letter-spacing: .08em; color: var(--muted); margin: 16px 0 8px; text-transform: uppercase; }
+aside h2:first-child { margin-top: 0; }
+.field { display: grid; grid-template-columns: 1fr 104px; align-items: center; gap: 8px; margin: 6px 0; }
+.field label { color: var(--ink); font-size: 13px; }
+.field label small { display: block; color: var(--muted); font-size: 11.5px; line-height: 1.3; }
+.field input[type=number], .field input[type=date] {
+  width: 100%; font: 500 13px var(--font-num); padding: 5px 7px; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--bg); color: var(--ink); text-align: right;
+}
+.field input[type=date] { text-align: left; font-size: 12px; }
+.field input:focus-visible, button:focus-visible, .mode:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.check { display: flex; align-items: center; gap: 6px; font-size: 13px; margin: 6px 0; }
+.derived { color: var(--muted); font-size: 12px; margin: 2px 0 6px; }
+.derived b { color: var(--ink); font-family: var(--font-num); font-weight: 500; }
+button { font: 500 13px var(--font-body); border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+  border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--accent); color: var(--accent); }
+.row-btns { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+main { min-width: 0; display: grid; gap: 20px; }
+section.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+section.card > h2 { font: 700 16px/1.3 var(--font-display); margin: 0 0 4px; }
+section.card > p.sub { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+.modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 1100px) { .modes { grid-template-columns: minmax(0, 1fr); } }
+.mode { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; cursor: pointer; background: var(--panel);
+  display: grid; gap: 8px; text-align: left; transition: border-color .15s; }
+.mode:hover { border-color: var(--accent); }
+.mode.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-soft); }
+.mode h3 { margin: 0; font: 700 15px var(--font-display); display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.mode h3 small { font: 500 12px var(--font-num); color: var(--muted); }
+.mode p { margin: 0; color: var(--muted); font-size: 12.5px; }
+.metrics { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; font-size: 13px; }
+.metrics dt { color: var(--muted); }
+.metrics dd { margin: 0; text-align: right; font-family: var(--font-num); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.metrics dd.best { color: var(--good); font-weight: 500; }
+.metrics dd.best::after { content: " ▲"; font-size: 10px; }
+.chip { display: inline-block; font-size: 11.5px; padding: 1px 8px; border-radius: 10px; white-space: nowrap; }
+.chip.good { background: color-mix(in srgb, var(--good) 15%, transparent); color: var(--good); }
+.chip.mid { background: var(--warn-soft); color: var(--warn); }
+.chip.low { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
+.bind { font-size: 12px; color: var(--muted); }
+.bind b { color: var(--ink); font-weight: 500; }
+.verdict { margin: 12px 0 0; padding: 10px 12px; border-radius: 8px; background: var(--bg); color: var(--ink); font-size: 13px; max-width: 110ch; }
+.tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.tabs button { border: 0; border-radius: 0; padding: 5px 12px; }
+.tabs button.on { background: var(--accent); color: var(--panel); }
+.card-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; margin-bottom: 10px; }
+.card-head h2 { font: 700 16px/1.3 var(--font-display); margin: 0; }
+.card-head p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+.scroll { overflow-x: auto; }
+svg text { fill: var(--muted); font-family: var(--font-body); font-size: 11px; }
+svg .lab { fill: var(--ink); font-size: 12px; }
+svg .num { font-family: var(--font-num); font-size: 10.5px; }
+svg .grid { stroke: var(--line); stroke-width: 1; }
+svg .today { stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 3; }
+table.sched { border-collapse: collapse; width: 100%; font-size: 13px; }
+.sched th, .sched td { padding: 6px 10px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+.sched th { color: var(--muted); font-weight: 500; font-size: 12px; position: sticky; top: 0; background: var(--panel); }
+.sched td.n { text-align: right; }
+.sched tr.past td { color: var(--muted); }
+.notes { color: var(--muted); font-size: 12.5px; margin: 0; padding-left: 18px; display: grid; gap: 4px; max-width: 110ch; }
+.toast { font-size: 12px; color: var(--good); margin-left: 8px; }
+textarea.copybuf { position: absolute; left: -9999px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+.sw.retain { background: repeating-linear-gradient(135deg, var(--nursery) 0 3px, transparent 3px 6px); border: 1px solid var(--nursery); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; margin: 4px 0 2px; flex-wrap: wrap; }
+.seg label { position: relative; padding: 4px 10px; font-size: 12.5px; cursor: pointer; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label:has(input:checked) { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+.seg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+.field select { width: 100%; font: 500 13px var(--font-body); padding: 5px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); }
+.alert { font-size: 12.5px; color: var(--warn); background: var(--warn-soft); border-radius: 6px; padding: 6px 10px; }
+.alert.bad { color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, transparent); }
+.alerts { display: grid; gap: 6px; }
+.metrics dd.warnv { color: var(--warn); font-weight: 500; }
+.metrics dt.grp { grid-column: 1 / -1; color: var(--ink); font-weight: 500; font-size: 12px; margin-top: 4px; padding-top: 4px; border-top: 1px dashed var(--line); }
+nav.tabbar { max-width: 1440px; margin: 0 auto 16px; display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+nav.tabbar a { padding: 8px 14px; color: var(--muted); text-decoration: none; font-weight: 500; border-bottom: 2px solid transparent; white-space: nowrap; }
+nav.tabbar a:hover { color: var(--ink); }
+nav.tabbar a[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); }
+nav.tabbar a:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.kpi { border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px; display: grid; gap: 2px; align-content: start; }
+.kpi .k { color: var(--muted); font-size: 12px; }
+.kpi .v { font: 500 22px/1.2 var(--font-num); font-variant-numeric: tabular-nums; }
+.kpi .v small { font: 400 12px var(--font-body); color: var(--muted); margin-left: 3px; }
+.kpi .d { color: var(--muted); font-size: 11.5px; line-height: 1.4; }
+.kpi.warn { border-color: color-mix(in srgb, var(--warn) 55%, var(--line)); }
+.kpi.warn .v { color: var(--warn); }
+.kpi.bad { border-color: color-mix(in srgb, var(--bad) 55%, var(--line)); }
+.kpi.bad .v { color: var(--bad); }
+.kpi.good .v { color: var(--good); }
+table.years { border-collapse: collapse; font-size: 13px; }
+.years th, .years td { padding: 5px 14px 5px 0; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+.years th:first-child, .years td:first-child { text-align: left; }
+.years th { color: var(--muted); font-weight: 500; font-size: 12px; }
+.years td { font-family: var(--font-num); }
+.years tr.partial td { color: var(--muted); }
+.cols2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+@media (max-width: 1000px) { .cols2 { grid-template-columns: minmax(0, 1fr); } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <a class="home" href="index.html">← tidypptsda</a>
+    <h1>测定站进苗规划</h1>
+    <p>三种进苗方案：全进全出、衔接进苗、分组滚动（周批次）。每批上测多少头、从多少头里挑、一年测多少头、测定站用得多满、需要多少台，以及测定站推迟清空时猪会长到多大。</p>
+  </div>
+  <div class="legend" aria-label="阶段颜色">
+    <span><i class="sw nursery"></i>保育</span><span><i class="sw retain"></i>未入选猪留养</span><span><i class="sw test"></i>测定</span>
+    <span><i class="sw wash"></i>洗消</span><span><i class="sw rest"></i>静置</span>
+  </div>
+</header>
+
+<nav class="tabbar" aria-label="方案">
+  <a href="#all-in" data-tab="A">全进全出</a>
+  <a href="#linked" data-tab="B">衔接进苗</a>
+  <a href="#rolling" data-tab="C">分组滚动（周批次）</a>
+  <a href="#compare" data-tab="X">三种对比</a>
+</nav>
+
+<div class="layout">
+  <aside class="params" aria-label="规划参数">
+    <h2>时间</h2>
+    <div class="field wide"><label for="p-start">首批进保育</label><input id="p-start" type="date" value="2024-11-01"></div>
+    <div class="field"><label for="p-months">规划时长<small>月</small></label><input id="p-months" type="number" min="6" max="60" step="1" value="24"></div>
+
+    <h2>各阶段天数</h2>
+    <div class="field"><label for="p-n">保育<small>进保育到上测</small></label><input id="p-n" type="number" min="1" max="120" value="45"></div>
+    <div class="field"><label for="p-t">测定</label><input id="p-t" type="number" min="1" max="200" value="90"></div>
+    <div class="field"><label for="p-w">测定站洗消</label><input id="p-w" type="number" min="0" max="60" value="10"></div>
+    <div class="field"><label for="p-r">测定站静置</label><input id="p-r" type="number" min="0" max="60" value="7"></div>
+    <div class="field"><label for="p-wn">保育舍洗消静置<small>保育舍清空到再进苗</small></label><input id="p-wn" type="number" min="0" max="60" value="7"></div>
+    <div class="field"><label for="p-mindown">要求的最短洗消静置<small>天，按本场生物安全规定；0 = 不检查</small></label><input id="p-mindown" type="number" min="0" max="60" value="21"></div>
+
+    <h2>栏舍</h2>
+    <div class="field"><label for="p-stations">测定站台数</label><input id="p-stations" type="number" min="1" value="120"></div>
+    <div class="field"><label for="p-perst">每台最多头数</label><input id="p-perst" type="number" min="1" value="15"></div>
+    <p class="derived">测定位 <b id="d-ct">1,800</b> 个</p>
+
+    <h2>猪群</h2>
+    <div class="field"><label for="p-loss">保育死淘率<small>%</small></label><input id="p-loss" type="number" min="0" max="50" step="0.5" value="3"></div>
+    <div class="field"><label for="p-tloss">测定期死淘率<small>%</small></label><input id="p-tloss" type="number" min="0" max="50" step="0.5" value="0"></div>
+    <div class="field"><label for="p-q">入选比例<small>% 保育下床的猪中上测的比例（衔接、滚动）</small></label><input id="p-q" type="number" min="10" max="100" step="1" value="90"></div>
+    <div class="field"><label for="p-w0">进保育体重<small>kg</small></label><input id="p-w0" type="number" min="1" max="40" step="0.5" value="7"></div>
+    <div class="field"><label for="p-adg">保育日增重<small>kg/d</small></label><input id="p-adg" type="number" min="0.1" max="1.2" step="0.01" value="0.45"></div>
+    <div class="field"><label for="p-wmin">最低进站体重<small>kg</small></label><input id="p-wmin" type="number" min="1" max="60" step="0.5" value="15"></div>
+    <div class="field"><label for="p-wstage">测定区间起点<small>kg，上测时最好还没到</small></label><input id="p-wstage" type="number" min="5" max="80" step="1" value="30"></div>
+    <div class="field"><label for="p-delay">测定站推迟清空<small>天，用于评估风险</small></label><input id="p-delay" type="number" min="0" max="60" value="14"></div>
+
+    <div data-for="A">
+      <h2>全进全出</h2>
+      <div class="field"><label for="p-ea">每批进苗<small>一般进满全场</small></label><input id="p-ea" type="number" min="1" value="3200"></div>
+    </div>
+
+    <div data-for="B">
+      <h2>衔接进苗</h2>
+      <div class="seg" role="radiogroup" aria-label="什么时候进保育">
+        <label><input type="radio" name="p-rule" id="p-rule-back" value="back" checked><span>倒推进苗</span></label>
+        <label><input type="radio" name="p-rule" id="p-rule-now" value="now"><span>保育空出即进</span></label>
+      </div>
+      <p class="derived" id="rule-help"></p>
+    </div>
+
+    <div data-for="C">
+      <h2>分组滚动（周批次）</h2>
+      <div class="field"><label for="p-interval">批次间隔<small>跟母猪场断奶批次一致</small></label>
+        <select id="p-interval"><option value="7">单周批（7 天）</option><option value="14">二周批（14 天）</option><option value="21" selected>三周批（21 天）</option><option value="28">四周批（28 天）</option><option value="35">五周批（35 天）</option></select></div>
+      <div class="seg" role="radiogroup" aria-label="怎么算">
+        <label><input type="radio" name="p-dir" id="p-dir-st" value="stations" checked><span>已有测定站，算每批头数</span></label>
+        <label><input type="radio" name="p-dir" id="p-dir-b" value="batch"><span>已知每批头数，算台数</span></label>
+      </div>
+      <div class="field" id="row-batch"><label for="p-batch">每批上测头数</label><input id="p-batch" type="number" min="1" value="400"></div>
+      <div class="field"><label for="p-groups">分组数<small>0 = 自动</small></label><input id="p-groups" type="number" min="0" max="30" value="0"></div>
+      <div class="field"><label for="p-fault">设备故障预留<small>%</small></label><input id="p-fault" type="number" min="0" max="50" step="1" value="0"></div>
+    </div>
+
+    <div class="row-btns"><button id="btn-reset" type="button">恢复示例参数</button></div>
+  </aside>
+
+  <main id="main"></main>
+</div>
+<textarea class="copybuf" id="copybuf" aria-hidden="true" tabindex="-1"></textarea>
+
+<script>
+(function () {
+  "use strict";
+  var DAY = 86400000;
+  var MODES = [
+    { id: "A", hash: "all-in", name: "全进全出", desc: "进满全场，挑满测定站；全部离场、洗消后再进下一批" },
+    { id: "B", hash: "linked", name: "衔接进苗", desc: "只进够挑满测定站的头数，测定站一空就上测" },
+    { id: "C", hash: "rolling", name: "分组滚动（周批次）", desc: "按母猪场的断奶批次固定间隔进站，测定站分组轮流使用" }
+  ];
+  var DEFAULTS = { start: "2024-11-01", months: 24, n: 45, t: 90, w: 10, r: 7, wn: 7, mindown: 21, stations: 120, perst: 15,
+                   loss: 3, tloss: 0, q: 90, w0: 7, adg: 0.45, wmin: 15, wstage: 30, delay: 14, ea: 3200, rule: "back",
+                   interval: "21", dir: "stations", batch: 400, groups: 0, fault: 0 };
+  var NUMS = ["months", "n", "t", "w", "r", "wn", "mindown", "stations", "perst", "loss", "tloss", "q", "w0", "adg", "wmin", "wstage", "delay", "batch", "groups", "fault"];
+  var GL = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+  var state = { tab: "A", view: "batch" };
+  function el(id) { return document.getElementById(id); }
+  function toDay(s) { var p = s.split("-").map(Number); return Math.round(Date.UTC(p[0], p[1] - 1, p[2]) / DAY); }
+  function fmt(d) { return new Date(d * DAY).toISOString().slice(0, 10); }
+  function yearOf(d) { return new Date(d * DAY).getUTCFullYear(); }
+  function addMonths(d, m) { var x = new Date(d * DAY); return Math.round(Date.UTC(x.getUTCFullYear(), x.getUTCMonth() + m, x.getUTCDate()) / DAY); }
+  function nf(x, dig) { return (dig ? x.toFixed(dig) : Math.round(x).toString()).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+  function pct(x) { return (100 * x).toFixed(0) + "%"; }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+
+  // ---------------------------------------------------------------- parameters
+  function read() {
+    var p = { start: el("p-start").value || DEFAULTS.start, rule: el("p-rule-now").checked ? "now" : "back",
+              dir: el("p-dir-b").checked ? "batch" : "stations", interval: +el("p-interval").value || 21 };
+    NUMS.forEach(function (k) { var e = el("p-" + k), v = +e.value; p[k] = e.value !== "" && isFinite(v) ? v : DEFAULTS[k]; });
+    var ea = el("p-ea").value; p.ea = ea === "" || !isFinite(+ea) ? DEFAULTS.ea : Math.max(1, Math.round(+ea));
+    ["n", "t", "w", "r", "wn", "ret", "delay", "groups", "mindown"].forEach(function (k) { p[k] = Math.max(0, Math.round(p[k])); });
+    p.n = Math.max(1, p.n); p.t = Math.max(1, p.t); p.months = Math.min(60, Math.max(6, Math.round(p.months)));
+    p.stations = Math.max(1, Math.round(p.stations)); p.perst = Math.max(1, Math.round(p.perst)); p.batch = Math.max(1, Math.round(p.batch));
+    p.ct = p.stations * p.perst;
+    p.l = Math.min(0.5, Math.max(0, p.loss / 100)); p.tl = Math.min(0.5, Math.max(0, p.tloss / 100));
+    p.qq = Math.min(1, Math.max(0.1, p.q / 100)); p.ff = Math.max(0, p.fault / 100);
+    p.adg2 = 0.65;
+    return p;
+  }
+  function write(p) {
+    el("p-start").value = p.start;
+    NUMS.forEach(function (k) { el("p-" + k).value = p[k]; });
+    el("p-ea").value = p.ea === null || p.ea === undefined || p.ea === "" ? DEFAULTS.ea : p.ea;
+    el("p-interval").value = String(p.interval);
+    el("p-rule-back").checked = p.rule !== "now"; el("p-rule-now").checked = p.rule === "now";
+    el("p-dir-st").checked = p.dir !== "batch"; el("p-dir-b").checked = p.dir === "batch";
+  }
+  function save(p) {
+    var o = { start: p.start, rule: p.rule, dir: p.dir, interval: String(p.interval), ea: p.ea };
+    NUMS.forEach(function (k) { o[k] = p[k]; });
+    try { localStorage.setItem("station-planner-v4", JSON.stringify(o)); } catch (e) {}
+  }
+  function load() { try { return JSON.parse(localStorage.getItem("station-planner-v4") || "null"); } catch (e) { return null; } }
+
+  // ---------------------------------------------------------------- weekly-batch rolling: groups and stations
+  function rolling(p) {
+    var I = p.interval, cyc = p.t + p.w + p.r, raw = cyc / I;
+    var auto = cyc % I === 0 ? raw + 1 : Math.ceil(raw);
+    var G = p.groups > 0 ? p.groups : auto;
+    var margin = I * G - cyc, o = { I: I, cyc: cyc, raw: raw, auto: auto, G: G, margin: margin, exact: cyc % I === 0 };
+    if (p.dir === "stations") {
+      o.upg = Math.floor(p.stations / G);
+      o.usable = Math.floor(o.upg / (1 + p.ff));
+      o.seats = o.usable * p.perst;
+      o.total = G * o.upg; o.spare = p.stations - o.total;
+    } else {
+      o.base = Math.ceil(p.batch / p.perst);
+      o.upg = Math.ceil(o.base * (1 + p.ff) - 1e-9);
+      o.usable = o.base; o.seats = p.batch;
+      o.total = G * o.upg; o.spare = p.stations - o.total;
+    }
+    return o;
+  }
+
+  // ---------------------------------------------------------------- schedules
+  function schedule(mode, p, ro) {
+    var start = toDay(p.start), end = addMonths(start, p.months);
+    var N = p.n, T = p.t, W = p.w, R = p.r, list = [], room = T + W + R, cycle, perYear, k = 1;
+    function mk(i, g, a, tin, retEnd) { return { i: i, room: g, nIn: a, tIn: tin, tOut: tin + T, wEnd: tin + T + W, rEnd: tin + T + W + R, retEnd: retEnd }; }
+    if (mode === "A") {
+      cycle = Math.max(N + room, N + T + p.wn);          // not selected pigs leave with the test pigs, then the nursery is washed
+      for (var i = 0; start + i * cycle < end; i++) { var a = start + i * cycle; list.push(mk(i, 0, a, a + N, a + N + T)); }
+      perYear = 365 / cycle;
+    } else if (mode === "B") {
+      var a2 = start, ready = start + N, j = 0;
+      while (a2 < end) {
+        var tin = Math.max(a2 + N, ready);
+        list.push(mk(j, 0, a2, tin, tin + T));
+        ready = tin + room;
+        var free = tin + p.wn;
+        a2 = p.rule === "now" ? free : Math.max(free, ready - N);
+        j++;
+      }
+      cycle = Math.max(room, N + p.wn); perYear = 365 / cycle;
+    } else {
+      k = ro.G; cycle = ro.I * ro.G;
+      for (var q = 0; start + q * ro.I < end; q++) { var t2 = start + N + q * ro.I; list.push(mk(q, q % ro.G, t2 - N, t2, t2 + T)); }
+      perYear = 365 / ro.I;
+    }
+    return { mode: mode, list: list, start: start, end: end, k: k, cycle: cycle, perYear: perYear };
+  }
+
+  // ---------------------------------------------------------------- evaluation
+  function evaluate(mode, p) {
+    var ro = mode === "C" ? rolling(p) : null;
+    var s = schedule(mode, p, ro), L = s.list, d0 = s.start, d1 = s.end;
+    function wAt(days) { return p.w0 + p.adg * days; }
+    var seats = mode === "C" ? ro.seats : p.ct;
+    var notes = [];
+    var last = L.length ? L[L.length - 1].rEnd : d1;
+    var len = Math.max(d1, last) - d0 + 1, stayMax = 0;
+    L.forEach(function (b) { var st = b.tIn - b.nIn; if (b.i > 0 && st > stayMax) stayMax = st; });
+    if (!stayMax && L.length) stayMax = L[0].tIn - L[0].nIn;
+    var wait = mode === "A" ? 0 : mode === "B" ? p.delay : Math.max(0, p.delay - Math.max(0, ro.margin));
+    var wTest = wAt(stayMax), wLate = wAt(stayMax + wait);
+    var E = mode === "A" ? p.ea : Math.ceil(seats / ((1 - p.l) * p.qq));
+    var T_ = Math.max(0, Math.min(Math.floor(seats), Math.floor(E * (1 - p.l) * (mode === "A" ? 1 : p.qq))));
+    // daily head counts: nursery phase, on test, not selected (kept until the test batch leaves)
+    var nP = new Float64Array(len), rP = new Float64Array(len), tP = new Float64Array(len);
+    L.forEach(function (b) {
+      var stay = b.tIn - b.nIn, kept = Math.max(0, E * (1 - p.l) - T_);
+      for (var d = b.nIn; d < b.tIn; d++) nP[d - d0] += E * (1 - p.l * (d - b.nIn) / Math.max(1, stay));
+      for (d = b.tIn; d < b.retEnd; d++) rP[d - d0] += kept;
+      for (d = b.tIn; d < b.tOut; d++) tP[d - d0] += T_;
+    });
+    var pk = { N: 0, T: 0, R: 0, tot: 0 };
+    for (var ii = 0; ii < len; ii++) {
+      var tot = nP[ii] + rP[ii] + tP[ii];
+      if (nP[ii] > pk.N) pk.N = nP[ii]; if (tP[ii] > pk.T) pk.T = tP[ii]; if (rP[ii] > pk.R) pk.R = rP[ii]; if (tot > pk.tot) pk.tot = tot;
+    }
+    var st = { E: E, tested: T_, nP: nP, rP: rP, tP: tP, pk: pk };
+    var entries = st.E, tested = st.tested, out = Math.round(tested * (1 - p.tl));
+    var seatsTotal = mode === "C" ? ro.total * p.perst : p.ct;
+    var perYearPigs = s.perYear * out;
+    var years = {}, y0 = yearOf(d0), y1 = yearOf(d1 - 1);
+    for (var y = y0; y <= y1; y++) years[y] = { entIn: 0, testIn: 0, done: 0, pigs: 0 };
+    L.forEach(function (b) {
+      var a = yearOf(b.nIn), t = yearOf(b.tIn), o = yearOf(b.tOut);
+      if (years[a] && b.nIn < d1) years[a].entIn++;
+      if (years[t] && b.tIn < d1) years[t].testIn++;
+      if (years[o] && b.tOut <= d1) { years[o].done++; years[o].pigs += out; }
+    });
+    var sd = new Date(d0 * DAY), ed = new Date(d1 * DAY);
+    var firstFull = sd.getUTCMonth() === 0 && sd.getUTCDate() === 1 ? y0 : y0 + 1;
+    var lastFull = ed.getUTCMonth() === 0 && ed.getUTCDate() === 1 ? y1 : y1 - 1;
+    return {
+      mode: mode, s: s, ro: ro, entries: entries, tested: tested, out: out, notes: notes, seatsBatch: Math.floor(seats),
+      sel: tested / Math.max(1, entries * (1 - p.l)),
+      perYear: s.perYear, perYearPigs: perYearPigs, perYearIn: s.perYear * entries,
+      perYearOther: s.perYear * Math.max(0, entries * (1 - p.l) - tested),
+      timeUtil: p.t / s.cycle, seatUtil: perYearPigs * p.t / Math.max(1, seatsTotal * 365), seatsTotal: seatsTotal,
+      peakN: st.pk.N, peakT: st.pk.T, peakR: st.pk.R, peakTot: st.pk.tot,
+      wTest: wTest, wLate: wLate, stay: stayMax, wait: wait, nP: st.nP, rP: st.rP, tP: st.tP, len: len,
+      down: p.w + p.r, years: years, firstFull: firstFull, lastFull: lastFull,
+      finished: L.filter(function (b) { return b.tOut <= d1; }).length
+    };
+  }
+
+  function alertsOf(r, p) {
+    var a = r.notes.slice();
+    if (r.mode === "C") {
+      if (r.ro.margin < 0) a.push(["bad", "分组数不够：同一组测定站上一批还没洗消静置完，下一批就要进（差 " + (-r.ro.margin) + " 天）。增加分组数或缩短周转。"]);
+      else if (r.ro.margin === 0) a.push(["warn", "安全裕度为 0：测定站推迟一天清空，下一批就进不去。"]);
+      if (p.dir === "stations" && r.ro.usable < 1) a.push(["bad", "测定站太少：分成 " + r.ro.G + " 组后每组不到 1 台。"]);
+      if (p.dir === "batch" && r.ro.spare < 0) a.push(["bad", "需要 " + nf(r.ro.total) + " 台测定站，现有 " + nf(p.stations) + " 台，还差 " + nf(-r.ro.spare) + " 台。"]);
+    }
+    if (p.mindown > 0 && r.down < p.mindown) a.push(["warn", "测定站洗消 + 静置 " + r.down + " 天，少于本场要求的 " + p.mindown + " 天。"]);
+    if (r.wTest < p.wmin) a.push(["warn", "上测体重 " + r.wTest.toFixed(1) + " kg，低于 " + p.wmin + " kg：保育天数不够。"]);
+    if (r.wTest > p.wstage) a.push(["warn", "上测时已有 " + r.wTest.toFixed(1) + " kg，超过测定区间起点 " + p.wstage + " kg：区间开头没有记录，要靠外推。"]);
+    else if (r.wait > 0 && r.wLate > p.wstage) a.push(["warn", "测定站推迟 " + p.delay + " 天清空时，猪要长到 " + r.wLate.toFixed(1) + " kg 才上测，超过区间起点 " + p.wstage + " kg。"]);
+    if (r.tested < r.seatsBatch) a.push(["warn", "测定站装不满：每批进苗 " + nf(r.entries) + " 头，保育下床只有 " + nf(r.entries * (1 - p.l)) + " 头，上测 " + nf(r.tested) + " 头（测定位 " + nf(r.seatsBatch) + " 个）。"]);
+    return a;
+  }
+
+  // ---------------------------------------------------------------- shared drawing helpers
+  function axis(d0, d1, x, top, h, labelY, yearY) {
+    var out = "", dt = new Date(d0 * DAY), y0 = dt.getUTCFullYear(), m0 = dt.getUTCMonth();
+    for (var i = 0; ; i++) {
+      var day = Math.round(Date.UTC(y0, m0 + i, 1) / DAY);
+      if (day > d1) break;
+      if (day < d0) continue;
+      var dd = new Date(day * DAY), mon = dd.getUTCMonth() + 1, xx = x(day);
+      out += '<line class="grid" x1="' + xx + '" x2="' + xx + '" y1="' + top + '" y2="' + (top + h) + '"' + (mon === 1 ? ' style="stroke:var(--muted);stroke-opacity:.5"' : ' stroke-dasharray="3 3"') + "/>";
+      out += '<text x="' + (+xx + 3) + '" y="' + (labelY === undefined ? top - 6 : labelY) + '">' + mon + "月</text>";
+      if (mon === 1 || i === 0) out += '<text class="lab" x="' + (+xx + 3) + '" y="' + (yearY === undefined ? top - 21 : yearY) + '">' + dd.getUTCFullYear() + "年</text>";
+    }
+    return out;
+  }
+  function todayLine(d0, d1, x, top, h) {
+    var t = Math.round(Date.now() / DAY);
+    if (t < d0 || t > d1) return "";
+    return '<line class="today" x1="' + x(t) + '" x2="' + x(t) + '" y1="' + (top - 2) + '" y2="' + (top + h) + '"/><text x="' + (+x(t) + 3) + '" y="' + (top + h - 4) + '" style="fill:var(--accent)">今天</text>';
+  }
+  var PH = [["nIn", "tIn", "nursery", "保育"], ["tIn", "tOut", "test", "测定"], ["tOut", "wEnd", "wash", "洗消"], ["wEnd", "rEnd", "rest", "静置"]];
+  function bar(x, a, e, y, h, pxd, fill, title) {
+    return '<rect x="' + x(a) + '" y="' + y + '" width="' + Math.max(1, (e - a) * pxd - 1).toFixed(1) + '" height="' + h + '" rx="4" style="' + fill + '"><title>' + esc(title) + "</title></rect>";
+  }
+  function groupName(r, g) { return r.mode === "C" ? "组 " + GL[g % GL.length] : ""; }
+
+  function ganttSVG(r, p, width0) {
+    var s = r.s, L = s.list, d0 = s.start;
+    var d1 = L.length ? Math.max(s.end, L[L.length - 1].rEnd, L[L.length - 1].retEnd) : s.end;
+    var left = 118, right = 12, top = 40, rowH = 26;
+    var pxd = Math.max(0.9, (width0 - left - right) / (d1 - d0 + 1)), width = left + right + pxd * (d1 - d0 + 1);
+    function x(d) { return (left + (d - d0) * pxd).toFixed(1); }
+    var body = "", rows = 0, hatch = "fill:url(#retain);stroke:var(--nursery);stroke-width:1";
+    function t(b, name, a, e) { return "第 " + (b.i + 1) + " 批" + (r.mode === "C" ? "（" + groupName(r, b.room) + "）" : "") + " " + name + "：" + fmt(a) + " 至 " + fmt(e) + "（" + (e - a) + " 天）"; }
+    if (state.view === "batch") {
+      L.forEach(function (b, k) {
+        var y = top + k * rowH + 6;
+        body += '<text class="lab" x="8" y="' + (y + 11) + '">第 ' + (b.i + 1) + " 批" + (r.mode === "C" ? '<tspan dx="6" style="fill:var(--muted);font-size:11px">' + groupName(r, b.room) + "</tspan>" : "") + "</text>";
+        PH.forEach(function (ph) { var a = b[ph[0]], e = b[ph[1]]; if (e > a) body += bar(x, a, e, y, 14, pxd, "fill:var(--" + ph[2] + ")", t(b, ph[3], a, e)); });
+        if (b.retEnd > b.tIn) body += bar(x, b.tIn, b.retEnd, y + 15, 5, pxd, hatch, t(b, "未入选猪养到出栏", b.tIn, b.retEnd));
+        var lx = (b.rEnd - d0) * pxd + left + 6;
+        if (lx + 170 < width) body += '<text class="num" x="' + lx.toFixed(1) + '" y="' + (y + 11) + '">进 ' + nf(r.entries) + " · 测 " + nf(r.tested) + "</text>";
+      });
+      rows = L.length;
+    } else {
+      var sub = [];
+      L.forEach(function (b) {
+        var endN = (r.mode === "A" ? b.retEnd : b.tIn) + (r.mode === "C" ? 0 : p.wn);
+        for (var q = 0; q < sub.length; q++) if (sub[q] <= b.nIn) break;
+        if (q === sub.length) sub.push(0);
+        sub[q] = endN; b.lane = q;
+      });
+      var lanes = sub.length;
+      for (var q = 0; q < lanes; q++) body += '<text class="lab" x="8" y="' + (top + q * rowH + 17) + '">保育期的猪' + (lanes > 1 ? " " + (q + 1) : "") + "</text>";
+      for (var g = 0; g < s.k; g++) body += '<text class="lab" x="8" y="' + (top + (lanes + g) * rowH + 17) + '">' + (r.mode === "C" ? groupName(r, g) + '<tspan dx="6" style="fill:var(--muted);font-size:11px">' + r.ro.upg + " 台</tspan>" : "测定站 " + nf(p.ct) + " 位") + "</text>";
+      L.forEach(function (b) {
+        var yN = top + b.lane * rowH + 6, yT = top + (lanes + b.room) * rowH + 6;
+        body += bar(x, b.nIn, b.tIn, yN, 14, pxd, "fill:var(--nursery)", t(b, "保育", b.nIn, b.tIn));
+        if (r.mode === "A" && b.retEnd > b.tIn) body += bar(x, b.tIn, b.retEnd, yN, 14, pxd, hatch, t(b, "未入选猪养到出栏", b.tIn, b.retEnd));
+        PH.slice(1).forEach(function (ph) { var a = b[ph[0]], e = b[ph[1]]; if (e > a) body += bar(x, a, e, yT, 14, pxd, "fill:var(--" + ph[2] + ")", t(b, ph[3], a, e)); });
+        if ((b.tIn - b.nIn) * pxd > 22) body += '<text x="' + (+x(b.nIn) + 4) + '" y="' + (yN + 11) + '" style="fill:var(--panel);font-size:10.5px;font-weight:500">' + (b.i + 1) + "</text>";
+        if (p.t * pxd > 22) body += '<text x="' + (+x(b.tIn) + 4) + '" y="' + (yT + 11) + '" style="fill:var(--panel);font-size:10.5px;font-weight:500">' + (b.i + 1) + "</text>";
+      });
+      rows = lanes + s.k;
+    }
+    var h = rows * rowH + 8, endX = +x(s.end);
+    return '<svg width="' + width.toFixed(0) + '" height="' + (top + h + 6) + '" role="img" aria-label="进苗时间线">' +
+      '<defs><pattern id="retain" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="3" height="6" style="fill:var(--nursery)"/></pattern></defs>' +
+      axis(d0, d1, x, top, h) +
+      '<rect x="' + endX + '" y="' + top + '" width="' + Math.max(0, width - right - endX) + '" height="' + h + '" style="fill:var(--bg);opacity:.6"/>' +
+      body + todayLine(d0, d1, x, top, h) + "</svg>";
+  }
+
+  function stockSVG(r, p, width0) {
+    var s = r.s, d0 = s.start, len = r.len, H = 246;
+    var left = 58, right = 14, top = 14, bottom = 44, ph = H - top - bottom;
+    var pxd = Math.max(0.9, (width0 - left - right) / len), width = left + right + pxd * len;
+    var refs = [{ v: r.seatsTotal, label: "测定位 " + nf(r.seatsTotal), c: "var(--test)" }];
+    var ymax = Math.max(r.peakTot, r.seatsTotal) * 1.1 || 1;
+    function x(i) { return (left + i * pxd).toFixed(1); }
+    function y(v) { return (top + ph - v / ymax * ph).toFixed(1); }
+    var step = Math.max(1, Math.round(1 / pxd));
+    // stacked: on test (bottom), not selected, nursery phase (top)
+    var A1 = new Float64Array(len), A2 = new Float64Array(len), A3 = new Float64Array(len);
+    for (var ii = 0; ii < len; ii++) { A1[ii] = r.tP[ii]; A2[ii] = A1[ii] + r.rP[ii]; A3[ii] = A2[ii] + r.nP[ii]; }
+    function area(top_, base) {
+      var d = "M" + x(0) + "," + y(base ? base[0] : 0), i;
+      for (i = 0; i < len; i += step) d += "L" + x(i) + "," + y(top_[i]);
+      d += "L" + x(len - 1) + "," + y(top_[len - 1]);
+      if (base) { d += "L" + x(len - 1) + "," + y(base[len - 1]); for (i = len - 1 - ((len - 1) % step); i >= 0; i -= step) d += "L" + x(i) + "," + y(base[i]); }
+      else d += "L" + x(len - 1) + "," + y(0);
+      return d + "Z";
+    }
+    var grid = "", tick = Math.pow(10, Math.floor(Math.log10(ymax / 4))), nt = Math.ceil(ymax / 4 / tick) * tick;
+    for (var v = 0; v <= ymax; v += nt) grid += '<line class="grid" x1="' + left + '" x2="' + (width - right) + '" y1="' + y(v) + '" y2="' + y(v) + '"/><text class="num" x="' + (left - 6) + '" y="' + (+y(v) + 4) + '" text-anchor="end">' + nf(v) + "</text>";
+    var refl = refs.map(function (q, k) {
+      return '<line x1="' + left + '" x2="' + (width - right) + '" y1="' + y(q.v) + '" y2="' + y(q.v) + '" style="stroke:' + q.c + ';stroke-width:1.5" stroke-dasharray="6 4"/>' +
+        '<text x="' + (width - right - 6) + '" y="' + (+y(q.v) - 5 ) + '" text-anchor="end" style="fill:' + q.c + ';font-weight:500">' + q.label + "</text>";
+    }).join("");
+    function xd(d) { return x(d - d0); }
+    return '<svg width="' + width.toFixed(0) + '" height="' + H + '" role="img" aria-label="每日存栏">' + grid +
+      axis(d0, d0 + len - 1, xd, top, ph, top + ph + 16, top + ph + 31) +
+      '<path d="' + area(A1) + '" style="fill:var(--test);opacity:.65"/>' +
+      '<path d="' + area(A2, A1) + '" style="fill:url(#retain2);opacity:.6"/>' +
+      '<path d="' + area(A3, A2) + '" style="fill:var(--nursery);opacity:.45"/>' +
+      refl + todayLine(d0, d0 + len - 1, xd, top, ph) +
+      '<defs><pattern id="retain2" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="3" height="6" style="fill:var(--nursery)"/></pattern></defs>' +
+      '<text x="' + (left + 6) + '" y="' + (top + 12) + '" class="lab">全场最多 ' + nf(r.peakTot) + " 头（保育阶段最多 " + nf(r.peakN) + "，测定站最多 " + nf(r.peakT) + "）</text></svg>";
+  }
+
+  function scheduleRows(r) {
+    var L = r.s.list, ret = false, grp = r.mode === "C";
+    var head = ["批次"].concat(grp ? ["测定站组"] : [], ["进保育", "上测", "保育天数"], ret ? ["未入选猪离场"] : [], ["结测出栏", "洗消完成", "静置完成", "进苗", "上测", "结测"]);
+    var rows = L.map(function (b) {
+      return ["第 " + (b.i + 1) + " 批"].concat(grp ? [groupName(r, b.room)] : [], [fmt(b.nIn), fmt(b.tIn), b.tIn - b.nIn], ret ? [fmt(b.retEnd)] : [],
+        [fmt(b.tOut), fmt(b.wEnd), fmt(b.rEnd), r.entries, r.tested, r.out]);
+    });
+    return { head: head, rows: rows, numFrom: head.length - 3 };
+  }
+
+  // ---------------------------------------------------------------- KPI tiles per scheme
+  function tile(k, v, unit, d, cls) {
+    return '<div class="kpi' + (cls ? " " + cls : "") + '"><span class="k">' + k + '</span><span class="v">' + v + (unit ? "<small>" + unit + "</small>" : "") + '</span>' + (d ? '<span class="d">' + d + "</span>" : "") + "</div>";
+  }
+  function tilesOf(r, p) {
+    var t = [];
+    if (r.mode === "C") {
+      var ro = r.ro;
+      t.push(tile("分组数", ro.G, "组", p.groups > 0 ? "手动设定（自动为 " + ro.auto + " 组）" : "⌈" + ro.cyc + " ÷ " + ro.I + "⌉" + (ro.exact ? " + 1，整除时多留一组" : "") + " = " + ro.auto));
+      t.push(tile("每组测定站", nf(ro.upg), "台", p.dir === "stations" ? nf(p.stations) + " 台 ÷ " + ro.G + " 组" + (p.ff > 0 ? "，其中 " + nf(ro.upg - ro.usable) + " 台预留故障" : "") : "⌈" + nf(p.batch) + " ÷ " + p.perst + "⌉" + (p.ff > 0 ? " × (1 + " + p.fault + "%)" : "")));
+      t.push(tile(p.dir === "stations" ? "使用测定站" : "需要测定站", nf(ro.total), "台", ro.spare >= 0 ? "现有 " + nf(p.stations) + " 台，空余 " + nf(ro.spare) + " 台" : "现有 " + nf(p.stations) + " 台，还差 " + nf(-ro.spare) + " 台", ro.spare < 0 ? "bad" : ""));
+      t.push(tile("安全裕度", ro.margin, "天", ro.I + " × " + ro.G + " − " + ro.cyc + "；测定站推迟清空不超过这些天，不影响下一批", ro.margin < 0 ? "bad" : ro.margin === 0 ? "warn" : "good"));
+    }
+    t.push(tile("每批进苗", nf(r.entries), "头", r.mode === "A" ? "进满全场" : "上测 ÷ (1 − 保育死淘) ÷ 入选比例"));
+    t.push(tile("每批上测", nf(r.tested), "头", "入选比例 " + pct(r.sel) + (p.tl > 0 ? "；结测 " + nf(r.out) + " 头" : "")));
+    t.push(tile("年测定头数", nf(r.perYearPigs), "头", r.perYear.toFixed(2) + " 批 × " + nf(r.out) + " 头（长期平均）"));
+    t.push(tile("测定站时间利用率", pct(r.timeUtil), "", "测定 " + p.t + " 天 ÷ " + (r.mode === "C" ? "每组周期 " + r.s.cycle : "周期 " + r.s.cycle) + " 天"));
+    t.push(tile("上测体重", r.wTest.toFixed(1), "kg", r.mode === "A" ? "测定站推迟清空不影响" : r.wait > 0 ? "推迟 " + p.delay + " 天清空时 " + r.wLate.toFixed(1) + " kg" : "推迟 " + p.delay + " 天在裕度内，不受影响",
+      (r.wTest < p.wmin || r.wTest > p.wstage) ? "warn" : (r.wait > 0 && r.wLate > p.wstage ? "warn" : "")));
+    t.push(tile("全场头数峰值", nf(r.peakTot), "头", "保育阶段 + 测定 + 未入选，栋舍怎么放由场里安排"));
+    return t.join("");
+  }
+  function yearsTable(r) {
+    var ys = Object.keys(r.years).map(Number).sort();
+    var rows = ys.map(function (y) {
+      var o = r.years[y], partial = y < r.firstFull || y > r.lastFull;
+      return '<tr class="' + (partial ? "partial" : "") + '"><td>' + y + (partial ? "（不满一年）" : "") + "</td><td>" + o.entIn + "</td><td>" + o.testIn + "</td><td>" + o.done + "</td><td>" + nf(o.pigs) + "</td></tr>";
+    }).join("");
+    return '<div class="scroll"><table class="years"><thead><tr><th>年份</th><th>进保育批次</th><th>上测批次</th><th>结测批次</th><th>结测头数</th></tr></thead><tbody>' + rows + "</tbody></table></div>";
+  }
+  var NOTES = {
+    A: ["上一批测定结束、全部出栏（未入选的猪和测定站的猪一起出栏），测定站洗消和静置完成后，下一批才进保育。全场同时只有一批猪。",
+        "周期 = 保育 + 测定 + 洗消 + 静置。年测定头数 = 365 ÷ 周期 × 每批结测头数。",
+        "每批进满全场，保育下床时挑满测定站，入选比例 = 测定位 ÷ 保育下床头数，入选比例越低选择强度越高。"],
+    B: ["每批只进够挑满测定站的头数 = 测定位 ÷ (1 − 保育死淘率) ÷ 入选比例；挑完后未入选的猪转到其他栋舍，养到和测定站的猪一起出栏，保育舍清空，洗消静置后才能进下一批。",
+        "倒推进苗：按测定站可以进猪的日子（上一批结测 + 洗消 + 静置）倒推保育天数进苗；保育空出即进：保育舍洗消完就进，猪在保育阶段等测定站，上测时更大。",
+        "测定站推迟清空几天，保育阶段的猪就多长几天：上测体重 = 进保育体重 + 保育日增重 × 实际保育天数。"],
+    C: ["按母猪场的断奶批次，每隔固定天数（1–5 周）有一批猪上测。测定站分成几组轮流用：一组从上测到洗消静置完要 测定 + 洗消 + 静置 天，所以需要 ⌈周转天数 ÷ 批次间隔⌉ 组；正好整除时没有余量，自动多留一组。",
+        "安全裕度 = 批次间隔 × 分组数 − 周转天数：同一组测定站推迟清空不超过这么多天，下一批照常进站；超过的部分，猪要在保育阶段多等。",
+        "已有测定站时，每组台数 = 测定站台数 ÷ 分组数，扣除故障预留后乘每台头数就是每批上测头数；已知每批头数时，倒过来算需要的台数。每批要准备的仔猪 = 上测头数 ÷ (1 − 保育死淘率) ÷ 入选比例。",
+        "保育阶段同时有 ⌈保育天数 ÷ 批次间隔⌉ 批猪，是连续流，生物安全比前两种方案弱；适合周批次生产、断奶仔猪直接进保育的种猪场。"]
+  };
+  var COMMON = ["测定站和栋舍不一一对应：测定站可以分散在几栋舍里，有测定站的栋舍里也可以养不测定的猪；规划只要求保育下床时有足够的猪挑满测定站。",
+                "栋舍容量不做检查：哪栋放多少猪由场里安排，存栏图给出每天保育阶段、测定中和未入选的猪各有多少头，供核对。只有测定位是硬约束，每批上测不超过测定站能装的头数。",
+                "未入选的猪不上测，继续养到出栏体重，和同批测定站的猪一起在结测时出栏。",
+                "按年份统计按排程表逐个日历年计数：结测是测定结束、出站那天，不含洗消和静置。"];
+
+  // ---------------------------------------------------------------- pages
+  function schemePage(r, p) {
+    var m = MODES.filter(function (x) { return x.id === r.mode; })[0];
+    var al = alertsOf(r, p);
+    var sch = scheduleRows(r);
+    var sub = r.mode === "C" ? "批次间隔 " + r.ro.I + " 天，" + r.ro.G + " 组测定站轮流使用" : r.mode === "B" ? (p.rule === "now" ? "保育空出即进" : "倒推进苗") : "全场单批";
+    return '<section class="card" aria-labelledby="h-kpi"><div class="card-head"><div><h2 id="h-kpi">' + m.name + "</h2><p>" + m.desc + "（" + sub + "）</p></div></div>" +
+      '<div class="kpis">' + tilesOf(r, p) + "</div>" +
+      (al.length ? '<div class="alerts" style="margin-top:12px">' + al.map(function (a) { return '<div class="alert' + (a[0] === "bad" ? " bad" : "") + '">' + a[1] + "</div>"; }).join("") + "</div>" : "") +
+      "</section>" +
+      '<section class="card" aria-labelledby="h-gantt"><div class="card-head"><div><h2 id="h-gantt">时间线</h2><p>' + r.s.list.length + " 批，" + fmt(r.s.start) + " 至 " + fmt(r.s.end - 1) + "。阴影部分在规划期之后，只为画完最后几批。</p></div>" +
+      '<div class="tabs" role="tablist" aria-label="时间线视图"><button type="button" data-view="batch" class="' + (state.view === "batch" ? "on" : "") + '" role="tab" aria-selected="' + (state.view === "batch") + '">按批次</button>' +
+      '<button type="button" data-view="station" class="' + (state.view === "station" ? "on" : "") + '" role="tab" aria-selected="' + (state.view === "station") + '">按测定站</button></div></div>' +
+      '<div class="scroll" id="gantt"></div></section>' +
+      '<div class="cols2"><section class="card" aria-labelledby="h-years"><h2 id="h-years">按年份统计</h2><p class="sub">按排程表逐年计数；灰色的年份不满一年。</p>' + yearsTable(r) + "</section>" +
+      '<section class="card" aria-labelledby="h-notes"><h2 id="h-notes">计算方法</h2><ul class="notes">' + NOTES[r.mode].concat(COMMON).map(function (s) { return "<li>" + s + "</li>"; }).join("") + "</ul></section></div>" +
+      '<section class="card" aria-labelledby="h-stock"><div class="card-head"><div><h2 id="h-stock">存栏</h2><p>每天的头数，按去向叠加：测定站（黄）、未入选继续养到出栏的猪（斜线，在保育舍或其他栋舍）、保育阶段的猪（红）。栋舍怎么放由场里安排，这里只给出头数供核对。</p></div></div><div class="scroll" id="stock"></div></section>' +
+      '<section class="card" aria-labelledby="h-sched"><div class="card-head"><div><h2 id="h-sched">排程表</h2><p>规划期内 ' + r.s.list.length + " 批进保育，其中 " + r.finished + " 批在规划期内结测。</p></div>" +
+      '<div><button type="button" id="btn-copy">复制到 Excel</button><span class="toast" id="toast" role="status"></span></div></div>' +
+      '<div class="scroll" style="max-height:460px;overflow-y:auto"><table class="sched"><thead><tr>' + sch.head.map(function (h, i) { return "<th" + (i >= sch.numFrom ? ' class="n"' : "") + ">" + h + "</th>"; }).join("") + "</tr></thead><tbody>" +
+      sch.rows.map(function (row) { return "<tr>" + row.map(function (c, i) { return "<td" + (i >= sch.numFrom ? ' class="n"' : /^\d{4}-/.test(c) ? ' class="num"' : "") + ">" + (typeof c === "number" ? nf(c) : esc(c)) + "</td>"; }).join("") + "</tr>"; }).join("") +
+      "</tbody></table></div></section>";
+  }
+
+  function comparePage(res, p) {
+    var rows = [
+      { grp: "每批" },
+      { key: "entries", label: "进苗", f: function (r) { return nf(r.entries) + " 头"; } },
+      { key: "tested", label: "上测", f: function (r) { return nf(r.tested) + " 头"; } },
+      { key: "sel", label: "入选比例", f: function (r) { return pct(r.sel); }, best: "min" },
+      { key: "wTest", label: "上测体重", f: function (r) { return r.wTest.toFixed(1) + " kg"; } },
+      { grp: "每年" },
+      { key: "perYear", label: "测定批次", f: function (r) { return r.perYear.toFixed(2); } },
+      { key: "perYearPigs", label: "测定头数", f: function (r) { return nf(r.perYearPigs) + " 头"; }, best: "max" },
+      { key: "perYearIn", label: "进苗头数", f: function (r) { return nf(r.perYearIn) + " 头"; } },
+      { key: "perYearOther", label: "其中不上测", f: function (r) { return nf(r.perYearOther) + " 头"; }, best: "min" },
+      { grp: "测定站" },
+      { key: "seatsTotal", label: "使用测定位", f: function (r) { return nf(r.seatsTotal) + " 个"; } },
+      { key: "peakTot", label: "全场头数峰值", f: function (r) { return nf(r.peakTot) + " 头"; } },
+
+      { key: "timeUtil", label: "时间利用率", f: function (r) { return pct(r.timeUtil); }, best: "max" },
+      { key: "seatUtil", label: "测定位利用率", f: function (r) { return pct(r.seatUtil); }, best: "max" },
+      { grp: "测定站推迟清空 " + p.delay + " 天" },
+      { key: "wLate", label: "上测体重", f: function (r) { return r.wait > 0 ? r.wLate.toFixed(1) + " kg" : "不受影响"; } }
+    ];
+    var BIO = { A: ["good", "全场单批"], B: ["mid", "同场两批"], C: ["low", "多批连续流"] };
+    var best = {};
+    rows.forEach(function (row) {
+      if (!row.best) return;
+      var vals = MODES.map(function (m) { return res[m.id][row.key]; });
+      var top = row.best === "max" ? Math.max.apply(null, vals) : Math.min.apply(null, vals);
+      if (vals.some(function (v) { return Math.abs(v - top) > 1e-6 * Math.max(1, Math.abs(top)); })) best[row.key] = top;
+    });
+    var cards = MODES.map(function (m) {
+      var r = res[m.id], bad = alertsOf(r, p).filter(function (a) { return a[0] === "bad"; });
+      var dl = rows.map(function (row) {
+        if (row.grp) return '<dt class="grp">' + row.grp + "</dt>";
+        var b = best[row.key] !== undefined && Math.abs(r[row.key] - best[row.key]) < 1e-6 * Math.max(1, Math.abs(best[row.key]));
+        return "<dt>" + row.label + "</dt><dd" + (b ? ' class="best"' : "") + ">" + row.f(r) + "</dd>";
+      }).join("");
+      var cyc = m.id === "C" ? "每 " + r.ro.I + " 天一批，" + r.ro.G + " 组" : "周期 " + r.s.cycle + " 天";
+      return '<a class="mode" href="#' + m.hash + '" style="color:inherit;text-decoration:none"><h3>' + m.name + "<small>" + cyc + "</small></h3><p>" + m.desc + "</p>" +
+        '<dl class="metrics">' + dl + "</dl>" + '<div><span class="chip ' + BIO[m.id][0] + '">生物安全：' + BIO[m.id][1] + "</span></div>" +
+        bad.map(function (a) { return '<div class="alert bad">' + a[1] + "</div>"; }).join("") + "</a>";
+    }).join("");
+    var A = res.A, B = res.B, C = res.C;
+    var v = "衔接进苗每年测 " + nf(B.perYearPigs) + " 头，全进全出 " + nf(A.perYearPigs) + " 头：衔接进苗省掉了每个周期里测定站等猪长大的 " + p.n + " 天。全进全出每批从 " + nf(A.entries * (1 - p.l)) +
+      " 头里挑 " + nf(A.tested) + " 头（入选 " + pct(A.sel) + "），选择强度最高。分组滚动按 " + C.ro.I + " 天一批、" + C.ro.G + " 组测定站轮转，每年测 " + nf(C.perYearPigs) + " 头，测定位利用率 " + pct(C.seatUtil) +
+      "，适合周批次生产的种猪场，但保育阶段同时有几批猪，生物安全最弱。点卡片进入对应方案。";
+    return '<section class="card" aria-labelledby="h-compare"><h2 id="h-compare">三种对比</h2><p class="sub">同一套参数下的三种方案。▲ 表示该项最好。</p><div class="modes">' + cards + '</div><p class="verdict">' + v + "</p></section>";
+  }
+
+  // ---------------------------------------------------------------- wiring
+  var current = null;
+  function renderAll(fromInput) {
+    var p = read();
+    el("d-ct").textContent = nf(p.ct);
+    el("rule-help").textContent = p.rule === "now" ? "保育舍洗消完就进下一批，猪在保育阶段等测定站，上测时更大。" : "从测定站可进猪的日子倒推保育天数进苗，猪按计划体重上测。";
+    el("row-batch").hidden = p.dir !== "batch";
+    Array.prototype.forEach.call(document.querySelectorAll("[data-for]"), function (s) { s.hidden = state.tab !== "X" && s.getAttribute("data-for") !== state.tab; });
+    Array.prototype.forEach.call(document.querySelectorAll("nav.tabbar a"), function (a) {
+      if (a.getAttribute("data-tab") === state.tab) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    });
+    var main = el("main");
+    if (state.tab === "X") {
+      var res = {}; MODES.forEach(function (m) { res[m.id] = evaluate(m.id, p); });
+      main.innerHTML = comparePage(res, p);
+      current = null;
+    } else {
+      var r = evaluate(state.tab, p);
+      main.innerHTML = schemePage(r, p);
+      var w = Math.max(720, el("gantt").clientWidth || 720);
+      el("gantt").innerHTML = ganttSVG(r, p, w);
+      el("stock").innerHTML = stockSVG(r, p, Math.max(720, el("stock").clientWidth || 720));
+      current = r;
+      Array.prototype.forEach.call(main.querySelectorAll("[data-view]"), function (b) {
+        b.addEventListener("click", function () { state.view = b.getAttribute("data-view"); renderAll(false); });
+      });
+      el("btn-copy").addEventListener("click", copyTable);
+    }
+    if (fromInput) save(p);
+  }
+  function copyTable() {
+    var sch = scheduleRows(current);
+    var text = [sch.head.join("\t")].concat(sch.rows.map(function (r) { return r.join("\t"); })).join("\n"), tt = el("toast");
+    function done(msg) { tt.textContent = msg; setTimeout(function () { tt.textContent = ""; }, 2500); }
+    function fallback() { var ta = el("copybuf"); ta.value = text; ta.select(); try { document.execCommand("copy"); done("已复制，粘贴到 Excel 即可"); } catch (e) { done("请手动选择表格复制"); } }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { done("已复制，粘贴到 Excel 即可"); }, fallback); else fallback();
+  }
+  function fromHash() {
+    var h = (location.hash || "").replace("#", "");
+    var m = MODES.filter(function (x) { return x.hash === h; })[0];
+    state.tab = h === "compare" ? "X" : m ? m.id : "A";
+    renderAll(false);
+  }
+  Array.prototype.forEach.call(document.querySelectorAll("aside input, aside select"), function (e) {
+    e.addEventListener("input", function () { renderAll(true); });
+    e.addEventListener("change", function () { renderAll(true); });
+  });
+  el("btn-reset").addEventListener("click", function () { write(DEFAULTS); renderAll(true); });
+  window.addEventListener("hashchange", fromHash);
+  var rt; window.addEventListener("resize", function () { clearTimeout(rt); rt = setTimeout(function () { renderAll(false); }, 150); });
+  var saved = load();
+  if (saved) { var merged = {}; Object.keys(DEFAULTS).forEach(function (k) { merged[k] = saved[k] !== undefined ? saved[k] : DEFAULTS[k]; }); write(merged); }
+  fromHash();
+})();
+</script>
+</body>
+</html>

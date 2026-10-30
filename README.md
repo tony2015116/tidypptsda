@@ -35,6 +35,9 @@ Documentation (in Chinese):
 [快速入门](https://tony2015116.github.io/tidypptsda/articles/tidypptsda-zh.html);
 all articles by topic (data, methods, results, validation) are in the
 [article index](https://tony2015116.github.io/tidypptsda/articles/index.html).
+To plan pig entries into the testing stations (all-in/all-out, back-scheduled
+or weekly-batch rolling groups), use the
+[planner](https://tony2015116.github.io/tidypptsda/planner.html).
 
 ## Installation
 

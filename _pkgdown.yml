@@ -9,15 +9,18 @@ template:
 navbar:
   bg: light
   structure:
-    left:  [getstarted, reference, articles, cheatsheet, news]
+    left:  [getstarted, reference, articles, planner, cheatsheet, news]
     right: [github, lightswitch]
 
   components:
     getstarted:
       text: Get started
       href: articles/get-started.html
+    planner:
+      text: Planner
+      href: planner.html
     cheatsheet:
-      text: 速查表 / Cheatsheet
+      text: Cheatsheet
       menu:
       - text: 中文
         href: cheatsheet.html
