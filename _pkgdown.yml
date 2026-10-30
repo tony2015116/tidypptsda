@@ -82,17 +82,40 @@ reference:
   - fire
 
 articles:
-- title: 中文文档
-  navbar: 中文文档
+- title: 入门
+  navbar: 入门
+  desc: 从原始数据到料肉比的完整流程，以及这个包的设计思路。
   contents:
   - tidypptsda-zh
   - design-zh
+- title: 数据与参数
+  navbar: 数据与参数
+  desc: 读取测定站导出文件、自定义格式、加入品种、提高数据质量；全部质控参数。
+  contents:
+  - data-zh
   - qc-parameters-zh
+- title: 计算方法
+  navbar: 计算方法
+  desc: 每一步用的方法和出处；日体重和日采食的填充，附逐步动画。
+  contents:
   - methods-zh
   - fill-zh
-  - validation-zh
-  - validation-guide-zh
+- title: 结果
+  navbar: 结果
+  desc: 每张输出表和每一列的含义；作图、导出 csv、HTML 报告。
+  contents:
   - output-zh
+- title: 方法验证
+  navbar: 方法验证
+  desc: 在自己的数据上比较方法和参数：每个参数怎么设，以及示例数据上的结果。
+  contents:
+  - validation-guide-zh
+  - validation-zh
+- title: 运行
+  navbar: 运行
+  desc: 运行提示怎么看、并行计算和耗时。
+  contents:
+  - run-zh
 - title: internal
   contents:
   - get-started

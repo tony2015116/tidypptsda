@@ -1,8 +1,8 @@
 ---
-title: "中文使用说明"
+title: "快速入门"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{中文使用说明}
+  %\VignetteIndexEntry{快速入门}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -12,7 +12,7 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 9,
                       fig.height = 6, out.width = "100%")
 ```
 
-tidypptsda 用于处理种猪性能测定站（NEDAP、FIRE）导出的访问记录，计算日增重（ADG）、日采食量（ADFI）和料肉比（FCR）。本说明按实际分析的顺序介绍每一步：做什么、输出什么，以及结果怎么读。常用函数和参数都汇总在一页[速查表](../cheatsheet.html)上，可以打印出来放在手边；这个包为什么这样设计，见《设计思路》。
+tidypptsda 用于处理种猪性能测定站（NEDAP、FIRE）导出的访问记录，计算日增重（ADG）、日采食量（ADFI）和料肉比（FCR）。本文按实际分析的顺序介绍每一步：做什么、输出什么，以及结果怎么读；每个主题的细节见文末列出的各篇文档。常用函数和参数都汇总在一页[速查表](../cheatsheet.html)上，可以打印出来放在手边；这个包为什么这样设计，见[《设计思路》](design-zh.html)。
 
 ```{r setup, message = FALSE}
 library(tidypptsda)
@@ -35,116 +35,21 @@ library(tidypptsda)
 | 9 | `write_results()` | 把全部结果表导出为 csv |
 | 10 | `write_report()` | 生成 HTML 报告：每个测定站一页，可以像翻书一样浏览 |
 
-每一步的方法和出处见《计算方法说明》。不需要中间结果时，用 `run_pipeline()` 一次跑完：
+每一步的方法和出处见[《计算方法说明》](methods-zh.html)。不需要中间结果时，用 `run_pipeline()` 一次跑完：
 
 ```{r pipeline}
 res <- run_pipeline(nedap, verbose = 0)
 res
 ```
 
-## 2. 数据要求
-
-### 读取文件：`read_station()`
-
-`read_station()` 读取测定站导出的文件（CSV、TXT 或 Excel，一个、多个或整个文件夹），把各列对应到**标准字段**，统一类型和单位后合并成一张表，直接交给 `prep_visits()`：
+## 2. 读入数据
 
 ```{r read, eval = FALSE}
-raw <- read_station("D:/测定站导出/2024批次")                  # 文件夹下所有 csv/txt/xlsx
-raw <- read_station(c("101.csv", "102.csv"), station = "fire")
+raw <- read_station("D:/测定站导出/2024批次")      # 文件夹下所有 csv/txt/xlsx
 visits <- prep_visits(raw)
 ```
 
-- `station` 取 `"nedap"` 或 `"fire"`，决定用哪一套标准字段和后续处理方式；不写时按列名自动判断。
-- CSV、TXT 用 `data.table::fread()` 读取，分隔符（逗号、制表符、分号）自动识别；Excel 需要安装 readxl 包。
-- 耳标号一律按文本读入，前导零不会丢失。
-- 输出的列名、类型和单位对两种测定站都一样：时间为 POSIXct（按钟点时间存为 UTC），停留时长为秒，体重为 kg，采食量、料槽重和下料量为 g。原始文件中没有对应到标准字段的列不会保留。
-
-### 标准字段
-
-| 字段 | 含义 | 单位 | NEDAP | FIRE |
-|---|---|---|---|---|
-| `responder` | 耳标号 | 文本 | 必需 | 必需 |
-| `location` | 站号 | 文本 | 必需 | 必需 |
-| `entry_time` | 进站时间 | 时间 | 必需 | 必需 |
-| `exit_time` | 离站时间 | 时间 | 可选 | 必需 |
-| `duration` | 停留时长 | 秒 | 必需* | — |
-| `feed_intake` | 本次采食量 | g | 必需 | 必需 |
-| `weight` | 体重 | kg | 必需 | 必需 |
-| `trough_in`、`trough_out` | 进站、离站料槽重 | g | — | 必需 |
-| `topup` | 本次下料量 | g | — | 可选 |
-| `breed` | 品种 | 文本 | 可选 | 可选 |
-
-\* NEDAP 需要 `duration` 或 `exit_time` 二者之一。FIRE 由进站、离站时间计算停留时长，离站早于进站时视为跨零点访问。
-
-### 内置格式
-
-包里内置了两种测定站常见导出格式的对应关系，一般不需要任何设置：
-
-```{r formats}
-station_format("nedap")
-station_format("fire")
-```
-
-- NEDAP：`responder`、`location`、`visit_time`、`duration`、`weight`（g，按数值大小自动判断 g 或 kg）、`feed_intake`（g）。
-- FIRE：`Tag`、`Location`、`Date` + `Entry`/`Exit`、`Ent Wt`、`Ext Wt`、`Consumed`、`Weight`（kg），`Topup Amount` 可选。
-
-包内自带的示例数据 `nedap` 和 `fire` 是这两种原始导出格式，`prep_visits()` 会用同一套内置格式把它们转成标准字段，所以示例数据和自己读入的文件走的是同一条处理路径。
-
-### 自定义格式文件
-
-导出软件版本不同、表头是中文，或者换了一家设备时，把对应关系写成一个制表符分隔的格式文件即可。先导出内置格式作为模板，再按自己的导出修改：
-
-```{r format-template, eval = FALSE}
-station_format("fire", file = "fire_format.txt")
-```
-
-```
-field        column      unit
-responder    耳标号      -
-location     站号        -
-entry_time   日期,进站   -
-exit_time    日期,出站   -
-trough_in    进站料重    kg
-trough_out   出站料重    kg
-feed_intake  采食量      kg
-weight       体重        kg
-```
-
-```{r format-use, eval = FALSE}
-raw <- read_station("D:/测定站导出/2024批次", station = "fire",
-                    format = "fire_format.txt")
-```
-
-- `column` 写列名，也可以写列号（如 `6`）。**优先写列名**：导出软件增加一列后，按列号对应会整体错位而且不报错，算出的结果是错的。
-- 同一字段有几种可能的列名时用 `|` 分隔（如 `Tag|耳标号`），按顺序取第一个找到的。
-- 日期和钟点时间分在两列时，用 `,` 连接（如 `日期,进站`），读取时合并为一列。
-- `unit`：质量类字段写 `kg`、`g` 或 `auto`；停留时长写 `s` 或 `min`；时间字段写 `-`（自动识别 `年-月-日 时:分:秒` 和 `年/月/日 时:分:秒`），或写 `strptime()` 格式，如 `%d/%m/%Y %H:%M`。
-- 以 `#` 开头的行是注释；`-` 或空白表示导出中没有这个字段（只适用于可选字段）。
-- 字段名写错、缺少必需字段、单位不认识、列找不到、数值或时间读不出来时，都会报错并指出是哪个字段、哪个文件。
-- 已经在 R 里的原始数据（例如从数据库读出的表）也可以用同样的格式：`prep_visits(data, station = "fire", format = "fire_format.txt")`。
-
-### 添加品种信息
-
-测定站导出的数据一般不含品种，耳标号前缀也不一定能对应品种，所以需要你**手动准备一张品种表**（每头猪一行：耳标号、品种），再合并进访问表：
-
-```{r breed}
-visits_b <- prep_visits(nedap, verbose = 0)
-pigs <- unique(visits_b[identified == TRUE, responder])
-# 实际使用时从种猪档案读取，例如 breeds <- read.csv("品种表.csv")
-breeds <- data.frame(responder = pigs, breed = rep(c("YY", "LL"), length.out = length(pigs)))
-visits_b <- add_breed(visits_b, breeds)
-```
-
-- 品种表的列名不同时，用 `id = "耳标列名", breed = "品种列名"` 指定。
-- 品种表里找不到的猪会给出警告，这些猪的品种记为 NA。
-
-有了品种列以后：
-
-- 日采食校正模型会把品种作为固定效应；
-- `fiv_max_by_weight` 可以按品种设定单次采食上限；
-- 料肉比汇总表 `fcr$summary` 会按品种分组。
-
-`run_pipeline()` 也可以直接传入品种表：`run_pipeline(nedap, breeds = breeds)`。
+`station` 取 `"nedap"` 或 `"fire"`，不写时按列名自动判断。导出格式不同、表头是中文、需要加入品种时，见[《数据准备》](data-zh.html)。下面直接用包里的示例数据。
 
 ## 3. 质控参数：`qc_config()`
 
@@ -177,7 +82,7 @@ qc$stage_range
 
 ### 4.1 整理访问表
 
-FIRE 示例数据中的猪在 45–60 kg 才进站，因此这里按第 7 节的建议，以 60–120 kg 作为计算区间：
+FIRE 示例数据中的猪在 45–60 kg 才进站，因此按[《数据准备》](data-zh.html)中的建议，以 60–120 kg 作为计算区间：
 
 ```{r prep}
 qc_fire <- qc_config(stage_range = c(60, 120))
@@ -187,11 +92,7 @@ visits <- prep_visits(fire, qc = qc_fire, verbose = 1)
 - 体重和采食量的单位统一为 kg 和 g，时间统一为 UTC。
 - 未识别耳标的访问会**保留**，并标记为 `identified = FALSE`：计算前后两次访问的料重差、时间差时需要用到它们。
 - FIRE 跨零点的访问会自动修正离站时间；体重为 0 的记录视为缺失。
-- 一头猪出现在多个站时（跑到别的栏、被放回、隔离后放错栏等），各站的记录都视为这头猪的真实数据，全部保留，也支持转回原站：
-  - 夹在另一站连续访问中间、不超过 2 次的零星访问视为读卡误读，转为未识别访问；
-  - 中间的空档（例如隔离治疗）不拆分个体，按缺失处理；最长无访问超过 `max_gap_days`（3 天），或转栏前后体重跳变超过 `max_jump_kg`（10 kg）时，`clean_weight()` 把猪标为低可信度。
-
-  每头猪的处理结果可以用 `attr(visits, "stations")` 查看。
+- 一头猪出现在多个站（跑栏、隔离后放错栏等）时，各站的记录都保留，详见[《数据准备》](data-zh.html)。
 
 ### 4.2 体重质控
 
@@ -210,7 +111,7 @@ head(w$per_pig[, .(responder, n_valid, test_days, missing_rate, status, reason)]
 
 每头猪进站后头 7 天是**适应期**（`adapt_days = 7`），这几天的体重不参与分析（`qc_flag = "adaptation"`）。适应期的采食照常统计：如果这几天已经落在分析区间内（例如 45 kg 进站、区间 30–120 kg），计入 ADFI 和 FCR；如果猪还没到区间下限，则不计入。
 
-异常值检测之前，会先从测定末期往回**逐日追踪**每头猪的体重。测定站只有四条腿都站上秤才称重，读数偏轻的情况很少；进站初期猪小，常有几头猪同时挤进测定站，读数偏重。末期猪大、只容得下一头，读数最可靠，所以从末期开始往前推，只保留与预测体重衔接的读数（`qc_flag = "track"`）。追踪之后，再用二次稳健回归（rlm，bisquare 权重 < 0.5）和 LOESS 平滑曲线（偏离超过 3 倍稳健标准差）找出零散的异常读数。追踪剔除超过 40% 记录的猪降级为 `low_confidence`（可能是称重异常，如体重传感器故障）；有效体重对 LOESS 平滑曲线的 R² 低于 0.99 的猪也降级。详见《质控参数详解》。
+异常值检测之前，会先从测定末期往回**逐日追踪**每头猪的体重。测定站只有四条腿都站上秤才称重，读数偏轻的情况很少；进站初期猪小，常有几头猪同时挤进测定站，读数偏重。末期猪大、只容得下一头，读数最可靠，所以从末期开始往前推，只保留与预测体重衔接的读数（`qc_flag = "track"`）。追踪之后，再用二次稳健回归（rlm，bisquare 权重 < 0.5）和 LOESS 平滑曲线（偏离超过 3 倍稳健标准差）找出零散的异常读数。追踪剔除超过 40% 记录的猪降级为 `low_confidence`（可能是称重异常，如体重传感器故障）；有效体重对 LOESS 平滑曲线的 R² 低于 0.99 的猪也降级。详见[《质控参数详解》](qc-parameters-zh.html)。
 
 ### 4.3 日增重
 
@@ -244,7 +145,7 @@ table(adfi$daily[in_stage == TRUE, state])
 日采食量的校正分两步：
 
 1. **校正**：对每头猪的每一天，先求"无错误访问的采食量之和" Y，再用混合模型扣除错误项的影响（Jiao 等，2014）。没有错误的日子保持原值不变。
-2. **填充**：只在与 ADG 相同的体重区间内进行。两个有记录的日子之间，连续缺失不超过 3 天的用 LOESS 平滑插补；超过 3 天的、以及区间开头缺失的日子，用全群（有品种时按品种）的"日采食 ~ 体重"曲线乘以这头猪自己的采食水平：曲线提供采食随体重变化的形状，个体比例保留这头猪吃得多还是少。区间末端缺失的日子，用这头猪自己的"日采食 ~ 体重"线性回归。每个位置用什么方法、由哪个参数控制，见《填充方法》中的逐步演示。体重用的是上一步补齐后的日体重。`qc_config(impute_method = "loess_lm")` 改用每头猪自己的"日采食 ~ 体重"线性回归；`"linear"` 时，中间改用线性插值。
+2. **填充**：只在与 ADG 相同的体重区间内进行。两个有记录的日子之间，连续缺失不超过 3 天的用 LOESS 平滑插补；超过 3 天的、以及区间开头缺失的日子，用全群（有品种时按品种）的"日采食 ~ 体重"曲线乘以这头猪自己的采食水平：曲线提供采食随体重变化的形状，个体比例保留这头猪吃得多还是少。区间末端缺失的日子，用这头猪自己的"日采食 ~ 体重"线性回归。每个位置用什么方法、由哪个参数控制，见[《填充方法》](fill-zh.html)中的逐步演示。体重用的是上一步补齐后的日体重。`qc_config(impute_method = "loess_lm")` 改用每头猪自己的"日采食 ~ 体重"线性回归；`"linear"` 时，中间改用线性插值。
 
 `state` 列标明每一天的来源：
 
@@ -284,158 +185,36 @@ head(fcr$by_bin[, .(responder, weight_from, weight_to, feed_kg = round(feed_kg, 
                     gain_kg = round(gain_kg, 1), fcr = round(fcr, 2), weight_coverage_kg = round(weight_coverage_kg, 1))])
 ```
 
-## 5. 作图与保存
+## 5. 出图、导出与报告
 
 ```{r plots}
 g <- plot_adg(adg, weight = w, responders = c("35853", "35855", "35877"))
 g$plot[[1]]
 ```
 
-```{r plot-adfi}
-h <- plot_adfi(adfi, responders = c("35853", "35855", "35877"))
-h$plot[[1]]
+```{r outputs, eval = FALSE}
+save_plots(g, path = "结果/生长曲线", suffix = "growth")   # 每个测定站一张图
+write_results(res, dir = "结果", farm = "A01")            # 全部结果表导出为 csv
+write_report(res, path = "结果/报告")                     # HTML 报告，每个站一页
 ```
 
-### 生长曲线图怎么看
+图怎么看、每张表每一列的含义、HTML 报告怎么用，见[《结果、图表与报告》](output-zh.html)。猪多时可以用 `cores` 并行，见[《运行提示、并行与速度》](run-zh.html)。
 
-每个测定站一张图，每头猪一个分面：
+## 6. 下一步
 
-| 图中元素 | 图例 | 含义 |
-|---|---|---|
-| 浅灰色小点 | weight record | 有效的原始体重记录（传入 `weight = w` 时才画） |
-| 深灰色小叉 | outlier | 被剔除的原始记录：适应期、超出体重范围、追踪剔除、rlm 或 LOESS 判为异常，原因见 `w$records$qc_flag` |
-| 蓝色点 | daily weight (observed) | 实测日体重：当天有效记录的中位数 |
-| 橙黄色点 | daily weight (interpolated) | 两个有记录的日子之间缺失的日子，线性插值 |
-| 紫红色点 | daily weight (growth curve) | 首个有记录日之前、末个有记录日之后缺失的日子，用生长曲线填充 |
-| 绿色实线和浅绿色带 | growth curve | 生长曲线及其约 95% 范围（±1.96 倍残差标准差） |
-| 黑色长虚线 | ADG regression line | 区间内全部日体重（蓝、橙黄、紫红点）对日期的回归线，斜率就是 ADG |
-| 灰色水平虚线 | — | 分析区间的上下限（`stage_range`） |
-
-左上角的文字是日增重、回归 R²、`adg_type`，以及区间从下限长到上限用了多少天。看图时重点看：紫红色点多（区间两端靠曲线填充）、橙黄色点成段出现（中间长时间缺记录）、深灰色叉成片出现（追踪剔除较多，可能是几头猪同时上秤或秤的问题）。
-
-### 采食量图怎么看
-
-只画区间内的日子：
-
-| 图中元素 | 图例 | 含义 |
-|---|---|---|
-| 浅灰色点 | recorded | 记录的日采食量（全部访问相加，未校正） |
-| 蓝色点 | error-free | 当天没有错误访问，直接使用记录值（`state = "org"`） |
-| 橙色点 | corrected | 当天有错误访问，用混合模型校正后的值（`corr`） |
-| 绿色点 | filled (between records) | 两个有记录的日子之间缺失：≤ 3 天 LOESS，> 3 天用群体曲线 × 个体比例（`iii`） |
-| 紫红色点 | filled (stage ends) | 区间两端缺失：开头用群体曲线 × 个体比例，末端用单猪回归（`elrp`） |
-| 细灰线 | — | 把最终使用的日采食量（彩色点）按日期连起来 |
-| 灰色水平虚线 | — | 这头猪的 ADFI（区间内日采食量的平均值） |
-
-左上角的文字是 ADFI，以及区间内有实测（含校正）采食的天数比例。灰色点和彩色点离得远的日子，说明当天的错误访问多、校正幅度大；紫红色点连成一长段，说明进站晚或出栏早，ADFI 有一部分是推算的。
-
-### 保存图片
-
-每个测定站输出一张图，每头猪一个分面。保存为图片：
-
-```{r save, eval = FALSE}
-save_plots(g, path = "结果/生长曲线", prefix = "站", suffix = "growth", device = "png")
-```
-
-保存图片的时间几乎都花在 ggplot2 绘图上：每个测定站（15 头猪左右）约 1–1.5 秒，与图片格式关系不大。测定站多时可以：
-
-- 用 `cores` 并行保存，例如 `save_plots(g, path = "结果", cores = 4)`，耗时大致按核心数缩短；
-- 只在屏幕上查看时，用 `dpi = 150`，约快 20%，文件大小约为原来的 1/4；
-- 用 `locations` 或 `responders` 只画需要核查的测定站或猪。
-
-## 6. 导出结果与并行计算
-
-### 导出为 csv
-
-```{r export, eval = FALSE}
-res <- run_pipeline(fire, qc = qc_config(stage_range = c(60, 120)))
-write_results(res, dir = "结果", farm = "A01")
-```
-
-文件按"场名_内容_日期.csv"命名，例如 `A01_fcr_20261022.csv`。全部文件如下：
-
-| 文件 | 内容 |
+| 想做什么 | 看哪篇 |
 |---|---|
-| `fcr` | 每头猪的 ADG、ADFI、FCR 和可信度标记 |
-| `by_bin` | 每个体重段的采食、增重和分段料肉比 |
-| `daily_feed` | 每天的采食量（原始、校正、插补） |
-| `daily_weight` | 每天的体重（实测、填充和生长曲线） |
-| `weight_pigs` | 每头猪的体重质控结果 |
-| `feed_model` | 采食校正模型的系数 |
-| `summary` | 性状汇总统计 |
-| `removed` | 被剔除的猪及原因 |
-| `settings` | 本次使用的质控参数 |
+| 读入自己的数据、加入品种、提高数据质量 | [《数据准备》](data-zh.html) |
+| 调整阈值和方法 | [《质控参数详解》](qc-parameters-zh.html) |
+| 了解每一步的方法和出处 | [《计算方法说明》](methods-zh.html)、[《填充方法》](fill-zh.html) |
+| 看懂结果、出图、导出、生成报告 | [《结果、图表与报告》](output-zh.html) |
+| 在自己的数据上比较方法和参数 | [《验证函数使用指南》](validation-guide-zh.html)、[《方法验证》](validation-zh.html) |
+| 加速、看懂运行提示 | [《运行提示、并行与速度》](run-zh.html) |
+| 这个包为什么这样设计 | [《设计思路》](design-zh.html) |
 
-文件带有 UTF-8 BOM，用 Excel 直接打开时中文不会乱码。
+在育种评估中，建议**优先使用 `fcr_flag = "ok"` 的个体**；低可信度的个体可以单独核查，或在模型中加以区分。
 
-### 生成 HTML 报告
-
-`write_report()` 把结果写成一个文件夹（`index.html` 和图片目录 `img/`），用浏览器打开 `index.html` 即可，不需要联网：
-
-```{r report, eval = FALSE}
-res <- run_pipeline(nedap)
-write_report(res, path = "结果/报告", cores = 4)
-```
-
-- 第一页是总览：猪数，ADG、ADFI、FCR 的均值 ± 标准差，所用的质控设置，**需要核查的猪**（低可信度或被剔除，附原因），以及各测定站的汇总表；
-- 之后每个测定站一页：生长曲线图、采食图，以及该站每头猪的 ADG、ADFI、FCR、状态和原因；
-- 用键盘左右方向键（或 Page Up / Page Down）翻页，`Home` 回到总览，`End` 到最后一个站；左侧的站名列表可以直接跳转，有需要核查的猪的站带黄色数字；
-- 在右上角输入耳号、按回车，会跳到这头猪所在的站，并高亮它的那一行；
-- 用浏览器打印（例如另存为 PDF）时，每个站各占一页。
-
-整个文件夹可以直接拷贝或压缩后发给别人。图片默认 `dpi = 150`；用 `locations` 可以只生成部分测定站。
-
-### 并行计算
-
-猪的头数很多时，逐头猪拟合曲线是最耗时的步骤。`clean_weight()`、`calc_adg()`、`calc_adfi()` 和 `run_pipeline()` 都有 `cores` 参数：
-
-```{r cores, eval = FALSE}
-res <- run_pipeline(nedap, cores = 4)          # 用 4 个 CPU 核心
-parallel::detectCores()                         # 查看电脑有几个核心
-```
-
-并行使用 R 自带的 parallel 包，不增加依赖，结果与 `cores = 1` 完全相同。几十头猪时并行没有必要；上千头猪时才有明显的加速效果。在 Windows 上，并行要求本包是正式安装的（而不是用 `devtools::load_all()` 临时加载）。
-
-### 运行提示与耗时
-
-所有提示都用 cli 的样式在当时显示，`verbose` 控制显示多少：`0` 不显示，`1`（默认）显示汇总，`2` 显示细节。
-
-`run_pipeline()` 的每一步带编号和耗时（例如 `[2/6] Cleaning body weight` … `✔ … 1.2s`）；各项数量右对齐并给出比例，`└` 表示上一项中的一部分；为 0 的项只在 `verbose = 2` 时显示，有记录或猪被删掉的项标成黄色。最后的汇总框列出猪数、ADG / ADFI / FCR 的均值 ± 标准差和需要核查的猪（最多 5 头，其余见 `$fcr$per_pig` 和 `$removed`）；打印结果（`res`）时也显示这个汇总框。需要注意的情况（例如部分猪没有达到区间终点）以黄色 `!` 开头的提示给出，不再作为 R 的"警告信息"攒到最后才打印；相应的猪和原因同时记录在结果的 `$removed` 或 `adg_type`、`fcr_note` 等列中，`verbose = 0` 时也不会丢失。
-
-逐头猪拟合的步骤（`clean_weight()`、`calc_adg()`、`calc_adfi()` 的插补）和 `save_plots()` 超过 2 秒时会显示进度条，`cores > 1` 并行时也会显示。在约 1650 头猪、175 万条访问记录的模拟数据上，整个流程约 45 秒（单核）：
-
-| 步骤 | 耗时 |
-|---|---|
-| `prep_visits()` | 约 4 秒 |
-| `clean_weight()` | 约 18 秒 |
-| `calc_adg()` | 约 12 秒 |
-| `flag_feed_errors()` | 约 2 秒 |
-| `calc_adfi()` | 约 9 秒 |
-| `calc_fcr()` | < 1 秒 |
-
-### 方法验证
-
-想知道哪种异常值检测方法、生长曲线、体重填充或采食插补方法更适合自己的数据，可以用 `validate_outliers()`、`validate_adg()`、`validate_weight_fill()` 和 `validate_adfi()` 在本批次数据上检验，详见《方法验证》。
-
-## 7. 结果怎么用
-
-每张输出表、每一列的含义见《输出结果说明》。
-
-- **最终结果**：`fcr$per_pig`，包含每头猪的 ADG、ADFI、FCR 及可信度标记。
-- **被剔除的猪及原因**：`fcr$removed`，或 `run_pipeline()` 结果中的 `$removed`。
-- 在育种评估中，建议**优先使用 `fcr_flag = "ok"` 的个体**。低可信度的个体可以单独核查，或在模型中加以区分。
-
-## 8. 提高数据质量的建议
-
-以下是根据示例数据和缺失模拟得到的经验：
-
-1. **进站要早于区间起点 5–10 kg**。进站后头 1–2 周的数据最差：在 nedap 示例数据中，前3 天的体重异常率高达 50%。若从 30 kg 开始计算，宜在 20–25 kg 进站。
-2. **出栏要晚于区间终点**。区间终点为 120 kg 时，宜在 125 kg 以上出栏；若只能在 115 kg左右出栏，就把 `stage_range` 设为 `c(30, 110)`。
-3. **进站较晚的批次，改用实际覆盖的体重段**。例如 FIRE 示例数据中的猪 45–60 kg 才进站，应使用 `stage_range = c(60, 120)`，而不是依靠外推补齐 30–60 kg。
-4. **避免连续多天缺数据**。区间中间的随机缺失影响很小，而连续一周以上的缺失会明显降低结果的排名准确性。每 1–2 天检查一次没有访问记录的猪和测定站。
-5. **定期校准设备，核对耳标**。每周校准料槽和体重秤，转栏时记录日期和站号。
-
-## 9. 常见问题
+## 7. 常见问题
 
 **问：为什么 ADFI 比实测记录的平均值低？**答：ADFI 是整个体重区间内的平均值，包括体重较小、采食较少的前期；实测记录可能只覆盖了体重较大的后期。
 

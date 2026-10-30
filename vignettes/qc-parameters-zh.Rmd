@@ -16,7 +16,7 @@ library(tidypptsda)
 library(data.table)
 ```
 
-tidypptsda 把整个分析流程中的全部阈值都集中在 `qc_config()` 返回的一个对象里。各分析函数通过 `qc` 参数接收这个对象，结果中的 `$settings` 也会原样保存这份设置，方便复现。本文逐一说明全部 43 个参数；每一步用的是什么方法、方法出自哪里，见《计算方法说明》。
+tidypptsda 把整个分析流程中的全部阈值都集中在 `qc_config()` 返回的一个对象里。各分析函数通过 `qc` 参数接收这个对象，结果中的 `$settings` 也会原样保存这份设置，方便复现。本文逐一说明全部 43 个参数；每一步用的是什么方法、方法出自哪里，见[《计算方法说明》](methods-zh.html)。
 
 ## 1. 基本用法
 
@@ -148,7 +148,7 @@ rbindlist(lapply(c(0.3, 0.5, 0.7), function(k) {
 **调整建议**
 
 - 测定站的称量下限较高，或者小猪数据不可靠时，把 `weight_range` 的下限调高，例如 `c(20, 150)`。
-- 各方法的检出率和误删率可以用 `validate_outliers()` 在自己的数据上比较，见《方法验证》。
+- 各方法的检出率和误删率可以用 `validate_outliers()` 在自己的数据上比较，见[《方法验证》](validation-zh.html)。
 
 ## 5. 个体判定参数
 
@@ -197,11 +197,11 @@ summary(w_n$per_pig$r2)
 2. **把区间内每一天的体重补齐**：有有效体重的日子用当天中位数（`source = "observed"`）；两个有记录的日子之间缺失的日子，用前后两天**线性插值**（`"interpolated"`）；首条记录之前、末条记录之后的日子，用**生长曲线**的值（`"curve"`）。结果在 `adg$daily$weight_filled`。
 3. **日增重** = 区间内全部日体重（实测 + 填充）对日期做直线回归的斜率（`adg`，g/d），可靠性看 `r_squared`。各来源的天数在 `n_observed_days`、`n_interpolated_days`、`n_curve_days` 中。
 
-**切线外推**：二次、三次曲线往记录范围外推几周时容易弯折，例如末期增重稍慢时，曲线外推后会提前"封顶"。切线外推时，记录范围内仍用原来的曲线，范围之外改为直线。在 457 头 NEDAP 猪的无泄露检验中（《方法验证》中的 `validate_truncation()`），开头用切线使 ADG 误差在开头缺 20 天时从 81 降到 66 g/d、FCR 排名相关从 0.82 升到 0.86；末端用切线虽然 ADG 也更准，但末端的采食是按外推的体重填充的，FCR 排名反而变差（结尾缺 30 天时，前 20% 一致率从 0.70 降到 0.44）。所以默认 `"start"`：只在首条记录之前用切线。示意图见《填充方法》。
+**切线外推**：二次、三次曲线往记录范围外推几周时容易弯折，例如末期增重稍慢时，曲线外推后会提前"封顶"。切线外推时，记录范围内仍用原来的曲线，范围之外改为直线。在 457 头 NEDAP 猪的无泄露检验中（[《方法验证》](validation-zh.html)中的 `validate_truncation()`），开头用切线使 ADG 误差在开头缺 20 天时从 81 降到 66 g/d、FCR 排名相关从 0.82 升到 0.86；末端用切线虽然 ADG 也更准，但末端的采食是按外推的体重填充的，FCR 排名反而变差（结尾缺 30 天时，前 20% 一致率从 0.70 降到 0.44）。所以默认 `"start"`：只在首条记录之前用切线。示意图见[《填充方法》](fill-zh.html)。
 
 `adg_curve` 是生长曲线在区间两端的体重差 ÷ 天数，只用来对照。`r_squared` 受体重跨度影响，只在同一批次、同一区间内比较才有意义。`gompertz` 用 `nls(SSgompertz)` 拟合，不收敛时自动改用二次曲线，实际使用的曲线记录在 `curve_used` 列中。
 
-哪种曲线填充两端更准，可以用 `validate_weight_fill()` 在自己的数据上比较（见《方法验证》）：
+哪种曲线填充两端更准，可以用 `validate_weight_fill()` 在自己的数据上比较（见[《方法验证》](validation-zh.html)）：
 
 ```{r curves}
 w_n <- clean_weight(prep_visits(nedap, verbose = 0), verbose = 0)
@@ -277,7 +277,7 @@ c(fixed_2000g = sum(fixed$fiv_hi), by_weight_raw_bw = sum(raw_bw$fiv_hi),
   by_weight_fitted_bw = sum(fit_bw$fiv_hi))
 ```
 
-按品种使用时，先用 `add_breed()` 把品种列加进访问表（见《中文使用说明》）。
+按品种使用时，先用 `add_breed()` 把品种列加进访问表（见[《快速入门》](tidypptsda-zh.html)）。
 
 ### 示例：`duration_max` 对 FIRE 错误率的影响
 
@@ -314,7 +314,7 @@ rbindlist(lapply(c(1800, 3600), function(d) {
 **调整建议**
 
 - 公猪后期日采食量可能超过 4 kg，`dfi_range` 的上限不宜低于 5 kg。
-- 三种插补方法在随机缺失时结果几乎相同，差别主要在区间开头和成段缺失：开头缺 20 天时，`loess_pop` 的 ADFI 误差比 `loess_lm` 小约三分之一（457 头猪的无泄露检验：7.5% → 4.9%）；末端两者相同。比较整条流程时请用 `validate_truncation()`；`validate_adfi()` 只看插补这一步（见《方法验证》）。
+- 三种插补方法在随机缺失时结果几乎相同，差别主要在区间开头和成段缺失：开头缺 20 天时，`loess_pop` 的 ADFI 误差比 `loess_lm` 小约三分之一（457 头猪的无泄露检验：7.5% → 4.9%）；末端两者相同。比较整条流程时请用 `validate_truncation()`；`validate_adfi()` 只看插补这一步（见[《方法验证》](validation-zh.html)）。
 - `loess_pop` 的群体曲线来自本批次的猪，批次里的猪太少（少于约 10 头）或体重跨度太窄时，曲线不可靠，可以改用 `loess_lm`。各曲线的猪数、天数和系数见 `adfi$pop_curve`。
 
 ## 9. 可信度参数

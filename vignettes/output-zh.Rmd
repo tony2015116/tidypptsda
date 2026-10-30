@@ -1,14 +1,15 @@
 ---
-title: "输出结果说明"
+title: "结果、图表与报告"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{输出结果说明}
+  %\VignetteIndexEntry{结果、图表与报告}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
 ```{r, include = FALSE}
-knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 9,
+                      fig.height = 6, out.width = "100%")
 options(width = 100)
 ```
 
@@ -18,7 +19,7 @@ library(data.table)
 res <- run_pipeline(nedap, verbose = 0)
 ```
 
-本文逐一说明 tidypptsda 输出的每一张表、每一列的含义。体重单位为 kg，日增重（ADG）和日采食量（ADFI、`dfi_*`）单位为 g/d，日期为 `Date` 类型。
+本文逐一说明 tidypptsda 输出的每一张表、每一列的含义，以及怎么出图、导出 csv 和生成 HTML 报告。体重单位为 kg，日增重（ADG）和日采食量（ADFI、`dfi_*`）单位为 g/d，日期为 `Date` 类型。
 
 ## 1. 结果的整体结构
 
@@ -222,20 +223,109 @@ res$weight$records[, .N, by = qc_flag]
 res$removed
 ```
 
-## 8. 导出文件
+## 8. 导出为 csv
 
-想直接浏览结果时，用 `write_report(res, path)` 生成 HTML 报告（每个测定站一页，见《使用说明》）。
+`write_results(res, dir, farm)` 把结果写成 csv：
 
-`write_results(res, dir, farm)` 把结果写成 csv（UTF-8 带 BOM，Excel 可以直接打开），文件名为"场名_内容_日期.csv"：
+```{r export, eval = FALSE}
+res <- run_pipeline(fire, qc = qc_config(stage_range = c(60, 120)))
+write_results(res, dir = "结果", farm = "A01")
+```
 
-| 文件 | 对应的表 |
-|---|---|
-| `fcr` | `res$fcr$per_pig` |
-| `by_bin` | `res$fcr$by_bin` |
-| `daily_feed` | `res$adfi$daily` |
-| `daily_weight` | `res$adg$daily` |
-| `weight_pigs` | `res$weight$per_pig` |
-| `feed_model` | `res$adfi$model` |
-| `summary` | `res$fcr$summary` |
-| `removed` | `res$removed` |
-| `settings` | 本次使用的全部质控参数，每个参数一行 |
+文件按"场名_内容_日期.csv"命名，例如 `A01_fcr_20261022.csv`。全部文件如下：
+
+| 文件 | 内容 | 对应的表 |
+|---|---|---|
+| `fcr` | 每头猪的 ADG、ADFI、FCR 和可信度标记 | `res$fcr$per_pig` |
+| `by_bin` | 每个体重段的采食、增重和分段料肉比 | `res$fcr$by_bin` |
+| `daily_feed` | 每天的采食量（原始、校正、插补） | `res$adfi$daily` |
+| `daily_weight` | 每天的体重（实测、填充和生长曲线） | `res$adg$daily` |
+| `weight_pigs` | 每头猪的体重质控结果 | `res$weight$per_pig` |
+| `feed_model` | 采食校正模型的系数 | `res$adfi$model` |
+| `summary` | 性状汇总统计 | `res$fcr$summary` |
+| `removed` | 被剔除的猪及原因 | `res$removed` |
+| `settings` | 本次使用的全部质控参数，每个参数一行 | — |
+
+文件带有 UTF-8 BOM，用 Excel 直接打开时中文不会乱码。
+
+## 9. 作图
+
+```{r plots}
+g <- plot_adg(res$adg, weight = res$weight, responders = c("13913", "13954", "15967"), verbose = 0)
+g$plot[[1]]
+```
+
+```{r plot-adfi}
+h <- plot_adfi(res$adfi, responders = c("13913", "13954", "15967"), verbose = 0)
+h$plot[[1]]
+```
+
+### 生长曲线图怎么看
+
+每个测定站一张图，每头猪一个分面：
+
+| 图中元素 | 图例 | 含义 |
+|---|---|---|
+| 浅灰色小点 | weight record | 有效的原始体重记录（传入 `weight = res$weight` 时才画） |
+| 深灰色小叉 | outlier | 被剔除的原始记录：适应期、超出体重范围、追踪剔除、rlm 或 LOESS 判为异常，原因见 `res$weight$records$qc_flag` |
+| 蓝色点 | daily weight (observed) | 实测日体重：当天有效记录的中位数 |
+| 橙黄色点 | daily weight (interpolated) | 两个有记录的日子之间缺失的日子，线性插值 |
+| 紫红色点 | daily weight (growth curve) | 首个有记录日之前、末个有记录日之后缺失的日子，用生长曲线填充 |
+| 绿色实线和浅绿色带 | growth curve | 生长曲线及其约 95% 范围（±1.96 倍残差标准差） |
+| 黑色长虚线 | ADG regression line | 区间内全部日体重（蓝、橙黄、紫红点）对日期的回归线，斜率就是 ADG |
+| 灰色水平虚线 | — | 分析区间的上下限（`stage_range`） |
+
+左上角的文字是日增重、回归 R²、`adg_type`，以及区间从下限长到上限用了多少天。看图时重点看：紫红色点多（区间两端靠曲线填充）、橙黄色点成段出现（中间长时间缺记录）、深灰色叉成片出现（追踪剔除较多，可能是几头猪同时上秤或秤的问题）。
+
+### 采食量图怎么看
+
+只画区间内的日子：
+
+| 图中元素 | 图例 | 含义 |
+|---|---|---|
+| 浅灰色点 | recorded | 记录的日采食量（全部访问相加，未校正） |
+| 蓝色点 | error-free | 当天没有错误访问，直接使用记录值（`state = "org"`） |
+| 橙色点 | corrected | 当天有错误访问，用混合模型校正后的值（`corr`） |
+| 绿色点 | filled (between records) | 两个有记录的日子之间缺失：≤ 3 天 LOESS，> 3 天用群体曲线 × 个体比例（`iii`） |
+| 紫红色点 | filled (stage ends) | 区间两端缺失：开头用群体曲线 × 个体比例，末端用单猪回归（`elrp`） |
+| 细灰线 | — | 把最终使用的日采食量（彩色点）按日期连起来 |
+| 灰色水平虚线 | — | 这头猪的 ADFI（区间内日采食量的平均值） |
+
+左上角的文字是 ADFI，以及区间内有实测（含校正）采食的天数比例。灰色点和彩色点离得远的日子，说明当天的错误访问多、校正幅度大；紫红色点连成一长段，说明进站晚或出栏早，ADFI 有一部分是推算的。
+
+### 保存图片
+
+每个测定站输出一张图，每头猪一个分面。保存为图片：
+
+```{r save, eval = FALSE}
+save_plots(g, path = "结果/生长曲线", prefix = "站", suffix = "growth", device = "png")
+```
+
+保存图片的时间几乎都花在 ggplot2 绘图上：每个测定站（15 头猪左右）约 1–1.5 秒，与图片格式关系不大。测定站多时可以：
+
+- 用 `cores` 并行保存，例如 `save_plots(g, path = "结果", cores = 4)`，耗时大致按核心数缩短；
+- 只在屏幕上查看时，用 `dpi = 150`，约快 20%，文件大小约为原来的 1/4；
+- 用 `locations` 或 `responders` 只画需要核查的测定站或猪。
+
+## 10. HTML 报告
+
+`write_report()` 把结果写成一个文件夹（`index.html` 和图片目录 `img/`），用浏览器打开 `index.html` 即可，不需要联网：
+
+```{r report, eval = FALSE}
+res <- run_pipeline(nedap)
+write_report(res, path = "结果/报告", cores = 4)
+```
+
+- 第一页是总览：猪数，ADG、ADFI、FCR 的均值 ± 标准差，所用的质控设置，**需要核查的猪**（低可信度或被剔除，附原因），以及各测定站的汇总表；
+- 之后每个测定站一页：生长曲线图、采食图，以及该站每头猪的 ADG、ADFI、FCR、状态和原因；
+- 用键盘左右方向键（或 Page Up / Page Down）翻页，`Home` 回到总览，`End` 到最后一个站；左侧的站名列表可以直接跳转，有需要核查的猪的站带黄色数字；
+- 在右上角输入耳号、按回车，会跳到这头猪所在的站，并高亮它的那一行；
+- 用浏览器打印（例如另存为 PDF）时，每个站各占一页。
+
+整个文件夹可以直接拷贝或压缩后发给别人。图片默认 `dpi = 150`；用 `locations` 可以只生成部分测定站。
+
+## 11. 结果怎么用
+
+- **最终结果**：`res$fcr$per_pig`，包含每头猪的 ADG、ADFI、FCR 及可信度标记。
+- **被剔除的猪及原因**：`res$removed`。
+- 在育种评估中，建议**优先使用 `fcr_flag = "ok"` 的个体**。低可信度的个体可以单独核查，或在模型中加以区分。

@@ -32,8 +32,9 @@ Cheatsheet:
 [English](https://tony2015116.github.io/tidypptsda/cheatsheet-en.html),
 [中文](https://tony2015116.github.io/tidypptsda/cheatsheet.html).
 Documentation (in Chinese):
-[中文使用说明](https://tony2015116.github.io/tidypptsda/articles/tidypptsda-zh.html),
-[设计思路](https://tony2015116.github.io/tidypptsda/articles/design-zh.html).
+[快速入门](https://tony2015116.github.io/tidypptsda/articles/tidypptsda-zh.html);
+all articles by topic (data, methods, results, validation) are in the
+[article index](https://tony2015116.github.io/tidypptsda/articles/index.html).
 
 ## Installation
 

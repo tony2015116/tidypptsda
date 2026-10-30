@@ -1,0 +1,149 @@
+---
+title: "数据准备：读取、格式与品种"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{数据准备：读取、格式与品种}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r setup, message = FALSE}
+library(tidypptsda)
+```
+
+分析的第一步是把测定站导出的文件变成一张标准的访问表。本文介绍怎么读取文件、各列怎么对应、换了设备或导出格式时怎么写格式文件、怎么加入品种，以及测定时怎样保证数据质量。分析的整体流程见[《快速入门》](tidypptsda-zh.html)。
+
+## 1. 读取文件：`read_station()`
+
+`read_station()` 读取测定站导出的文件（CSV、TXT 或 Excel，一个、多个或整个文件夹），把各列对应到**标准字段**，统一类型和单位后合并成一张表，直接交给 `prep_visits()`：
+
+```{r read, eval = FALSE}
+raw <- read_station("D:/测定站导出/2024批次")                  # 文件夹下所有 csv/txt/xlsx
+raw <- read_station(c("101.csv", "102.csv"), station = "fire")
+visits <- prep_visits(raw)
+```
+
+- `station` 取 `"nedap"` 或 `"fire"`，决定用哪一套标准字段和后续处理方式；不写时按列名自动判断。
+- CSV、TXT 用 `data.table::fread()` 读取，分隔符（逗号、制表符、分号）自动识别；Excel 需要安装 readxl 包。
+- 耳标号一律按文本读入，前导零不会丢失。
+- 输出的列名、类型和单位对两种测定站都一样：时间为 POSIXct（按钟点时间存为 UTC），停留时长为秒，体重为 kg，采食量、料槽重和下料量为 g。原始文件中没有对应到标准字段的列不会保留。
+
+## 2. 标准字段
+
+| 字段 | 含义 | 单位 | NEDAP | FIRE |
+|---|---|---|---|---|
+| `responder` | 耳标号 | 文本 | 必需 | 必需 |
+| `location` | 站号 | 文本 | 必需 | 必需 |
+| `entry_time` | 进站时间 | 时间 | 必需 | 必需 |
+| `exit_time` | 离站时间 | 时间 | 可选 | 必需 |
+| `duration` | 停留时长 | 秒 | 必需* | — |
+| `feed_intake` | 本次采食量 | g | 必需 | 必需 |
+| `weight` | 体重 | kg | 必需 | 必需 |
+| `trough_in`、`trough_out` | 进站、离站料槽重 | g | — | 必需 |
+| `topup` | 本次下料量 | g | — | 可选 |
+| `breed` | 品种 | 文本 | 可选 | 可选 |
+
+\* NEDAP 需要 `duration` 或 `exit_time` 二者之一。FIRE 由进站、离站时间计算停留时长，离站早于进站时视为跨零点访问。
+
+## 3. 内置格式
+
+包里内置了两种测定站常见导出格式的对应关系，一般不需要任何设置：
+
+```{r formats}
+station_format("nedap")
+station_format("fire")
+```
+
+- NEDAP：`responder`、`location`、`visit_time`、`duration`、`weight`（g，按数值大小自动判断 g 或 kg）、`feed_intake`（g）。
+- FIRE：`Tag`、`Location`、`Date` + `Entry`/`Exit`、`Ent Wt`、`Ext Wt`、`Consumed`、`Weight`（kg），`Topup Amount` 可选。
+
+包内自带的示例数据 `nedap` 和 `fire` 是这两种原始导出格式，`prep_visits()` 会用同一套内置格式把它们转成标准字段，所以示例数据和自己读入的文件走的是同一条处理路径。
+
+## 4. 自定义格式文件
+
+导出软件版本不同、表头是中文，或者换了一家设备时，把对应关系写成一个制表符分隔的格式文件即可。先导出内置格式作为模板，再按自己的导出修改：
+
+```{r format-template, eval = FALSE}
+station_format("fire", file = "fire_format.txt")
+```
+
+```
+field        column      unit
+responder    耳标号      -
+location     站号        -
+entry_time   日期,进站   -
+exit_time    日期,出站   -
+trough_in    进站料重    kg
+trough_out   出站料重    kg
+feed_intake  采食量      kg
+weight       体重        kg
+```
+
+```{r format-use, eval = FALSE}
+raw <- read_station("D:/测定站导出/2024批次", station = "fire",
+                    format = "fire_format.txt")
+```
+
+- `column` 写列名，也可以写列号（如 `6`）。**优先写列名**：导出软件增加一列后，按列号对应会整体错位而且不报错，算出的结果是错的。
+- 同一字段有几种可能的列名时用 `|` 分隔（如 `Tag|耳标号`），按顺序取第一个找到的。
+- 日期和钟点时间分在两列时，用 `,` 连接（如 `日期,进站`），读取时合并为一列。
+- `unit`：质量类字段写 `kg`、`g` 或 `auto`；停留时长写 `s` 或 `min`；时间字段写 `-`（自动识别 `年-月-日 时:分:秒` 和 `年/月/日 时:分:秒`），或写 `strptime()` 格式，如 `%d/%m/%Y %H:%M`。
+- 以 `#` 开头的行是注释；`-` 或空白表示导出中没有这个字段（只适用于可选字段）。
+- 字段名写错、缺少必需字段、单位不认识、列找不到、数值或时间读不出来时，都会报错并指出是哪个字段、哪个文件。
+- 已经在 R 里的原始数据（例如从数据库读出的表）也可以用同样的格式：`prep_visits(data, station = "fire", format = "fire_format.txt")`。
+
+## 5. 整理访问表：`prep_visits()`
+
+`prep_visits()` 把读入的数据（或示例数据 `nedap`、`fire`）整理为标准访问表，后面的每一步都从它开始：
+
+```{r prep}
+visits <- prep_visits(fire, verbose = 1)
+```
+
+- 体重和采食量的单位统一为 kg 和 g，时间统一为 UTC。
+- 未识别耳标的访问会**保留**，并标记为 `identified = FALSE`：计算前后两次访问的料重差、时间差时需要用到它们。
+- FIRE 跨零点的访问会自动修正离站时间；体重为 0 的记录视为缺失。
+- 一头猪出现在多个站时（跑到别的栏、被放回、隔离后放错栏等），各站的记录都视为这头猪的真实数据，全部保留，也支持转回原站：
+  - 夹在另一站连续访问中间、不超过 2 次的零星访问视为读卡误读，转为未识别访问；
+  - 中间的空档（例如隔离治疗）不拆分个体，按缺失处理；最长无访问超过 `max_gap_days`（3 天），或转栏前后体重跳变超过 `max_jump_kg`（10 kg）时，`clean_weight()` 把猪标为低可信度。
+
+  每头猪的处理结果可以用 `attr(visits, "stations")` 查看。
+
+## 6. 添加品种信息
+
+测定站导出的数据一般不含品种，耳标号前缀也不一定能对应品种，所以需要你**手动准备一张品种表**（每头猪一行：耳标号、品种），再合并进访问表：
+
+```{r breed}
+visits_b <- prep_visits(nedap, verbose = 0)
+pigs <- unique(visits_b[identified == TRUE, responder])
+# 实际使用时从种猪档案读取，例如 breeds <- read.csv("品种表.csv")
+breeds <- data.frame(responder = pigs, breed = rep(c("YY", "LL"), length.out = length(pigs)))
+visits_b <- add_breed(visits_b, breeds)
+```
+
+- 品种表的列名不同时，用 `id = "耳标列名", breed = "品种列名"` 指定。
+- 品种表里找不到的猪会给出警告，这些猪的品种记为 NA。
+
+有了品种列以后：
+
+- 日采食校正模型会把品种作为固定效应；
+- `fiv_max_by_weight` 可以按品种设定单次采食上限；
+- 料肉比汇总表 `fcr$summary` 会按品种分组。
+
+`run_pipeline()` 也可以直接传入品种表：`run_pipeline(nedap, breeds = breeds)`。
+
+## 7. 提高数据质量的建议
+
+以下是根据示例数据和缺失模拟得到的经验：
+
+1. **进站要早于区间起点 5–10 kg**。进站后头 1–2 周的数据最差：在 nedap 示例数据中，前 3 天的体重异常率高达 50%。若从 30 kg 开始计算，宜在 20–25 kg 进站。
+2. **出栏要晚于区间终点**。区间终点为 120 kg 时，宜在 125 kg 以上出栏；若只能在 115 kg 左右出栏，就把 `stage_range` 设为 `c(30, 110)`。
+3. **进站较晚的批次，改用实际覆盖的体重段**。例如 FIRE 示例数据中的猪 45–60 kg 才进站，应使用 `stage_range = c(60, 120)`，而不是依靠外推补齐 30–60 kg。
+4. **避免连续多天缺数据**。区间中间的随机缺失影响很小，而连续一周以上的缺失会明显降低结果的排名准确性。每 1–2 天检查一次没有访问记录的猪和测定站。
+5. **定期校准设备，核对耳标**。每周校准料槽和体重秤，转栏时记录日期和站号。
+
+这些建议的依据见[《方法验证》](validation-zh.html)：区间中间的零散缺失对结果影响很小，两端缺失才会明显降低准确性，**保证测定期两端有记录，比选择任何填充方法都重要**。
