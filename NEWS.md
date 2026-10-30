@@ -10,6 +10,11 @@
   examples). The usage guide is now a shorter 《快速入门》; plots, CSV
   export and the HTML report moved to 《结果、图表与报告》.
 * Mentions of other articles are links.
+* New page **Planner** (`planner.html`, in the navbar): plans pig entries into
+  the nursery and testing stations for three schemes (all-in/all-out,
+  back-scheduled, weekly-batch rolling groups) with timelines, head counts,
+  pigs tested per year and a schedule to copy to Excel. The navbar item
+  "速查表 / Cheatsheet" is now "Cheatsheet".
 
 # tidypptsda 1.6.2
 

@@ -211,6 +211,7 @@ write_report(res, path = "结果/报告")                     # HTML 报告，�
 | 在自己的数据上比较方法和参数 | [《验证函数使用指南》](validation-guide-zh.html)、[《方法验证》](validation-zh.html) |
 | 加速、看懂运行提示 | [《运行提示、并行与速度》](run-zh.html) |
 | 这个包为什么这样设计 | [《设计思路》](design-zh.html) |
+| 安排测定站进苗：全进全出、衔接进苗、分组滚动 | [进苗规划工具](../planner.html) |
 
 在育种评估中，建议**优先使用 `fcr_flag = "ok"` 的个体**；低可信度的个体可以单独核查，或在模型中加以区分。
 
