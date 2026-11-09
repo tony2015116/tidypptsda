@@ -798,7 +798,8 @@ details.mode-grp .seg label:has(input:checked) { background: var(--accent); colo
       '<section class="card gantt-card" aria-labelledby="h-gantt"><div class="card-head"><div><h2 id="h-gantt">时间线</h2><p>' + nB + " 批" + (r.s.skipped && r.s.skipped.length ? "上测（母猪场 " + r.s.nSow + " 批，跳过 " + r.s.skipped.length + " 批）" : "") + "，" + fmt(r.s.start) + " 至 " + fmt(r.s.end - 1) + "。灰底部分在规划期之后。</p></div>" +
       '<div class="acts"><div class="legend inline" aria-label="阶段颜色"><span><i class="sw nursery"></i>保育</span><span><i class="sw test"></i>测定</span><span><i class="sw wash"></i>洗消</span><span><i class="sw rest"></i>静置</span><span><i class="sw retain"></i>未入选留养</span></div>' +
       '<div class="tabs" role="tablist" aria-label="时间线视图"><button type="button" data-view="batch" class="' + (state.view === "batch" ? "on" : "") + '" role="tab" aria-selected="' + (state.view === "batch") + '">按批次</button>' +
-      '<button type="button" data-view="station" class="' + (state.view === "station" ? "on" : "") + '" role="tab" aria-selected="' + (state.view === "station") + '">按测定站</button></div></div></div>' +
+      '<button type="button" data-view="station" class="' + (state.view === "station" ? "on" : "") + '" role="tab" aria-selected="' + (state.view === "station") + '">按测定站</button></div>' +
+      '<button type="button" id="btn-png" class="noprint" title="导出当前视图的全部批次">导出 PNG</button></div></div>' +
       '<div class="scroll" id="gantt"></div>' +
       (state.view === "batch" && nB > SHOW + 2 ? '<button type="button" class="showall noprint" id="btn-expand">' + (folded ? "展开全部 " + nB + " 批" : "只看前 " + SHOW + " 批") + "</button>" : "") +
       "</section>" +
@@ -904,7 +905,7 @@ details.mode-grp .seg label:has(input:checked) { background: var(--accent); colo
     } else {
       var r = evaluate(state.tab, p);
       main.innerHTML = schemePage(r, p);
-      var w = state.print ? 1040 : Math.max(720, el("gantt").clientWidth || 720);
+      var w = state.print ? 1040 : state.pngW || Math.max(720, el("gantt").clientWidth || 720);
       el("gantt").innerHTML = ganttSVG(r, p, w);
       el("stock").innerHTML = stockSVG(r, p, state.print ? 1040 : Math.max(720, el("stock").clientWidth || 720));
       current = r;
@@ -912,6 +913,7 @@ details.mode-grp .seg label:has(input:checked) { background: var(--accent); colo
         b.addEventListener("click", function () { state.view = b.getAttribute("data-view"); renderAll(false); });
       });
       el("btn-copy").addEventListener("click", copyTable);
+      el("btn-png").addEventListener("click", exportPng);
       if (el("btn-expand")) el("btn-expand").addEventListener("click", function () { state.expand = !state.expand; renderAll(false); });
       el("more").addEventListener("toggle", function () { if (!state.print) state.more = el("more").open; });
     }
@@ -1063,6 +1065,50 @@ details.mode-grp .seg label:has(input:checked) { background: var(--accent); colo
       root.classList.remove("pdfmode"); state.print = false; renderAll(false); busy(false);
       alertMsg(e && e.code === "unavailable" ? "这里不能保存文件。" : "PDF 没有生成成功，请稍后再试。");
     });
+  }
+  // timeline as PNG: every batch, light colours, styles inlined so the SVG stands alone, drawn at 2x
+  function exportPng() {
+    var root = document.documentElement, keep = { expand: state.expand };
+    root.classList.add("pdfmode"); state.expand = true; state.pngW = 1500; renderAll(false);
+    var svg = el("gantt").querySelector("svg"), title = el("h-gantt").parentNode.querySelector("p").textContent;
+    var clone = svg.cloneNode(true), src = svg.querySelectorAll("*"), dst = clone.querySelectorAll("*");
+    var PROPS = ["fill", "stroke", "stroke-width", "stroke-dasharray", "stroke-opacity", "opacity", "font-family", "font-size", "font-weight"];
+    for (var i = 0; i < src.length; i++) {
+      var cs = getComputedStyle(src[i]);
+      dst[i].setAttribute("style", PROPS.map(function (k) { return k + ":" + cs.getPropertyValue(k); }).join(";"));
+      dst[i].removeAttribute("class");
+    }
+    var W = +svg.getAttribute("width"), H = +svg.getAttribute("height");
+    clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    var xml = new XMLSerializer().serializeToString(clone);
+    root.classList.remove("pdfmode"); state.expand = keep.expand; state.pngW = 0; renderAll(false);
+    var img = new Image(), url = URL.createObjectURL(new Blob([xml], { type: "image/svg+xml;charset=utf-8" }));
+    img.onload = function () {
+      var k = 2, head = 64, cv = document.createElement("canvas");
+      cv.width = (W + 32) * k; cv.height = (H + head + 16) * k;
+      var g = cv.getContext("2d"); g.scale(k, k);
+      g.fillStyle = "#ffffff"; g.fillRect(0, 0, W + 32, H + head + 16);
+      g.fillStyle = "#1d2622"; g.font = "700 18px 'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif";
+      g.fillText("测定站进苗规划 · " + pageName() + " · 时间线（" + (state.view === "batch" ? "按批次" : "按测定站") + "）", 16, 28);
+      g.fillStyle = "#5d6b65"; g.font = "13px 'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif";
+      g.fillText(title, 16, 50);
+      // colour legend, right-aligned on the subtitle line
+      var LEG = [["#d4675c", "保育"], ["#d8a92b", "测定"], ["#6a78d4", "洗消"], ["#a46bd6", "静置"]].concat(state.view === "batch" ? [[null, "未入选留养"]] : []);
+      g.font = "12px 'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif";
+      var lx = W + 16 - LEG.reduce(function (a, l) { return a + 28 + g.measureText(l[1]).width + 14; }, 0);
+      LEG.forEach(function (l) {
+        if (l[0]) { g.fillStyle = l[0]; g.fillRect(lx, 41, 22, 9); }
+        else { g.strokeStyle = "#d4675c"; g.strokeRect(lx + .5, 43.5, 21, 5); g.fillStyle = "#d4675c"; for (var q = 0; q < 22; q += 4) g.fillRect(lx + q, 44, 2, 5); }
+        g.fillStyle = "#5d6b65"; g.fillText(l[1], lx + 28, 50); lx += 28 + g.measureText(l[1]).width + 14;
+      });
+      g.drawImage(img, 16, head, W, H); URL.revokeObjectURL(url);
+      cv.toBlob(function (blob) {
+        saveFile("进苗规划-" + pageName() + "-时间线-" + stamp() + ".png", blob, "image/png")
+          .catch(function () { alertMsg("这里不能保存文件。"); });
+      }, "image/png");
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); alertMsg("PNG 没有生成成功。"); };
+    img.src = url;
   }
   function alertMsg(t) { var b = document.createElement("div"); b.className = "busy"; b.textContent = t; document.body.appendChild(b); setTimeout(function () { b.remove(); }, 2500); }
   function printPdf() {
