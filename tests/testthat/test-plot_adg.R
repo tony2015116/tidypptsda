@@ -36,6 +36,24 @@ test_that("another stage range does not drop points", {
   expect_no_warning(render_ok(g$plot[[1]]))
 })
 
+test_that("date labels do not depend on the system locale", {
+  old <- Sys.getlocale("LC_TIME")
+  withr::defer(Sys.setlocale("LC_TIME", old))
+  zh <- c("zh_CN.UTF-8", "zh_CN.utf8", "Chinese (Simplified)_China.utf8", "Chinese")
+  l <- Find(function(x) nzchar(suppressWarnings(Sys.setlocale("LC_TIME", x))), zh)
+  skip_if(is.null(l), "no Chinese locale available")
+  labs_of <- function(p) {
+    b <- ggplot2::ggplot_build(p)
+    unlist(lapply(b$layout$panel_params, function(pp) pp$x$get_labels()))
+  }
+  r <- plot_inputs(nedap)
+  g <- plot_adg(r$adg, weight = r$w, locations = "101", verbose = 0)
+  f <- plot_adfi(r$adfi, locations = "101", verbose = 0)
+  x <- stats::na.omit(c(labs_of(g$plot[[1]]), labs_of(f$plot[[1]])))
+  expect_gt(length(x), 0L)
+  expect_true(all(grepl("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", x)))
+})
+
 test_that("plot_adfi renders and shows the states", {
   r <- plot_inputs()
   f <- plot_adfi(r$adfi, verbose = 0)

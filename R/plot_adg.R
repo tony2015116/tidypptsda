@@ -233,6 +233,7 @@ adg_station_plot <- function(d, rec, lab, lv, stage_rng, cols, ncol) {
         size = ifelse(brk %in% c("record", "outlier"), 1, 1.5)))
     ) +
     ggplot2::labs(title = paste("Station", loc), x = NULL, y = "Body weight (kg)") +
+    ppt_date_scale() +
     ppt_theme()
 }
 
@@ -261,6 +262,7 @@ adfi_station_plot <- function(d, lab, lv, cols, labels, ncol) {
                                  labels = labels[brk]) +
     ggplot2::labs(title = paste("Station", loc), x = NULL,
                   y = "Daily feed intake (g)") +
+    ppt_date_scale() +
     ppt_theme()
 }
 
@@ -285,6 +287,13 @@ natural_order <- function(x) {
   x <- unique(as.character(x))
   num <- suppressWarnings(as.numeric(sub("_.*$", "", x)))
   x[order(is.na(num), num, x)]
+}
+
+# Numeric date labels. The default labels use month names of the system
+# locale (e.g. Chinese month names on Windows), which the pdf() device cannot
+# draw: saving to PDF or running R CMD check then fails.
+ppt_date_scale <- function() {
+  ggplot2::scale_x_date(labels = function(x) format(x, "%Y-%m-%d"))
 }
 
 ppt_theme <- function() {
