@@ -6079,6 +6079,7 @@ adg_station_plot <- function(d, rec, lab, lv, stage_rng, cols, ncol) {
         size = ifelse(brk %in% c("record", "outlier"), 1, 1.5)))
     ) +
     ggplot2::labs(title = paste("Station", loc), x = NULL, y = "Body weight (kg)") +
+    ppt_date_scale() +
     ppt_theme()
 }
 
@@ -6107,6 +6108,7 @@ adfi_station_plot <- function(d, lab, lv, cols, labels, ncol) {
                                  labels = labels[brk]) +
     ggplot2::labs(title = paste("Station", loc), x = NULL,
                   y = "Daily feed intake (g)") +
+    ppt_date_scale() +
     ppt_theme()
 }
 
@@ -6131,6 +6133,13 @@ natural_order <- function(x) {
   x <- unique(as.character(x))
   num <- suppressWarnings(as.numeric(sub("_.*$", "", x)))
   x[order(is.na(num), num, x)]
+}
+
+# Numeric date labels. The default labels use month names of the system
+# locale (e.g. Chinese month names on Windows), which the pdf() device cannot
+# draw: saving to PDF or running R CMD check then fails.
+ppt_date_scale <- function() {
+  ggplot2::scale_x_date(labels = function(x) format(x, "%Y-%m-%d"))
 }
 
 ppt_theme <- function() {
@@ -6197,6 +6206,24 @@ test_that("another stage range does not drop points", {
   a <- calc_adg(w, verbose = 0)
   g <- plot_adg(a, weight = w, locations = "101", verbose = 0)
   expect_no_warning(render_ok(g$plot[[1]]))
+})
+
+test_that("date labels do not depend on the system locale", {
+  old <- Sys.getlocale("LC_TIME")
+  withr::defer(Sys.setlocale("LC_TIME", old))
+  zh <- c("zh_CN.UTF-8", "zh_CN.utf8", "Chinese (Simplified)_China.utf8", "Chinese")
+  l <- Find(function(x) nzchar(suppressWarnings(Sys.setlocale("LC_TIME", x))), zh)
+  skip_if(is.null(l), "no Chinese locale available")
+  labs_of <- function(p) {
+    b <- ggplot2::ggplot_build(p)
+    unlist(lapply(b$layout$panel_params, function(pp) pp$x$get_labels()))
+  }
+  r <- plot_inputs(nedap)
+  g <- plot_adg(r$adg, weight = r$w, locations = "101", verbose = 0)
+  f <- plot_adfi(r$adfi, locations = "101", verbose = 0)
+  x <- stats::na.omit(c(labs_of(g$plot[[1]]), labs_of(f$plot[[1]])))
+  expect_gt(length(x), 0L)
+  expect_true(all(grepl("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", x)))
 })
 
 test_that("plot_adfi renders and shows the states", {

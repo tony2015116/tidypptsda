@@ -1,5 +1,15 @@
 # tidypptsda (development)
 
+## Bug fixes
+
+* `plot_adg()` and `plot_adfi()` label the date axis with numbers
+  (`YYYY-MM-DD`) instead of month names of the system locale. On Chinese
+  Windows the month names (e.g. "3月") could not be drawn by the `pdf()`
+  device, so `save_plots(device = "pdf")`, the examples and R CMD check
+  failed.
+* The Chinese usage guide links to the cheatsheet and the planner with full
+  URLs, so R CMD check no longer reports invalid relative URLs.
+
 ## Documentation
 
 * The Chinese articles are grouped by topic on the website: 入门, 数据与参数,
