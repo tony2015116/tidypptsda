@@ -28,6 +28,8 @@ export(validate_weight_fill)
 export(write_report)
 export(write_results)
 import(data.table)
-importFrom(cli,cli_abort)
-importFrom(cli,cli_warn)
+importFrom(cli,
+  cli_abort,
+  cli_warn
+)
 importFrom(utils,globalVariables)
