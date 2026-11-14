@@ -4,32 +4,32 @@ Version: 1.6.2
 Authors@R: 
     person("Meng", "Guo", , "tony2015116@163.com", role = c("aut", "cre", "cph"))
 Description: Tools to clean and analyse visit records from automatic pig
-    feeding stations ('NEDAP' and 'FIRE'). Covers data import, preprocessing,
-    the 16 feeder error criteria of Casey et al. (2005)
+    feeding stations ('NEDAP' and 'FIRE'). Covers data import,
+    preprocessing, the 16 feeder error criteria of Casey et al. (2005)
     <doi:10.2527/2005.835969x>, body weight cleaning with robust
     regression, average daily gain, feed intake correction with a linear
     mixed model as in Jiao et al. (2014) <doi:10.2527/jas.2013-7338>, feed
     conversion ratio and plotting.
 License: MIT + file LICENSE
-URL: https://tony2015116.github.io/tidypptsda/,
+URL: https://mguo.dpdns.org/tidypptsda/,
     https://github.com/tony2015116/tidypptsda
 BugReports: https://github.com/tony2015116/tidypptsda/issues
 Depends: 
     R (>= 4.1.0)
 Imports: 
-    MASS,
     cli,
     data.table,
     ggplot2,
     grDevices,
+    MASS,
     parallel,
+    readxl,
     stats,
     tools,
     utils
 Suggests: 
     knitr,
     nlme,
-    readxl,
     rmarkdown,
     testthat,
     withr,
@@ -37,8 +37,8 @@ Suggests:
 VignetteBuilder: 
     knitr
 Config/fusen/version: 0.7.2
+Config/roxygen2/version: 8.1.0
 Encoding: UTF-8
 Language: en-US
 LazyData: true
 Roxygen: list(markdown = TRUE)
-Config/roxygen2/version: 8.1.0

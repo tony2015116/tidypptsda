@@ -33,10 +33,11 @@
 #' @return Invisibly, the path of `index.html`.
 #' @export
 #' @examples
+#' \donttest{
 #' res <- run_pipeline(nedap, verbose = 0)
 #' dir <- file.path(tempdir(), "report")
-#' write_report(res, dir)
-#' # then open file.path(dir, "index.html") in a web browser
+#' write_report(res, dir, locations = res$fcr$per_pig$location[1], dpi = 72, verbose = 0)
+#' }
 write_report <- function(x, path, title = NULL, locations = NULL, dpi = 150,
                          open = FALSE, verbose = 1, cores = 1) {
   local_verbose(verbose)

@@ -90,24 +90,13 @@ methods are small; they mostly reflect which good records each method
 removes.
 }
 \examples{
+\donttest{
 visits <- prep_visits(nedap, verbose = 0)
-w <- clean_weight(visits, verbose = 0)
-
-# 1. weight outlier methods: 5\% artificial errors of 3-15 kg
-vo <- validate_outliers(visits, reps = 1)
+vo <- validate_outliers(
+  visits,
+  methods = list(rlm = "rlm", sd = "sd"),
+  reps = 1, max_pigs = 6, verbose = 0
+)
 vo$summary
-
-# 2. growth curve models
-va <- validate_adg(w, models = c("poly1", "poly2", "poly3"))
-va$summary
-
-# 3. weight fill methods
-vw <- validate_weight_fill(w, methods = c("linear", "poly2"),
-                           scenarios = c("blocks3", "late20"), reps = 1)
-vw$summary
-
-# 4. feed intake imputation
-adfi <- calc_adfi(visits, calc_adg(w, verbose = 0), verbose = 0)
-vf <- validate_adfi(adfi, w, scenarios = c("random30", "late20"), reps = 2)
-vf$summary
+}
 }

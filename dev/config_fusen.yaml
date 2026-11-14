@@ -13,8 +13,8 @@ flat_tidypptsda.Rmd:
   - R/prep_visits.R
   - R/qc_config.R
   - R/read_station.R
-  - R/station_format.R
   - R/run_pipeline.R
+  - R/station_format.R
   - R/validate.R
   - R/validate_truncation.R
   - R/write_report.R
@@ -39,13 +39,13 @@ flat_tidypptsda.Rmd:
   - tests/testthat/test-write_results.R
   - tests/testthat/test-validate.R
   - tests/testthat/test-validate_truncation.R
-  vignettes: vignettes/get-started.Rmd
+  vignettes: vignettes/teaching.Rmd
   inflate:
     flat_file: dev/flat_tidypptsda.Rmd
-    vignette_name: Get started
-    open_vignette: false
+    vignette_name: teaching
+    open_vignette: true
     check: false
     document: true
-    overwrite: 'yes'
+    overwrite: ask
     clean: ask
     codecov: false

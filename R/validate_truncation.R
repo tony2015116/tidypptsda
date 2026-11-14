@@ -65,14 +65,16 @@
 #'   steps.
 #' @export
 #' @examples
+#' \donttest{
 #' visits <- prep_visits(nedap, verbose = 0)
-#' # 2 settings x 1 scenario x 1 repetition; use more repetitions on real data
 #' res <- validate_truncation(
 #'   visits,
-#'   settings = list(lm = qc_config(impute_method = "loess_lm"), pop = qc_config()),
-#'   scenarios = "late20", reps = 1
+#'   settings = list(pop = qc_config()),
+#'   scenarios = "late20", reps = 1,
+#'   pigs = unique(visits$responder)[1:8], verbose = 0
 #' )
 #' res$summary[, .(setting, trait, mae_pct, spearman, slope, top_agree)]
+#' }
 validate_truncation <- function(visits, settings = qc_config(),
                                 scenarios = c("late10", "late20", "early10", "early20", "gap10"),
                                 share = 0.5, reps = 5, top = 0.2, pigs = NULL,
