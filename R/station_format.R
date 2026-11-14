@@ -34,7 +34,7 @@
 #' ```
 #'
 #' - `column`: the column name, or its position (`6`). Several
-#'   alternatives are separated by `|` (`Tag|耳标号`); the first one found
+#'   alternatives are separated by `|` (\ifelse{latex}{\code{Tag|ErBiaoHao}}{\code{Tag|耳标号}}); the first one found
 #'   is used. Two columns separated by `,` are joined for a time field:
 #'   date and clock time (`Date,Entry`). `-` or empty means the export
 #'   does not have the field (only allowed for optional fields).
