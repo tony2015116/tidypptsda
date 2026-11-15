@@ -9,7 +9,7 @@ vignette: >
 
 ```{r, include = FALSE}
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
-  eval = identical(Sys.getenv("NOT_CRAN"), "true"),
+knitr::opts_chunk$set(eval = identical(Sys.getenv("NOT_CRAN"), "true"))
 ```
 
 tidypptsda 要解决的问题很具体：把测定站导出的一次次访问记录，变成每头猪可信、可比的日增重（ADG）、日采食量（ADFI）和料肉比（FCR）。本文说明这个包为什么这样设计：每一步背后的考虑、做过的取舍，以及刻意没有做的事。具体方法见[《计算方法说明》](methods-zh.html)，参数见[《质控参数详解》](qc-parameters-zh.html)。
