@@ -57,8 +57,9 @@ jump to its station. Printing the page (e.g. to PDF) prints every page.
 The folder works offline and can be copied or zipped as a whole.
 }
 \examples{
+\donttest{
 res <- run_pipeline(nedap, verbose = 0)
 dir <- file.path(tempdir(), "report")
-write_report(res, dir)
-# then open file.path(dir, "index.html") in a web browser
+write_report(res, dir, locations = res$fcr$per_pig$location[1], dpi = 72, verbose = 0)
+}
 }

@@ -1,7 +1,7 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# tidypptsda <a href="https://tony2015116.github.io/tidypptsda/"><img src="man/figures/logo.png" align="right" height="120" alt="tidypptsda website" /></a>
+# tidypptsda <a href="https://mguo.dpdns.org/tidypptsda/"><img src="man/figures/logo.png" align="right" height="120" alt="tidypptsda website" /></a>
 
 <!-- badges: start -->
 
@@ -9,7 +9,7 @@
 <!-- badges: end -->
 
 tidypptsda cleans and analyses visit records from automatic pig feeding
-stations (NEDAP and FIRE): body weight cleaning, average daily gain
+stations ('NEDAP' and 'FIRE'): body weight cleaning, average daily gain
 (ADG), feed intake correction (ADFI) and feed conversion ratio (FCR).
 
 - Feeder errors are flagged with the 16 criteria of Casey et al. (2005).
@@ -29,15 +29,15 @@ stations (NEDAP and FIRE): body weight cleaning, average daily gain
   with R.
 
 Cheatsheet:
-[English](https://tony2015116.github.io/tidypptsda/cheatsheet-en.html),
-[中文](https://tony2015116.github.io/tidypptsda/cheatsheet.html).
+[English](https://mguo.dpdns.org/tidypptsda/cheatsheet-en.html),
+[中文](https://mguo.dpdns.org/tidypptsda/cheatsheet.html).
 Documentation (in Chinese):
-[快速入门](https://tony2015116.github.io/tidypptsda/articles/tidypptsda-zh.html);
+[快速入门](https://mguo.dpdns.org/tidypptsda/articles/tidypptsda-zh.html);
 all articles by topic (data, methods, results, validation) are in the
-[article index](https://tony2015116.github.io/tidypptsda/articles/index.html).
+[article index](https://mguo.dpdns.org/tidypptsda/articles/index.html).
 To plan pig entries into the testing stations (all-in/all-out, back-scheduled
 or weekly-batch rolling groups), use the
-[planner](https://tony2015116.github.io/tidypptsda/planner.html).
+[planner](https://mguo.dpdns.org/tidypptsda/planner.html).
 
 ## Installation
 

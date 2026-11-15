@@ -7,6 +7,10 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
+```{r cran-setup, include = FALSE}
+knitr::opts_chunk$set(eval = identical(Sys.getenv("NOT_CRAN"), "true"))
+```
+
 ```{r setup, message = FALSE}
 library(tidypptsda)
 ```

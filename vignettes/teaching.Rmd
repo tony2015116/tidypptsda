@@ -1,14 +1,15 @@
 ---
-title: "Get started"
+title: "teaching"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Get started}
+  %\VignetteIndexEntry{teaching}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
+  eval = identical(Sys.getenv("NOT_CRAN"), "true"),
   collapse = TRUE,
   comment = "#>"
 )
@@ -86,8 +87,6 @@ write the format once as a small tab-separated file and pass it with
 `format`. `station_format("fire", file = "fire_format.txt")` writes the
 built-in format as a template to start from.
 
-
-
 ```{r example-read_station}
 # Write the example data to two CSV files, then read them back
 folder <- file.path(tempdir(), "fire_export")
@@ -112,8 +111,6 @@ unlink(folder, recursive = TRUE)
 A station format says which column of an export holds which standard
 field, and in which unit. `station_format()` shows the built-in format of
 a station type and writes it as a template file for other exports.
-
-
 
 ```{r example-station_format}
 station_format("nedap")
@@ -200,7 +197,7 @@ three layers:
      LOESS for pigs with fewer than 14 days;
    - `"sd"`: quadratic least squares, residuals beyond `sd_max` SDs;
 3. **pig checks**: number of valid records, test length, missing rate,
-   entry and exit weight, share removed by the tracking and the R<c2><b2> of the
+   entry and exit weight, share removed by the tracking and the R² of the
    LOESS smooth.
 
 Nothing is deleted silently: every record keeps a `qc_flag`, and every
@@ -259,8 +256,6 @@ Every pig gets an `adg_type`:
 - `"partial"`: a limit is not reached even after extrapolation. ADG is then
   computed over the part of the stage that is covered;
 - `"none"`: less than 7 days of the stage are covered; ADG is `NA`.
-
-
 
 ```{r example-calc_adg}
 visits <- prep_visits(nedap, verbose = 0)
@@ -394,8 +389,6 @@ Day states: `"org"` (no error, recorded value), `"corr"` (corrected),
 `"iii"` (filled between recorded days), `"elrp"` (filled before the first or
 after the last recorded day), `"missing"`.
 
-
-
 ```{r example-calc_adfi}
 visits <- prep_visits(nedap, verbose = 0)
 w <- clean_weight(visits, verbose = 0)
@@ -487,6 +480,8 @@ write_report(res, dir)
 # then open file.path(dir, "index.html") in a web browser
 ```
 
+
+
 # write_results
 
 `write_results()` writes the tables of an analysis to CSV files named
@@ -555,10 +550,6 @@ vf$summary
 
 
 
-<!--
-
-
-
 # validate_truncation
 
 `validate_truncation()` checks the whole pipeline **without information
@@ -591,9 +582,8 @@ res$summary[, .(setting, trait, mae_pct, spearman, slope, top_agree)]
 
 
 
+
+
 <!--
-
-
-
 # Inflate your package
 -->

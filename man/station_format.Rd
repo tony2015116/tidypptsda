@@ -29,16 +29,24 @@ A tab-separated text file with a header line \code{field}, \code{column}, \code{
 (the unit column may be left out). Lines starting with \verb{#} and empty
 lines are ignored. For example, for a FIRE export with Chinese headers:
 
-\if{html}{\out{<div class="sourceCode">}}\preformatted{field        column      unit
-responder    耳标号      -
-location     站号        -
-entry_time   日期,进站   -
-exit_time    日期,出站   -
-trough_in    进站料重    kg
-trough_out   出站料重    kg
-feed_intake  采食量      kg
-weight       体重        kg
-}\if{html}{\out{</div>}}
+\if{html}{\out{<pre>field       column     unit
+responder   耳标号     -
+location    站号       -
+entry_time  日期,进站  -
+exit_time   日期,出站  -
+trough_in   进站料重   kg
+trough_out  出站料重   kg
+feed_intake 采食量     kg
+weight      体重       kg</pre>}}
+\if{latex}{\preformatted{field       column                   unit
+responder   ErBiaoHao (ear tag)      -
+location    ZhanHao (station)        -
+entry_time  RiQi,JinZhan (date,in)   -
+exit_time   RiQi,ChuZhan (date,out)  -
+trough_in   JinZhanLiaoZhong         kg
+trough_out  ChuZhanLiaoZhong         kg
+feed_intake CaiShiLiang              kg
+weight      TiZhong                  kg}}
 \itemize{
 \item \code{column}: the column name, or its position (\code{6}). Several
 alternatives are separated by \code{|} (\ifelse{latex}{\code{Tag|ErBiaoHao}}{\code{Tag|耳标号}}); the first one found
