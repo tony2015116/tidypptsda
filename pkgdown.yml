@@ -5,15 +5,15 @@ articles:
   data-zh: data-zh.html
   design-zh: design-zh.html
   fill-zh: fill-zh.html
-  get-started: get-started.html
   methods-zh: methods-zh.html
   output-zh: output-zh.html
   qc-parameters-zh: qc-parameters-zh.html
   run-zh: run-zh.html
+  teaching: teaching.html
   tidypptsda-zh: tidypptsda-zh.html
   validation-guide-zh: validation-guide-zh.html
   validation-zh: validation-zh.html
-last_built: 2026-11-14T10:48Z
+last_built: 2026-11-15T23:46Z
 urls:
-  reference: https://tony2015116.github.io/tidypptsda/reference
-  article: https://tony2015116.github.io/tidypptsda/articles
+  reference: https://mguo.dpdns.org/tidypptsda/reference
+  article: https://mguo.dpdns.org/tidypptsda/articles

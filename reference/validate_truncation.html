@@ -3,7 +3,7 @@
 entry, early exit or a gap), rerun the pipeline from clean_weight() to
 calc_fcr() with each QC setting, and compare ADG, ADFI and FCR with the
 result of all data. Nothing of the hidden days is used, so the result
-measures what really happens when a pig misses these days."><meta property="og:image" content="https://tony2015116.github.io/tidypptsda/logo.png"><!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js" integrity="sha256-nvJJv9wWKEm88qvoQl9ekL2J+k/RWIsaSScxxlsrv8k=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/config/TeX-AMS-MML_HTMLorMML.js" integrity="sha256-84DKXVJXs0/F8OTMzX4UR909+jtl4G7SPypPavF+GfA=" crossorigin="anonymous"></script><!--[if lt IE 9]>
+measures what really happens when a pig misses these days."><meta property="og:image" content="https://mguo.dpdns.org/tidypptsda/logo.png"><!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js" integrity="sha256-nvJJv9wWKEm88qvoQl9ekL2J+k/RWIsaSScxxlsrv8k=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/config/TeX-AMS-MML_HTMLorMML.js" integrity="sha256-84DKXVJXs0/F8OTMzX4UR909+jtl4G7SPypPavF+GfA=" crossorigin="anonymous"></script><!--[if lt IE 9]>
 <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
 <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
 <![endif]--></head><body data-spy="scroll" data-target="#toc">
@@ -21,7 +21,7 @@ measures what really happens when a pig misses these days."><meta property="og:i
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">tidypptsda</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.6.2</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.6.4</span>
       </span>
     </div>
 
@@ -240,41 +240,21 @@ steps.</p></div>
 
     <div id="ref-examples">
     <h2>Examples</h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">visits</span> <span class="op">&lt;-</span> <span class="fu"><a href="prep_visits.html">prep_visits</a></span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="co"># 2 settings x 1 scenario x 1 repetition; use more repetitions on real data</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
+<span class="r-in"><span><span class="va">visits</span> <span class="op">&lt;-</span> <span class="fu"><a href="prep_visits.html">prep_visits</a></span><span class="op">(</span><span class="va">nedap</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu">validate_truncation</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  <span class="va">visits</span>,</span></span>
-<span class="r-in"><span>  settings <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>lm <span class="op">=</span> <span class="fu"><a href="qc_config.html">qc_config</a></span><span class="op">(</span>impute_method <span class="op">=</span> <span class="st">"loess_lm"</span><span class="op">)</span>, pop <span class="op">=</span> <span class="fu"><a href="qc_config.html">qc_config</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>  scenarios <span class="op">=</span> <span class="st">"late20"</span>, reps <span class="op">=</span> <span class="fl">1</span></span></span>
+<span class="r-in"><span>  settings <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>pop <span class="op">=</span> <span class="fu"><a href="qc_config.html">qc_config</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  scenarios <span class="op">=</span> <span class="st">"late20"</span>, reps <span class="op">=</span> <span class="fl">1</span>,</span></span>
+<span class="r-in"><span>  pigs <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">visits</span><span class="op">$</span><span class="va">responder</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">8</span><span class="op">]</span>, verbose <span class="op">=</span> <span class="fl">0</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Validating the pipeline by truncation</span> <span style="color: #00BBBB;">───────────────────────────────────────</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> ⠙ [1/2] Full-data run of each setting <span style="color: #555555;">■■■■■■■■■■■■■■■</span> 0/2 | ETA ?</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> ⠹ [1/2] Full-data run of each setting <span style="color: #00BB00;">■■■■■■■■</span><span style="color: #555555;">■■■■■■■</span> 1/2 | ETA  1s</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> ⠹ [1/2] Full-data run of each setting <span style="color: #00BB00;">■■■■■■■■■■■■■■■</span> 2/2 | ETA  0s</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> [1/2] Full-data run of each setting (2 settings) <span style="color: #555555;">2.4s</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> 21 pigs with a fully covered stage · 2 settings · 1 scenario · 1 repetition · 4 runs of the pipeline</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [2/2] Truncated runs <span style="color: #00BB00;">■■■■■■■■■■■</span><span style="color: #555555;">■■■■</span> 3/4 | ETA  1s</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [2/2] Truncated runs <span style="color: #00BB00;">■■■■■■■■■■■■■■■</span> 4/4 | ETA  0s</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> [2/2] Truncated runs (4 runs) <span style="color: #555555;">4.3s</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Done in 6.7s<span style="color: #555555;"> · details in $summary</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">FCR: rank correlation with the full-data FCR</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #555555;">       late20</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   lm   0.916 </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   pop  <span style="color: #00BB00;">0.922*</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">FCR: mean absolute error (%)</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #555555;">       late20</span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   lm    4.59 </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   pop  <span style="color: #00BB00;"> 1.83*</span></span>
 <span class="r-in"><span><span class="va">res</span><span class="op">$</span><span class="va">summary</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">setting</span>, <span class="va">trait</span>, <span class="va">mae_pct</span>, <span class="va">spearman</span>, <span class="va">slope</span>, <span class="va">top_agree</span><span class="op">)</span><span class="op">]</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    setting  trait  mae_pct  spearman     slope top_agree</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     &lt;char&gt; &lt;char&gt;    &lt;num&gt;     &lt;num&gt;     &lt;num&gt;     &lt;num&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1:      lm    adg 1.847664 0.9129870 0.9403050      0.75</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2:     pop    adg 1.847664 0.9129870 0.9403050      0.75</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3:      lm   adfi 5.924236 0.9701299 1.1338426      0.75</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4:     pop   adfi 1.794426 0.9688312 0.9211916      0.75</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5:      lm    fcr 4.590688 0.9155844 1.3116640      0.50</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6:     pop    fcr 1.833390 0.9220779 1.0095083      0.75</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1:     pop    adg 1.835766 0.8285714 0.8344798         1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2:     pop   adfi 2.402067 0.8857143 1.0666862         1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3:     pop    fcr 1.898544 0.9428571 1.2279490         1</span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>
   </div>
