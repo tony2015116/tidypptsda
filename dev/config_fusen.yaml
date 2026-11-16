@@ -1,25 +1,25 @@
 flat_tidypptsda.Rmd:
-  path: dev/flat_history/flat_tidypptsda.Rmd
-  state: deprecated
+  path: dev/flat_tidypptsda.Rmd
+  state: active
   R:
-  - R/add_breed.R
-  - R/calc_adfi.R
-  - R/calc_adg.R
-  - R/calc_fcr.R
-  - R/clean_weight.R
-  - R/flag_feed_errors.R
-  - R/plot_adg.R
+  - R/example-datasets.R
   - R/utils.R
-  - R/prep_visits.R
   - R/qc_config.R
   - R/read_station.R
-  - R/run_pipeline.R
   - R/station_format.R
+  - R/prep_visits.R
+  - R/add_breed.R
+  - R/clean_weight.R
+  - R/calc_adg.R
+  - R/flag_feed_errors.R
+  - R/calc_adfi.R
+  - R/calc_fcr.R
+  - R/plot_adg.R
+  - R/run_pipeline.R
+  - R/write_results.R
+  - R/write_report.R
   - R/validate.R
   - R/validate_truncation.R
-  - R/write_report.R
-  - R/write_results.R
-  - R/example-datasets.R
   tests:
   - tests/testthat/test-datasets.R
   - tests/testthat/test-utils.R
@@ -35,17 +35,17 @@ flat_tidypptsda.Rmd:
   - tests/testthat/test-calc_fcr.R
   - tests/testthat/test-plot_adg.R
   - tests/testthat/test-run_pipeline.R
-  - tests/testthat/test-write_report.R
   - tests/testthat/test-write_results.R
+  - tests/testthat/test-write_report.R
   - tests/testthat/test-validate.R
   - tests/testthat/test-validate_truncation.R
   vignettes: []
   inflate:
-    flat_file: dev/flat_history/flat_tidypptsda.Rmd
-    vignette_name: teaching
-    open_vignette: true
+    flat_file: dev/flat_tidypptsda.Rmd
+    vignette_name: .na
+    open_vignette: false
     check: false
-    document: true
-    overwrite: ask
+    document: false
+    overwrite: 'yes'
     clean: ask
     codecov: false
