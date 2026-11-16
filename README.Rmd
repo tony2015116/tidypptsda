@@ -13,7 +13,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-# tidypptsda <a href="https://mguo.dpdns.org/tidypptsda/"><img src="man/figures/logo.png" align="right" height="120" alt="tidypptsda website" /></a>
+# tidypptsda <a href="https://mguo.dpdns.org/tidypptsda/"><img src="man/figures/logo.png" align="right" width="120" height="139" style="width: 120px; max-width: 100%; height: auto;" alt="tidypptsda logo" /></a>
 
 <!-- badges: start -->
 [![R-CMD-check](https://github.com/tony2015116/tidypptsda/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/tony2015116/tidypptsda/actions/workflows/R-CMD-check.yaml)
