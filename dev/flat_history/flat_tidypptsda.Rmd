@@ -5,6 +5,11 @@ editor_options:
   chunk_output_type: console
 ---
 
+<!-- DEPRECATED since tidypptsda 1.6.5: this flat file is out of date and is no longer
+the source of the package. Edit the files in R/, tests/ and vignettes/ directly.
+Do not run fusen::inflate() on it: it would overwrite later changes. -->
+
+
 <!--
 Run this 'development' chunk
 

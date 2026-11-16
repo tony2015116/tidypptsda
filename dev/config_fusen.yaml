@@ -1,6 +1,6 @@
 flat_tidypptsda.Rmd:
-  path: dev/flat_tidypptsda.Rmd
-  state: active
+  path: dev/flat_history/flat_tidypptsda.Rmd
+  state: deprecated
   R:
   - R/add_breed.R
   - R/calc_adfi.R
@@ -39,9 +39,9 @@ flat_tidypptsda.Rmd:
   - tests/testthat/test-write_results.R
   - tests/testthat/test-validate.R
   - tests/testthat/test-validate_truncation.R
-  vignettes: vignettes/teaching.Rmd
+  vignettes: []
   inflate:
-    flat_file: dev/flat_tidypptsda.Rmd
+    flat_file: dev/flat_history/flat_tidypptsda.Rmd
     vignette_name: teaching
     open_vignette: true
     check: false
