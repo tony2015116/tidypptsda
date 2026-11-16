@@ -1,7 +1,7 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# tidypptsda <a href="https://mguo.dpdns.org/tidypptsda/"><img src="man/figures/logo.png" align="right" width="120" height="139" style="width: 120px; max-width: 100%; height: auto;" alt="tidypptsda logo" /></a>
+# tidypptsda <a href="https://mguo.dpdns.org/tidypptsda/"><img src="man/figures/logo.png" align="right" height="120" alt="tidypptsda website" /></a>
 
 <!-- badges: start -->
 
