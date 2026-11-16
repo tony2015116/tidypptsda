@@ -55,6 +55,8 @@ test_that("read_station and prep_visits give the same visits as the raw data", {
 })
 
 test_that("a format file maps other column names, positions and units", {
+  # Chinese column names in the file and the format must match byte by byte
+  skip_if_not(isTRUE(l10n_info()[["UTF-8"]]), "needs a UTF-8 locale")
   folder <- withr::local_tempdir()
   d <- data.table::as.data.table(fire)
   d[, `:=`(Consumed = Consumed * 1000, when = paste(Date, Entry))]

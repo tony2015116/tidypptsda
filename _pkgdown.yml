@@ -16,7 +16,7 @@ navbar:
   components:
     getstarted:
       text: Get started
-      href: articles/get-started.html
+      href: articles/tidypptsda-zh.html
     planner:
       text: Planner
       href: planner.html
@@ -120,9 +120,6 @@ articles:
   desc: 运行提示怎么看、并行计算和耗时。
   contents:
   - run-zh
-- title: internal
-  contents:
-  - teaching #get-started
 
 news:
   one_page: true
